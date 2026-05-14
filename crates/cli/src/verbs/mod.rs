@@ -1,6 +1,7 @@
 pub mod root;
 pub mod setup;
 pub mod up;
+pub mod selfup;
 pub mod doctor;
 pub mod here;
 pub mod ai;

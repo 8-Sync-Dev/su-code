@@ -122,10 +122,12 @@ pub fn run(a: Args) -> Result<()> {
     pkg::run_loud("sudo", &["usermod", "-aG", "docker", &whoami()])?;
 
     ui::header("Done — next steps");
-    println!("  1. Reboot or re-login (for docker group)");
-    println!("  2. {}", "forge login".bold_str());
-    println!("  3. {}", "8sync doctor".bold_str());
-    println!("  4. cd into a project and run {}", "8sync .".bold_str());
+    println!("  1. {} {} (remote control needs full restart, not reload)",
+             "Close & reopen Kitty once".bold_str(), "—".bright_black_str());
+    println!("  2. Reboot or re-login (for docker group)");
+    println!("  3. {}", "forge login".bold_str());
+    println!("  4. {}", "8sync doctor".bold_str());
+    println!("  5. cd into a project and run {}", "8sync .".bold_str());
     Ok(())
 }
 
@@ -241,10 +243,15 @@ fn enable_services(env: &env_detect::Env, warp: bool) -> Result<()> {
 
 trait BoldStr {
     fn bold_str(&self) -> String;
+    fn bright_black_str(&self) -> String;
 }
 impl BoldStr for &str {
     fn bold_str(&self) -> String {
         use owo_colors::OwoColorize;
         self.bold().to_string()
+    }
+    fn bright_black_str(&self) -> String {
+        use owo_colors::OwoColorize;
+        self.bright_black().to_string()
     }
 }

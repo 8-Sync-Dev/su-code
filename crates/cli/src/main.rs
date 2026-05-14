@@ -42,7 +42,8 @@ enum Cmd {
     /// Install everything (idempotent): system pkgs, kitty/helix/fish configs, WARP, UFW, docker, forge, skills, MCP daemon
     Setup(verbs::setup::Args),
 
-    /// Update managed tools (only if newer version available)
+    /// Update managed tools (only if newer version available). Self-updates 8sync binary from GitHub first.
+    #[command(alias = "update")]
     Up,
 
     /// Health-check; report what's installed and what's missing
@@ -102,6 +103,14 @@ enum Cmd {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    // Rate-limited auto-check for new upstream commit (6h). Skips on
+    // commands that already touch the binary or are short non-interactive.
+    if !matches!(
+        cli.cmd,
+        Some(Cmd::Up) | Some(Cmd::Setup(_)) | Some(Cmd::Help) | Some(Cmd::Mcp)
+    ) {
+        verbs::selfup::auto_check_notice();
+    }
     match cli.cmd {
         None => {
             // `8sync` no args → print cheatsheet
