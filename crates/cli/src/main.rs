@@ -96,7 +96,7 @@ enum Cmd {
     /// Search code (rg + fzf) or filenames (fd); pick → open in helix
     Find(verbs::find::Args),
 
-    /// Append a one-line note to .gsd/NOTES.md (AI sẽ đọc lại session sau)
+    /// Append a one-line note to agents/NOTES.md (AI sẽ đọc lại session sau)
     Note(verbs::note::Args),
 }
 

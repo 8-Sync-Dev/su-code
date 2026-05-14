@@ -11,10 +11,10 @@ pub fn print_cheatsheet() {
         (".",      "open/attach project session (kitty + forge in abduco)"),
         ("ai",     "ai prompt / resume session"),
         ("find",   "rg + fzf preview, pick → open in helix"),
-        ("note",   "append idea to .gsd/NOTES.md"),
+        ("note",   "append idea to agents/NOTES.md"),
         ("run",    "dev | build | test | fmt | lint"),
         ("ship",   "git add + commit + push + PR"),
-        ("end",    "AI capture knowledge → .gsd/*.md"),
+        ("end",    "AI capture knowledge → agents/*.md"),
     ]);
 
     println!("\n{}", "Session mgmt (subcommands of `.`):".bold().yellow());

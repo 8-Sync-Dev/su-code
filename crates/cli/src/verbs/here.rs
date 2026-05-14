@@ -294,13 +294,13 @@ Sau đó đọc memory project (mục dưới).
 
 | File | Mục đích |
 |---|---|
-| `.gsd/PROJECT.md`     | facts cố định (stack, entrypoint, conventions) |
-| `.gsd/KNOWLEDGE.md`   | append-only: AI học được gì về codebase |
-| `.gsd/DECISIONS.md`   | append-only: quyết định kiến trúc |
-| `.gsd/PREFERENCES.md` | append-only: user style preferences |
-| `.gsd/STATE.md`       | việc đang dở, next-step concrete |
+| `agents/PROJECT.md`     | facts cố định (stack, entrypoint, conventions) |
+| `agents/KNOWLEDGE.md`   | append-only: AI học được gì về codebase |
+| `agents/DECISIONS.md`   | append-only: quyết định kiến trúc |
+| `agents/PREFERENCES.md` | append-only: user style preferences |
+| `agents/STATE.md`       | việc đang dở, next-step concrete |
 
-**KHÔNG modify `.gsd/*.md` trực tiếp.** Chỉ append qua `8sync end` capture format
+**KHÔNG modify `agents/*.md` trực tiếp.** Chỉ append qua `8sync end` capture format
 (xem `~/.forge/skills/8sync-cli/SKILL.md` mục 4).
 
 ## Conventions
@@ -310,22 +310,22 @@ Sau đó đọc memory project (mục dưới).
 - Screenshot UI / PDF / diff: ưu tiên `8sync shot|pdf-img|diff-img` thay vì
   dump text (tiết kiệm token 3-10×).
 - Tìm symbol/file: `8sync find <kw>` (không gọi `rg`/`fd` thô).
-- Ghi nhớ ý tưởng nhanh: `8sync note "..."` (append vào `.gsd/NOTES.md`).
+- Ghi nhớ ý tưởng nhanh: `8sync note "..."` (append vào `agents/NOTES.md`).
 
 ## Session boundary
 
 - `8sync .` = session bắt đầu → AI đọc tất cả file trên.
 - `8sync end` = session kết thúc → AI output 4 block `<DECISIONS>`,
-  `<KNOWLEDGE>`, `<PREFERENCES>`, `<STATE>` để 8sync append vào `.gsd/*.md`.
+  `<KNOWLEDGE>`, `<PREFERENCES>`, `<STATE>` để 8sync append vào `agents/*.md`.
 "#
         );
         std::fs::write(&agents, content)?;
         ui::ok(&format!("seeded {}", agents.display()));
     }
 
-    let gsd_dir = root.join(".gsd");
-    std::fs::create_dir_all(&gsd_dir)?;
-    let project_md = gsd_dir.join("PROJECT.md");
+    let agents_dir = root.join("agents");
+    std::fs::create_dir_all(&agents_dir)?;
+    let project_md = agents_dir.join("PROJECT.md");
     if !project_md.exists() {
         std::fs::write(
             &project_md,
@@ -338,7 +338,7 @@ Sau đó đọc memory project (mục dưới).
         ui::ok(&format!("seeded {}", project_md.display()));
     }
     for f in ["KNOWLEDGE.md", "DECISIONS.md", "PREFERENCES.md", "STATE.md", "NOTES.md"] {
-        let p = gsd_dir.join(f);
+        let p = agents_dir.join(f);
         if !p.exists() {
             std::fs::write(
                 &p,

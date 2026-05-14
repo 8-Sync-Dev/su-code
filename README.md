@@ -34,7 +34,7 @@ Then bootstrap your machine (idempotent — skips what's installed):
 | `run`      | `dev / build / test / fmt / lint` per recipe                   |
 | `bg`       | Wallpaper — `<keywords | path | url | 0..1 | + | - | off>`     |
 | `look`     | Style preset — `neon / ice / mint / dark / dim`                |
-| `end`      | Capture session knowledge to `.gsd/`, close panes              |
+| `end`      | Capture session knowledge to `agents/`, close panes              |
 
 ## Skill + context verbs
 
@@ -57,7 +57,7 @@ Every verb has `-h` with examples.
 5. **UFW** + **Docker** enabled on boot.
 6. **Configs** written: kitty.conf (opacity + bg image), helix config + `glass_black` theme, fish aliases, fcitx5 IME.
 7. **Wallpaper**: downloads a default 4K image to `~/.local/share/8sync/wallpapers/`.
-8. **Skills** copied to `~/.forge/skills/`: `karpathy-guidelines`, `image-routing`, `8sync-conventions`.
+8. **Skills** copied to `~/.forge/skills/`: `karpathy-guidelines`, `image-routing`, `8sync-cli`.
 9. **systemd-user** service for `8sync mcp` (auto-start on login).
 10. **Docker group** for current user.
 
@@ -69,11 +69,11 @@ Re-run is safe — only newer versions get installed, configs are backed up befo
 `8sync .` inside a project:
 
 1. Detects project root (`.git` / `Cargo.toml` / `package.json` / …).
-2. Auto-seeds `AGENTS.md` + `.gsd/PROJECT.md` if missing.
+2. Auto-seeds `AGENTS.md` + `agents/PROJECT.md` if missing.
 3. Splits kitty into 3 panes: `hx .` | `forge` | `fish`.
-4. Forge auto-loads `.gsd/*.md` via AGENTS.md anchor → has full prior context.
+4. Forge auto-loads `agents/*.md` via AGENTS.md anchor → has full prior context.
 
-`8sync end` captures structured knowledge back into `.gsd/*.md` for next time.
+`8sync end` captures structured knowledge back into `agents/*.md` for next time.
 
 ## License
 

@@ -12,9 +12,9 @@ use crate::ui;
           8sync note \"chuyển sang zustand vì state đơn giản\"
           8sync note --tag arch \"cache layer sẽ dùng valkey\"
           8sync note --tag bug \"login fail khi password có dấu ngoặc kép\"
-          8sync note                            mở .gsd/NOTES.md trong editor
+          8sync note                            mở agents/NOTES.md trong editor
 
-        Notes append-only vào <repo>/.gsd/NOTES.md với timestamp + tag.
+        Notes append-only vào <repo>/agents/NOTES.md với timestamp + tag.
         AI đọc NOTES.md tại session sau qua AGENTS.md.
     "}
 )]
@@ -30,9 +30,9 @@ pub struct Args {
 pub fn run(a: Args) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let root = find_root(&cwd).unwrap_or(cwd);
-    let gsd = root.join(".gsd");
-    std::fs::create_dir_all(&gsd)?;
-    let notes = gsd.join("NOTES.md");
+    let agents_dir = root.join("agents");
+    std::fs::create_dir_all(&agents_dir)?;
+    let notes = agents_dir.join("NOTES.md");
     if !notes.exists() {
         std::fs::write(&notes, "# NOTES (8sync managed — append-only)\n\n")?;
     }

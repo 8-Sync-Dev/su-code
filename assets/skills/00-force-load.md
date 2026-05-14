@@ -11,7 +11,7 @@ Trước khi bắt đầu **bất kỳ** task không tầm thường, bạn (AI)
 Sau đó (nếu trong 1 project):
 
 4. **`<repo>/AGENTS.md`** — guidance riêng project.
-5. **`<repo>/.gsd/PROJECT.md`** + **`KNOWLEDGE.md`** + **`DECISIONS.md`** + **`PREFERENCES.md`** + **`STATE.md`** — memory tích lũy.
+5. **`<repo>/agents/PROJECT.md`** + **`KNOWLEDGE.md`** + **`DECISIONS.md`** + **`PREFERENCES.md`** + **`STATE.md`** — memory tích lũy.
 
 ## Bảng tra cứu nhanh
 
@@ -19,7 +19,7 @@ Sau đó (nếu trong 1 project):
 |---|---|
 | Mọi task coding | karpathy → **8sync-cli** → image-routing |
 | Review UI / PDF / diff | karpathy → **image-routing** trước khi fetch |
-| Trong project 8sync | tất cả + `.gsd/*.md` |
+| Trong project 8sync | tất cả + `agents/*.md` |
 | Câu hỏi đơn giản (1 câu) | karpathy (vẫn bắt buộc) |
 
 ## Quy tắc bất biến

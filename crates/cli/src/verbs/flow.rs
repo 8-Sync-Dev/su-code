@@ -17,20 +17,20 @@ pub fn run() -> Result<()> {
     section("VIBE LOOP — mở project mới → ship code", &[
         ("cd ~/code/my-app", ""),
         ("8sync .", "attach/tạo session: kitty 3-pane + forge detached qua abduco"),
-        ("8sync ai \"explain codebase\"", "AI đọc AGENTS.md + .gsd/* tự nhớ"),
+        ("8sync ai \"explain codebase\"", "AI đọc AGENTS.md + agents/* tự nhớ"),
         ("8sync ai \"add login form\"", "vibe code"),
         ("8sync run dev", "start dev server (chạy nền, sống qua đóng terminal)"),
         ("8sync shot /login", "screenshot UI → forge review bằng image (rẻ token)"),
         ("8sync ai \"fix z-index header\"", ""),
         ("8sync find auth", "tìm symbol/file nhanh qua rg + fzf preview"),
-        ("8sync note \"đổi sang zustand\"", "append nhanh vào .gsd/NOTES.md không mất flow"),
+        ("8sync note \"đổi sang zustand\"", "append nhanh vào agents/NOTES.md không mất flow"),
         ("8sync ship \"feat: login\"", "git add + commit + push + gh pr create"),
-        ("8sync end", "AI tự đúc kết → .gsd/{DECISIONS,KNOWLEDGE,...}.md"),
+        ("8sync end", "AI tự đúc kết → agents/{DECISIONS,KNOWLEDGE,...}.md"),
     ]);
 
     section("RESUME hôm sau (hoặc reboot)", &[
         ("cd ~/code/my-app", ""),
-        ("8sync .", "forge nhớ toàn bộ session trước (qua .gsd + AGENTS.md)"),
+        ("8sync .", "forge nhớ toàn bộ session trước (qua agents + AGENTS.md)"),
     ]);
 
     section("ĐA SESSION SONG SONG", &[
