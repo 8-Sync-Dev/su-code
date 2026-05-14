@@ -138,7 +138,12 @@ struct State {
     tint: Option<f32>,
     last_source: Option<String>,
     last_path: Option<String>,
+    original_path: Option<String>,
     rotate_every_min: Option<u32>,
+}
+
+fn which(name: &str) -> Option<PathBuf> {
+    ::which::which(name).ok()
 }
 
 fn state_path() -> PathBuf {
@@ -216,12 +221,91 @@ fn handle_tint(v: Option<&str>) -> Result<()> {
     let parsed: f32 = v.parse().context("overlay must be 0..1")?;
     let clamped = parsed.clamp(0.0, 1.0);
     ensure_kitty_conf()?;
+
+    // FLASH-WEZTERM SECRET: WezTerm has `hsb.brightness` on image source —
+    // kitty doesn't. So we PRE-DARKEN the image file itself with ImageMagick,
+    // then point kitty to the darkened copy. This is the ONLY way to get
+    // equivalent of wezterm hsb on kitty.
+    //
+    // Brightness of darkened image = (1 - overlay) * 100  (modulate %).
+    // overlay 0.6 → image brightness 40% → much easier to read code on top.
+    let st_orig = load_state();
+    if let Some(orig) = st_orig.last_path.as_ref() {
+        let orig_path = std::path::Path::new(orig);
+        // Find the TRUE original (un-darkened) — if last_path is already a darkened
+        // version in cache, use the stored orig instead.
+        let true_orig = st_orig.original_path.as_ref()
+            .map(std::path::Path::new)
+            .filter(|p| p.exists())
+            .unwrap_or(orig_path);
+        if true_orig.exists() && which("magick").is_some() {
+            let bright_pct = ((1.0 - clamped) * 100.0).clamp(5.0, 100.0) as u32;
+            let cache = dirs::cache_dir().unwrap_or_default().join("8sync/bg/dim");
+            std::fs::create_dir_all(&cache)?;
+            let stem = true_orig.file_stem()
+                .and_then(|s| s.to_str()).unwrap_or("img");
+            let dimmed = cache.join(format!("{}-b{}.jpg", stem, bright_pct));
+            if !dimmed.exists() {
+                ui::info(&format!("pre-darkening image to {}% brightness ...", bright_pct));
+                let status = Command::new("magick")
+                    .arg(true_orig)
+                    .args(["-modulate", &format!("{},90,100", bright_pct)])
+                    .args(["-quality", "85"])
+                    .arg(&dimmed)
+                    .status();
+                if !matches!(status, Ok(s) if s.success()) {
+                    ui::warn("ImageMagick failed — falling back to kitty background_tint");
+                } else {
+                    // Point kitty to the darkened image, NOT the original.
+                    kitty_conf_set("background_image", dimmed.to_str().unwrap())?;
+                    // Reset native tint to 0 — darkening already baked in.
+                    kitty_conf_set("background_tint", "0.0")?;
+                    kitty_conf_set("background_tint_gaps", "0.0")?;
+                    let _ = Command::new("kitty")
+                        .args(["@", "set-background-image", dimmed.to_str().unwrap()])
+                        .stdin(std::process::Stdio::null())
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .status();
+                    kitty_reload();
+                    ui::ok(&format!("overlay = {:.2} (image pre-darkened to {}% — code is now {} to read)",
+                        clamped, bright_pct,
+                        if clamped > 0.5 { "much easier" } else { "easier" }));
+                    let mut st = load_state();
+                    st.tint = Some(clamped);
+                    st.last_path = Some(dimmed.to_string_lossy().to_string());
+                    st.original_path = Some(true_orig.to_string_lossy().to_string());
+                    save_state(&st)?;
+                    return Ok(());
+                }
+            } else {
+                // Cache hit — instant swap
+                kitty_conf_set("background_image", dimmed.to_str().unwrap())?;
+                kitty_conf_set("background_tint", "0.0")?;
+                kitty_conf_set("background_tint_gaps", "0.0")?;
+                let _ = Command::new("kitty")
+                    .args(["@", "set-background-image", dimmed.to_str().unwrap()])
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status();
+                kitty_reload();
+                ui::ok(&format!("overlay = {:.2} (cached, instant swap)", clamped));
+                let mut st = load_state();
+                st.tint = Some(clamped);
+                st.last_path = Some(dimmed.to_string_lossy().to_string());
+                st.original_path = Some(true_orig.to_string_lossy().to_string());
+                save_state(&st)?;
+                return Ok(());
+            }
+        }
+    }
+
+    // Fallback: no image or ImageMagick missing → use kitty native tint
     kitty_conf_set("background_tint", &format!("{:.2}", clamped))?;
     kitty_conf_set("background_tint_gaps", &format!("{:.2}", clamped))?;
     kitty_reload();
-    ui::ok(&format!("overlay = {:.2}  (image dimmed by {:.0}% — code now {} to read)",
-        clamped, clamped * 100.0,
-        if clamped > 0.5 { "easier" } else { "less obstructed" }));
+    ui::ok(&format!("overlay = {:.2} (via kitty tint — install imagemagick for true pre-darken)", clamped));
     let mut st = load_state();
     st.tint = Some(clamped);
     save_state(&st)?;
@@ -354,12 +438,8 @@ fn set_bg_file(path: &Path) -> Result<()> {
     let abs = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     ensure_kitty_conf()?;
     kitty_conf_set("background_image", abs.to_str().unwrap())?;
-    // Always cover-scale to the window size so the image is never tiled or cropped weirdly.
     kitty_conf_set("background_image_layout", "scaled")?;
     kitty_conf_set("background_image_linear", "yes")?;
-    // Force tint=0 so that `background_opacity` truly alpha-blends the image
-    // with the desktop (compositor compositing). Without this, tint paints a
-    // solid color *over* the image → opacity has no perceptible effect.
     kitty_conf_set("background_tint", "0.0")?;
     kitty_conf_set("background_tint_gaps", "0.0")?;
     let live = Command::new("kitty")
@@ -375,7 +455,13 @@ fn set_bg_file(path: &Path) -> Result<()> {
         if live { "(live)" } else { "(SIGUSR1 reload)" }));
     let mut st = load_state();
     st.last_path = Some(abs.to_string_lossy().to_string());
+    st.original_path = Some(abs.to_string_lossy().to_string());
     save_state(&st)?;
+    // Auto-reapply overlay if user previously set one
+    let prev_tint = st.tint.unwrap_or(0.0);
+    if prev_tint > 0.05 {
+        let _ = handle_tint(Some(&format!("{:.2}", prev_tint)));
+    }
     Ok(())
 }
 
