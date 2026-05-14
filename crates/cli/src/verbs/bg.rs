@@ -45,6 +45,7 @@ use crate::ui;
       8sync bg blend                 keep image + low opacity (image AND desktop visible)
       8sync bg blend 0.4             blend with custom opacity
       8sync bg blend /img.jpg 0.5    blend a specific image
+      8sync bg apply-now             spawn a new kitty window to see changes (opacity needs new window)
       8sync bg pick                  fzf from cache+library
       8sync bg rotate on 10          rotate every 10 min (systemd-user timer)
       8sync bg rotate off
@@ -83,6 +84,9 @@ pub fn run(a: Args) -> Result<()> {
     if trimmed == "+" { return nudge_opacity(0.05); }
     if trimmed == "-" { return nudge_opacity(-0.05); }
     if trimmed == "off" { return clear_bg(); }
+    if trimmed == "apply-now" || trimmed == "apply" {
+        return apply_now();
+    }
     if trimmed == "through" || trimmed == "see" || trimmed == "glass" {
         return see_through(0.55);
     }
@@ -157,6 +161,7 @@ fn set_opacity(v: f32) -> Result<()> {
     ensure_kitty_conf()?;
     kitty_conf_set("background_opacity", &format!("{:.2}", clamped))?;
     kitty_conf_set("dynamic_background_opacity", "yes")?;
+    kitty_conf_set("background_blur", "32")?;
     // Try live runtime change via remote control first (no flash)
     let live = Command::new("kitty")
         .args(["@", "set-background-opacity", &format!("{:.2}", clamped)])
@@ -172,10 +177,23 @@ fn set_opacity(v: f32) -> Result<()> {
     }
     ui::ok(&format!("kitty opacity = {:.2} {}", clamped,
         if live { "(live)" } else { "(SIGUSR1 reload)" }));
+    if !live {
+        warn_opacity_needs_restart();
+    }
     let mut st = load_state();
     st.opacity = Some(clamped);
     save_state(&st)?;
     Ok(())
+}
+
+/// Kitty trade-off: `background_image` swaps live via SIGUSR1, but
+/// `background_opacity` is baked in at window creation. Reloading
+/// conf does NOT change opacity for already-open windows — only new
+/// ones pick it up. Let the user know exactly what to do.
+fn warn_opacity_needs_restart() {
+    eprintln!(
+        "\x1b[33m! Opacity is baked in at window creation. Current kitty windows will\n  stay opaque until you close & reopen kitty. Quick test:\n    \x1b[1msetsid -f kitty\x1b[0m\x1b[33m       (opens a new window with the new opacity)\n  Or run `8sync bg apply-now` to spawn a test window automatically.\x1b[0m"
+    );
 }
 
 fn nudge_opacity(d: f32) -> Result<()> {
@@ -214,15 +232,24 @@ fn ensure_kitty_conf() -> Result<()> {
 # Run `8sync setup` for the full managed config.
 font_family       JetBrainsMono Nerd Font
 font_size         12.0
+
+# Background — see-through model for KDE Plasma Wayland
+background         #0b1220
 background_opacity 0.85
 dynamic_background_opacity yes
+background_blur    32
 background_tint    0.0
 background_tint_gaps 0.0
 background_image_layout cscaled
 background_image_linear yes
+
+# Remote control (kitty @ ...)
 allow_remote_control yes
 listen_on          unix:@kitty
 clipboard_control  write-clipboard write-primary read-clipboard read-primary
+
+# Wayland: explicit so KDE/Plasma6 + Hyprland behave the same
+linux_display_server wayland
 "#;
     std::fs::write(&p, stub)?;
     ui::ok(&format!("created {}", p.display()));
@@ -336,11 +363,26 @@ fn see_through(opacity: f32) -> Result<()> {
         .status();
     kitty_reload();
     ui::ok(&format!("see-through mode: image=none, tint=0, opacity={:.2}", clamped));
+    warn_opacity_needs_restart();
     let mut st = load_state();
     st.last_path = None;
     st.tint = Some(0.0);
     st.opacity = Some(clamped);
     save_state(&st)?;
+    Ok(())
+}
+
+/// Spawn a fresh kitty window so the user can immediately see whether the
+/// current opacity/image config produces translucency on their compositor.
+fn apply_now() -> Result<()> {
+    ensure_kitty_conf()?;
+    let _ = Command::new("setsid")
+        .args(["-f", "kitty"])
+        .spawn();
+    ui::ok("spawned a new kitty window — that's where opacity changes take effect");
+    eprintln!(
+        "\x1b[36m  tip: close your old kitty windows once the new one looks right,\n       then every subsequent `8sync bg ...` will apply live.\x1b[0m"
+    );
     Ok(())
 }
 
@@ -388,6 +430,7 @@ fn blend_mode(arg1: Option<&str>, arg2: Option<&str>) -> Result<()> {
         abs.display(),
         clamped
     ));
+    warn_opacity_needs_restart();
     let mut st = load_state();
     st.last_path = Some(abs.to_string_lossy().to_string());
     st.tint = Some(0.0);
