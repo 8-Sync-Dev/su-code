@@ -39,7 +39,8 @@ use crate::ui;
       8sync bg 0.7                   opacity
       8sync bg +                     opacity +0.05
       8sync bg -                     opacity -0.05
-      8sync bg tint 0.4              kitty background_tint
+      8sync bg overlay 0.6           dark overlay 0..1 (higher = darker, easier to read code)
+      8sync bg tint 0.4              same as overlay (kitty native key name)
       8sync bg off                   clear image (desktop shows through)
       8sync bg through               see-through mode (image=none, tint=0, opacity=0.55)
       8sync bg blend                 keep image + low opacity (image AND desktop visible)
@@ -101,8 +102,8 @@ pub fn run(a: Args) -> Result<()> {
     }
     if trimmed == "pick" { return pick_local(); }
 
-    // tint
-    if rest.first().copied() == Some("tint") {
+    // tint / overlay (semantic alias: overlay = how dark a layer goes ON TOP of image)
+    if matches!(rest.first().copied(), Some("tint") | Some("overlay") | Some("dim")) {
         return handle_tint(rest.get(1).copied());
     }
     // rotate
@@ -206,13 +207,16 @@ fn nudge_opacity(d: f32) -> Result<()> {
 }
 
 fn handle_tint(v: Option<&str>) -> Result<()> {
-    let v = v.ok_or_else(|| anyhow::anyhow!("usage: 8sync bg tint <0..1>"))?;
-    let parsed: f32 = v.parse().context("tint must be 0..1")?;
+    let v = v.ok_or_else(|| anyhow::anyhow!("usage: 8sync bg overlay <0..1>  (0 = image full visible, 1 = fully dark)"))?;
+    let parsed: f32 = v.parse().context("overlay must be 0..1")?;
     let clamped = parsed.clamp(0.0, 1.0);
     ensure_kitty_conf()?;
     kitty_conf_set("background_tint", &format!("{:.2}", clamped))?;
+    kitty_conf_set("background_tint_gaps", &format!("{:.2}", clamped))?;
     kitty_reload();
-    ui::ok(&format!("kitty background_tint = {:.2} (SIGUSR1 reload)", clamped));
+    ui::ok(&format!("overlay = {:.2}  (image dimmed by {:.0}% — code now {} to read)",
+        clamped, clamped * 100.0,
+        if clamped > 0.5 { "easier" } else { "less obstructed" }));
     let mut st = load_state();
     st.tint = Some(clamped);
     save_state(&st)?;
