@@ -1,0 +1,10 @@
+# wallpapers.toml — default + extra URLs the setup wizard can pick from
+# These are public Unsplash photos (free to use under Unsplash License).
+
+default = "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?w=3840&q=90&fm=jpg"
+
+[extras]
+neon-city    = "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=3840&q=90&fm=jpg"
+ice-mountain = "https://images.unsplash.com/photo-1465056836041-7f43ac27dcb5?w=3840&q=90&fm=jpg"
+mint-forest  = "https://images.unsplash.com/photo-1448375240586-882707db888b?w=3840&q=90&fm=jpg"
+dark-space   = "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?w=3840&q=90&fm=jpg"

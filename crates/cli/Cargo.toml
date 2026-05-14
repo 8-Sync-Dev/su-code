@@ -1,0 +1,24 @@
+[package]
+name = "su-code"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "8sync — vibe coding harness for CachyOS + Kitty + Helix"
+
+[[bin]]
+name = "8sync"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "wrap_help"] }
+anyhow = "1.0"
+owo-colors = "4.1"
+dirs = "5.0"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+semver = "1.0"
+which = "7.0"
+indoc = "2.0"
+rust-embed = { version = "8.5", features = ["debug-embed"] }

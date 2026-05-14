@@ -1,0 +1,13 @@
+# ~/.config/8sync/global.toml — global preferences
+[ai]
+default_engine = "forge"
+budget_daily_usd = 5.0
+
+[ui]
+theme = "glass_black"
+opacity = 0.85
+tint = 0.85
+
+[behavior]
+auto_capture_on_end = true
+auto_commit_gsd = false

@@ -1,0 +1,7 @@
+# glass_black — transparent so kitty bg shines through
+inherits = "catppuccin_mocha"
+
+"ui.background"          = { }
+"ui.background.separator"= { fg = "#38e7ff" }
+"ui.cursorline.primary"  = { bg = "#0d0d0d" }
+"ui.virtual.indent-guide"= { fg = "#1f2937" }

@@ -1,0 +1,16 @@
+pub mod root;
+pub mod setup;
+pub mod up;
+pub mod doctor;
+pub mod here;
+pub mod ai;
+pub mod ship;
+pub mod run;
+pub mod bg;
+pub mod look;
+pub mod end;
+pub mod skill;
+pub mod shot;
+pub mod diff_img;
+pub mod pdf_img;
+pub mod mcp;

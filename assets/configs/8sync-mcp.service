@@ -1,0 +1,12 @@
+[Unit]
+Description=8sync MCP server (project context for forge/cursor/opencode)
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/8sync mcp
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
