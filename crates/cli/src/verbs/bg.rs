@@ -235,7 +235,13 @@ font_size         12.0
 
 # Background — see-through model for KDE Plasma Wayland
 background         #0b1220
-background_opacity 0.85
+# CRITICAL for translucency on KDE Plasma Wayland:
+# - dynamic_background_opacity MUST be set in initial config (can't be added via reload)
+# - background_opacity < 1 makes bg color transparent (but NOT background_image)
+# - background_tint > 0 mixes image with bg color → image becomes semi-transparent
+#   Formula per kitty docs: pixel = image*(1-tint) + bg_color*tint
+#   Since bg_color has alpha=opacity, effective image transparency = tint*(1-opacity)
+background_opacity 0.75
 dynamic_background_opacity yes
 background_blur    32
 background_tint    0.0
@@ -346,8 +352,8 @@ fn clear_bg() -> Result<()> {
     Ok(())
 }
 
-/// Maximum-transparency mode: clear image, tint=0, low opacity → KDE/Wayland
-/// shows the desktop through the kitty window.
+/// Maximum-transparency mode: clear image, low opacity → desktop shows through.
+/// No image = no tint conflict, opacity directly controls bg color alpha.
 fn see_through(opacity: f32) -> Result<()> {
     ensure_kitty_conf()?;
     kitty_conf_set("background_image", "none")?;
@@ -361,8 +367,14 @@ fn see_through(opacity: f32) -> Result<()> {
         .stderr(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .status();
+    // Apply opacity runtime to existing windows (dynamic_background_opacity must be yes in initial conf)
+    let _ = Command::new("kitty")
+        .args(["@", "set-background-opacity", &format!("{:.2}", clamped)])
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status();
     kitty_reload();
-    ui::ok(&format!("see-through mode: image=none, tint=0, opacity={:.2}", clamped));
+    ui::ok(&format!("see-through mode: image=none, opacity={:.2}", clamped));
     warn_opacity_needs_restart();
     let mut st = load_state();
     st.last_path = None;
@@ -414,9 +426,13 @@ fn blend_mode(arg1: Option<&str>, arg2: Option<&str>) -> Result<()> {
     kitty_conf_set("background_image", abs.to_str().unwrap())?;
     kitty_conf_set("background_image_layout", "cscaled")?;
     kitty_conf_set("background_image_linear", "yes")?;
-    kitty_conf_set("background_tint", "0.0")?;
-    kitty_conf_set("background_tint_gaps", "0.0")?;
     let clamped = opacity.clamp(0.2, 1.0);
+    // KEY FIX: tint must be > 0 for image to mix with bg color → semi-transparent.
+    // tint=(1-opacity) gives intuitive "opacity" = how visible image is.
+    // Lower opacity → higher tint → more desktop bleeding through image.
+    let tint = (1.0 - clamped).clamp(0.3, 0.85);
+    kitty_conf_set("background_tint", &format!("{:.2}", tint))?;
+    kitty_conf_set("background_tint_gaps", &format!("{:.2}", tint))?;
     kitty_conf_set("background_opacity", &format!("{:.2}", clamped))?;
     kitty_conf_set("dynamic_background_opacity", "yes")?;
     let _ = Command::new("kitty")
@@ -424,16 +440,22 @@ fn blend_mode(arg1: Option<&str>, arg2: Option<&str>) -> Result<()> {
         .stderr(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .status();
+    let _ = Command::new("kitty")
+        .args(["@", "set-background-opacity", &format!("{:.2}", clamped)])
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status();
     kitty_reload();
     ui::ok(&format!(
-        "blend mode: image={} opacity={:.2} (image AND desktop visible)",
+        "blend: image={} opacity={:.2} tint={:.2} (image semi-transparent + desktop visible)",
         abs.display(),
-        clamped
+        clamped,
+        tint
     ));
     warn_opacity_needs_restart();
     let mut st = load_state();
     st.last_path = Some(abs.to_string_lossy().to_string());
-    st.tint = Some(0.0);
+    st.tint = Some(tint);
     st.opacity = Some(clamped);
     save_state(&st)?;
     Ok(())
