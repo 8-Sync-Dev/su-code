@@ -86,6 +86,9 @@ enum Cmd {
 
     /// Run MCP server (exposed to forge/cursor/opencode)
     Mcp,
+
+    /// Show overview cheatsheet (alias of `8sync` with no args)
+    Help,
 }
 
 fn main() -> Result<()> {
@@ -111,5 +114,9 @@ fn main() -> Result<()> {
         Some(Cmd::DiffImg(a)) => verbs::diff_img::run(a),
         Some(Cmd::PdfImg(a)) => verbs::pdf_img::run(a),
         Some(Cmd::Mcp) => verbs::mcp::run(),
+        Some(Cmd::Help) => {
+            verbs::root::print_cheatsheet();
+            Ok(())
+        }
     }
 }

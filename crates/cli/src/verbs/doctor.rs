@@ -7,7 +7,7 @@ pub fn run() -> Result<()> {
 
     check("OS",       &format!("{} (kitty: {})", env.os_id, env.kitty));
     check_cmd("kitty",      &["--version"]);
-    check_cmd("hx",         &["--version"]);
+    check_cmd_any(&[("helix", &["--version"]), ("hx", &["--version"])], "helix");
     check_cmd("fish",       &["--version"]);
     check_cmd("git",        &["--version"]);
     check_cmd("gh",         &["--version"]);
@@ -78,4 +78,14 @@ fn check_cmd(name: &str, args: &[&str]) {
         Some(v) => ui::ok(&format!("{}: {}", name, v)),
         None => ui::warn(&format!("{}: missing or broken", name)),
     }
+}
+
+fn check_cmd_any(candidates: &[(&str, &[&str])], label: &str) {
+    for (name, args) in candidates {
+        if let Some(v) = env_detect::cmd_version(name, args) {
+            ui::ok(&format!("{} ({}): {}", label, name, v));
+            return;
+        }
+    }
+    ui::warn(&format!("{}: missing or broken", label));
 }
