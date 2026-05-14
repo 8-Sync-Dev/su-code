@@ -42,6 +42,9 @@ use crate::ui;
       8sync bg tint 0.4              kitty background_tint
       8sync bg off                   clear image (desktop shows through)
       8sync bg through               see-through mode (image=none, tint=0, opacity=0.55)
+      8sync bg blend                 keep image + low opacity (image AND desktop visible)
+      8sync bg blend 0.4             blend with custom opacity
+      8sync bg blend /img.jpg 0.5    blend a specific image
       8sync bg pick                  fzf from cache+library
       8sync bg rotate on 10          rotate every 10 min (systemd-user timer)
       8sync bg rotate off
@@ -82,6 +85,11 @@ pub fn run(a: Args) -> Result<()> {
     if trimmed == "off" { return clear_bg(); }
     if trimmed == "through" || trimmed == "see" || trimmed == "glass" {
         return see_through(0.55);
+    }
+    // `bg blend [path|opacity]` = image + low opacity + tint=0 → image hiện
+    // mờ và desktop vẫn ló qua (vibe glass có ảnh).
+    if rest.first().copied() == Some("blend") {
+        return blend_mode(rest.get(1).copied(), rest.get(2).copied());
     }
     if trimmed == "pick" { return pick_local(); }
 
@@ -271,6 +279,11 @@ fn set_bg_file(path: &Path) -> Result<()> {
     // Always cover-scale to the window size so the image is never tiled or cropped weirdly.
     kitty_conf_set("background_image_layout", "cscaled")?;
     kitty_conf_set("background_image_linear", "yes")?;
+    // Force tint=0 so that `background_opacity` truly alpha-blends the image
+    // with the desktop (compositor compositing). Without this, tint paints a
+    // solid color *over* the image → opacity has no perceptible effect.
+    kitty_conf_set("background_tint", "0.0")?;
+    kitty_conf_set("background_tint_gaps", "0.0")?;
     let live = Command::new("kitty")
         .args(["@", "set-background-image", abs.to_str().unwrap()])
         .stderr(std::process::Stdio::null())
@@ -325,6 +338,58 @@ fn see_through(opacity: f32) -> Result<()> {
     ui::ok(&format!("see-through mode: image=none, tint=0, opacity={:.2}", clamped));
     let mut st = load_state();
     st.last_path = None;
+    st.tint = Some(0.0);
+    st.opacity = Some(clamped);
+    save_state(&st)?;
+    Ok(())
+}
+
+/// Glass-with-image: keeps a background image AND blends the whole thing
+/// with the desktop via low opacity. `arg1` can be a path, a number
+/// (opacity), or empty (re-use last image + 0.6 opacity).
+fn blend_mode(arg1: Option<&str>, arg2: Option<&str>) -> Result<()> {
+    // Parse: (path?, opacity?)
+    let mut path: Option<PathBuf> = None;
+    let mut opacity: f32 = 0.6;
+    for a in [arg1, arg2].into_iter().flatten() {
+        if let Ok(v) = a.parse::<f32>() {
+            opacity = v;
+        } else {
+            let p = PathBuf::from(a);
+            if p.exists() {
+                path = Some(p);
+            }
+        }
+    }
+    let path = path.or_else(|| load_state().last_path.map(PathBuf::from));
+    let Some(path) = path else {
+        return Err(anyhow::anyhow!(
+            "no image to blend — try `8sync bg <kw>` first or pass a path: `8sync bg blend /img.jpg 0.5`"
+        ));
+    };
+    let abs = std::fs::canonicalize(&path).unwrap_or(path.clone());
+    ensure_kitty_conf()?;
+    kitty_conf_set("background_image", abs.to_str().unwrap())?;
+    kitty_conf_set("background_image_layout", "cscaled")?;
+    kitty_conf_set("background_image_linear", "yes")?;
+    kitty_conf_set("background_tint", "0.0")?;
+    kitty_conf_set("background_tint_gaps", "0.0")?;
+    let clamped = opacity.clamp(0.2, 1.0);
+    kitty_conf_set("background_opacity", &format!("{:.2}", clamped))?;
+    kitty_conf_set("dynamic_background_opacity", "yes")?;
+    let _ = Command::new("kitty")
+        .args(["@", "set-background-image", abs.to_str().unwrap()])
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status();
+    kitty_reload();
+    ui::ok(&format!(
+        "blend mode: image={} opacity={:.2} (image AND desktop visible)",
+        abs.display(),
+        clamped
+    ));
+    let mut st = load_state();
+    st.last_path = Some(abs.to_string_lossy().to_string());
     st.tint = Some(0.0);
     st.opacity = Some(clamped);
     save_state(&st)?;
