@@ -5,29 +5,53 @@ pub fn print_cheatsheet() {
         "{}\n",
         "8sync — vibe coding harness for CachyOS + Kitty + Helix".bold().cyan()
     );
-    println!("{}", "Daily:".bold());
+
+    println!("{}", "Vibe loop (daily):".bold().yellow());
+    rows(&[
+        (".",      "open/attach project session (kitty + forge in abduco)"),
+        ("ai",     "ai prompt / resume session"),
+        ("find",   "rg + fzf preview, pick → open in helix"),
+        ("note",   "append idea to .gsd/NOTES.md"),
+        ("run",    "dev | build | test | fmt | lint"),
+        ("ship",   "git add + commit + push + PR"),
+        ("end",    "AI capture knowledge → .gsd/*.md"),
+    ]);
+
+    println!("\n{}", "Session mgmt (subcommands of `.`):".bold().yellow());
+    rows(&[
+        (". ls",      "list live sessions"),
+        (". to <n>",  "switch to another session"),
+        (". new <n>", "create detached session"),
+        (". rm <n>",  "kill + remove"),
+        (". wipe",    "kill all of current project"),
+    ]);
+
+    println!("\n{}", "Look & feel:".bold().yellow());
+    rows(&[
+        ("bg",     "wallpaper: search / pick / set / opacity"),
+        ("look",   "preset: neon | ice | mint | dark | dim"),
+    ]);
+
+    println!("\n{}", "Lifecycle:".bold().yellow());
     rows(&[
         ("setup",  "install everything (run once)"),
         ("up",     "update tools (idempotent)"),
         ("doctor", "health check"),
-        (".",      "open project session (kitty + forge)"),
-        ("ai",     "ai prompt / resume session"),
-        ("ship",   "commit + push + PR"),
-        ("run",    "dev | build | test | fmt | lint"),
-        ("bg",     "wallpaper: search / pick / set / opacity"),
-        ("look",   "style preset: neon | ice | mint | dark | dim"),
-        ("end",    "capture knowledge, close session"),
+        ("flow",   "workflow help theo thứ tự dùng"),
     ]);
-    println!("\n{}", "Skill & context:".bold());
+
+    println!("\n{}", "AI tooling:".bold().yellow());
     rows(&[
         ("skill",    "list / add / sync skills"),
         ("shot",     "render web/file to PNG"),
         ("diff-img", "render git diff to PNG"),
         ("pdf-img",  "render PDF pages to PNG"),
-        ("mcp",      "run MCP server for forge/cursor/opencode"),
+        ("mcp",      "MCP server for forge/cursor/opencode"),
     ]);
-    println!("\nEvery verb supports {}.", "-h".bold().green());
-    println!("Try: {}", "8sync setup".bold().cyan());
+
+    println!("\nMọi verb có {} hoặc {}.", "-h".bold().green(), "--help".bold().green());
+    println!("Lần đầu: {}", "8sync setup".bold().cyan());
+    println!("Xem flow: {}", "8sync flow".bold().cyan());
 }
 
 fn rows(items: &[(&str, &str)]) {

@@ -62,7 +62,7 @@ pub fn run(a: Args) -> Result<()> {
     println!("  · forge (curl install)");
     println!("  · configs (kitty/helix/fish/im)");
     println!("  · wallpaper (bundle default)");
-    println!("  · skills (karpathy, image-routing, 8sync-conventions)");
+    println!("  · skills (karpathy, image-routing, 8sync-cli)");
     println!("  · systemd-user (8sync-mcp.service)");
     println!();
 
@@ -87,8 +87,8 @@ pub fn run(a: Args) -> Result<()> {
         "python", "python-pip",
         // image tooling for `8sync shot/pdf-img`
         "poppler", "imagemagick",
-        // tree-sitter for AST outline (used later)
-        // (rust deps handle this; nothing to install here)
+        // detached sessions (live across terminal close, replaces tmux)
+        "abduco",
         // image-routing helpers
         "curl",
     ];
@@ -194,7 +194,7 @@ fn install_skills(env: &env_detect::Env) -> Result<()> {
     let trio = [
         ("skills/karpathy/SKILL.md",            "karpathy-guidelines/SKILL.md"),
         ("skills/image-routing/SKILL.md",       "image-routing/SKILL.md"),
-        ("skills/8sync-conventions/SKILL.md",   "8sync-conventions/SKILL.md"),
+        ("skills/8sync-cli/SKILL.md",           "8sync-cli/SKILL.md"),
     ];
     for (src, rel) in &trio {
         let target = skills_dir.join(rel);

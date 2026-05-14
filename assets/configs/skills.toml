@@ -7,6 +7,6 @@ when = "always"
 src  = "builtin:image-routing"
 when = "always"
 
-[8sync-conventions]
-src  = "builtin:8sync-conventions"
+[8sync-cli]
+src  = "builtin:8sync-cli"
 when = "always"

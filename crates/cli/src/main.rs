@@ -48,9 +48,9 @@ enum Cmd {
     /// Health-check; report what's installed and what's missing
     Doctor,
 
-    /// Open project session: kitty layout + resume forge
+    /// Open project session: kitty 3-pane + forge in abduco. Subcommands: ls/to/new/rm/mv/wipe/kick
     #[command(name = ".", alias = "here")]
-    Here,
+    Here(verbs::here::Args),
 
     /// AI session / one-shot prompt (forge)
     Ai(verbs::ai::Args),
@@ -89,6 +89,15 @@ enum Cmd {
 
     /// Show overview cheatsheet (alias of `8sync` with no args)
     Help,
+
+    /// Workflow-ordered help (lifecycle commands theo thứ tự dùng)
+    Flow,
+
+    /// Search code (rg + fzf) or filenames (fd); pick → open in helix
+    Find(verbs::find::Args),
+
+    /// Append a one-line note to .gsd/NOTES.md (AI sẽ đọc lại session sau)
+    Note(verbs::note::Args),
 }
 
 fn main() -> Result<()> {
@@ -102,7 +111,7 @@ fn main() -> Result<()> {
         Some(Cmd::Setup(a)) => verbs::setup::run(a),
         Some(Cmd::Up) => verbs::up::run(),
         Some(Cmd::Doctor) => verbs::doctor::run(),
-        Some(Cmd::Here) => verbs::here::run(),
+        Some(Cmd::Here(a)) => verbs::here::run(a),
         Some(Cmd::Ai(a)) => verbs::ai::run(a),
         Some(Cmd::Ship(a)) => verbs::ship::run(a),
         Some(Cmd::Run(a)) => verbs::run::run(a),
@@ -118,5 +127,8 @@ fn main() -> Result<()> {
             verbs::root::print_cheatsheet();
             Ok(())
         }
+        Some(Cmd::Flow) => verbs::flow::run(),
+        Some(Cmd::Find(a)) => verbs::find::run(a),
+        Some(Cmd::Note(a)) => verbs::note::run(a),
     }
 }

@@ -14,3 +14,6 @@ pub mod shot;
 pub mod diff_img;
 pub mod pdf_img;
 pub mod mcp;
+pub mod flow;
+pub mod find;
+pub mod note;
