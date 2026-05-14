@@ -46,6 +46,7 @@ use crate::ui;
       8sync bg blend 0.4             blend with custom opacity
       8sync bg blend /img.jpg 0.5    blend a specific image
       8sync bg apply-now             spawn a new kitty window to see changes (opacity needs new window)
+      8sync bg verify                full diagnostic: kitty ver, compositor, conf, KDE rules + test window
       8sync bg pick                  fzf from cache+library
       8sync bg rotate on 10          rotate every 10 min (systemd-user timer)
       8sync bg rotate off
@@ -86,6 +87,9 @@ pub fn run(a: Args) -> Result<()> {
     if trimmed == "off" { return clear_bg(); }
     if trimmed == "apply-now" || trimmed == "apply" {
         return apply_now();
+    }
+    if trimmed == "verify" || trimmed == "diag" || trimmed == "test" {
+        return verify_transparency();
     }
     if trimmed == "through" || trimmed == "see" || trimmed == "glass" {
         return see_through(0.55);
@@ -248,6 +252,10 @@ background_tint    0.0
 background_tint_gaps 0.0
 background_image_layout cscaled
 background_image_linear yes
+# transparent_background_colors lets specific cell bg colors be semi-transparent
+# even when they don't match the default terminal bg. Critical for TUIs like
+# forge/helix that paint their own bg. Format: color@opacity.
+transparent_background_colors #000000@0.5 #0b1220@0.5 #1e1e2e@0.5 #282a36@0.5 #1a1b26@0.5
 
 # Remote control (kitty @ ...)
 allow_remote_control yes
@@ -390,11 +398,110 @@ fn apply_now() -> Result<()> {
     ensure_kitty_conf()?;
     let _ = Command::new("setsid")
         .args(["-f", "kitty"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn();
     ui::ok("spawned a new kitty window — that's where opacity changes take effect");
     eprintln!(
         "\x1b[36m  tip: close your old kitty windows once the new one looks right,\n       then every subsequent `8sync bg ...` will apply live.\x1b[0m"
     );
+    Ok(())
+}
+
+/// Full diagnostic for "why isn't my transparency working".
+/// Spawns a test window with EXPLICIT --override flags so user can isolate
+/// whether it's a config issue, a compositor issue, or a window-rule issue.
+fn verify_transparency() -> Result<()> {
+    println!("\x1b[1;36m=== 8sync bg verify — transparency diagnostic ===\x1b[0m");
+
+    // 1. Kitty version
+    let ver = Command::new("kitty").arg("--version").output()
+        .ok().and_then(|o| String::from_utf8(o.stdout).ok())
+        .unwrap_or_else(|| "unknown".to_string());
+    println!("kitty:        {}", ver.trim());
+
+    // 2. Session type / compositor
+    let session = std::env::var("XDG_SESSION_TYPE").unwrap_or_else(|_| "?".into());
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "?".into());
+    let wayland = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "(none)".into());
+    println!("session:      {} ({})", session, desktop);
+    println!("wayland:      {}", wayland);
+
+    // 3. Current window state
+    let win_pid = std::env::var("KITTY_PID").unwrap_or_else(|_| "?".into());
+    println!("current win:  KITTY_PID={}", win_pid);
+
+    // 4. Conf path + key settings
+    let conf = kitty_conf_path();
+    println!("conf:         {}", conf.display());
+    if conf.exists() {
+        let content = std::fs::read_to_string(&conf).unwrap_or_default();
+        for key in [
+            "background_opacity",
+            "background_image",
+            "background_image_layout",
+            "background_tint",
+            "background_tint_gaps",
+            "background_blur",
+            "dynamic_background_opacity",
+            "transparent_background_colors",
+        ] {
+            let found = content.lines().find(|l| {
+                let t = l.trim_start();
+                t.starts_with(&format!("{} ", key)) || t == key
+            });
+            println!("  {:30} {}", key, found.unwrap_or("(unset)"));
+        }
+    } else {
+        println!("  \x1b[33m! conf file missing — run any `8sync bg ...` command to create it\x1b[0m");
+    }
+
+    // 5. Remote control reachability
+    let rc = Command::new("kitty").args(["@", "ls"])
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status().map(|s| s.success()).unwrap_or(false);
+    println!("remote ctrl:  {}", if rc { "\x1b[32mreachable\x1b[0m" }
+                                  else { "\x1b[31munreachable\x1b[0m (need restart kitty after enabling)" });
+
+    // 6. KDE window rules check (best-effort)
+    if desktop.to_lowercase().contains("kde") {
+        let rules = dirs::config_dir().unwrap_or_default().join("kwinrulesrc");
+        if rules.exists() {
+            let txt = std::fs::read_to_string(&rules).unwrap_or_default();
+            if txt.to_lowercase().contains("kitty") && txt.contains("opacityactive") {
+                println!("\x1b[33m! KDE window rule for kitty found in kwinrulesrc — may override opacity\x1b[0m");
+                println!("  open: System Settings → Window Management → Window Rules");
+            }
+        }
+    }
+
+    println!();
+    println!("\x1b[1;36m=== test 1: pure opacity (no image), via --override ===\x1b[0m");
+    println!("running: setsid -f kitty --override background_opacity=0.4 \\");
+    println!("                          --override background_blur=24 \\");
+    println!("                          --override dynamic_background_opacity=yes");
+    let _ = Command::new("setsid")
+        .args(["-f", "kitty",
+            "--override", "background_opacity=0.4",
+            "--override", "background_blur=24",
+            "--override", "dynamic_background_opacity=yes",
+            "--title", "8sync-test-opacity",
+        ])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+    println!("→ new kitty window opened. \x1b[1mIf it shows the desktop through, your compositor works.\x1b[0m");
+    println!("  If it does NOT show desktop:");
+    println!("    a) KDE Plasma: check System Settings → Window Management → Compositor");
+    println!("       (Compositor must be ON, hardware accel = OpenGL)");
+    println!("    b) Check window rule for 'kitty' overriding opacity");
+    println!("    c) Try `kitty --debug-config | grep background_opacity` to confirm value");
+    println!();
+    println!("\x1b[1;36mtest 2:\x1b[0m once test 1 works, run:");
+    println!("  8sync bg apply-now    # spawn window with full conf");
     Ok(())
 }
 
