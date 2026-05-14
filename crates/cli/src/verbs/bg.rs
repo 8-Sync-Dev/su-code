@@ -39,8 +39,10 @@ use crate::ui;
       8sync bg 0.7                   opacity
       8sync bg +                     opacity +0.05
       8sync bg -                     opacity -0.05
+      8sync bg fit scaled            fill window exactly (default — recommended)
+      8sync bg fit cscaled           keep aspect ratio, crop edges
+      8sync bg fit centered          no scale, center
       8sync bg overlay 0.6           dark overlay 0..1 (higher = darker, easier to read code)
-      8sync bg tint 0.4              same as overlay (kitty native key name)
       8sync bg off                   clear image (desktop shows through)
       8sync bg through               see-through mode (image=none, tint=0, opacity=0.55)
       8sync bg blend                 keep image + low opacity (image AND desktop visible)
@@ -102,6 +104,9 @@ pub fn run(a: Args) -> Result<()> {
     }
     if trimmed == "pick" { return pick_local(); }
 
+    if rest.first().copied() == Some("fit") {
+        return handle_fit(rest.get(1).copied());
+    }
     // tint / overlay (semantic alias: overlay = how dark a layer goes ON TOP of image)
     if matches!(rest.first().copied(), Some("tint") | Some("overlay") | Some("dim")) {
         return handle_tint(rest.get(1).copied());
@@ -223,6 +228,34 @@ fn handle_tint(v: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+/// `bg fit <mode>` — control how image fills kitty window.
+///   scaled       fill window exactly (may stretch — best for "đúng cửa sổ")
+///   cscaled      cover-scaled, keep aspect ratio, crop edges (default)
+///   centered     center, no scale (good for small images)
+///   tiled        repeat
+///   mirror-tiled mirror repeat
+///   clamped      no scale, no center
+fn handle_fit(v: Option<&str>) -> Result<()> {
+    let mode = v.unwrap_or("scaled");
+    let valid = ["scaled", "cscaled", "centered", "tiled", "mirror-tiled", "clamped"];
+    if !valid.contains(&mode) {
+        return Err(anyhow::anyhow!(
+            "invalid mode '{}'. Valid: {}",
+            mode, valid.join(" | ")
+        ));
+    }
+    ensure_kitty_conf()?;
+    kitty_conf_set("background_image_layout", mode)?;
+    kitty_conf_set("background_image_linear", "yes")?;
+    kitty_reload();
+    ui::ok(&format!("layout = {} (SIGUSR1 reload)", mode));
+    println!("  scaled       fill window exactly (may stretch, no empty space)");
+    println!("  cscaled      cover-scaled, keep aspect, crop edges");
+    println!("  centered     center, no scale");
+    println!("  tiled        repeat image");
+    Ok(())
+}
+
 // ─────────────────────────────────────────────────────────────────
 // kitty.conf live editor (no restart needed thanks to SIGUSR1)
 // ─────────────────────────────────────────────────────────────────
@@ -254,7 +287,7 @@ dynamic_background_opacity yes
 background_blur    32
 background_tint    0.0
 background_tint_gaps 0.0
-background_image_layout cscaled
+background_image_layout scaled
 background_image_linear yes
 # transparent_background_colors lets specific cell bg colors be semi-transparent
 # even when they don't match the default terminal bg. Critical for TUIs like
@@ -322,7 +355,7 @@ fn set_bg_file(path: &Path) -> Result<()> {
     ensure_kitty_conf()?;
     kitty_conf_set("background_image", abs.to_str().unwrap())?;
     // Always cover-scale to the window size so the image is never tiled or cropped weirdly.
-    kitty_conf_set("background_image_layout", "cscaled")?;
+    kitty_conf_set("background_image_layout", "scaled")?;
     kitty_conf_set("background_image_linear", "yes")?;
     // Force tint=0 so that `background_opacity` truly alpha-blends the image
     // with the desktop (compositor compositing). Without this, tint paints a
@@ -535,7 +568,7 @@ fn blend_mode(arg1: Option<&str>, arg2: Option<&str>) -> Result<()> {
     let abs = std::fs::canonicalize(&path).unwrap_or(path.clone());
     ensure_kitty_conf()?;
     kitty_conf_set("background_image", abs.to_str().unwrap())?;
-    kitty_conf_set("background_image_layout", "cscaled")?;
+    kitty_conf_set("background_image_layout", "scaled")?;
     kitty_conf_set("background_image_linear", "yes")?;
     let clamped = opacity.clamp(0.2, 1.0);
     // KEY FIX: tint must be > 0 for image to mix with bg color → semi-transparent.
