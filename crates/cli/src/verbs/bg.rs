@@ -142,14 +142,24 @@ fn save_state(s: &State) -> Result<()> {
 // ─────────────────────────────────────────────────────────────────
 fn set_opacity(v: f32) -> Result<()> {
     let clamped = v.clamp(0.0, 1.0);
-    let s = Command::new("kitty")
+    ensure_kitty_conf()?;
+    kitty_conf_set("background_opacity", &format!("{:.2}", clamped))?;
+    kitty_conf_set("dynamic_background_opacity", "yes")?;
+    // Try live runtime change via remote control first (no flash)
+    let live = Command::new("kitty")
         .args(["@", "set-background-opacity", &format!("{:.2}", clamped)])
-        .status();
-    if s.is_err() || !s.unwrap().success() {
-        ui::warn("kitty @ failed (no remote control? open new kitty after `8sync setup`)");
-    } else {
-        ui::ok(&format!("kitty opacity = {:.2}", clamped));
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status()
+        .ok()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !live {
+        // Fallback: SIGUSR1 reload (works without remote control)
+        kitty_reload();
     }
+    ui::ok(&format!("kitty opacity = {:.2} {}", clamped,
+        if live { "(live)" } else { "(SIGUSR1 reload)" }));
     let mut st = load_state();
     st.opacity = Some(clamped);
     save_state(&st)?;
@@ -165,39 +175,81 @@ fn handle_tint(v: Option<&str>) -> Result<()> {
     let v = v.ok_or_else(|| anyhow::anyhow!("usage: 8sync bg tint <0..1>"))?;
     let parsed: f32 = v.parse().context("tint must be 0..1")?;
     let clamped = parsed.clamp(0.0, 1.0);
-    // kitty doesn't expose `background_tint` to @ set-... in older versions.
-    // Edit kitty.conf line + reload.
-    let conf = dirs::config_dir().unwrap_or_default().join("kitty/kitty.conf");
-    if conf.exists() {
-        let mut content = std::fs::read_to_string(&conf)?;
-        let mut found = false;
-        content = content
-            .lines()
-            .map(|l| {
-                if l.trim_start().starts_with("background_tint ") {
-                    found = true;
-                    format!("background_tint {:.2}", clamped)
-                } else {
-                    l.to_string()
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        if !found {
-            content.push_str(&format!("\nbackground_tint {:.2}\n", clamped));
-        }
-        std::fs::write(&conf, content)?;
-        let _ = Command::new("kill").args(["-SIGUSR1"]).arg(kitty_pid()).status();
-        ui::ok(&format!("kitty background_tint = {:.2} (SIGUSR1 sent)", clamped));
-    } else {
-        ui::warn("kitty.conf missing — run `8sync setup`");
-    }
+    ensure_kitty_conf()?;
+    kitty_conf_set("background_tint", &format!("{:.2}", clamped))?;
+    kitty_reload();
+    ui::ok(&format!("kitty background_tint = {:.2} (SIGUSR1 reload)", clamped));
     let mut st = load_state();
     st.tint = Some(clamped);
     save_state(&st)?;
     Ok(())
 }
 
+// ─────────────────────────────────────────────────────────────────
+// kitty.conf live editor (no restart needed thanks to SIGUSR1)
+// ─────────────────────────────────────────────────────────────────
+fn kitty_conf_path() -> PathBuf {
+    dirs::config_dir().unwrap_or_default().join("kitty/kitty.conf")
+}
+
+/// Create a minimal kitty.conf if missing, so subsequent edits have something to patch.
+/// Contains the keys needed for live wallpaper/opacity reload + remote control.
+fn ensure_kitty_conf() -> Result<()> {
+    let p = kitty_conf_path();
+    if p.exists() { return Ok(()); }
+    std::fs::create_dir_all(p.parent().unwrap())?;
+    let stub = r#"# ~/.config/kitty/kitty.conf — bootstrapped by 8sync
+# Run `8sync setup` for the full managed config.
+font_family       JetBrainsMono Nerd Font
+font_size         12.0
+background_opacity 0.85
+dynamic_background_opacity yes
+background_tint    0.85
+allow_remote_control yes
+listen_on          unix:@kitty
+clipboard_control  write-clipboard write-primary read-clipboard read-primary
+"#;
+    std::fs::write(&p, stub)?;
+    ui::ok(&format!("created {}", p.display()));
+    Ok(())
+}
+
+/// Set or replace a single `key value` line in kitty.conf (idempotent).
+fn kitty_conf_set(key: &str, value: &str) -> Result<()> {
+    let p = kitty_conf_path();
+    let content = std::fs::read_to_string(&p).unwrap_or_default();
+    let mut found = false;
+    let mut lines: Vec<String> = content
+        .lines()
+        .map(|l| {
+            let lt = l.trim_start();
+            if lt.starts_with(&format!("{} ", key)) || lt == key {
+                found = true;
+                format!("{} {}", key, value)
+            } else {
+                l.to_string()
+            }
+        })
+        .collect();
+    if !found {
+        lines.push(format!("{} {}", key, value));
+    }
+    let mut joined = lines.join("\n");
+    if !joined.ends_with('\n') { joined.push('\n'); }
+    std::fs::write(&p, joined)?;
+    Ok(())
+}
+
+/// Reload kitty config in every running kitty instance.
+/// `SIGUSR1` triggers a config re-read across all OS windows (since v0.21+).
+/// Works even WITHOUT `allow_remote_control` — no restart required.
+fn kitty_reload() {
+    let _ = Command::new("pkill")
+        .args(["-USR1", "-x", "kitty"])
+        .status();
+}
+
+#[allow(dead_code)]
 fn kitty_pid() -> String {
     std::env::var("KITTY_PID").unwrap_or_default()
 }
@@ -207,14 +259,19 @@ fn kitty_pid() -> String {
 // ─────────────────────────────────────────────────────────────────
 fn set_bg_file(path: &Path) -> Result<()> {
     let abs = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    let s = Command::new("kitty")
+    ensure_kitty_conf()?;
+    kitty_conf_set("background_image", abs.to_str().unwrap())?;
+    let live = Command::new("kitty")
         .args(["@", "set-background-image", abs.to_str().unwrap()])
-        .status();
-    if s.is_err() || !s.unwrap().success() {
-        ui::warn("kitty @ failed (need allow_remote_control + new kitty session)");
-    } else {
-        ui::ok(&format!("kitty bg ← {}", abs.display()));
-    }
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status()
+        .ok()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !live { kitty_reload(); }
+    ui::ok(&format!("kitty bg ← {} {}", abs.display(),
+        if live { "(live)" } else { "(SIGUSR1 reload)" }));
     let mut st = load_state();
     st.last_path = Some(abs.to_string_lossy().to_string());
     save_state(&st)?;
@@ -222,10 +279,15 @@ fn set_bg_file(path: &Path) -> Result<()> {
 }
 
 fn clear_bg() -> Result<()> {
-    Command::new("kitty")
+    ensure_kitty_conf()?;
+    kitty_conf_set("background_image", "none")?;
+    let _ = Command::new("kitty")
         .args(["@", "set-background-image", "none"])
-        .status()?;
-    ui::ok("kitty bg cleared");
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status();
+    kitty_reload();
+    ui::ok("kitty bg cleared (SIGUSR1 reload)");
     let mut st = load_state();
     st.last_path = None;
     save_state(&st)?;
