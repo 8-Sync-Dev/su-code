@@ -40,7 +40,8 @@ use crate::ui;
       8sync bg +                     opacity +0.05
       8sync bg -                     opacity -0.05
       8sync bg tint 0.4              kitty background_tint
-      8sync bg off                   clear image
+      8sync bg off                   clear image (desktop shows through)
+      8sync bg through               see-through mode (image=none, tint=0, opacity=0.55)
       8sync bg pick                  fzf from cache+library
       8sync bg rotate on 10          rotate every 10 min (systemd-user timer)
       8sync bg rotate off
@@ -79,6 +80,9 @@ pub fn run(a: Args) -> Result<()> {
     if trimmed == "+" { return nudge_opacity(0.05); }
     if trimmed == "-" { return nudge_opacity(-0.05); }
     if trimmed == "off" { return clear_bg(); }
+    if trimmed == "through" || trimmed == "see" || trimmed == "glass" {
+        return see_through(0.55);
+    }
     if trimmed == "pick" { return pick_local(); }
 
     // tint
@@ -204,7 +208,10 @@ font_family       JetBrainsMono Nerd Font
 font_size         12.0
 background_opacity 0.85
 dynamic_background_opacity yes
-background_tint    0.85
+background_tint    0.0
+background_tint_gaps 0.0
+background_image_layout cscaled
+background_image_linear yes
 allow_remote_control yes
 listen_on          unix:@kitty
 clipboard_control  write-clipboard write-primary read-clipboard read-primary
@@ -261,6 +268,9 @@ fn set_bg_file(path: &Path) -> Result<()> {
     let abs = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     ensure_kitty_conf()?;
     kitty_conf_set("background_image", abs.to_str().unwrap())?;
+    // Always cover-scale to the window size so the image is never tiled or cropped weirdly.
+    kitty_conf_set("background_image_layout", "cscaled")?;
+    kitty_conf_set("background_image_linear", "yes")?;
     let live = Command::new("kitty")
         .args(["@", "set-background-image", abs.to_str().unwrap()])
         .stderr(std::process::Stdio::null())
@@ -281,15 +291,42 @@ fn set_bg_file(path: &Path) -> Result<()> {
 fn clear_bg() -> Result<()> {
     ensure_kitty_conf()?;
     kitty_conf_set("background_image", "none")?;
+    kitty_conf_set("background_tint", "0.0")?;
     let _ = Command::new("kitty")
         .args(["@", "set-background-image", "none"])
         .stderr(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .status();
     kitty_reload();
-    ui::ok("kitty bg cleared (SIGUSR1 reload)");
+    ui::ok("kitty bg cleared + tint=0 — desktop will show through opacity (SIGUSR1 reload)");
     let mut st = load_state();
     st.last_path = None;
+    st.tint = Some(0.0);
+    save_state(&st)?;
+    Ok(())
+}
+
+/// Maximum-transparency mode: clear image, tint=0, low opacity → KDE/Wayland
+/// shows the desktop through the kitty window.
+fn see_through(opacity: f32) -> Result<()> {
+    ensure_kitty_conf()?;
+    kitty_conf_set("background_image", "none")?;
+    kitty_conf_set("background_tint", "0.0")?;
+    kitty_conf_set("background_tint_gaps", "0.0")?;
+    let clamped = opacity.clamp(0.2, 1.0);
+    kitty_conf_set("background_opacity", &format!("{:.2}", clamped))?;
+    kitty_conf_set("dynamic_background_opacity", "yes")?;
+    let _ = Command::new("kitty")
+        .args(["@", "set-background-image", "none"])
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status();
+    kitty_reload();
+    ui::ok(&format!("see-through mode: image=none, tint=0, opacity={:.2}", clamped));
+    let mut st = load_state();
+    st.last_path = None;
+    st.tint = Some(0.0);
+    st.opacity = Some(clamped);
     save_state(&st)?;
     Ok(())
 }
