@@ -42,7 +42,7 @@ pub fn print_cheatsheet() {
 
     println!("\n{}", "AI tooling:".bold().yellow());
     rows(&[
-        ("skill",    "list / add / sync skills"),
+        ("skill",    "list/add/sync/help skills + tools + rules + inject model"),
         ("shot",     "render web/file to PNG"),
         ("diff-img", "render git diff to PNG"),
         ("pdf-img",  "render PDF pages to PNG"),
