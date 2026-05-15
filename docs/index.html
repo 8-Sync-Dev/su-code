@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>8sync — Terminal-first AI Coding Harness</title>
+  <meta name="description" content="8sync: terminal-first AI coding harness cho CachyOS/Arch + Kitty + Helix + Forge. Giữ workflow terminal bình thường, AI quan sát context và hỗ trợ thực thi." />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: rgba(255,255,255,0.06);
+      --line: rgba(255,255,255,0.16);
+      --txt: #e8edf7;
+      --muted: #aab6d3;
+      --pri: #5eead4;
+      --pri2: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: var(--txt);
+      background:
+        radial-gradient(900px 420px at 8% -10%, rgba(94,234,212,.18), transparent 60%),
+        radial-gradient(850px 450px at 100% 0%, rgba(96,165,250,.18), transparent 60%),
+        var(--bg);
+      line-height: 1.6;
+    }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 18px 48px; }
+    .top { display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
+    .badge { border:1px solid var(--line); padding:6px 10px; border-radius:999px; color:var(--muted); font-size:13px; }
+    h1 { margin: 20px 0 10px; font-size: clamp(30px, 6vw, 52px); line-height:1.08; }
+    .sub { color:var(--muted); max-width:820px; font-size:18px; }
+    .cta { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; }
+    .btn { display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; color:#06111f; background: linear-gradient(90deg,var(--pri),var(--pri2)); font-weight:700; }
+    .btn.ghost { background: transparent; color: var(--txt); border:1px solid var(--line); }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:28px; }
+    .card { background: var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+    .card h3 { margin:0 0 6px; font-size:18px; }
+    .muted { color: var(--muted); }
+    code { background: rgba(255,255,255,.08); padding:2px 6px; border-radius:6px; }
+    pre { background: rgba(0,0,0,.28); border:1px solid var(--line); padding:12px; border-radius:12px; overflow:auto; }
+    .section { margin-top: 30px; }
+    ul { padding-left: 18px; }
+    footer { margin-top:36px; color:var(--muted); border-top:1px solid var(--line); padding-top:16px; }
+    a { color:#9cd7ff; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="top">
+      <div class="badge">8-Sync-Dev / su-code</div>
+      <div class="badge">GitHub Pages · /su-code</div>
+    </div>
+
+    <h1>8sync — dùng terminal bình thường,<br/>AI đứng sau quan sát và hỗ trợ</h1>
+    <p class="sub">
+      <strong>VI:</strong> Bạn vẫn <code>cd</code>, code, build, test như thường. AI agent bám theo project context + memory để nghe lệnh, hỗ trợ thực thi nhanh hơn.<br/>
+      <strong>EN:</strong> Keep your normal terminal workflow; AI agents observe project context and execute tasks on demand.
+    </p>
+
+    <div class="cta">
+      <a class="btn" href="https://github.com/8-Sync-Dev/su-code" target="_blank" rel="noreferrer">View on GitHub</a>
+      <a class="btn ghost" href="https://github.com/orgs/8-Sync-Dev/discussions" target="_blank" rel="noreferrer">Community</a>
+    </div>
+
+    <section class="grid">
+      <article class="card">
+        <h3>Terminal-first</h3>
+        <p class="muted">Không ép dùng “AI terminal” riêng. Workflow CLI hiện tại của bạn giữ nguyên.</p>
+      </article>
+      <article class="card">
+        <h3>Context-aware</h3>
+        <p class="muted">Đi tới thư mục/project nào, AI theo ngữ cảnh đó và đọc memory dự án.</p>
+      </article>
+      <article class="card">
+        <h3>Low-RAM Rust CLI</h3>
+        <p class="muted">Nhẹ, nhanh, phù hợp CachyOS/Arch + Kitty + Helix + Forge.</p>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2>Quick start</h2>
+      <pre><code>git clone https://github.com/8-Sync-Dev/su-code.git
+cd su-code
+bash scripts/bootstrap.sh
+8sync setup --dry-run
+8sync setup
+forge login
+8sync doctor</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>Core commands</h2>
+      <ul>
+        <li><code>8sync .</code> — open/attach project session</li>
+        <li><code>8sync ai [prompt]</code> — run AI in current context</li>
+        <li><code>8sync find &lt;kw&gt;</code> — fast code search</li>
+        <li><code>8sync run [dev|build|test|fmt|lint]</code> — routine tasks</li>
+        <li><code>8sync ship "msg"</code> — commit/push/PR flow</li>
+      </ul>
+    </section>
+
+    <section class="section card">
+      <h2>Author &amp; Social</h2>
+      <p class="muted">Cập nhật link chính thức của bạn tại đây:</p>
+      <ul>
+        <li>Facebook: <a href="https://facebook.com/" target="_blank" rel="noreferrer">https://facebook.com/</a></li>
+        <li>YouTube: <a href="https://youtube.com/" target="_blank" rel="noreferrer">https://youtube.com/</a></li>
+        <li>TikTok: <a href="https://tiktok.com/@" target="_blank" rel="noreferrer">https://tiktok.com/@</a></li>
+      </ul>
+    </section>
+
+    <footer>
+      Built with GitHub Pages · © 8-Sync-Dev · #8sync #AIAgent #VibeCoding #TerminalWorkflow
+    </footer>
+  </main>
+</body>
+</html>
