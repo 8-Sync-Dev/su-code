@@ -85,12 +85,12 @@ User-added profiles live in `~/.config/8sync/profiles/*.toml` and override built
 
 | Invocation | Stage A | Stage B |
 |---|---|---|
-| `8sync setup` | run | TTY: prompt per profile<br>no-TTY: skip |
-| `8sync setup --yes` | run, no confirm | same as above |
+| `8sync setup` | run (no "Continue?" prompt — gõ là cài) | TTY: prompt y/N per profile<br>no-TTY: skip |
+| `8sync setup --yes` | run | apply ALL profiles, no prompts |
 | `8sync setup --no-profile` | run | skip |
 | `8sync setup --profile alexdev` | run | apply `alexdev` non-interactive |
 | `8sync setup --profile vietnamese --profile displaylink` | run | apply both, non-interactive |
-| `8sync setup --dry-run` | print plan | print profile prompts as inert text |
+| `8sync setup --dry-run` | print plan | print profile list as inert text |
 | `8sync setup profile apply alexdev` | skip | apply only |
 
 ---
