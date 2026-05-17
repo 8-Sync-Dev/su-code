@@ -71,7 +71,7 @@ commands = []
 | File | Packages |
 |---|---|
 | `vietnamese.toml` | pacman: `fcitx5, fcitx5-configtool, fcitx5-gtk, fcitx5-qt, fcitx5-unikey`<br>configs: `environment.d/im.conf` |
-| `hardware-lianli.toml` | pacman: `cmake, nasm, rustup, webkit2gtk-4.1`<br>aur: `lianli-linux-git` |
+| `hardware-lianli.toml` | aur: `lianli-linux-git` (yay/paru auto-pulls all deps: cmake, nasm, rustup, webkit2gtk-4.1, hidapi, libusb, gtk3, librsvg, ffmpeg)<br>requires: `aur_helper = true` |
 | `hardware-cooling.toml` | pacman: `openrgb, coolercontrol, liquidctl` |
 | `displaylink.toml` | pacman: `evdi-dkms` |
 | `apps-personal.toml` | pacman: `bitwarden` |
@@ -213,8 +213,8 @@ $ 8sync setup --profile alexdev --yes
 [profile] hardware-cooling: pacman → openrgb ✓, coolercontrol ✓, liquidctl ✓ — skip
 [profile] displaylink:      pacman → evdi-dkms ✓ — skip
 [profile] apps-personal:    pacman → bitwarden ✓ — skip
-[profile] hardware-lianli:  pacman → cmake ✓, nasm ✓, rustup ✓, webkit2gtk-4.1 ✓ — skip
-                            aur (paru) → lianli-linux-git ✓ — skip
+[profile] hardware-lianli:  aur (paru) → lianli-linux-git ✓ — skip
+                            (yay/paru tự kéo deps lúc build)
 Done. profile.toml saved → ~/.config/8sync/profile.toml
 ```
 
