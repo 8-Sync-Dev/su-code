@@ -66,16 +66,17 @@ commands = []
 
 ## 3. Built-in profiles (`assets/profiles/`)
 
-5 building blocks + 1 bundle, all committed in the repo (no secrets, just package names):
+6 building blocks + 1 bundle, all committed in the repo (no secrets, just package names):
 
-| File | Packages |
+| File | Packages / Actions |
 |---|---|
 | `vietnamese.toml` | pacman: `fcitx5, fcitx5-configtool, fcitx5-gtk, fcitx5-qt, fcitx5-unikey`<br>configs: `environment.d/im.conf` |
 | `hardware-lianli.toml` | aur: `lianli-linux-git` (yay/paru auto-pulls all deps: cmake, nasm, rustup, webkit2gtk-4.1, hidapi, libusb, gtk3, librsvg, ffmpeg)<br>requires: `aur_helper = true` |
 | `hardware-cooling.toml` | pacman: `openrgb, coolercontrol, liquidctl` |
 | `displaylink.toml` | pacman: `evdi-dkms` |
 | `apps-personal.toml` | pacman: `bitwarden` |
-| `alexdev.toml` (bundle) | `extends = ["vietnamese", "hardware-lianli", "hardware-cooling", "displaylink", "apps-personal"]` |
+| `warp.toml` | aur: `cloudflare-warp-bin`<br>requires: `aur_helper = true`<br>post_install: enable `warp-svc.service`, register, mode=doh, MASQUE tunnel, malware DNS filter, connect |
+| `alexdev.toml` (bundle) | `extends = ["vietnamese", "hardware-lianli", "hardware-cooling", "displaylink", "apps-personal", "warp"]` |
 
 User-added profiles live in `~/.config/8sync/profiles/*.toml` and override built-ins on name conflict.
 
@@ -215,6 +216,8 @@ $ 8sync setup --profile alexdev --yes
 [profile] apps-personal:    pacman → bitwarden ✓ — skip
 [profile] hardware-lianli:  aur (paru) → lianli-linux-git ✓ — skip
                             (yay/paru tự kéo deps lúc build)
+[profile] warp:             aur (paru) → cloudflare-warp-bin ✓ — skip
+                            post: warp-svc enabled, mode=doh, MASQUE, malware DNS, connected
 Done. profile.toml saved → ~/.config/8sync/profile.toml
 ```
 
