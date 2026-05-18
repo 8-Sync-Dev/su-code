@@ -129,14 +129,21 @@ fn pipe_to_fzf_then_open(stdout: &str) -> Result<()> {
     }
     let file = parts[0];
     let line = parts[1];
-    let editor = if which::which("hx").is_ok() {
-        "hx"
-    } else if which::which("helix").is_ok() {
-        "helix"
-    } else {
-        "vi"
-    };
+    let editor = pick_editor();
     let target = format!("{}:{}", file, line);
     Command::new(editor).arg(&target).status()?;
     Ok(())
+}
+
+/// Honor `$EDITOR` / `$VISUAL` first; fall back to helix/hx/vi.
+fn pick_editor() -> String {
+    if let Ok(e) = std::env::var("VISUAL") {
+        if !e.is_empty() && which::which(&e).is_ok() { return e; }
+    }
+    if let Ok(e) = std::env::var("EDITOR") {
+        if !e.is_empty() && which::which(&e).is_ok() { return e; }
+    }
+    if which::which("hx").is_ok()    { return "hx".to_string(); }
+    if which::which("helix").is_ok() { return "helix".to_string(); }
+    "vi".to_string()
 }

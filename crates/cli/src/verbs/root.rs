@@ -26,18 +26,19 @@ pub fn print_cheatsheet() {
         (". wipe",    "kill all of current project"),
     ]);
 
-    println!("\n{}", "Look & feel:".bold().yellow());
+    println!("\n{}", "Security:".bold().yellow());
     rows(&[
-        ("bg",     "wallpaper: search / pick / set / opacity"),
-        ("look",   "preset: neon | ice | mint | dark | dim"),
+        ("sec",       "warp VPN + ufw firewall: on / off / status / toggle"),
     ]);
 
     println!("\n{}", "Lifecycle:".bold().yellow());
     rows(&[
-        ("setup",  "install everything (run once)"),
-        ("up",     "update tools (idempotent)"),
-        ("doctor", "health check"),
-        ("flow",   "workflow help theo thứ tự dùng"),
+        ("setup",          "install harness, then y/N per personal profile"),
+        ("setup --yall",   "install harness + ALL profiles, no prompts"),
+        ("setup profile",  "list / show / apply individual profiles"),
+        ("up",             "update 8sync + forge (system pkgs not touched)"),
+        ("doctor",         "health check"),
+        ("flow",           "workflow help theo thứ tự dùng"),
     ]);
 
     println!("\n{}", "AI tooling:".bold().yellow());
@@ -46,7 +47,6 @@ pub fn print_cheatsheet() {
         ("shot",     "render web/file to PNG"),
         ("diff-img", "render git diff to PNG"),
         ("pdf-img",  "render PDF pages to PNG"),
-        ("mcp",      "MCP server for forge/cursor/opencode"),
     ]);
 
     println!("\nMọi verb có {} hoặc {}.", "-h".bold().green(), "--help".bold().green());

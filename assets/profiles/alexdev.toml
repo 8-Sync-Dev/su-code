@@ -1,0 +1,23 @@
+name = "alexdev"
+description = "alexdev's full personal setup (bundle)"
+
+extends = [
+  "vietnamese",
+  "hardware-cooling",
+  "hardware-lianli",
+  "displaylink",
+  "apps-personal",
+  "warp",
+]
+
+[packages]
+pacman = []
+aur = []
+
+[services]
+system_enable = []
+user_enable = []
+
+[post_install]
+commands = []
+hint = ""

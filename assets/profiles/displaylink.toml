@@ -1,0 +1,14 @@
+name = "displaylink"
+description = "DisplayLink USB monitor driver (evdi-dkms)"
+
+[packages]
+pacman = ["evdi-dkms"]
+aur = []
+
+[services]
+system_enable = []
+user_enable = []
+
+[post_install]
+commands = []
+hint = "Reboot once after install so the DKMS module loads."

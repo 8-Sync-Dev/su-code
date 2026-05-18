@@ -1,0 +1,14 @@
+name = "apps-personal"
+description = "Personal apps (Bitwarden)"
+
+[packages]
+pacman = ["bitwarden"]
+aur = []
+
+[services]
+system_enable = []
+user_enable = []
+
+[post_install]
+commands = []
+hint = ""

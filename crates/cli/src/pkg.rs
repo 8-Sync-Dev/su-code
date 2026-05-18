@@ -122,6 +122,95 @@ pub fn ensure_paru() -> Result<bool> {
     Ok(true)
 }
 
+/// Transactional install: snapshot which pkgs are NEW, install with --needed,
+/// on failure roll back any package that was successfully installed in this batch.
+///
+/// `noconfirm` controls whether we pass `--noconfirm` (auto-yes for unattended runs).
+pub fn pacman_install_safe(pkgs: &[&str], noconfirm: bool) -> Result<()> {
+    if pkgs.is_empty() { return Ok(()); }
+
+    // 1. Snapshot pre-install state
+    let new_pkgs: Vec<&str> = pkgs.iter().copied()
+        .filter(|p| matches!(pacman_state(p), InstallState::Missing))
+        .collect();
+    let already: Vec<&str> = pkgs.iter().copied()
+        .filter(|p| !matches!(pacman_state(p), InstallState::Missing))
+        .collect();
+
+    for p in &already {
+        ui::skip(p, "already installed");
+    }
+    if new_pkgs.is_empty() {
+        return Ok(());
+    }
+
+    ui::step(&format!("pacman install: {}", new_pkgs.join(" ")));
+    let mut cmd = Command::new("sudo");
+    cmd.arg("pacman").arg("-S").arg("--needed");
+    if noconfirm { cmd.arg("--noconfirm"); }
+    cmd.args(&new_pkgs);
+    let status = cmd.status()?;
+
+    if !status.success() {
+        // Rollback any that DID get installed in this batch
+        let installed_now: Vec<&str> = new_pkgs.iter().copied()
+            .filter(|p| !matches!(pacman_state(p), InstallState::Missing))
+            .collect();
+        if !installed_now.is_empty() {
+            ui::warn(&format!("install failed — rolling back: {}", installed_now.join(" ")));
+            let mut roll = Command::new("sudo");
+            roll.arg("pacman").arg("-Rns");
+            if noconfirm { roll.arg("--noconfirm"); }
+            roll.args(&installed_now);
+            let _ = roll.status();
+        }
+        return Err(anyhow!("pacman install failed (rolled back)"));
+    }
+    Ok(())
+}
+
+/// Transactional AUR install via `helper` (paru/yay) with rollback on failure.
+pub fn aur_install_safe(helper: &str, pkgs: &[&str], noconfirm: bool) -> Result<()> {
+    if pkgs.is_empty() { return Ok(()); }
+
+    let new_pkgs: Vec<&str> = pkgs.iter().copied()
+        .filter(|p| matches!(pacman_state(p), InstallState::Missing))
+        .collect();
+    let already: Vec<&str> = pkgs.iter().copied()
+        .filter(|p| !matches!(pacman_state(p), InstallState::Missing))
+        .collect();
+
+    for p in &already {
+        ui::skip(p, "already installed");
+    }
+    if new_pkgs.is_empty() {
+        return Ok(());
+    }
+
+    ui::step(&format!("{} install: {}", helper, new_pkgs.join(" ")));
+    let mut cmd = Command::new(helper);
+    cmd.arg("-S").arg("--needed");
+    if noconfirm { cmd.arg("--noconfirm"); }
+    cmd.args(&new_pkgs);
+    let status = cmd.status()?;
+
+    if !status.success() {
+        let installed_now: Vec<&str> = new_pkgs.iter().copied()
+            .filter(|p| !matches!(pacman_state(p), InstallState::Missing))
+            .collect();
+        if !installed_now.is_empty() {
+            ui::warn(&format!("install failed — rolling back: {}", installed_now.join(" ")));
+            let mut roll = Command::new("sudo");
+            roll.arg("pacman").arg("-Rns");
+            if noconfirm { roll.arg("--noconfirm"); }
+            roll.args(&installed_now);
+            let _ = roll.status();
+        }
+        return Err(anyhow!("{} install failed (rolled back)", helper));
+    }
+    Ok(())
+}
+
 /// Install AUR packages via paru (idempotent)
 pub fn paru_ensure(pkgs: &[&str]) -> Result<()> {
     let mut missing: Vec<&str> = Vec::new();

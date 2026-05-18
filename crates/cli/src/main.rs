@@ -27,19 +27,21 @@ struct Cli {
 
 const HELP_AFTER: &str = "\
 QUICK START
-  8sync setup                       install everything (run once)
+  8sync setup                       install harness, then ask y/N per profile
+  8sync setup --yall                install harness + ALL profiles, no prompts
   8sync .                           open project session (kitty + forge)
   8sync ai \"add dark mode toggle\"   ai prompt
   8sync ship \"feat: dark mode\"      commit + push + PR
   8sync end                         capture knowledge, close session
+  8sync sec on                      WARP VPN + ufw firewall on
 
 Every verb supports -h:
-  8sync setup -h    8sync ai -h    8sync bg -h
+  8sync setup -h    8sync ai -h    8sync sec -h
 ";
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Install everything (idempotent): system pkgs, kitty/helix/fish configs, WARP, UFW, docker, forge, skills, MCP daemon
+    /// Install harness (helix/lazygit/abduco/gh + forge + configs + skills) then prompt per personal profile
     Setup(verbs::setup::Args),
 
     /// Update managed tools (only if newer version available). Self-updates 8sync binary from GitHub first.
@@ -49,7 +51,7 @@ enum Cmd {
     /// Health-check; report what's installed and what's missing
     Doctor,
 
-    /// Open project session: kitty 3-pane + forge in abduco. Subcommands: ls/to/new/rm/mv/wipe/kick
+    /// Open project session: kitty 3-pane (if remote control on) + forge in abduco. Subcommands: ls/to/new/rm/mv/wipe/kick
     #[command(name = ".", alias = "here")]
     Here(verbs::here::Args),
 
@@ -62,11 +64,8 @@ enum Cmd {
     /// Run project command per recipe (dev/build/test/fmt/lint)
     Run(verbs::run::Args),
 
-    /// Background wallpaper all-in-one (search/pick/set/opacity)
-    Bg(verbs::bg::Args),
-
-    /// Style preset (kitty + helix combo): neon | ice | mint | dark | dim
-    Look(verbs::look::Args),
+    /// Security toggle: WARP VPN + ufw firewall (on/off/status/toggle)
+    Sec(verbs::sec::Args),
 
     /// Capture session knowledge, save state, close panes
     End,
@@ -85,16 +84,13 @@ enum Cmd {
     #[command(name = "pdf-img")]
     PdfImg(verbs::pdf_img::Args),
 
-    /// Run MCP server (exposed to forge/cursor/opencode)
-    Mcp,
-
     /// Show overview cheatsheet (alias of `8sync` with no args)
     Help,
 
     /// Workflow-ordered help (lifecycle commands theo thứ tự dùng)
     Flow,
 
-    /// Search code (rg + fzf) or filenames (fd); pick → open in helix
+    /// Search code (rg + fzf) or filenames (fd); pick → open in $EDITOR or helix
     Find(verbs::find::Args),
 
     /// Append a one-line note to agents/NOTES.md (AI sẽ đọc lại session sau)
@@ -103,41 +99,33 @@ enum Cmd {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    // Rate-limited auto-check for new upstream commit (6h). Skips on
-    // commands that already touch the binary or are short non-interactive.
     if !matches!(
         cli.cmd,
-        Some(Cmd::Up) | Some(Cmd::Setup(_)) | Some(Cmd::Help) | Some(Cmd::Mcp)
+        Some(Cmd::Up) | Some(Cmd::Setup(_)) | Some(Cmd::Help)
     ) {
         verbs::selfup::auto_check_notice();
     }
     match cli.cmd {
         None => {
-            // `8sync` no args → print cheatsheet
             verbs::root::print_cheatsheet();
             Ok(())
         }
-        Some(Cmd::Setup(a)) => verbs::setup::run(a),
-        Some(Cmd::Up) => verbs::up::run(),
-        Some(Cmd::Doctor) => verbs::doctor::run(),
-        Some(Cmd::Here(a)) => verbs::here::run(a),
-        Some(Cmd::Ai(a)) => verbs::ai::run(a),
-        Some(Cmd::Ship(a)) => verbs::ship::run(a),
-        Some(Cmd::Run(a)) => verbs::run::run(a),
-        Some(Cmd::Bg(a)) => verbs::bg::run(a),
-        Some(Cmd::Look(a)) => verbs::look::run(a),
-        Some(Cmd::End) => verbs::end::run(),
-        Some(Cmd::Skill(a)) => verbs::skill::run(a),
-        Some(Cmd::Shot(a)) => verbs::shot::run(a),
+        Some(Cmd::Setup(a))   => verbs::setup::run(a),
+        Some(Cmd::Up)         => verbs::up::run(),
+        Some(Cmd::Doctor)     => verbs::doctor::run(),
+        Some(Cmd::Here(a))    => verbs::here::run(a),
+        Some(Cmd::Ai(a))      => verbs::ai::run(a),
+        Some(Cmd::Ship(a))    => verbs::ship::run(a),
+        Some(Cmd::Run(a))     => verbs::run::run(a),
+        Some(Cmd::Sec(a))     => verbs::sec::run(a),
+        Some(Cmd::End)        => verbs::end::run(),
+        Some(Cmd::Skill(a))   => verbs::skill::run(a),
+        Some(Cmd::Shot(a))    => verbs::shot::run(a),
         Some(Cmd::DiffImg(a)) => verbs::diff_img::run(a),
-        Some(Cmd::PdfImg(a)) => verbs::pdf_img::run(a),
-        Some(Cmd::Mcp) => verbs::mcp::run(),
-        Some(Cmd::Help) => {
-            verbs::root::print_cheatsheet();
-            Ok(())
-        }
-        Some(Cmd::Flow) => verbs::flow::run(),
-        Some(Cmd::Find(a)) => verbs::find::run(a),
-        Some(Cmd::Note(a)) => verbs::note::run(a),
+        Some(Cmd::PdfImg(a))  => verbs::pdf_img::run(a),
+        Some(Cmd::Help)       => { verbs::root::print_cheatsheet(); Ok(()) }
+        Some(Cmd::Flow)       => verbs::flow::run(),
+        Some(Cmd::Find(a))    => verbs::find::run(a),
+        Some(Cmd::Note(a))    => verbs::note::run(a),
     }
 }

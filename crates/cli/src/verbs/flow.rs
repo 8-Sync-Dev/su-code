@@ -6,9 +6,10 @@ pub fn run() -> Result<()> {
 
     section("LẦN ĐẦU CÀI MÁY MỚI", &[
         ("git clone https://github.com/8-Sync-Dev/su-code", ""),
-        ("cd su-code && bash scripts/bootstrap.sh", "cài rustup + build + install 8sync"),
-        ("8sync setup", "full stack 1 lệnh (idempotent)"),
-        ("(đóng & mở lại kitty 1 lần)", "kích hoạt allow_remote_control"),
+        ("cd su-code && bash scripts/bootstrap.sh", "cài rustup (nếu thiếu) + build + install 8sync"),
+        ("8sync setup", "harness (slim) + hỏi y/N từng personal profile"),
+        ("# hoặc 8sync setup --yall", "cài full không hỏi"),
+        ("# hoặc 8sync setup --profile alexdev", "apply bundle cá nhân hóa"),
         ("forge login", "chọn provider AI + paste API key"),
         ("gh auth status", "kiểm tra GitHub đã login chưa"),
         ("8sync doctor", "verify"),
@@ -36,22 +37,30 @@ pub fn run() -> Result<()> {
     section("ĐA SESSION SONG SONG", &[
         ("8sync . ls", "liệt kê session đang sống"),
         ("8sync . to other-project", "chuyển session"),
-        ("8sync . new bg-fix forge", "tạo session detached phụ"),
-        ("8sync . rm bg-fix", "xoá session"),
+        ("8sync . new hotfix forge", "tạo session detached phụ"),
+        ("8sync . rm hotfix", "xoá session"),
         ("8sync . wipe", "xoá all session của project hiện tại"),
     ]);
 
     section("LOOK & FEEL", &[
-        ("8sync bg cyberpunk city", "search wallpaper → set live cho mọi cửa sổ kitty"),
-        ("8sync bg 0.7", "đặt opacity 0.7"),
-        ("8sync look neon", "preset kitty + helix transparent"),
+        ("# HyDE quản: kitty theme + wallpaper + Hyprland config", ""),
+        ("hydectl wallpaper next", "đổi wallpaper (HyDE built-in)"),
+        ("hydectl theme set <name>", "đổi theme (HyDE built-in)"),
+    ]);
+
+    section("SECURITY (VPN + Firewall)", &[
+        ("8sync sec", "status WARP + ufw"),
+        ("8sync sec on", "bật cả WARP VPN + ufw firewall"),
+        ("8sync sec off", "tắt cả 2"),
+        ("8sync sec warp on", "chỉ điều khiển WARP"),
+        ("8sync sec ufw on", "chỉ điều khiển ufw"),
     ]);
 
     section("KHI CẦN", &[
-        ("8sync up", "update tool (chỉ cài nếu version mới hơn)"),
+        ("8sync up", "update 8sync + forge (hệ thống pkg user tự lo)"),
         ("8sync doctor", "health check"),
         ("8sync skill", "quản lý skill cho forge"),
-        ("8sync mcp", "MCP server (forge/cursor/opencode dùng được)"),
+        ("8sync setup profile list", "liệt kê profile"),
     ]);
 
     println!("Mọi verb có {} hoặc {} để xem chi tiết.", "-h".bold().green(), "--help".bold().green());

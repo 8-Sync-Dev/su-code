@@ -1,0 +1,14 @@
+name = "hardware-cooling"
+description = "Cooler & RGB control (CoolerControl, OpenRGB, liquidctl)"
+
+[packages]
+pacman = ["coolercontrol", "openrgb", "liquidctl"]
+aur = []
+
+[services]
+system_enable = ["coolercontrold.service"]
+user_enable = []
+
+[post_install]
+commands = []
+hint = "Open the CoolerControl GUI to configure curves. OpenRGB needs `i2c-dev` kernel module for RAM/mobo RGB."

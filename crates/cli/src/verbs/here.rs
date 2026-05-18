@@ -70,12 +70,16 @@ fn open_or_attach() -> Result<()> {
         ui::warn("forge not installed — run `8sync setup` first. Falling back to fish shell.");
     }
 
-    // Open Kitty layout (3 panes) if running inside kitty
+    // Open Kitty layout (3 panes) only when running inside kitty AND remote control is enabled.
     let in_kitty = env.kitty && std::env::var("KITTY_PID").is_ok();
-    if in_kitty {
+    let remote_on = env_detect::kitty_remote_on();
+    if in_kitty && remote_on {
         open_kitty_layout(&root, &session_name, has_abduco, has_forge)?;
     } else {
-        // No kitty → just attach/create in current terminal
+        if in_kitty && !remote_on {
+            ui::info("kitty allow_remote_control off — using soft 1-pane mode (add `allow_remote_control yes` to ~/.config/kitty/kitty.conf for full 3-pane)");
+        }
+        // Soft mode: just attach/create in current terminal
         exec_forge_in_session(&root, &session_name, has_abduco, has_forge)?;
     }
     Ok(())
@@ -355,7 +359,8 @@ fn open_kitty_layout(
     has_abduco: bool,
     has_forge: bool,
 ) -> Result<()> {
-    let editor = if which::which("hx").is_ok() { "hx" } else if which::which("helix").is_ok() { "helix" } else { "fish" };
+    let editor = pick_editor();
+    let shell = pick_shell();
 
     // Pane 1: editor (current tab → new tab so the chat session is preserved)
     let _ = Command::new("kitty")
@@ -364,7 +369,7 @@ fn open_kitty_layout(
             "--cwd", root.to_str().unwrap(),
             "--type=tab",
             "--tab-title=8sync",
-            editor, ".",
+            &editor, ".",
         ])
         .status();
 
@@ -375,23 +380,43 @@ fn open_kitty_layout(
             "@", "launch",
             "--cwd", root.to_str().unwrap(),
             "--location=vsplit",
-            "fish", "-c", &forge_cmd,
+            &shell, "-c", &forge_cmd,
         ])
         .status();
 
-    // Pane 3: fish for logs / run
+    // Pane 3: shell for logs / run
     let _ = Command::new("kitty")
         .args([
             "@", "launch",
             "--cwd", root.to_str().unwrap(),
             "--location=hsplit",
-            "fish",
+            &shell,
         ])
         .status();
 
     let bg = if has_abduco { " (detached via abduco)" } else { " (no abduco — exec direct)" };
-    ui::ok(&format!("kitty layout: {} | forge{} | fish", editor, bg));
+    ui::ok(&format!("kitty layout: {} | forge{} | {}", editor, bg, shell));
     Ok(())
+}
+
+fn pick_editor() -> String {
+    if let Ok(e) = std::env::var("VISUAL") { if !e.is_empty() && which::which(&e).is_ok() { return e; } }
+    if let Ok(e) = std::env::var("EDITOR") { if !e.is_empty() && which::which(&e).is_ok() { return e; } }
+    if which::which("hx").is_ok()    { return "hx".to_string(); }
+    if which::which("helix").is_ok() { return "helix".to_string(); }
+    pick_shell()
+}
+
+fn pick_shell() -> String {
+    if let Ok(s) = std::env::var("SHELL") {
+        if !s.is_empty() {
+            // strip path
+            return s.rsplit('/').next().unwrap_or(&s).to_string();
+        }
+    }
+    if which::which("zsh").is_ok()  { return "zsh".to_string(); }
+    if which::which("fish").is_ok() { return "fish".to_string(); }
+    "bash".to_string()
 }
 
 fn exec_forge_in_session(
@@ -401,18 +426,20 @@ fn exec_forge_in_session(
     has_forge: bool,
 ) -> Result<()> {
     let cmd = forge_invocation(root, session_name, has_abduco, has_forge);
-    Command::new("fish").arg("-c").arg(&cmd).current_dir(root).status()?;
+    let shell = pick_shell();
+    Command::new(&shell).arg("-c").arg(&cmd).current_dir(root).status()?;
     Ok(())
 }
 
 fn forge_invocation(root: &Path, session_name: &str, has_abduco: bool, has_forge: bool) -> String {
-    let inner = if has_forge { "forge" } else { "fish" };
+    let shell = pick_shell();
+    let inner = if has_forge { "forge".to_string() } else { shell.clone() };
     let cd = format!("cd {}", shell_quote(root.to_str().unwrap()));
     if has_abduco {
         // abduco -A name cmd → attach if exists, else create
-        format!("{cd}; and abduco -A {session_name} {inner}")
+        format!("{cd} && abduco -A {session_name} {inner}")
     } else {
-        format!("{cd}; and {inner}")
+        format!("{cd} && {inner}")
     }
 }
 

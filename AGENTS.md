@@ -22,18 +22,25 @@ Stack: **Rust** (single workspace, 1 binary `8sync` ≈ 1.3 MB stripped).
 ```bash
 git clone https://github.com/8-Sync-Dev/su-code.git
 cd su-code
-bash scripts/bootstrap.sh        # cài rustup + build + install vào ~/.local/bin
+bash scripts/bootstrap.sh        # cài rustup (nếu thiếu) + build + install vào ~/.local/bin
 ```
 
 Sau đó:
 ```bash
-8sync setup                      # cài full môi trường (idempotent)
-# đóng & mở lại kitty 1 lần      # bật allow_remote_control
+8sync setup                      # harness slim + hỏi y/N từng personal profile
+# hoặc:
+8sync setup --yall               # cài full harness + ALL profiles, không hỏi
+8sync setup --no-profile         # chỉ harness (không hỏi profile)
+8sync setup --profile alexdev    # apply bundle cá nhân hóa của alexdev
+
 forge login                      # paste API key của forge
 8sync doctor                     # verify
 ```
 
-**Quy tắc**: KHÔNG chạy `8sync setup` mà chưa hỏi user trước — nó sẽ `sudo pacman -S` nhiều package. Luôn chạy `8sync setup --dry-run` trước.
+**Quy tắc an toàn**:
+- `8sync setup --dry-run` xem trước không thay đổi gì.
+- Mọi `pacman -S` / AUR install đều **transactional**: snapshot pkg mới trước khi install, nếu fail sẽ `pacman -Rns` rủi ro những pkg đã cài được trong batch đó (xem `pkg::pacman_install_safe` / `aur_install_safe`).
+- Re-run setup là idempotent: đã cài → skip.
 
 ---
 
@@ -68,28 +75,26 @@ su-code/
 │           ├── root.rs · flow.rs · setup.rs · doctor.rs · up.rs
 │           ├── here.rs (`8sync .` + sub: ls/to/new/rm/mv/wipe/kick)
 │           ├── ai.rs · end.rs · ship.rs · run.rs
-│           ├── bg.rs (Wallhaven/yandere/safebooru + opacity + tint + rotate)
-│           ├── look.rs (5 presets: neon/ice/mint/dark/dim)
-│           ├── find.rs (rg+fzf+helix) · note.rs (agents/NOTES.md)
-│           ├── skill.rs · shot.rs · diff_img.rs · pdf_img.rs
-│           └── mcp.rs (stub)
+│           ├── profile.rs   (load/resolve/apply assets/profiles/*.toml + state)
+│           ├── sec.rs       (WARP VPN + ufw firewall toggle: on/off/status/toggle)
+│           ├── find.rs (rg+fzf+$EDITOR) · note.rs (agents/NOTES.md)
+│           └── skill.rs · shot.rs · diff_img.rs · pdf_img.rs
 └── assets/                                                  bundled vào binary qua rust-embed
-    ├── configs/                                             kitty.conf, helix-config.toml, fish-config.fish, ...
-    ├── presets/                                             5 kitty preset .conf (neon_glass, ice_glass, ...)
-    ├── skills/                                              karpathy, image-routing, 8sync-cli + 00-force-load.md
-    └── wallpapers/wallpapers.toml                           URL list cho default wallpaper
+    ├── configs/                                             helix config + theme + kitty/8sync.session + 8sync/{global,skills}.toml
+    ├── profiles/                                            7 personal profile TOML (vietnamese, hw-cooling, hw-lianli, displaylink, apps-personal, warp, alexdev-bundle)
+    └── skills/                                              karpathy, image-routing, 8sync-cli + 00-force-load.md
 ```
 
 ---
 
-## 5. Toàn bộ verb (20 verb flat, không sub-sub)
+## 5. Toàn bộ verb (13 verb flat sau khi slim-down cho HyDE)
 
 ### Vibe loop (daily, dùng liên tục)
 | Verb | Mô tả |
 |---|---|
-| `8sync .` | Mở/attach session: kitty 3-pane + forge trong abduco |
+| `8sync .` | Mở/attach session. Nếu kitty có `allow_remote_control yes` → 3-pane; nếu không → soft 1-pane + forge trong abduco |
 | `8sync ai [prompt]` | AI session (resume hoặc one-shot, wrap forge) |
-| `8sync find <kw>` | rg/fd + fzf preview → enter mở helix tại `file:line` |
+| `8sync find <kw>` | rg/fd + fzf preview → mở bằng `$EDITOR` (fallback hx/helix/vi) tại `file:line` |
 | `8sync note "msg" [-t tag]` | Append `agents/NOTES.md` |
 | `8sync run [dev\|build\|test\|fmt\|lint]` | Project command theo recipe |
 | `8sync ship "msg"` | `git add -A && commit && push && gh pr create` |
@@ -98,25 +103,27 @@ su-code/
 ### Session mgmt (sub của `.`)
 `8sync . ls` / `to <n>` / `new <n> [cmd]` / `rm <n>` / `wipe` / `kick`
 
-### Look & feel
+### Security (VPN + Firewall)
 | Verb | Mô tả |
 |---|---|
-| `8sync bg <kw>` | Wallhaven search → tải về `~/.local/share/8sync/wallpapers/` → set |
-| `8sync bg -s yandere\|safebooru <kw>` | Đổi source |
-| `8sync bg /path` | Set từ file local |
-| `8sync bg https://...` | Tải URL → set |
-| `8sync bg 0.7` / `+` / `-` / `off` | Opacity / nudge / clear |
-| `8sync bg tint 0.5` | Background tint |
-| `8sync bg pick` | fzf picker với icat preview |
-| `8sync bg rotate on [N]` / `off` / `now` | Systemd-user timer đổi bg mỗi N phút |
-| `8sync look <preset>` | neon\|ice\|mint\|dark\|dim (5 preset) |
+| `8sync sec` | Status WARP + ufw |
+| `8sync sec on \| off \| toggle` | Bật/tắt/flip cả 2 |
+| `8sync sec warp [on\|off\|status]` | Chỉ điều khiển WARP |
+| `8sync sec ufw [on\|off\|status]` | Chỉ điều khiển ufw |
+
+**Lưu ý**: "Look & feel" (wallpaper/theme/kitty layout) đã **delegate cho HyDE** — dùng `hydectl wallpaper next` và `hydectl theme set <name>`.
 
 ### Lifecycle
 | Verb | Mô tả |
 |---|---|
-| `8sync setup [--dry-run\|--minimal\|--no-warp\|--no-mobile\|--no-db]` | Cài full môi trường (1 lần) |
-| `8sync up` | Update tool (chỉ cài nếu version mới hơn) |
-| `8sync doctor` | Health check |
+| `8sync setup` | Stage A (harness slim: helix/lazygit/abduco/gh + forge + configs + skills) + Stage B (hỏi y/N từng profile) |
+| `8sync setup --yall` | Auto-yes — cài harness + ALL profiles (bundle `alexdev`) không prompt |
+| `8sync setup --no-profile` | Chỉ harness, không hỏi profile |
+| `8sync setup --profile <name>` | Apply 1 profile cụ thể non-interactive |
+| `8sync setup --dry-run` | Preview, không thay đổi gì |
+| `8sync setup profile list\|show\|apply <name>` | Quan lý profile sau khi setup |
+| `8sync up` | Self-update binary + forge (KHÔNG chạy `pacman -Syu` — user tự lo) |
+| `8sync doctor` | Health check (HyDE detect, kitty remote, gh hard-check, sec status, profiles applied) |
 | `8sync flow` | Workflow help theo thứ tự dùng |
 | `8sync help` | Cheatsheet |
 
@@ -127,7 +134,30 @@ su-code/
 | `8sync shot <url\|file>` | Render web/file → PNG (cho image-routing) |
 | `8sync diff-img [ref]` | Git diff → PNG |
 | `8sync pdf-img <file>` | PDF page → PNG |
-| `8sync mcp` | MCP server (stub, phase 2) |
+
+---
+
+## 5b. Profile system (Stage B của setup)
+
+7 built-in profile trong `assets/profiles/*.toml`:
+
+| Profile | Nội dung | Cần AUR helper |
+|---|---|---|
+| `vietnamese` | fcitx5 + Unikey | no |
+| `hardware-cooling` | coolercontrol + openrgb + liquidctl | no |
+| `hardware-lianli` | `lianli-linux-git` (yay/paru auto-pulls deps) | **yes** |
+| `displaylink` | evdi-dkms | no |
+| `apps-personal` | bitwarden | no |
+| `warp` | `cloudflare-warp-bin` + enable warp-svc + config DoH/MASQUE/malware DNS | **yes** |
+| `alexdev` | bundle: extends cả 6 profile trên | yes (qua warp/lianli) |
+
+User có thể thay/thêm profile trong `~/.config/8sync/profiles/*.toml` (override built-in).
+
+State luư ở `~/.config/8sync/profile.toml`:
+```toml
+applied = ["vietnamese", "hardware-cooling", ...]
+last_setup = "epoch:..."
+```
 
 ---
 

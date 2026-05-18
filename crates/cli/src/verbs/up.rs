@@ -3,18 +3,14 @@ use crate::{pkg, ui, verbs::selfup};
 
 pub fn run() -> Result<()> {
     ui::header("8sync up");
-    // 1. Self-update first (binary from GitHub)
+    // 1. Self-update 8sync binary first
     let _ = selfup::run_self_update(false);
-    // 2. System packages
-    let _ = pkg::run_loud("sudo", &["pacman", "-Syu", "--noconfirm"]);
-    // 3. Paru AUR
-    if which::which("paru").is_ok() {
-        let _ = pkg::run_loud("paru", &["-Syu", "--noconfirm", "--aur"]);
-    }
-    // 4. Forge
+    // 2. Forge AI CLI (curl re-installer if present)
     if which::which("forge").is_ok() {
         let _ = pkg::run_loud("sh", &["-c", "curl -fsSL https://forgecode.dev/cli | sh"]);
     }
-    ui::ok("up complete");
+    // Note: we DO NOT run `pacman -Syu` here. System updates are the user's choice
+    // (CachyOS rolling — run `paru -Syu` yourself when ready).
+    ui::ok("up complete (system pkgs untouched — run `paru -Syu` manually if needed)");
     Ok(())
 }

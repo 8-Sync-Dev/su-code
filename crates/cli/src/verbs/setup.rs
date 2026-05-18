@@ -1,165 +1,177 @@
 use anyhow::Result;
 use clap::Args as ClapArgs;
 
-use crate::{assets, env_detect, pkg, ui};
+use crate::{assets, env_detect, pkg, ui, verbs::profile};
 
 #[derive(ClapArgs, Debug)]
 #[command(
     after_help = indoc::indoc! {"
         EXAMPLES
-          8sync setup
-          8sync setup --dry-run
-          8sync setup --minimal
-          8sync setup --no-warp --no-mobile --no-db
+          8sync setup                     install harness, then ask y/N per profile
+          8sync setup --yall              install harness + ALL profiles (no prompts)
+          8sync setup --yes               same as --yall (alias)
+          8sync setup --no-profile        only harness (skip profile stage)
+          8sync setup --profile alexdev   apply a specific bundle non-interactively
+          8sync setup --dry-run           print plan, no changes
+          8sync setup profile list        list available profiles
+          8sync setup profile show <name> show resolved profile content
+          8sync setup profile apply <name> idempotent (re)apply a profile
     "}
 )]
 pub struct Args {
-    /// Print the plan without making changes
+    /// Sub-action (sub-command): `profile [list|show|apply <name>]`
+    pub action: Option<String>,
+    /// Arguments to sub-action
+    pub rest: Vec<String>,
+
+    /// Yes-to-all: install every profile + --noconfirm on pacman/AUR
+    #[arg(long = "yall", alias = "yes", short = 'y')]
+    pub yall: bool,
+
+    /// Skip profile stage entirely (harness only)
+    #[arg(long)]
+    pub no_profile: bool,
+
+    /// Apply a specific profile non-interactively
+    #[arg(long)]
+    pub profile: Option<String>,
+
+    /// Print plan without making changes
     #[arg(long)]
     pub dry_run: bool,
-
-    /// Skip everything optional (mobile, db, warp)
-    #[arg(long)]
-    pub minimal: bool,
-
-    /// Skip mobile dev (jdk, android-tools)
-    #[arg(long)]
-    pub no_mobile: bool,
-
-    /// Skip local databases (postgresql, valkey)
-    #[arg(long)]
-    pub no_db: bool,
-
-    /// Skip Cloudflare WARP
-    #[arg(long)]
-    pub no_warp: bool,
-
-    /// Update outdated packages instead of skipping
-    #[arg(long, short = 'u')]
-    pub update: bool,
 }
 
 pub fn run(a: Args) -> Result<()> {
-    let env = env_detect::Env::detect()?;
-    ui::header("8sync setup");
+    // Sub-command: `8sync setup profile <action>`
+    if a.action.as_deref() == Some("profile") {
+        return profile_sub(a.rest, a.yall, a.dry_run);
+    }
 
+    ui::header("8sync setup");
+    let env = env_detect::Env::detect()?;
     if !env.is_cachyos_or_arch() {
         ui::warn(&format!(
-            "Detected OS `{}` — su-code targets CachyOS/Arch. Some steps may fail.",
-            env.os_id
+            "OS `{}` is not CachyOS/Arch — some steps may fail.", env.os_id
         ));
     }
+    if env_detect::is_hyde() {
+        ui::ok("HyDE detected — will skip kitty/theme/wallpaper (HyDE manages them)");
+    }
 
-    let mobile = !a.minimal && !a.no_mobile;
-    let db = !a.minimal && !a.no_db;
-    let warp = !a.minimal && !a.no_warp;
-
-    println!("Plan:");
-    println!("  · core packages (kitty/helix/git/...)");
-    if mobile { println!("  · mobile dev (jdk, android-tools)"); }
-    if db     { println!("  · databases (postgresql, valkey)"); }
-    if warp   { println!("  · cloudflare-warp + DoH MASQUE + auto-start"); }
-    println!("  · forge (curl install)");
-    println!("  · configs (kitty/helix/fish/im)");
-    println!("  · wallpaper (bundle default)");
-    println!("  · skills (karpathy, image-routing, 8sync-cli)");
-    println!("  · systemd-user (8sync-mcp.service)");
-    println!();
-
+    // ── Stage A: Harness (always run) ────────────────────────────
+    ui::step("Stage A — coding harness");
     if a.dry_run {
-        ui::info("dry-run — exiting");
+        ui::info("would install: helix lazygit abduco github-cli");
+        ui::info("would install forge (curl) if missing");
+        ui::info("would write: configs + skills");
+    } else {
+        let core = ["helix", "lazygit", "abduco", "github-cli"];
+        pkg::pacman_install_safe(&core, true)?;
+        install_forge()?;
+        install_configs(&env)?;
+        install_skills(&env)?;
+    }
+
+    // ── Stage B: Profiles (optional) ─────────────────────────────
+    if a.no_profile {
+        ui::info("--no-profile → skipping personal profiles");
+        finish_msg();
         return Ok(());
     }
 
-    if !ui::prompt_yes_no("Continue?", true) {
-        ui::info("aborted");
+    let all = profile::load_all()?;
+
+    // explicit --profile <name>
+    if let Some(name) = a.profile.as_ref() {
+        ui::step(&format!("Stage B — applying profile `{}`", name));
+        let resolved = profile::resolve(name, &all)?;
+        profile::apply(&resolved, true, a.dry_run)?;
+        if !a.dry_run { profile::mark_applied(name)?; }
+        finish_msg();
         return Ok(());
     }
 
-    // 1. core pacman packages
-    ui::step("Core packages");
-    let mut core: Vec<&str> = vec![
-        "kitty", "helix", "git", "github-cli", "lazygit",
-        "nodejs", "npm", "pnpm", "bun", "docker", "docker-compose",
-        "ripgrep", "fd", "fzf", "eza", "bat", "jq", "fastfetch", "btop",
-        "zoxide", "protobuf", "unzip", "zip", "ufw", "fish",
-        // python tooling (uv installs itself, but base python ok)
-        "python", "python-pip",
-        // image tooling for `8sync shot/pdf-img`
-        "poppler", "imagemagick",
-        // detached sessions (live across terminal close, replaces tmux)
-        "abduco",
-        // image-routing helpers
-        "curl",
-    ];
-    if mobile { core.extend_from_slice(&["jdk-openjdk", "android-tools", "android-udev"]); }
-    if db     { core.extend_from_slice(&["postgresql", "valkey"]); }
-    pkg::pacman_ensure(&core, a.update)?;
-
-    // 2. paru + AUR
-    if warp {
-        ui::step("paru + cloudflare-warp-bin");
-        pkg::ensure_paru()?;
-        pkg::paru_ensure(&["cloudflare-warp-bin"])?;
+    // --yall: apply all non-bundle profiles
+    if a.yall {
+        ui::step("Stage B — --yall: applying ALL profiles");
+        // Apply alexdev bundle if present (covers everything), else apply each
+        let name = if all.contains_key("alexdev") { "alexdev" } else {
+            ui::warn("no `alexdev` bundle — applying every profile individually");
+            for (n, _) in &all {
+                let res = profile::resolve(n, &all)?;
+                let _ = profile::apply(&res, true, a.dry_run);
+                if !a.dry_run { let _ = profile::mark_applied(n); }
+            }
+            finish_msg();
+            return Ok(());
+        };
+        let resolved = profile::resolve(name, &all)?;
+        profile::apply(&resolved, true, a.dry_run)?;
+        if !a.dry_run { profile::mark_applied(name)?; }
+        finish_msg();
+        return Ok(());
     }
 
-    // 3. forge (curl installer if missing)
-    install_forge(a.update)?;
+    // Interactive y/N per profile (skip bundle profiles)
+    if !env_detect::has_tty() {
+        ui::info("no TTY — skipping interactive profile prompt (use --yall or --profile)");
+        finish_msg();
+        return Ok(());
+    }
 
-    // 4. configs
-    install_configs(&env)?;
+    ui::step("Stage B — personal profiles (y/N each)");
+    let mut names: Vec<&String> = all.keys().collect();
+    names.sort();
+    for name in &names {
+        let p = match all.get(*name) { Some(p) => p, None => continue };
+        // Skip bundles (they `extend` others) — apply via --profile flag instead
+        if !p.extends.is_empty() { continue; }
+        let desc = if p.description.is_empty() { name.as_str() } else { p.description.as_str() };
+        let q = format!("Apply `{}` — {}", name, desc);
+        if ui::prompt_yes_no(&q, false) {
+            let resolved = profile::resolve(name, &all)?;
+            if let Err(e) = profile::apply(&resolved, false, a.dry_run) {
+                ui::err(&format!("profile {} failed: {}", name, e));
+            } else if !a.dry_run {
+                let _ = profile::mark_applied(name);
+            }
+        }
+    }
 
-    // 5. wallpaper bundle
-    install_wallpaper(&env)?;
-
-    // 6. skills
-    install_skills(&env)?;
-
-    // 7. services
-    enable_services(&env, warp)?;
-
-    // 8. user groups
-    pkg::run_loud("sudo", &["usermod", "-aG", "docker", &whoami()])?;
-
-    ui::header("Done — next steps");
-    println!("  1. {} {} (remote control needs full restart, not reload)",
-             "Close & reopen Kitty once".bold_str(), "—".bright_black_str());
-    println!("  2. Reboot or re-login (for docker group)");
-    println!("  3. {}", "forge login".bold_str());
-    println!("  4. {}", "8sync doctor".bold_str());
-    println!("  5. cd into a project and run {}", "8sync .".bold_str());
+    finish_msg();
     Ok(())
 }
 
-fn whoami() -> String {
-    std::env::var("USER")
-        .or_else(|_| std::env::var("LOGNAME"))
-        .unwrap_or_else(|_| "alexdev".to_string())
+fn finish_msg() {
+    ui::header("Done — next steps");
+    println!("  · 8sync doctor               — verify");
+    println!("  · forge login                — connect AI provider");
+    println!("  · cd <project> && 8sync .    — start a session");
 }
 
-fn install_forge(update: bool) -> Result<()> {
+fn install_forge() -> Result<()> {
     ui::step("forge AI CLI");
-    if which::which("forge").is_ok() && !update {
+    if which::which("forge").is_ok() {
         let v = env_detect::cmd_version("forge", &["--version"]).unwrap_or_default();
         ui::skip("forge", &format!("present ({})", v));
         return Ok(());
     }
-    // curl -fsSL https://forgecode.dev/cli | sh
     pkg::run_loud("sh", &["-c", "curl -fsSL https://forgecode.dev/cli | sh"])?;
     Ok(())
 }
 
 fn install_configs(env: &env_detect::Env) -> Result<()> {
-    ui::step("Configs (kitty/helix/fish/im/8sync)");
+    ui::step("Configs (helix + 8sync session/global)");
+    // Only safe, non-HyDE-conflicting configs:
+    //   • helix config + theme  (only written if user doesn't have one)
+    //   • kitty/8sync.session   (separate file, NOT kitty.conf)
+    //   • 8sync/global.toml + skills.toml
     let pairs = [
-        ("configs/kitty.conf",            env.xdg_config.join("kitty/kitty.conf")),
-        ("configs/kitty.session",         env.xdg_config.join("kitty/8sync.session")),
-        ("configs/helix-config.toml",     env.xdg_config.join("helix/config.toml")),
-        ("configs/helix-glass_black.toml",env.xdg_config.join("helix/themes/glass_black.toml")),
-        ("configs/fish-config.fish",      env.xdg_config.join("fish/conf.d/8sync.fish")),
-        ("configs/environment-im.conf",   env.xdg_config.join("environment.d/im.conf")),
-        ("configs/global.toml",           env.xdg_config.join("8sync/global.toml")),
-        ("configs/skills.toml",           env.xdg_config.join("8sync/skills.toml")),
+        ("configs/helix-config.toml",      env.xdg_config.join("helix/config.toml")),
+        ("configs/helix-glass_black.toml", env.xdg_config.join("helix/themes/glass_black.toml")),
+        ("configs/kitty.session",          env.xdg_config.join("kitty/8sync.session")),
+        ("configs/global.toml",            env.xdg_config.join("8sync/global.toml")),
+        ("configs/skills.toml",            env.xdg_config.join("8sync/skills.toml")),
     ];
     for (asset, target) in &pairs {
         let changed = assets::install(asset, target, false)?;
@@ -169,34 +181,14 @@ fn install_configs(env: &env_detect::Env) -> Result<()> {
     Ok(())
 }
 
-fn install_wallpaper(env: &env_detect::Env) -> Result<()> {
-    ui::step("Wallpaper bundle");
-    let wp_dir = env.xdg_data.join("8sync/wallpapers");
-    std::fs::create_dir_all(&wp_dir)?;
-    let default_path = wp_dir.join("default.jpg");
-    if default_path.exists() {
-        ui::skip("default.jpg", "already exists");
-        return Ok(());
-    }
-    // wallpapers.toml has a list of URLs to choose from
-    let list = assets::read("wallpapers/wallpapers.toml").unwrap_or_default();
-    let url = list
-        .lines()
-        .find_map(|l| l.strip_prefix("default = ").map(|s| s.trim().trim_matches('"').to_string()))
-        .unwrap_or_else(|| "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?w=3840".to_string());
-    pkg::run_loud("curl", &["-fL", "-o", default_path.to_str().unwrap(), &url])?;
-    ui::ok(&format!("downloaded → {}", default_path.display()));
-    Ok(())
-}
-
 fn install_skills(env: &env_detect::Env) -> Result<()> {
     ui::step("Skills (~/.forge/skills/)");
     let skills_dir = env.home.join(".forge/skills");
     std::fs::create_dir_all(&skills_dir)?;
     let trio = [
-        ("skills/karpathy/SKILL.md",            "karpathy-guidelines/SKILL.md"),
-        ("skills/image-routing/SKILL.md",       "image-routing/SKILL.md"),
-        ("skills/8sync-cli/SKILL.md",           "8sync-cli/SKILL.md"),
+        ("skills/karpathy/SKILL.md",      "karpathy-guidelines/SKILL.md"),
+        ("skills/image-routing/SKILL.md", "image-routing/SKILL.md"),
+        ("skills/8sync-cli/SKILL.md",     "8sync-cli/SKILL.md"),
     ];
     for (src, rel) in &trio {
         let target = skills_dir.join(rel);
@@ -210,48 +202,52 @@ fn install_skills(env: &env_detect::Env) -> Result<()> {
     Ok(())
 }
 
-fn enable_services(env: &env_detect::Env, warp: bool) -> Result<()> {
-    ui::step("Services (warp / ufw / docker / mcp)");
+// ─── `8sync setup profile <sub>` ────────────────────────────────
 
-    // systemd-user MCP service
-    let svc_target = env.xdg_config.join("systemd/user/8sync-mcp.service");
-    assets::install("configs/8sync-mcp.service", &svc_target, true)?;
-    let _ = pkg::run_quiet("systemctl", &["--user", "daemon-reload"]);
-    let _ = pkg::run_quiet("systemctl", &["--user", "enable", "--now", "8sync-mcp.service"]);
-    ui::ok("8sync-mcp user service enabled");
+fn profile_sub(rest: Vec<String>, yall: bool, dry_run: bool) -> Result<()> {
+    let action = rest.first().map(|s| s.as_str()).unwrap_or("list");
+    let all = profile::load_all()?;
+    let state = profile::load_state();
 
-    // ufw
-    let _ = pkg::run_loud("sudo", &["systemctl", "enable", "--now", "ufw.service"]);
-    let _ = pkg::run_loud("sudo", &["ufw", "--force", "enable"]);
-
-    // docker
-    let _ = pkg::run_loud("sudo", &["systemctl", "enable", "--now", "docker.service"]);
-
-    if warp {
-        // warp-svc
-        let _ = pkg::run_loud("sudo", &["systemctl", "enable", "--now", "warp-svc.service"]);
-        // 8sync wraps the rest: registration + mode + protocol + dns + connect
-        let _ = pkg::run_loud("warp-cli", &["--accept-tos", "registration", "new"]);
-        let _ = pkg::run_loud("warp-cli", &["--accept-tos", "mode", "doh"]);
-        let _ = pkg::run_loud("warp-cli", &["--accept-tos", "tunnel", "protocol", "set", "MASQUE"]);
-        let _ = pkg::run_loud("warp-cli", &["--accept-tos", "dns", "families", "malware"]);
-        let _ = pkg::run_loud("warp-cli", &["--accept-tos", "connect"]);
-        ui::ok("WARP: DoH + MASQUE + malware filter, auto-start on boot");
-    }
-    Ok(())
-}
-
-trait BoldStr {
-    fn bold_str(&self) -> String;
-    fn bright_black_str(&self) -> String;
-}
-impl BoldStr for &str {
-    fn bold_str(&self) -> String {
-        use owo_colors::OwoColorize;
-        self.bold().to_string()
-    }
-    fn bright_black_str(&self) -> String {
-        use owo_colors::OwoColorize;
-        self.bright_black().to_string()
+    match action {
+        "list" => {
+            ui::header("Profiles");
+            let mut names: Vec<&String> = all.keys().collect();
+            names.sort();
+            for n in names {
+                let p = &all[n];
+                let marker = if state.applied.iter().any(|x| x == n) { "✓" } else { " " };
+                let kind = if !p.extends.is_empty() { "(bundle)" } else { "" };
+                println!("  {} {:20} {} {}", marker, n, kind, p.description);
+            }
+            Ok(())
+        }
+        "show" => {
+            let name = rest.get(1).ok_or_else(|| anyhow::anyhow!("usage: 8sync setup profile show <name>"))?;
+            let r = profile::resolve(name, &all)?;
+            println!("name         = {}", r.name);
+            println!("description  = {}", r.description);
+            println!("needs AUR    = {}", r.requires.aur_helper);
+            println!("pacman       = {:?}", r.packages.pacman);
+            println!("aur          = {:?}", r.packages.aur);
+            println!("sys services = {:?}", r.services.system_enable);
+            println!("user services= {:?}", r.services.user_enable);
+            println!("commands     = {:?}", r.post_install.commands);
+            if !r.post_install.hint.is_empty() {
+                println!("\nhints:\n{}", r.post_install.hint);
+            }
+            Ok(())
+        }
+        "apply" => {
+            let name = rest.get(1).ok_or_else(|| anyhow::anyhow!("usage: 8sync setup profile apply <name>"))?;
+            let resolved = profile::resolve(name, &all)?;
+            profile::apply(&resolved, yall, dry_run)?;
+            if !dry_run { profile::mark_applied(name)?; }
+            Ok(())
+        }
+        other => {
+            ui::warn(&format!("unknown sub-action `{}` — try list | show | apply", other));
+            Ok(())
+        }
     }
 }

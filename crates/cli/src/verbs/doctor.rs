@@ -1,36 +1,47 @@
 use anyhow::Result;
-use crate::{env_detect, pkg, ui};
+use crate::{env_detect, ui, verbs::{profile, sec}};
 
 pub fn run() -> Result<()> {
     ui::header("8sync doctor");
     let env = env_detect::Env::detect()?;
 
-    check("OS",       &format!("{} (kitty: {})", env.os_id, env.kitty));
-    check_cmd("kitty",      &["--version"]);
-    check_cmd_any(&[("helix", &["--version"]), ("hx", &["--version"])], "helix");
-    check_cmd("fish",       &["--version"]);
-    check_cmd("git",        &["--version"]);
-    check_cmd("gh",         &["--version"]);
-    check_cmd("lazygit",    &["--version"]);
-    check_cmd("docker",     &["--version"]);
-    check_cmd("node",       &["--version"]);
-    check_cmd("pnpm",       &["--version"]);
-    check_cmd("bun",        &["--version"]);
-    check_cmd("uv",         &["--version"]);
-    check_cmd("forge",      &["--version"]);
-    check_cmd("warp-cli",   &["--version"]);
-    check_cmd("ufw",        &["--version"]);
+    // OS / desktop stack
+    check("OS", &format!("{} (kitty TERM: {})", env.os_id, env.kitty));
+    if env_detect::is_hyde() {
+        ui::ok("HyDE detected (Hyprland + wallbash theme engine)");
+    }
+    if env_detect::kitty_remote_on() {
+        ui::ok("kitty allow_remote_control: yes (3-pane layout available)");
+    } else {
+        ui::info("kitty allow_remote_control: no — `8sync .` will use soft 1-pane mode");
+    }
 
-    // gh auth
+    // AUR helper
+    match env_detect::aur_helper() {
+        Some(h) => ui::ok(&format!("AUR helper: {}", h)),
+        None    => ui::info("AUR helper: none (paru or yay needed for hardware-lianli/warp profiles)"),
+    }
+
+    // Core harness
+    check_cmd("kitty",   &["--version"]);
+    check_cmd_any(&[("hx", &["--version"]), ("helix", &["--version"])], "helix");
+    check_cmd("git",     &["--version"]);
+    check_cmd("abduco",  &["-v"]);
+    check_cmd("lazygit", &["--version"]);
+    check_cmd("forge",   &["--version"]);
+
+    // gh is REQUIRED for `8sync ship`
+    match env_detect::cmd_version("gh", &["--version"]) {
+        Some(v) => ui::ok(&format!("gh: {}", v)),
+        None    => ui::err("gh: MISSING — `8sync ship` needs github-cli (run `8sync setup`)"),
+    }
     if let Some(out) = env_detect::cmd_version("gh", &["auth", "status"]) {
-        ui::info(&format!("gh: {}", out));
+        ui::info(&format!("gh auth: {}", out));
     }
 
     // Configs present?
     for path in [
-        env.xdg_config.join("kitty/kitty.conf"),
         env.xdg_config.join("helix/config.toml"),
-        env.xdg_config.join("fish/conf.d/8sync.fish"),
         env.xdg_config.join("8sync/global.toml"),
         env.xdg_config.join("8sync/skills.toml"),
         env.home.join(".forge/skills/00-force-load.md"),
@@ -42,30 +53,17 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // Wallpaper
-    let wp = env.xdg_data.join("8sync/wallpapers/default.jpg");
-    if wp.exists() {
-        ui::ok(&format!("wallpaper: {}", wp.display()));
+    // Security (warp + ufw) — compact one-liners
+    sec::status_quiet();
+
+    // Profiles applied
+    let st = profile::load_state();
+    if st.applied.is_empty() {
+        ui::info("profiles: none applied (run `8sync setup`)");
     } else {
-        ui::warn(&format!("missing wallpaper: {}", wp.display()));
+        ui::ok(&format!("profiles applied: {}", st.applied.join(", ")));
     }
 
-    // WARP status
-    if let Some(s) = env_detect::cmd_version("warp-cli", &["status"]) {
-        ui::info(&format!("warp: {}", s));
-    }
-
-    // MCP service
-    let mcp_active = std::process::Command::new("systemctl")
-        .args(["--user", "is-active", "8sync-mcp.service"])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
-    if mcp_active { ui::ok("8sync-mcp user service: active"); }
-    else { ui::warn("8sync-mcp user service: inactive"); }
-
-    // Suppress unused warning for pkg
-    let _ = pkg::ver_at_least;
     Ok(())
 }
 
@@ -76,7 +74,7 @@ fn check(label: &str, value: &str) {
 fn check_cmd(name: &str, args: &[&str]) {
     match env_detect::cmd_version(name, args) {
         Some(v) => ui::ok(&format!("{}: {}", name, v)),
-        None => ui::warn(&format!("{}: missing or broken", name)),
+        None => ui::warn(&format!("{}: missing", name)),
     }
 }
 
@@ -87,5 +85,5 @@ fn check_cmd_any(candidates: &[(&str, &[&str])], label: &str) {
             return;
         }
     }
-    ui::warn(&format!("{}: missing or broken", label));
+    ui::warn(&format!("{}: missing", label));
 }
