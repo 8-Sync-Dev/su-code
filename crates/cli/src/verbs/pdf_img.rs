@@ -6,14 +6,26 @@ use crate::ui;
 #[derive(ClapArgs, Debug)]
 #[command(after_help = indoc::indoc! {"
     EXAMPLES
-      8sync pdf-img doc.pdf
-      8sync pdf-img doc.pdf --page 3
-      8sync pdf-img doc.pdf -o /tmp/pages
+      8sync pdf-img doc.pdf                       render every page → /tmp/8sync-pdf/page-*.png
+      8sync pdf-img doc.pdf --page 3              render only page 3
+      8sync pdf-img spec.pdf -o /tmp/spec         custom output directory
+      8sync pdf-img book.pdf --page 12 -o /tmp/p  render one page to a custom dir
+
+    USE CASE
+      Convert PDF pages to PNGs so forge can read figures, diagrams, scanned docs
+      etc. visually — much cheaper than OCR + sending raw text.
+
+    REQUIREMENTS
+      · `pdftocairo` from `poppler` (`pacman -S poppler`).
+        poppler is usually already installed on HyDE/CachyOS as a dependency.
 "})]
 pub struct Args {
+    /// Path to the source PDF.
     pub file: String,
+    /// Render only one page (1-based).
     #[arg(long)]
     pub page: Option<u32>,
+    /// Output directory (will be created).
     #[arg(short, long, default_value = "/tmp/8sync-pdf")]
     pub output: String,
 }

@@ -8,25 +8,38 @@ use crate::ui;
 #[command(
     after_help = indoc::indoc! {"
         EXAMPLES
-          8sync find auth                       grep + fzf preview, mở match bằng helix
-          8sync find 'fn main'                  pattern có khoảng trắng
-          8sync find --files login              chỉ tìm filename (fd)
-          8sync find --type rs Result           giới hạn theo loại file
+          8sync find useAuth                    grep for `useAuth`, preview matches in fzf, open at file:line
+          8sync find \"fn main\"                  pattern with whitespace — quote it
+          8sync find --files login              search FILENAMES (fd) instead of content
+          8sync find -f config                  short form of --files
+          8sync find --type rs Result           limit search to .rs files (also: ts, py, go, md, ...)
+          8sync find -t ts useState             TypeScript-only content search
+          8sync find --no-open Result           print matches, do NOT open the editor
+
+        EDITOR
+          Honors $EDITOR / $VISUAL first; falls back to hx, helix, then vi.
+          To force helix:  EDITOR=hx 8sync find ...
+
+        REQUIREMENTS
+          · ripgrep (rg) for content search.
+          · fd      for filename search.
+          · fzf     for the interactive picker.
+          · bat     (optional) for syntax-highlighted preview.
     "}
 )]
 pub struct Args {
-    /// Keyword / pattern (regex)
+    /// Keyword or regex pattern (multi-word arguments will be joined with spaces).
     pub query: Vec<String>,
 
-    /// Chỉ tìm tên file (fd), không phải nội dung
+    /// Search filenames (fd) instead of content (rg).
     #[arg(long, short = 'f')]
     pub files: bool,
 
-    /// Lọc theo loại file (rs / ts / py / ...)
+    /// Limit by file type — extension shorthand (rs, ts, py, go, md, ...).
     #[arg(long, short = 't')]
     pub r#type: Option<String>,
 
-    /// Chỉ in kết quả, không mở editor
+    /// Print results only — do not open the editor.
     #[arg(long)]
     pub no_open: bool,
 }

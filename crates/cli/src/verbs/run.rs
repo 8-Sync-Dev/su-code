@@ -6,14 +6,21 @@ use crate::ui;
 #[derive(ClapArgs, Debug)]
 #[command(after_help = indoc::indoc! {"
     EXAMPLES
-      8sync run                   # default: dev
-      8sync run dev
-      8sync run build
-      8sync run test
-      8sync run fmt
-      8sync run lint
+      8sync run                  run the default recipe (`dev` for npm/cargo projects)
+      8sync run dev              start the dev server  (cargo run | npm/pnpm/bun dev)
+      8sync run build            build the project     (cargo build | npm build)
+      8sync run test             run the test suite    (cargo test | npm test)
+      8sync run fmt              format the code       (cargo fmt | npm run fmt)
+      8sync run lint             lint the code         (cargo clippy | npm run lint)
+      8sync run \"echo hi\"        no recipe? falls back to plain shell
+
+    PROJECT DETECTION
+      · Cargo.toml present  → uses `cargo <recipe>`
+      · package.json present→ uses bun > pnpm > npm (whichever is on PATH)
+      · neither             → runs the recipe as a shell command
 "})]
 pub struct Args {
+    /// Recipe name: dev | build | test | fmt | lint  (or any custom shell command).
     pub script: Option<String>,
 }
 

@@ -8,14 +8,22 @@ use crate::ui;
 #[command(
     after_help = indoc::indoc! {"
         EXAMPLES
-          8sync ai                          # resume forge session
-          8sync ai \"add dark mode toggle\"   # one-shot prompt
-          8sync ai cost                     # token usage today
-          8sync ai end                      # close session
+          8sync ai                                  resume the last forge chat in this project
+          8sync ai \"explain this codebase\"          one-shot prompt — forge replies, you continue
+          8sync ai \"add a login form with email + password validation\"
+          8sync ai \"refactor src/auth.rs into smaller files\"
+          8sync ai \"why does the build fail on macOS?\"
+          8sync ai cost                             show today's token usage (calls `forge usage`)
+          8sync ai end                              hint — use `8sync end` to capture knowledge
+
+        NOTES
+          · forge auto-loads project context from AGENTS.md + agents/* (memory files).
+          · run inside the project root after `8sync .` for best results.
+          · pass the prompt as ONE quoted argument so the shell doesn't split it.
     "}
 )]
 pub struct Args {
-    /// Prompt (or special: 'cost', 'end'); empty = resume
+    /// Prompt to send to forge. Special words: `cost`, `end`. Empty = resume last session.
     pub rest: Vec<String>,
 }
 

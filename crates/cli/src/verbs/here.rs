@@ -9,20 +9,29 @@ use crate::{env_detect, ui};
 #[command(
     after_help = indoc::indoc! {"
         EXAMPLES
-          8sync .                      attach hoặc tạo session ở project hiện tại
-          8sync . ls                   liệt kê các session đang sống (abduco -l)
-          8sync . to other-project     chuyển sang attach session khác
-          8sync . new bg-fix forge     tạo session detached mới tên `bg-fix`
-          8sync . rm bg-fix            kill + xoá session
-          8sync . mv old new           đổi tên session
-          8sync . wipe                 kill toàn bộ session của project hiện tại
-          8sync . kick                 detach mọi attach hiện tại (để máy khác attach)
+          8sync .                       attach (or create) the session for the current project
+          8sync . ls                    list every live session that belongs to this project
+          8sync . to other-project      switch / attach a different named session
+          8sync . new hotfix forge      spawn a new detached session named `hotfix` running forge
+          8sync . new logs              detached session named `logs`, default shell
+          8sync . rm hotfix             kill session `hotfix` and free its abduco socket
+          8sync . mv hotfix bugfix      rename a session
+          8sync . wipe                  kill every session of the current project (DANGEROUS)
+          8sync . kick                  detach any current attach (so another machine can attach)
+
+        BEHAVIOR
+          · If kitty `allow_remote_control yes` is set → opens a 3-pane layout:
+              pane 1: editor ($EDITOR or hx/helix)
+              pane 2: forge running inside `abduco` (survives terminal close)
+              pane 3: shell for `8sync run`, lazygit, etc.
+          · Otherwise → soft 1-pane mode: forge runs in `abduco` in the current terminal.
+          · Either way: forge auto-reads AGENTS.md + agents/* in the project root.
     "}
 )]
 pub struct Args {
-    /// Subcommand: ls | to | new | rm | mv | wipe | kick (mặc định: attach/create)
+    /// Subcommand: ls | to | new | rm | mv | wipe | kick   (default: attach/create)
     pub action: Option<String>,
-    /// Tham số phụ (tên session, lệnh, target...)
+    /// Extra arguments for the subcommand (session name, command to run, ...).
     pub rest: Vec<String>,
 }
 

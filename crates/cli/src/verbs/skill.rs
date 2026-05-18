@@ -7,15 +7,28 @@ use crate::{assets, env_detect, ui};
 #[derive(ClapArgs, Debug)]
 #[command(after_help = indoc::indoc! {"
     EXAMPLES
-      8sync skill                       # list all: installed skills/tools/rules + injection model
-      8sync skill list                  # same as default
-      8sync skill help                  # show usage + how auto inject works
-      8sync skill add gh:owner/repo
-      8sync skill add path:/path/to/skill
-      8sync skill sync                  # re-sync ~/.forge/skills/00-force-load.md
+      8sync skill                       list installed skills + auto-inject status (default action)
+      8sync skill list                  same as above
+      8sync skill help                  explain the auto-inject flow and config paths
+      8sync skill add gh:owner/repo     register a skill from a GitHub repo
+      8sync skill add path:/abs/path    register a skill from a local directory
+      8sync skill add builtin:karpathy  register a skill that's already shipped in 8sync
+      8sync skill sync                  rewrite ~/.forge/skills/00-force-load.md from registry
+
+    BUNDLED SKILLS (always installed by `8sync setup`)
+      karpathy-guidelines  Andrej Karpathy's engineering principles (read first every session)
+      image-routing        teach AI when to consume images vs text
+      8sync-cli            teach AI which `8sync` verb to use for each task
+
+    FILES
+      ~/.config/8sync/skills.toml       skill registry (editable TOML)
+      ~/.forge/skills/                  installed skill directories (one per skill)
+      ~/.forge/skills/00-force-load.md  master file — forge reads this first in every session
 "})]
 pub struct Args {
+    /// Sub-action: list (default) | help | add <spec> | sync
     pub sub: Option<String>,
+    /// Argument to the sub-action (e.g. the source spec for `add`).
     pub arg: Option<String>,
 }
 

@@ -6,15 +6,24 @@ use crate::ui;
 #[derive(ClapArgs, Debug)]
 #[command(after_help = indoc::indoc! {"
     EXAMPLES
-      8sync ship                       # auto-generate msg, commit, push, open PR
-      8sync ship \"feat: dark mode\"     # commit + push + PR with message
-      8sync ship --no-pr               # commit + push only
+      8sync ship                          stage all, auto-generated commit message, push, open PR
+      8sync ship \"feat: dark mode\"        commit with message, push, open PR
+      8sync ship \"fix(auth): token expiry off-by-one\"
+      8sync ship --no-pr                  commit + push, but do NOT open a PR
+      8sync ship --draft \"wip: refactor\"  open a draft PR (review-ready later)
+
+    REQUIREMENTS
+      · git must be configured (`git config --global user.email/name`).
+      · `gh` (github-cli) must be installed and logged in: `gh auth login`.
+      · current directory must be a git repo with a remote.
 "})]
 pub struct Args {
-    /// Commit message (auto-generated if omitted)
+    /// Commit message. Auto-generated as `chore: 8sync ship` if omitted.
     pub message: Option<String>,
+    /// Skip opening a pull request (commit + push only).
     #[arg(long)]
     pub no_pr: bool,
+    /// Open the PR as a draft.
     #[arg(long)]
     pub draft: bool,
 }

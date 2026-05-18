@@ -27,16 +27,20 @@ struct Cli {
 
 const HELP_AFTER: &str = "\
 QUICK START
+  8sync                             show this overview (any time)
+  8sync flow                        same as above but ordered by workflow
   8sync setup                       install harness, then ask y/N per profile
   8sync setup --yall                install harness + ALL profiles, no prompts
-  8sync .                           open project session (kitty + forge)
-  8sync ai \"add dark mode toggle\"   ai prompt
-  8sync ship \"feat: dark mode\"      commit + push + PR
-  8sync end                         capture knowledge, close session
-  8sync sec on                      WARP VPN + ufw firewall on
+  8sync .                           open project session (kitty 3-pane + forge)
+  8sync ai \"add dark mode toggle\"   one-shot AI prompt (or resume with `8sync ai`)
+  8sync find \"useAuth\"              rg + fzf preview, open at file:line
+  8sync ship \"feat: dark mode\"      commit + push + open a GitHub PR
+  8sync end                         AI captures knowledge into agents/*.md
+  8sync sec on                      enable WARP VPN + ufw firewall
+  8sync sec off                     disable both
 
-Every verb supports -h:
-  8sync setup -h    8sync ai -h    8sync sec -h
+Every verb supports -h / --help for detailed help with examples:
+  8sync setup -h    8sync ai -h    8sync sec -h    8sync find -h
 ";
 
 #[derive(Subcommand)]
@@ -87,13 +91,13 @@ enum Cmd {
     /// Show overview cheatsheet (alias of `8sync` with no args)
     Help,
 
-    /// Workflow-ordered help (lifecycle commands theo thứ tự dùng)
+    /// Workflow-ordered help (lifecycle commands in chronological order)
     Flow,
 
     /// Search code (rg + fzf) or filenames (fd); pick → open in $EDITOR or helix
     Find(verbs::find::Args),
 
-    /// Append a one-line note to agents/NOTES.md (AI sẽ đọc lại session sau)
+    /// Append a one-line note to agents/NOTES.md (AI will read it in the next session)
     Note(verbs::note::Args),
 }
 

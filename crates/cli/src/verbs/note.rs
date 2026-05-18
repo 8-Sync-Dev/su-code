@@ -9,20 +9,27 @@ use crate::ui;
 #[command(
     after_help = indoc::indoc! {"
         EXAMPLES
-          8sync note \"chuyển sang zustand vì state đơn giản\"
-          8sync note --tag arch \"cache layer sẽ dùng valkey\"
-          8sync note --tag bug \"login fail khi password có dấu ngoặc kép\"
-          8sync note                            mở agents/NOTES.md trong editor
+          8sync note \"switched state lib to zustand\"
+          8sync note --tag arch \"cache layer will use valkey\"
+          8sync note --tag bug  \"login fails when password contains double-quote\"
+          8sync note --tag idea \"add dark mode toggle in settings\"
+          8sync note --tag todo \"write integration test for /api/login\"
+          8sync note                                  open agents/NOTES.md in $EDITOR
 
-        Notes append-only vào <repo>/agents/NOTES.md với timestamp + tag.
-        AI đọc NOTES.md tại session sau qua AGENTS.md.
+        WHERE IT'S WRITTEN
+          Notes are appended to <repo>/agents/NOTES.md with a timestamp + tag.
+          AI tools (forge / claude-code / aider) read NOTES.md via AGENTS.md anchor
+          on the next session, so use this to leave context for future-you.
+
+        COMMON TAGS
+          arch, bug, idea, todo, learn, perf, security
     "}
 )]
 pub struct Args {
-    /// Nội dung note (không có = mở editor)
+    /// Note content. Omit to open agents/NOTES.md in $EDITOR.
     pub message: Vec<String>,
 
-    /// Tag tuỳ chọn: arch | bug | idea | todo | learn ...
+    /// Optional category tag: arch | bug | idea | todo | learn | perf | security | ...
     #[arg(long, short = 't', default_value = "")]
     pub tag: String,
 }

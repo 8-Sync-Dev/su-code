@@ -7,36 +7,59 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
 #[command(
     after_help = indoc::indoc! {"
         EXAMPLES
-          8sync setup                     install harness, then ask y/N per profile
-          8sync setup --yall              install harness + ALL profiles (no prompts)
-          8sync setup --yes               same as --yall (alias)
-          8sync setup --no-profile        only harness (skip profile stage)
-          8sync setup --profile alexdev   apply a specific bundle non-interactively
-          8sync setup --dry-run           print plan, no changes
-          8sync setup profile list        list available profiles
-          8sync setup profile show <name> show resolved profile content
-          8sync setup profile apply <name> idempotent (re)apply a profile
+          8sync setup                          install harness, then ask y/N for EACH personal profile
+          8sync setup --yall                   install harness + ALL profiles (yes-to-all, no prompts)
+          8sync setup --no-profile             install harness only (skip the profile stage)
+          8sync setup --profile alexdev        install harness + apply the `alexdev` bundle non-interactively
+          8sync setup --profile warp           install harness + apply just the WARP profile
+          8sync setup --dry-run                print the full plan without changing anything
+
+          8sync setup profile list             list every available profile (✓ = applied)
+          8sync setup profile show alexdev     show resolved packages + services + post-install of a profile
+          8sync setup profile apply warp       idempotently (re-)apply one profile
+
+        STAGE A — HARNESS (always run, idempotent)
+          · pacman -S --needed helix lazygit abduco github-cli   (4 pkgs, official repo)
+          · forge AI CLI (curl installer, only if missing)
+          · write configs: helix + kitty/8sync.session + 8sync/{global,skills}.toml
+          · write skills:  ~/.forge/skills/{karpathy-guidelines, image-routing, 8sync-cli}/SKILL.md
+                           + ~/.forge/skills/00-force-load.md  (auto-injected on every forge session)
+
+        STAGE B — PROFILES (opt-in personal customization)
+          vietnamese        fcitx5 + Unikey input method
+          hardware-cooling  CoolerControl + OpenRGB + liquidctl
+          hardware-lianli   lianli-linux-git from AUR (yay/paru auto-pulls build deps)
+          displaylink      evdi-dkms (DisplayLink USB monitor driver)
+          apps-personal     Bitwarden
+          warp              Cloudflare WARP + DoH + MASQUE + malware DNS  (toggle daily via `8sync sec`)
+          alexdev           BUNDLE — extends all of the above
+
+        SAFETY
+          · Every install is transactional: if pacman/AUR fails halfway, packages installed in
+            that batch are rolled back automatically (pacman -Rns).
+          · Re-running setup is idempotent — already-installed packages are skipped.
+          · `--dry-run` is always safe to inspect what would change.
     "}
 )]
 pub struct Args {
-    /// Sub-action (sub-command): `profile [list|show|apply <name>]`
+    /// Sub-command: `profile [list|show|apply <name>]`
     pub action: Option<String>,
-    /// Arguments to sub-action
+    /// Arguments for the sub-command.
     pub rest: Vec<String>,
 
-    /// Yes-to-all: install every profile + --noconfirm on pacman/AUR
+    /// Yes-to-all: install every profile (or the `alexdev` bundle) with --noconfirm.
     #[arg(long = "yall", alias = "yes", short = 'y')]
     pub yall: bool,
 
-    /// Skip profile stage entirely (harness only)
+    /// Skip Stage B entirely (harness only — no profile prompts).
     #[arg(long)]
     pub no_profile: bool,
 
-    /// Apply a specific profile non-interactively
+    /// Apply a specific profile non-interactively (use after Stage A).
     #[arg(long)]
     pub profile: Option<String>,
 
-    /// Print plan without making changes
+    /// Print the plan without making any changes.
     #[arg(long)]
     pub dry_run: bool,
 }
