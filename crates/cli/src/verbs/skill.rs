@@ -18,6 +18,8 @@ use crate::{assets, env_detect, ui};
       8sync skill add builtin:karpathy                           register a builtin skill (already shipped)
       8sync skill add https://...#better-name                    same #newname override works on any spec
       8sync skill sync                                           rewrite ~/.omp/skills/00-force-load.md from registry
+      8sync skill gen 1 2                                        FUSE local skill #1 and #2 into one combined SKILL.md
+      8sync skill gen karpathy-guidelines codegraph              same, but by name
 
     SPEC
       Each skill is a directory containing `SKILL.md` at its root (Anthropic Agent
@@ -51,10 +53,13 @@ use crate::{assets, env_detect, ui};
       <project>/agents/skills/         project-local skills (referenced from AGENTS.md)
 "})]
 pub struct Args {
-    /// Sub-action: list (default) | help | add <spec> | sync
+    /// Sub-action: list (default) | help | add <spec> | sync | gen <id> <id> …
     pub sub: Option<String>,
-    /// Argument to the sub-action (e.g. the source spec for `add`).
-    pub arg: Option<String>,
+    /// Arguments for the sub-action.
+    /// - `add`: source spec (one)
+    /// - `gen`: 2+ skill IDs (1-based index from local list, OR skill name)
+    #[arg(trailing_var_arg = true)]
+    pub args: Vec<String>,
 }
 
 pub fn run(a: Args) -> Result<()> {
@@ -63,8 +68,9 @@ pub fn run(a: Args) -> Result<()> {
     match a.sub.as_deref() {
         None | Some("list") => list_skills(&env, &skills_toml),
         Some("help") => print_help(&env, &skills_toml),
-        Some("add") => add_skill(&env, &skills_toml, a.arg.as_deref()),
+        Some("add") => add_skill(&env, &skills_toml, a.args.first().map(|s| s.as_str())),
         Some("sync") => sync_skills(&env),
+        Some("gen") => gen_skill(&env, &a.args),
         Some(other) => {
             ui::warn(&format!("unknown subcommand: {}", other));
             ui::info("try: 8sync skill help");
@@ -225,10 +231,10 @@ fn print_skill_list(dir: &Path) {
         println!("  (none)");
         return;
     }
-    for p in &dirs {
+    for (i, p) in dirs.iter().enumerate() {
         let (m, _entry) = meta_for_dir(p);
         let short = truncate(&m.description, 100);
-        println!("  - {} — {}", m.name, short);
+        println!("  {:>2}. {} — {}", i + 1, m.name, short);
         println!("      {}", p.display());
     }
 }
@@ -687,6 +693,161 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
+// ─── gen (fuse N skills into one) ──────────────────────────────────
+
+/// Resolve a CLI arg into a local skill dir under `<root>/agents/skills/`.
+/// Accepts either a 1-based index (matching the order shown in `8sync skill`
+/// list and AGENTS.md), or a skill name (the directory name OR the frontmatter
+/// `name`).
+fn resolve_skill_arg(arg: &str, locals: &[PathBuf]) -> Result<PathBuf> {
+    if let Ok(idx) = arg.parse::<usize>() {
+        if idx == 0 || idx > locals.len() {
+            return Err(anyhow!(
+                "index {} out of range (1..={})",
+                idx,
+                locals.len()
+            ));
+        }
+        return Ok(locals[idx - 1].clone());
+    }
+    for p in locals {
+        let dir_name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
+        if dir_name == arg {
+            return Ok(p.clone());
+        }
+        let (m, _) = meta_for_dir(p);
+        if m.name == arg {
+            return Ok(p.clone());
+        }
+    }
+    Err(anyhow!(
+        "no local skill matches `{}` (try `8sync skill` to see the numbered list)",
+        arg
+    ))
+}
+
+/// Strip YAML frontmatter (the leading `---` … `---` block) from a SKILL.md
+/// body so we can splice multiple bodies together without dragging duplicate
+/// frontmatter into the fused file.
+fn strip_frontmatter(s: &str) -> &str {
+    let trimmed = s.trim_start_matches('\u{feff}');
+    let Some(rest) = trimmed.strip_prefix("---\n").or_else(|| trimmed.strip_prefix("---\r\n")) else {
+        return s;
+    };
+    // Find the closing `---` on its own line.
+    let mut idx = 0usize;
+    for line in rest.split_inclusive('\n') {
+        if line.trim_end() == "---" {
+            idx += line.len();
+            return rest[idx..].trim_start_matches('\n');
+        }
+        idx += line.len();
+    }
+    s
+}
+
+fn gen_skill(env: &env_detect::Env, args: &[String]) -> Result<()> {
+    if args.len() < 2 {
+        ui::err("usage: 8sync skill gen <id1> <id2> [id3 …]");
+        ui::info("  ids: 1-based index from `8sync skill` local list, or skill name");
+        ui::info("  example: 8sync skill gen 1 2");
+        ui::info("           8sync skill gen karpathy-guidelines codegraph");
+        return Ok(());
+    }
+    let root = detect_current_project_root()
+        .ok_or_else(|| anyhow!("`skill gen` must run inside a project (no .git / Cargo.toml / package.json found)"))?;
+    let local_dir = root.join("agents/skills");
+    let locals = list_installed_skill_dirs(&local_dir).unwrap_or_default();
+    if locals.is_empty() {
+        return Err(anyhow!(
+            "no local skills under {} — run `8sync skill sync` first",
+            local_dir.display()
+        ));
+    }
+
+    // Resolve each arg → (path, meta, body).
+    let mut parts: Vec<(PathBuf, SkillMeta, String)> = Vec::with_capacity(args.len());
+    for arg in args {
+        let p = resolve_skill_arg(arg, &locals)?;
+        let (m, _entry) = meta_for_dir(&p);
+        let skill_md = p.join("SKILL.md");
+        let body = std::fs::read_to_string(&skill_md)
+            .map_err(|e| anyhow!("could not read {}: {}", skill_md.display(), e))?;
+        parts.push((p, m, body));
+    }
+
+    // Synthesize fused name + description + body.
+    let fused_name: String = parts
+        .iter()
+        .map(|(_, m, _)| m.name.clone())
+        .collect::<Vec<_>>()
+        .join("+");
+    if fused_name.len() > 64 {
+        ui::warn(&format!(
+            "fused name `{}` is {} chars (>64 — Agent Skills spec recommends ≤64)",
+            fused_name,
+            fused_name.len()
+        ));
+    }
+    let fused_desc = format!(
+        "Combined skill fusing {}. Use this when the user's task spans the concerns of all listed component skills. The AI MUST apply every component's rules together — read each section below before acting. Components: {}.",
+        parts
+            .iter()
+            .map(|(_, m, _)| format!("`{}`", m.name))
+            .collect::<Vec<_>>()
+            .join(" + "),
+        parts
+            .iter()
+            .map(|(_, m, _)| m.description.chars().take(140).collect::<String>())
+            .collect::<Vec<_>>()
+            .join(" || "),
+    );
+
+    let mut body = String::with_capacity(4096);
+    body.push_str("---\n");
+    body.push_str(&format!("name: {}\n", fused_name));
+    body.push_str(&format!("description: {}\n", yaml_quote(&fused_desc)));
+    body.push_str("sources:\n");
+    for (p, _, _) in &parts {
+        body.push_str(&format!("  - {}\n", p.display()));
+    }
+    body.push_str("---\n\n");
+    body.push_str(&format!(
+        "> Fused skill generated by `8sync skill gen` from {} components.\n",
+        parts.len()
+    ));
+    body.push_str("> Read every section below — the AI MUST apply ALL component rules together.\n\n");
+    for (i, (_, m, raw)) in parts.iter().enumerate() {
+        body.push_str(&format!("---\n\n## Component {}: `{}`\n\n", i + 1, m.name));
+        if !m.description.is_empty() {
+            body.push_str(&format!("_{}_\n\n", m.description));
+        }
+        body.push_str(strip_frontmatter(raw).trim_start());
+        if !body.ends_with('\n') {
+            body.push('\n');
+        }
+        body.push('\n');
+    }
+
+    // Write to <root>/agents/skills/<fused_name>/SKILL.md (and global mirror).
+    let local_target = local_dir.join(&fused_name);
+    let global_target = env.home.join(".omp/skills").join(&fused_name);
+    std::fs::create_dir_all(&local_target)?;
+    std::fs::create_dir_all(&global_target)?;
+    std::fs::write(local_target.join("SKILL.md"), &body)?;
+    std::fs::write(global_target.join("SKILL.md"), &body)?;
+    ui::ok(&format!("wrote {}/SKILL.md", local_target.display()));
+    ui::ok(&format!("wrote {}/SKILL.md", global_target.display()));
+
+    // Re-inject AGENTS.md so the fused skill appears in the force-load block.
+    inject_agents_md(&env.home, &root)?;
+    ui::info(&format!(
+        "fused skill `{}` ready — omp will load it on next session",
+        fused_name
+    ));
+    Ok(())
+}
+
 // ─── help ──────────────────────────────────────────────────────────
 
 fn print_help(env: &env_detect::Env, toml_path: &Path) -> Result<()> {
@@ -697,6 +858,7 @@ fn print_help(env: &env_detect::Env, toml_path: &Path) -> Result<()> {
     println!("  8sync skill help");
     println!("  8sync skill add <https URL|gh:owner/repo|path:/abs|builtin:name>");
     println!("  8sync skill sync");
+    println!("  8sync skill gen <id1> <id2> [id3 …]   # fuse N local skills into one combined SKILL.md");
 
     println!("\nSPEC (Agent Skills open standard)");
     println!("  Each skill is a directory containing `SKILL.md` at its root.");
