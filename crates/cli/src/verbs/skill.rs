@@ -445,15 +445,136 @@ fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&str>) -> Res
 // ─── sync ──────────────────────────────────────────────────────────
 
 fn sync_skills(env: &env_detect::Env) -> Result<()> {
+    // 1. Refresh master force-load file
     let target = env.home.join(".omp/skills/00-force-load.md");
     std::fs::create_dir_all(target.parent().unwrap())?;
     let content = assets::read("skills/00-force-load.md").unwrap_or_default();
     std::fs::write(&target, content)?;
     ui::ok(&format!("synced master skill list → {}", target.display()));
-    ui::info("global inject: every new omp session will read this file first");
+    ui::info("global: every new omp session will read this file first");
 
+    // 2. Re-deploy the 3 bundled skills into ~/.omp/skills/ from embedded assets,
+    //    so users who only ran `8sync skill sync` (without `8sync setup`) still
+    //    get the built-ins installed globally.
+    install_bundled_global(env)?;
+
+    // 3. If we're inside a project, mirror every global skill into
+    //    <root>/agents/skills/<name>/ so the project gets a committable,
+    //    vendored copy that AI loads via AGENTS.md. Mirroring strategy:
+    //      - If the global dir is a git clone: `git clone <origin>` locally
+    //        (kept as an independent clone, `git pull --ff-only` on re-sync).
+    //      - Otherwise (builtin / path:): plain recursive copy.
     if let Some(root) = detect_current_project_root() {
+        let count = mirror_global_to_local(&env.home, &root)?;
+        if count > 0 {
+            ui::ok(&format!("mirrored {} skill(s) into {}", count, root.join("agents/skills").display()));
+        }
         inject_agents_md(&env.home, &root)?;
+    } else {
+        ui::info("not inside a project — skipped local agents/skills/ mirror");
+    }
+    Ok(())
+}
+
+/// Write the 3 bundled skills (karpathy, image-routing, 8sync-cli) to
+/// ~/.omp/skills/<name>/SKILL.md from the embedded asset bundle. Overwrites
+/// existing SKILL.md to keep frontmatter up to date.
+fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
+    let skills_dir = env.home.join(".omp/skills");
+    let trio: [(&str, &str); 3] = [
+        ("skills/karpathy/SKILL.md",      "karpathy-guidelines"),
+        ("skills/image-routing/SKILL.md", "image-routing"),
+        ("skills/8sync-cli/SKILL.md",     "8sync-cli"),
+    ];
+    for (asset_path, name) in trio {
+        let Some(body) = assets::read(asset_path) else {
+            ui::warn(&format!("asset missing: {}", asset_path));
+            continue;
+        };
+        let target_dir = skills_dir.join(name);
+        std::fs::create_dir_all(&target_dir)?;
+        let target = target_dir.join("SKILL.md");
+        let prev = std::fs::read_to_string(&target).unwrap_or_default();
+        if prev != body {
+            std::fs::write(&target, body)?;
+            ui::ok(&format!("wrote {}", target.display()));
+        }
+    }
+    Ok(())
+}
+
+/// For every skill dir under `~/.omp/skills/`, create or refresh a copy under
+/// `<root>/agents/skills/<name>/`. Returns the number of skills processed.
+fn mirror_global_to_local(home: &Path, root: &Path) -> Result<usize> {
+    let global_dir = home.join(".omp/skills");
+    let local_dir = root.join("agents/skills");
+    std::fs::create_dir_all(&local_dir)?;
+    let globals = list_installed_skill_dirs(&global_dir).unwrap_or_default();
+    let mut count = 0usize;
+    for g in &globals {
+        let name = match g.file_name().and_then(|s| s.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+        let local_target = local_dir.join(name);
+        let origin = git_origin_url(g);
+        if let Some(url) = origin {
+            // Git-backed skill → keep local as an independent clone.
+            clone_or_pull_git(&url, &local_target)?;
+        } else if local_target.exists() {
+            // Refresh in place from the global vendor copy.
+            copy_dir_recursive(g, &local_target)?;
+            ui::ok(&format!("refreshed {}", local_target.display()));
+        } else {
+            copy_dir_recursive(g, &local_target)?;
+            ui::ok(&format!("copied  → {}", local_target.display()));
+        }
+        count += 1;
+    }
+    Ok(count)
+}
+
+/// Return the `origin` remote URL of a git repo at `dir`, or None if `dir` is
+/// not a git working copy.
+fn git_origin_url(dir: &Path) -> Option<String> {
+    if !dir.join(".git").exists() {
+        return None;
+    }
+    let out = Command::new("git")
+        .args(["-C", dir.to_str()?, "config", "--get", "remote.origin.url"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if url.is_empty() { None } else { Some(url) }
+}
+
+/// Recursively copy `src` into `dst`. Skips `.git/` (vendor copies should not
+/// carry the git history of an unrelated repo). Overwrites existing files.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if name == ".git" { continue; }
+        let from = entry.path();
+        let to = dst.join(&name);
+        let ft = entry.file_type()?;
+        if ft.is_dir() {
+            copy_dir_recursive(&from, &to)?;
+        } else if ft.is_symlink() {
+            // Resolve and copy the target as a regular file (keeps vendor copy self-contained).
+            if let Ok(target) = std::fs::read_link(&from) {
+                let resolved = if target.is_absolute() { target } else { from.parent().map(|p| p.join(&target)).unwrap_or(target) };
+                if resolved.is_file() {
+                    std::fs::copy(&resolved, &to)?;
+                }
+            }
+        } else {
+            std::fs::copy(&from, &to)?;
+        }
     }
     Ok(())
 }
