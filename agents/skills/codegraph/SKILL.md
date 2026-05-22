@@ -1,3 +1,13 @@
+---
+name: codegraph
+description: "Use this skill when the user mentions codegraph or related concepts. ~35% cheaper · ~70% fewer tool calls · 100% local"
+source: https://github.com/colbymchenry/codegraph
+---
+
+> Skill synthesised from `https://github.com/colbymchenry/codegraph/README.md` by `8sync skill add`.
+> Install / setup / usage commands are in the body below (verbatim README).
+> When this skill applies (see description above), follow the commands here.
+
 <div align="center">
 
 # CodeGraph

@@ -291,31 +291,118 @@ fn parse_spec(spec: &str) -> Result<Source> {
     ))
 }
 
-fn clone_or_pull_git(url: &str, target: &Path) -> Result<()> {
-    if target.exists() {
-        let st = Command::new("git")
-            .args(["-C", target.to_str().unwrap(), "pull", "--ff-only"])
-            .status();
-        match st {
-            Ok(s) if s.success() => {
-                ui::ok(&format!("updated {}", target.display()));
-            }
-            _ => {
-                ui::warn(&format!("git pull failed at {}, leaving as-is", target.display()));
+/// Fetch the README.md of a public GitHub repo via raw.githubusercontent.com.
+/// Tries refs in order: HEAD, main, master.
+fn fetch_github_readme(owner: &str, repo: &str) -> Result<String> {
+    for branch in ["HEAD", "main", "master"] {
+        for name in ["README.md", "readme.md", "README.MD", "Readme.md"] {
+            let url = format!(
+                "https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{name}"
+            );
+            let out = Command::new("curl")
+                .args(["-fsSL", "--max-time", "15", &url])
+                .output();
+            if let Ok(o) = out {
+                if o.status.success() && !o.stdout.is_empty() {
+                    return Ok(String::from_utf8_lossy(&o.stdout).into_owned());
+                }
             }
         }
-        return Ok(());
     }
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent)?;
+    Err(anyhow!("could not fetch README.md from {}/{}", owner, repo))
+}
+
+/// Parse `owner/repo` from any flavour of GitHub URL we accept.
+fn github_owner_repo(url: &str) -> Option<(String, String)> {
+    let u = url
+        .trim()
+        .trim_end_matches('/')
+        .trim_end_matches(".git")
+        .trim_start_matches("git+");
+    let rest = u
+        .strip_prefix("https://github.com/")
+        .or_else(|| u.strip_prefix("http://github.com/"))
+        .or_else(|| u.strip_prefix("git@github.com:"))?;
+    let mut it = rest.splitn(3, '/');
+    let owner = it.next()?.to_string();
+    let repo = it.next()?.to_string();
+    if owner.is_empty() || repo.is_empty() { return None; }
+    Some((owner, repo))
+}
+
+/// Wrap README content with YAML frontmatter so it becomes a valid SKILL.md.
+/// If the README already has frontmatter (rare — author already shipped it as
+/// a skill), pass it through unchanged.
+fn synthesize_skill_md(readme: &str, name: &str, source_url: &str) -> String {
+    let trimmed = readme.trim_start_matches('\u{feff}');
+    if trimmed.starts_with("---\n") || trimmed.starts_with("---\r\n") {
+        return readme.to_string();
     }
-    let st = Command::new("git")
-        .args(["clone", "--depth", "1", url, target.to_str().unwrap()])
-        .status()?;
-    if !st.success() {
-        return Err(anyhow!("git clone failed: {} → {}", url, target.display()));
+    let desc = extract_description(readme, name);
+    let q = yaml_quote(&desc);
+    format!(
+        "---\n\
+name: {name}\n\
+description: {q}\n\
+source: {source_url}\n\
+---\n\
+\n\
+> Skill synthesised from `{source_url}/README.md` by `8sync skill add`.\n\
+> Install / setup / usage commands are in the body below (verbatim README).\n\
+> When this skill applies (see description above), follow the commands here.\n\
+\n\
+{readme}"
+    )
+}
+
+/// Pick a one-line description from a README: first non-empty, non-heading,
+/// non-badge prose line. Falls back to a generic "use when user mentions <name>".
+fn extract_description(readme: &str, fallback_name: &str) -> String {
+    for line in readme.lines() {
+        let t = line.trim();
+        if t.is_empty() { continue; }
+        if t.starts_with('#') { continue; }
+        if t.starts_with("![") || t.starts_with("[![") { continue; }
+        if t.starts_with('<') { continue; }
+        if t.starts_with("---") { continue; }
+        let cleaned = t
+            .trim_start_matches('>')
+            .trim()
+            .trim_start_matches('*')
+            .trim_end_matches('*')
+            .trim_start_matches('_')
+            .trim_end_matches('_')
+            .trim();
+        if cleaned.len() < 10 { continue; }
+        // Single-line YAML value: collapse internal whitespace, clamp length.
+        let single: String = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+        let mut chars: String = single.chars().take(400).collect();
+        if single.chars().count() > 400 { chars.push('…'); }
+        return format!(
+            "Use this skill when the user mentions {fallback_name} or related concepts. {chars}"
+        );
     }
-    ui::ok(&format!("cloned → {}", target.display()));
+    format!(
+        "Use this skill when the user mentions {fallback_name}. See body for install/setup/usage commands fetched from the upstream README."
+    )
+}
+
+fn yaml_quote(s: &str) -> String {
+    let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
+    format!("\"{}\"", escaped)
+}
+
+/// Write a synthesised SKILL.md into `<target_dir>/SKILL.md`. Creates the dir.
+fn write_synth_skill(target_dir: &Path, content: &str) -> Result<()> {
+    std::fs::create_dir_all(target_dir)?;
+    let target = target_dir.join("SKILL.md");
+    let prev = std::fs::read_to_string(&target).unwrap_or_default();
+    if prev != content {
+        std::fs::write(&target, content)?;
+        ui::ok(&format!("wrote {}", target.display()));
+    } else {
+        ui::skip(&target.display().to_string(), "unchanged");
+    }
     Ok(())
 }
 
@@ -387,18 +474,19 @@ fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&str>) -> Res
 
     match &src {
         Source::Git { url, .. } => {
-            // Global keeps the .git/ so `git pull --ff-only` works on re-add/sync.
-            clone_or_pull_git(url, &global_target)?;
+            // README-as-skill model: fetch upstream README.md and synthesise a
+            // single SKILL.md with YAML frontmatter. No cloning — the README
+            // already carries install/setup/usage commands.
+            let (owner, repo) = github_owner_repo(url)
+                .ok_or_else(|| anyhow!("only github.com URLs supported (got `{}`)", url))?;
+            ui::info(&format!("fetching README from {}/{}", owner, repo));
+            let readme = fetch_github_readme(&owner, &repo)?;
+            let body = synthesize_skill_md(&readme, &name, url);
+            write_synth_skill(&global_target, &body)?;
             audit_skill_layout(&global_target);
             if let Some(root) = project_root.as_ref() {
-                // Local is a plain vendored copy (no nested .git/) — safe to commit.
                 let local_target = root.join("agents/skills").join(&name);
-                if local_target.exists() {
-                    // Refresh files from the freshly-pulled global copy.
-                    let _ = std::fs::remove_dir_all(&local_target);
-                }
-                copy_dir_recursive(&global_target, &local_target)?;
-                ui::ok(&format!("vendored → {}", local_target.display()));
+                write_synth_skill(&local_target, &body)?;
                 audit_skill_layout(&local_target);
             }
         }

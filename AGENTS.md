@@ -11,8 +11,8 @@ Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.c
 ### Global skills (always-on — `~/.omp/skills/`)
 1. **`8sync-cli`** — `~/.omp/skills/8sync-cli/SKILL.md`
      _Use this skill in EVERY session inside a repo whose AGENTS.md mentions 8sync. It teaches the AI which 8sync verbs (shot/diff-img/pdf-img/find/note/ship/skill/run) to use instead of raw shell equivalents — saving 3-10× tokens and keeping session memory in agents/* consistent. The AI MUST prefer the listed 8sync verbs over rg/fd/git/curl/etc when an equivalent exists._
-2. **`codegraph`** — `~/.omp/skills/codegraph/CLAUDE.md`
-     _Claude-Code-style skill — entrypoint: CLAUDE.md (no Agent-Skills SKILL.md)_
+2. **`codegraph`** — `~/.omp/skills/codegraph/SKILL.md`
+     _Use this skill when the user mentions codegraph or related concepts. ~35% cheaper · ~70% fewer tool calls · 100% local_
 3. **`image-routing`** — `~/.omp/skills/image-routing/SKILL.md`
      _Use this skill on EVERY read request to decide between text and image representation. Apply whenever the AI is about to open a PDF, screenshot a URL, review a UI, inspect a long git diff, or process diagrams — picking the wrong format wastes 3-10× tokens. The AI MUST consult the decision table here before issuing any read tool call on non-trivial content._
 4. **`karpathy-guidelines`** — `~/.omp/skills/karpathy-guidelines/SKILL.md`
@@ -21,8 +21,8 @@ Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.c
 ### Project-local skills (BẮT BUỘC dùng cho repo này — `agents/skills/`)
 1. **`8sync-cli`** — `agents/skills/8sync-cli/SKILL.md`
      _Use this skill in EVERY session inside a repo whose AGENTS.md mentions 8sync. It teaches the AI which 8sync verbs (shot/diff-img/pdf-img/find/note/ship/skill/run) to use instead of raw shell equivalents — saving 3-10× tokens and keeping session memory in agents/* consistent. The AI MUST prefer the listed 8sync verbs over rg/fd/git/curl/etc when an equivalent exists._
-2. **`codegraph`** — `agents/skills/codegraph/CLAUDE.md`
-     _Claude-Code-style skill — entrypoint: CLAUDE.md (no Agent-Skills SKILL.md)_
+2. **`codegraph`** — `agents/skills/codegraph/SKILL.md`
+     _Use this skill when the user mentions codegraph or related concepts. ~35% cheaper · ~70% fewer tool calls · 100% local_
 3. **`image-routing`** — `agents/skills/image-routing/SKILL.md`
      _Use this skill on EVERY read request to decide between text and image representation. Apply whenever the AI is about to open a PDF, screenshot a URL, review a UI, inspect a long git diff, or process diagrams — picking the wrong format wastes 3-10× tokens. The AI MUST consult the decision table here before issuing any read tool call on non-trivial content._
 4. **`karpathy-guidelines`** — `agents/skills/karpathy-guidelines/SKILL.md`
