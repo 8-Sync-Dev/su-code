@@ -662,6 +662,22 @@ fn detect_current_project_root() -> Option<PathBuf> {
 const BEGIN: &str = "<!-- 8sync:skills:begin -->";
 const END: &str = "<!-- 8sync:skills:end -->";
 
+/// Find the byte offset of `needle` only when it occurs as the start of a line
+/// (offset 0, or the byte immediately before is '\n'). Returns the offset of
+/// the needle itself (not the newline).
+fn find_line(hay: &str, needle: &str) -> Option<usize> {
+    let bytes = hay.as_bytes();
+    let mut start = 0;
+    while let Some(rel) = hay[start..].find(needle) {
+        let pos = start + rel;
+        if pos == 0 || bytes[pos - 1] == b'\n' {
+            return Some(pos);
+        }
+        start = pos + needle.len();
+    }
+    None
+}
+
 /// Rewrite (or insert) the force-load block in `<root>/AGENTS.md`.
 ///
 /// The block lists **both** global skills under `~/.omp/skills/` and project-local
@@ -739,7 +755,11 @@ Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.c
 
     let existing = std::fs::read_to_string(&agents).unwrap_or_default();
 
-    let new_contents = if let (Some(b), Some(e)) = (existing.find(BEGIN), existing.find(END)) {
+    // Match sentinels only when they appear as a standalone line (start of file
+    // or preceded by '\n'). Inline mentions of the sentinel strings inside prose
+    // — e.g. documentation describing this very feature — must not trigger a
+    // mid-paragraph rewrite.
+    let new_contents = if let (Some(b), Some(e)) = (find_line(&existing, BEGIN), find_line(&existing, END)) {
         if b < e {
             let mut s = String::with_capacity(existing.len() + block.len());
             s.push_str(&existing[..b]);
