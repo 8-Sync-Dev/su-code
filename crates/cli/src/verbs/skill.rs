@@ -14,7 +14,9 @@ use crate::{assets, env_detect, ui};
       8sync skill add https://github.com/colbymchenry/codegraph  clone a skill from a GitHub URL
       8sync skill add gh:owner/repo                              same, short form
       8sync skill add path:/abs/path                             register a skill from a local directory (symlink)
+      8sync skill add path:/abs/path#better-name                 …and rename it on install
       8sync skill add builtin:karpathy                           register a builtin skill (already shipped)
+      8sync skill add https://...#better-name                    same #newname override works on any spec
       8sync skill sync                                           rewrite ~/.omp/skills/00-force-load.md from registry
 
     SPEC
@@ -251,21 +253,31 @@ enum Source {
 }
 
 fn parse_spec(spec: &str) -> Result<Source> {
-    let s = spec.trim();
-    if let Some(rest) = s.strip_prefix("builtin:") {
-        return Ok(Source::Builtin { name: rest.to_string() });
+    // Allow an explicit name override via `<spec>#<name>` suffix.
+    // Examples:
+    //   path:/abs/foo#better-name
+    //   gh:owner/repo#better-name
+    //   https://github.com/owner/repo#better-name
+    let (core, name_override) = match spec.trim().rsplit_once('#') {
+        Some((lhs, rhs)) if !rhs.is_empty() && !rhs.contains('/') => (lhs, Some(rhs.to_string())),
+        _ => (spec.trim(), None),
+    };
+    let with_name = |default: String| name_override.clone().unwrap_or(default);
+
+    if let Some(rest) = core.strip_prefix("builtin:") {
+        return Ok(Source::Builtin { name: with_name(rest.to_string()) });
     }
-    if let Some(rest) = s.strip_prefix("path:") {
+    if let Some(rest) = core.strip_prefix("path:") {
         let p = PathBuf::from(rest);
-        let name = p
+        let default_name = p
             .file_name()
             .and_then(|x| x.to_str())
             .ok_or_else(|| anyhow!("cannot derive name from path: {}", rest))?
             .to_string();
-        return Ok(Source::Path { src: p, name });
+        return Ok(Source::Path { src: p, name: with_name(default_name) });
     }
-    if let Some(rest) = s.strip_prefix("gh:") {
-        let name = rest
+    if let Some(rest) = core.strip_prefix("gh:") {
+        let default_name = rest
             .trim_end_matches(".git")
             .rsplit('/')
             .next()
@@ -273,21 +285,21 @@ fn parse_spec(spec: &str) -> Result<Source> {
             .to_string();
         return Ok(Source::Git {
             url: format!("https://github.com/{}", rest.trim_end_matches(".git")),
-            name,
+            name: with_name(default_name),
         });
     }
-    if s.starts_with("https://") || s.starts_with("http://") || s.starts_with("git@") {
-        let name = s
+    if core.starts_with("https://") || core.starts_with("http://") || core.starts_with("git@") {
+        let default_name = core
             .trim_end_matches(".git")
             .rsplit('/')
             .next()
-            .ok_or_else(|| anyhow!("bad git url: {}", s))?
+            .ok_or_else(|| anyhow!("bad git url: {}", core))?
             .to_string();
-        return Ok(Source::Git { url: s.to_string(), name });
+        return Ok(Source::Git { url: core.to_string(), name: with_name(default_name) });
     }
     Err(anyhow!(
-        "unknown spec `{}` — use <https URL> | gh:owner/repo | path:/abs | builtin:name",
-        s
+        "unknown spec `{}` — use <https URL> | gh:owner/repo | path:/abs | builtin:name (optional #newname suffix to rename)",
+        spec
     ))
 }
 
