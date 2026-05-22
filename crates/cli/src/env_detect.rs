@@ -51,3 +51,51 @@ pub fn cmd_version(name: &str, args: &[&str]) -> Option<String> {
     let first = s.lines().next()?.trim().to_string();
     Some(first)
 }
+
+/// Detect HyDE-Project setup (hyprland + wallbash theme engine).
+pub fn is_hyde() -> bool {
+    let home = match dirs::home_dir() { Some(h) => h, None => return false };
+    home.join(".config/hyde/wallbash").exists()
+        || home.join(".config/hyde").exists() && which::which("hydectl").is_ok()
+}
+
+/// True when stdin/stdout is a real TTY (so we can prompt y/N).
+pub fn has_tty() -> bool {
+    // Use the simple `isatty(0)` trick via /proc.
+    // unistd::isatty would need a new dep — keep it tiny.
+    std::io::IsTerminal::is_terminal(&std::io::stdin())
+        && std::io::IsTerminal::is_terminal(&std::io::stdout())
+}
+
+/// Return preferred AUR helper on PATH (`paru` > `yay`), or None.
+pub fn aur_helper() -> Option<&'static str> {
+    if which::which("paru").is_ok() { return Some("paru"); }
+    if which::which("yay").is_ok()  { return Some("yay"); }
+    None
+}
+
+/// Kitty `allow_remote_control` enabled? Detected from `kitty.conf` chain.
+pub fn kitty_remote_on() -> bool {
+    let home = match dirs::home_dir() { Some(h) => h, None => return false };
+    let main = home.join(".config/kitty/kitty.conf");
+    let candidates: Vec<PathBuf> = vec![
+        main.clone(),
+        home.join(".config/kitty/hyde.conf"),
+    ];
+    for p in candidates {
+        if let Ok(c) = std::fs::read_to_string(&p) {
+            for line in c.lines() {
+                let l = line.trim();
+                if l.starts_with('#') { continue; }
+                if let Some(rest) = l.strip_prefix("allow_remote_control") {
+                    let v = rest.trim().to_lowercase();
+                    if v.starts_with("yes") || v.starts_with("socket") || v.starts_with("password") {
+                        return true;
+                    }
+                    if v.starts_with("no") { return false; }
+                }
+            }
+        }
+    }
+    false
+}

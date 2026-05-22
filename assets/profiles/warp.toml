@@ -1,0 +1,24 @@
+name = "warp"
+description = "Cloudflare WARP VPN + DoH + MASQUE + malware DNS filter"
+
+[packages]
+pacman = []
+aur = ["cloudflare-warp-bin"]
+
+[requires]
+aur_helper = true
+
+[services]
+system_enable = ["warp-svc.service"]
+user_enable = []
+
+# Configure WARP once at install (idempotent — re-running is harmless).
+# Day-to-day connect/disconnect is via `8sync sec`.
+[post_install]
+commands = [
+  "warp-cli --accept-tos registration new",
+  "warp-cli --accept-tos mode doh",
+  "warp-cli --accept-tos tunnel protocol set MASQUE",
+  "warp-cli --accept-tos dns families malware",
+]
+hint = "Use `8sync sec on` to connect, `8sync sec off` to disconnect."

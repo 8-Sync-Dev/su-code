@@ -3,18 +3,15 @@ use crate::{pkg, ui, verbs::selfup};
 
 pub fn run() -> Result<()> {
     ui::header("8sync up");
-    // 1. Self-update first (binary from GitHub)
+    // 1. Self-update 8sync binary first
     let _ = selfup::run_self_update(false);
-    // 2. System packages
-    let _ = pkg::run_loud("sudo", &["pacman", "-Syu", "--noconfirm"]);
-    // 3. Paru AUR
-    if which::which("paru").is_ok() {
-        let _ = pkg::run_loud("paru", &["-Syu", "--noconfirm", "--aur"]);
+    // 2. omp CLI: prefer its own self-update if available, else re-run installer.
+    if which::which("omp").is_ok() {
+        let st = std::process::Command::new("omp").arg("update").status();
+        if !matches!(st, Ok(s) if s.success()) {
+            let _ = pkg::run_loud("sh", &["-c", "curl -fsSL https://omp.sh/install | sh"]);
+        }
     }
-    // 4. Forge
-    if which::which("forge").is_ok() {
-        let _ = pkg::run_loud("sh", &["-c", "curl -fsSL https://forgecode.dev/cli | sh"]);
-    }
-    ui::ok("up complete");
+    ui::ok("up complete (system pkgs untouched — run `paru -Syu` manually if needed)");
     Ok(())
 }

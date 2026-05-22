@@ -1,0 +1,17 @@
+name = "hardware-lianli"
+description = "Lian Li chassis (fan/RGB/LCD) — built from AUR"
+
+[packages]
+pacman = []
+aur = ["lianli-linux-git"]
+
+[requires]
+aur_helper = true
+
+[services]
+system_enable = []
+user_enable = []
+
+[post_install]
+commands = []
+hint = "Launch Lian-Li-Linux from app menu. May need to re-plug controller USB and reboot once."

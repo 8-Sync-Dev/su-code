@@ -3,5 +3,5 @@ new_tab 8sync
 cd ~
 
 launch hx .
-launch --location=vsplit forge
+launch --location=vsplit omp --continue
 launch --location=hsplit fish

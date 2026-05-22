@@ -1,3 +1,8 @@
+---
+name: image-routing
+description: Use this skill on EVERY read request to decide between text and image representation. Apply whenever the AI is about to open a PDF, screenshot a URL, review a UI, inspect a long git diff, or process diagrams — picking the wrong format wastes 3-10× tokens. The AI MUST consult the decision table here before issuing any read tool call on non-trivial content.
+---
+
 # image-routing — choose image vs text reads to save tokens
 
 **Apply on every read request. Pick the cheaper representation by content type.**
