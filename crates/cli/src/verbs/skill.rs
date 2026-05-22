@@ -387,11 +387,18 @@ fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&str>) -> Res
 
     match &src {
         Source::Git { url, .. } => {
+            // Global keeps the .git/ so `git pull --ff-only` works on re-add/sync.
             clone_or_pull_git(url, &global_target)?;
             audit_skill_layout(&global_target);
             if let Some(root) = project_root.as_ref() {
+                // Local is a plain vendored copy (no nested .git/) — safe to commit.
                 let local_target = root.join("agents/skills").join(&name);
-                clone_or_pull_git(url, &local_target)?;
+                if local_target.exists() {
+                    // Refresh files from the freshly-pulled global copy.
+                    let _ = std::fs::remove_dir_all(&local_target);
+                }
+                copy_dir_recursive(&global_target, &local_target)?;
+                ui::ok(&format!("vendored → {}", local_target.display()));
                 audit_skill_layout(&local_target);
             }
         }
@@ -517,38 +524,22 @@ fn mirror_global_to_local(home: &Path, root: &Path) -> Result<usize> {
             None => continue,
         };
         let local_target = local_dir.join(name);
-        let origin = git_origin_url(g);
-        if let Some(url) = origin {
-            // Git-backed skill → keep local as an independent clone.
-            clone_or_pull_git(&url, &local_target)?;
-        } else if local_target.exists() {
-            // Refresh in place from the global vendor copy.
-            copy_dir_recursive(g, &local_target)?;
-            ui::ok(&format!("refreshed {}", local_target.display()));
-        } else {
-            copy_dir_recursive(g, &local_target)?;
-            ui::ok(&format!("copied  → {}", local_target.display()));
+        // Always vendor-copy (no nested .git/) so the local tree is committable.
+        // For git-backed skills we still call `git pull --ff-only` on the GLOBAL
+        // copy elsewhere; here we just refresh local files from whatever global has.
+        let existed = local_target.exists();
+        if existed {
+            let _ = std::fs::remove_dir_all(&local_target);
         }
+        copy_dir_recursive(g, &local_target)?;
+        ui::ok(&format!(
+            "{} → {}",
+            if existed { "refreshed" } else { "vendored " },
+            local_target.display()
+        ));
         count += 1;
     }
     Ok(count)
-}
-
-/// Return the `origin` remote URL of a git repo at `dir`, or None if `dir` is
-/// not a git working copy.
-fn git_origin_url(dir: &Path) -> Option<String> {
-    if !dir.join(".git").exists() {
-        return None;
-    }
-    let out = Command::new("git")
-        .args(["-C", dir.to_str()?, "config", "--get", "remote.origin.url"])
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if url.is_empty() { None } else { Some(url) }
 }
 
 /// Recursively copy `src` into `dst`. Skips `.git/` (vendor copies should not
