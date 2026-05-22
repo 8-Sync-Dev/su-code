@@ -9,7 +9,6 @@ pub mod here;
 pub mod ai;
 pub mod ship;
 pub mod run;
-pub mod end;
 pub mod skill;
 pub mod shot;
 pub mod diff_img;

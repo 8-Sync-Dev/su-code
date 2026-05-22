@@ -11,7 +11,7 @@ use crate::ui;
       8sync shot ./docs/index.html -o /tmp/docs.png
 
     USE CASE
-      Render a URL or local HTML file to PNG so that forge / claude-code can review the
+      Render a URL or local HTML file to PNG so that omp / claude-code can review the
       visual result cheaply (one image is far fewer tokens than parsing the full DOM).
 
     STATUS

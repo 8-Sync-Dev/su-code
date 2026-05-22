@@ -1,3 +1,8 @@
+---
+name: karpathy-guidelines
+description: Use this skill before EVERY non-trivial coding task. It enforces Andrej Karpathy-style engineering discipline — read-before-write, test-before-refactor, small steps, boring-is-better, delete-more-than-you-add. Apply whenever the user asks for code, refactor, debug, or review work; the AI MUST cite a rule from this skill before claiming "done".
+---
+
 # Karpathy Guidelines — software engineering baseline
 
 **Read this skill before every non-trivial coding task.**

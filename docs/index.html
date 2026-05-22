@@ -3,116 +3,284 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>8sync — Terminal-first AI Coding Harness</title>
-  <meta name="description" content="8sync: terminal-first AI coding harness cho CachyOS/Arch + Kitty + Helix + Forge. Giữ workflow terminal bình thường, AI quan sát context và hỗ trợ thực thi." />
+  <title>8sync — terminal-first AI coding harness</title>
+  <meta name="description" content="8sync: terminal-first AI coding harness cho CachyOS/Arch + Kitty + Helix + omp. Giữ workflow terminal bình thường, AI quan sát context và thực thi khi bạn yêu cầu." />
+  <meta property="og:title" content="8sync — terminal-first AI coding harness" />
+  <meta property="og:description" content="Keep your normal terminal workflow; AI agents observe project context, load agents/* memory, execute tasks on demand." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://8-sync-dev.github.io/su-code/" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" />
   <style>
     :root {
-      --bg: #0b1020;
-      --card: rgba(255,255,255,0.06);
-      --line: rgba(255,255,255,0.16);
+      --bg: #0a0e1c;
+      --bg2: #0f1428;
+      --card: rgba(255,255,255,0.04);
+      --card-hover: rgba(255,255,255,0.07);
+      --line: rgba(255,255,255,0.10);
+      --line-strong: rgba(255,255,255,0.18);
       --txt: #e8edf7;
-      --muted: #aab6d3;
+      --muted: #97a4c4;
+      --dim: #6b7796;
       --pri: #5eead4;
       --pri2: #60a5fa;
+      --accent: #a78bfa;
+      --good: #22d3ee;
+      --code-bg: rgba(0,0,0,0.35);
     }
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
       color: var(--txt);
       background:
-        radial-gradient(900px 420px at 8% -10%, rgba(94,234,212,.18), transparent 60%),
-        radial-gradient(850px 450px at 100% 0%, rgba(96,165,250,.18), transparent 60%),
+        radial-gradient(1000px 500px at 10% -10%, rgba(94,234,212,.16), transparent 60%),
+        radial-gradient(950px 520px at 100% 0%, rgba(96,165,250,.18), transparent 60%),
+        radial-gradient(700px 400px at 50% 100%, rgba(167,139,250,.12), transparent 70%),
         var(--bg);
-      line-height: 1.6;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
     }
-    .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 18px 48px; }
-    .top { display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
-    .badge { border:1px solid var(--line); padding:6px 10px; border-radius:999px; color:var(--muted); font-size:13px; }
-    h1 { margin: 20px 0 10px; font-size: clamp(30px, 6vw, 52px); line-height:1.08; }
-    .sub { color:var(--muted); max-width:820px; font-size:18px; }
-    .cta { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; }
-    .btn { display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; color:#06111f; background: linear-gradient(90deg,var(--pri),var(--pri2)); font-weight:700; }
-    .btn.ghost { background: transparent; color: var(--txt); border:1px solid var(--line); }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:28px; }
-    .card { background: var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
-    .card h3 { margin:0 0 6px; font-size:18px; }
-    .muted { color: var(--muted); }
-    code { background: rgba(255,255,255,.08); padding:2px 6px; border-radius:6px; }
-    pre { background: rgba(0,0,0,.28); border:1px solid var(--line); padding:12px; border-radius:12px; overflow:auto; }
-    .section { margin-top: 30px; }
-    ul { padding-left: 18px; }
-    footer { margin-top:36px; color:var(--muted); border-top:1px solid var(--line); padding-top:16px; }
-    a { color:#9cd7ff; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+
+    /* Header */
+    .top { display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom: 28px; }
+    .logo { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:-0.01em; }
+    .logo-mark { width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,var(--pri),var(--pri2)); display:grid; place-items:center; color:#06111f; font-weight:900; }
+    .nav { display:flex; gap:18px; flex-wrap:wrap; }
+    .nav a { color:var(--muted); text-decoration:none; font-size:14px; }
+    .nav a:hover { color:var(--txt); }
+
+    /* Hero */
+    .hero { padding: 16px 0 8px; }
+    .eyebrow { display:inline-flex; gap:8px; align-items:center; padding:6px 12px; border:1px solid var(--line-strong); border-radius:999px; color:var(--muted); font-size:13px; }
+    .eyebrow b { color:var(--pri); }
+    h1 { margin: 18px 0 14px; font-size: clamp(32px, 6.2vw, 56px); line-height:1.05; letter-spacing:-0.02em; }
+    h1 .grad { background: linear-gradient(90deg,var(--pri),var(--pri2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .sub { color:var(--muted); max-width:780px; font-size:17px; }
+    .cta { display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:11px 16px; border-radius:10px; text-decoration:none; font-weight:700; font-size:14px; transition: transform .12s ease, box-shadow .2s ease; }
+    .btn.primary { color:#06111f; background: linear-gradient(90deg,var(--pri),var(--pri2)); box-shadow: 0 8px 22px -10px rgba(94,234,212,.4); }
+    .btn.primary:hover { transform: translateY(-1px); }
+    .btn.ghost { background: transparent; color: var(--txt); border:1px solid var(--line-strong); }
+    .btn.ghost:hover { background: var(--card); }
+
+    /* Feature grid */
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-top:36px; }
+    .card { background: var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; transition: background .15s ease, border-color .15s ease; }
+    .card:hover { background: var(--card-hover); border-color: var(--line-strong); }
+    .card h3 { margin:0 0 8px; font-size:16px; display:flex; align-items:center; gap:8px; }
+    .card h3 .dot { width:8px; height:8px; border-radius:99px; background:var(--pri); box-shadow:0 0 12px var(--pri); }
+    .card p { margin:0; color: var(--muted); font-size:14px; }
+
+    /* Sections */
+    section { margin-top: 56px; scroll-margin-top: 20px; }
+    section > h2 { margin: 0 0 6px; font-size:24px; letter-spacing:-0.01em; }
+    section > .lede { color:var(--muted); margin: 0 0 18px; font-size:15px; }
+
+    /* Code blocks */
+    code { background: rgba(255,255,255,.08); padding:2px 6px; border-radius:6px; font-size:0.92em; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre { background: var(--code-bg); border:1px solid var(--line); padding:16px 18px; border-radius:12px; overflow:auto; margin:0; font-size:13.5px; line-height:1.6; }
+    pre code { background: transparent; padding:0; font-size:inherit; }
+    .codeblock { position:relative; }
+    .codeblock .lbl { position:absolute; top:10px; right:14px; font-size:11px; color:var(--dim); letter-spacing:.08em; text-transform:uppercase; }
+
+    /* Tables */
+    table { width:100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+    th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    td code { font-size: 12.5px; white-space: nowrap; }
+
+    /* Two-col rows */
+    .two { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+
+    /* Footer */
+    footer { margin-top:56px; color:var(--muted); border-top:1px solid var(--line); padding-top:22px; font-size: 13px; display:flex; flex-wrap:wrap; gap:14px; justify-content: space-between; }
+    footer .tags { color: var(--dim); }
+    a { color: #9cd7ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <main class="wrap">
+
+    <!-- HEADER -->
     <div class="top">
-      <div class="badge">8-Sync-Dev / su-code</div>
-      <div class="badge">GitHub Pages · /su-code</div>
+      <div class="logo">
+        <span class="logo-mark">8</span>
+        <span>8sync</span>
+        <span style="color:var(--dim); font-weight:400; font-size:13px;">· 8-Sync-Dev</span>
+      </div>
+      <nav class="nav">
+        <a href="#install">Install</a>
+        <a href="#commands">Commands</a>
+        <a href="#skills">Skills</a>
+        <a href="#update">Update</a>
+        <a href="https://github.com/8-Sync-Dev/su-code">GitHub</a>
+      </nav>
     </div>
 
-    <h1>8sync — dùng terminal bình thường,<br/>AI đứng sau quan sát và hỗ trợ</h1>
-    <p class="sub">
-      <strong>VI:</strong> Bạn vẫn <code>cd</code>, code, build, test như thường. AI agent bám theo project context + memory để nghe lệnh, hỗ trợ thực thi nhanh hơn.<br/>
-      <strong>EN:</strong> Keep your normal terminal workflow; AI agents observe project context and execute tasks on demand.
-    </p>
+    <!-- HERO -->
+    <header class="hero">
+      <span class="eyebrow">⚡ <b>terminal-first</b> · AI coding harness</span>
+      <h1>Dùng terminal như thường,<br/><span class="grad">AI đứng sau quan sát.</span></h1>
+      <p class="sub">
+        <strong>VI:</strong> Bạn vẫn <code>cd</code>, code, build, test bằng CLI. AI agent (omp) bám theo project context, đọc memory <code>agents/*</code>, và thực thi khi bạn yêu cầu.<br/>
+        <strong>EN:</strong> Keep your normal CLI workflow; AI agents observe project context, load <code>agents/*</code> memory, and execute tasks on demand.
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/8-Sync-Dev/su-code">View on GitHub →</a>
+        <a class="btn ghost" href="#install">Quick start</a>
+        <a class="btn ghost" href="https://github.com/orgs/8-Sync-Dev/discussions">Community</a>
+      </div>
+    </header>
 
-    <div class="cta">
-      <a class="btn" href="https://github.com/8-Sync-Dev/su-code" target="_blank" rel="noreferrer">View on GitHub</a>
-      <a class="btn ghost" href="https://github.com/orgs/8-Sync-Dev/discussions" target="_blank" rel="noreferrer">Community</a>
-    </div>
-
-    <section class="grid">
+    <!-- FEATURES -->
+    <section class="grid" style="margin-top:40px;">
       <article class="card">
-        <h3>Terminal-first</h3>
-        <p class="muted">Không ép dùng “AI terminal” riêng. Workflow CLI hiện tại của bạn giữ nguyên.</p>
+        <h3><span class="dot"></span>Terminal-first</h3>
+        <p>Không có “AI terminal” riêng. CLI workflow hiện tại của bạn giữ nguyên — 8sync chỉ wrap quanh.</p>
       </article>
       <article class="card">
-        <h3>Context-aware</h3>
-        <p class="muted">Đi tới thư mục/project nào, AI theo ngữ cảnh đó và đọc memory dự án.</p>
+        <h3><span class="dot"></span>Context-aware</h3>
+        <p>Đi tới project nào, AI bám theo ngữ cảnh đó. Memory shared qua <code>AGENTS.md</code> + <code>agents/*</code>.</p>
       </article>
       <article class="card">
-        <h3>Low-RAM Rust CLI</h3>
-        <p class="muted">Nhẹ, nhanh, phù hợp CachyOS/Arch + Kitty + Helix + Forge.</p>
+        <h3><span class="dot"></span>Skill injection</h3>
+        <p><code>8sync skill add &lt;github-url&gt;</code> clone vào cả global <code>~/.omp/skills/</code> và project <code>agents/skills/</code>.</p>
+      </article>
+      <article class="card">
+        <h3><span class="dot"></span>Small &amp; native</h3>
+        <p>1 binary Rust ≈ 1.3 MB stripped. Phù hợp CachyOS/Arch + Kitty + Helix + <a href="https://omp.sh">omp</a>.</p>
       </article>
     </section>
 
-    <section class="section">
+    <!-- INSTALL -->
+    <section id="install">
       <h2>Quick start</h2>
-      <pre><code>git clone https://github.com/8-Sync-Dev/su-code.git
+      <p class="lede">CachyOS / Arch Linux, terminal Kitty (bật <code>allow_remote_control yes</code> để có layout 3-pane).</p>
+      <div class="codeblock">
+        <span class="lbl">bash</span>
+<pre><code>git clone https://github.com/8-Sync-Dev/su-code.git
 cd su-code
-bash scripts/bootstrap.sh
-8sync setup --dry-run
-8sync setup
-forge login
-8sync doctor</code></pre>
+bash scripts/bootstrap.sh        # rustup + cargo build + install vào ~/.local/bin
+
+8sync setup --dry-run            # xem plan trước
+8sync setup                      # cài harness + chọn profile y/N
+8sync doctor                     # verify
+
+cd ~/code/my-app
+8sync .                          # mở session (kitty 3-pane + omp trong abduco)</code></pre>
+      </div>
+      <p class="lede" style="margin-top:14px;">
+        Đảm bảo <code>~/.local/bin</code> trong <code>$PATH</code>. Cờ thường dùng:
+        <code>--dry-run</code>, <code>--no-profile</code>, <code>--yall</code>, <code>--profile &lt;name&gt;</code>.
+      </p>
     </section>
 
-    <section class="section">
-      <h2>Core commands</h2>
-      <ul>
-        <li><code>8sync .</code> — open/attach project session</li>
-        <li><code>8sync ai [prompt]</code> — run AI in current context</li>
-        <li><code>8sync find &lt;kw&gt;</code> — fast code search</li>
-        <li><code>8sync run [dev|build|test|fmt|lint]</code> — routine tasks</li>
-        <li><code>8sync ship "msg"</code> — commit/push/PR flow</li>
-      </ul>
+    <!-- COMMANDS -->
+    <section id="commands">
+      <h2>Lệnh chính</h2>
+      <p class="lede">Mọi verb có <code>-h</code> / <code>--help</code> với block EXAMPLES. Chạy <code>8sync</code> hoặc <code>8sync help</code> để xem cheatsheet.</p>
+
+      <div class="two">
+        <div>
+          <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Vibe loop (daily)</h3>
+          <table>
+            <tbody>
+              <tr><td><code>8sync .</code></td><td>Mở/attach session (kitty 3-pane + <code>omp --continue</code> trong abduco)</td></tr>
+              <tr><td><code>8sync ai [prompt]</code></td><td>Trống → resume; có prompt → one-shot <code>omp -p</code></td></tr>
+              <tr><td><code>8sync find &lt;kw&gt;</code></td><td>rg/fd + fzf, mở editor tại <code>file:line</code></td></tr>
+              <tr><td><code>8sync note "msg"</code></td><td>Append <code>agents/NOTES.md</code></td></tr>
+              <tr><td><code>8sync run dev|build|test|fmt|lint</code></td><td>Project runner theo recipe</td></tr>
+              <tr><td><code>8sync ship "msg"</code></td><td><code>git add -A &amp;&amp; commit &amp;&amp; push &amp;&amp; gh pr create</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Lifecycle &amp; tools</h3>
+          <table>
+            <tbody>
+              <tr><td><code>8sync setup</code></td><td>Cài harness + chọn profile</td></tr>
+              <tr><td><code>8sync up</code></td><td>Self-update binary + <code>omp update</code></td></tr>
+              <tr><td><code>8sync doctor</code></td><td>Health check toàn diện</td></tr>
+              <tr><td><code>8sync skill</code></td><td>List + add skill (xem dưới)</td></tr>
+              <tr><td><code>8sync shot &lt;url|file&gt;</code></td><td>Render web/file → PNG</td></tr>
+              <tr><td><code>8sync diff-img | pdf-img</code></td><td>Diff / PDF → PNG</td></tr>
+              <tr><td><code>8sync sec on|off</code></td><td>WARP VPN + ufw cùng lúc</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
-    <section class="section card">
-      <h2>Author &amp; Social</h2>
-      <p class="muted">Cập nhật link chính thức của bạn tại đây:</p>
-      <ul>
-        <li>Facebook: <a href="https://facebook.com/" target="_blank" rel="noreferrer">https://facebook.com/</a></li>
-        <li>YouTube: <a href="https://youtube.com/" target="_blank" rel="noreferrer">https://youtube.com/</a></li>
-        <li>TikTok: <a href="https://tiktok.com/@" target="_blank" rel="noreferrer">https://tiktok.com/@</a></li>
-      </ul>
+    <!-- SKILLS -->
+    <section id="skills">
+      <h2>Skill injection</h2>
+      <p class="lede">Skill = module hướng dẫn cho AI. 8sync bundle sẵn 3 skill <code>karpathy-guidelines</code>, <code>8sync-cli</code>, <code>image-routing</code>; bạn add thêm từ GitHub.</p>
+      <div class="codeblock">
+        <span class="lbl">bash</span>
+<pre><code># Clone từ URL: cài vào CẢ ~/.omp/skills/ (omp đọc global) lẫn agents/skills/ (project)
+# Đồng thời rewrite block &lt;!-- 8sync:skills:* --&gt; trong AGENTS.md
+8sync skill add https://github.com/colbymchenry/codegraph
+
+# Các dạng spec khác
+8sync skill add gh:owner/repo
+8sync skill add path:/abs/local/dir
+8sync skill add builtin:karpathy
+
+# Idempotent: chạy lại = git pull --ff-only
+8sync skill add https://github.com/colbymchenry/codegraph   # → "updated"
+
+# Refresh master force-load file
+8sync skill sync</code></pre>
+      </div>
+    </section>
+
+    <!-- UPDATE -->
+    <section id="update">
+      <h2>Update</h2>
+      <p class="lede">Hai cách:</p>
+      <div class="two">
+        <div>
+          <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Auto (khuyên dùng)</h3>
+          <div class="codeblock">
+<pre><code>8sync up</code></pre>
+          </div>
+          <p class="lede" style="margin-top:10px;">Self-update binary (GitHub release) + <code>omp update</code>. Không đụng <code>pacman -Syu</code>.</p>
+        </div>
+        <div>
+          <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Manual (build từ source)</h3>
+          <div class="codeblock">
+<pre><code>cd su-code &amp;&amp; git pull
+cargo build --release
+install -m755 target/release/8sync \
+  ~/.local/bin/8sync</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOCS / SITE -->
+    <section id="docs">
+      <h2>Documentation site</h2>
+      <p class="lede">Trang này là <code>docs/index.html</code>, deploy tự động qua GitHub Pages mỗi khi push <code>main</code>.</p>
+      <table>
+        <tbody>
+          <tr><td>Source</td><td><a href="https://github.com/8-Sync-Dev/su-code/blob/main/docs/index.html">docs/index.html</a></td></tr>
+          <tr><td>Workflow</td><td><a href="https://github.com/8-Sync-Dev/su-code/blob/main/.github/workflows/pages.yml">.github/workflows/pages.yml</a></td></tr>
+          <tr><td>Trigger</td><td>push <code>main</code> hoặc <code>workflow_dispatch</code></td></tr>
+          <tr><td>URL</td><td><a href="https://8-sync-dev.github.io/su-code/">8-sync-dev.github.io/su-code</a></td></tr>
+          <tr><td>README chi tiết</td><td><a href="https://github.com/8-Sync-Dev/su-code#readme">github.com/8-Sync-Dev/su-code#readme</a></td></tr>
+          <tr><td>AGENTS.md (cho AI)</td><td><a href="https://github.com/8-Sync-Dev/su-code/blob/main/AGENTS.md">AGENTS.md</a></td></tr>
+        </tbody>
+      </table>
     </section>
 
     <footer>
-      Built with GitHub Pages · © 8-Sync-Dev · #8sync #AIAgent #VibeCoding #TerminalWorkflow
+      <div>© 8-Sync-Dev · MIT License · built on <a href="https://omp.sh">omp</a></div>
+      <div class="tags">#8sync #omp #VibeCoding #TerminalWorkflow #RustLang #ArchLinux #CachyOS</div>
     </footer>
   </main>
 </body>

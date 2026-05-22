@@ -1,44 +1,43 @@
 # su-code (`8sync`)
 
-> **VI (mặc định):** Bộ harness cho coding với AI agent theo kiểu **dùng terminal bình thường**, còn AI đứng phía sau để quan sát ngữ cảnh dự án, học theo lịch sử làm việc và thực thi lệnh khi bạn yêu cầu.
+> **VI:** Coding harness terminal-first cho CachyOS/Arch + Kitty + Helix + [omp](https://omp.sh).
+> Bạn vẫn dùng terminal như thường ngày; AI agent quan sát ngữ cảnh project, đọc memory `agents/*`, và thực thi lệnh khi bạn yêu cầu.
 >
-> **EN:** A coding harness where you keep using your normal terminal workflow, while AI agents observe project context, learn from session memory, and execute tasks on demand.
+> **EN:** Terminal-first AI coding harness for CachyOS/Arch + Kitty + Helix + [omp](https://omp.sh).
+> Keep your normal CLI workflow; AI agents observe project context, load `agents/*` memory, and execute tasks on demand.
+
+- **Website / docs**: <https://8-sync-dev.github.io/su-code> (auto-deploy từ `docs/` qua [`.github/workflows/pages.yml`](.github/workflows/pages.yml))
+- **Repo**: <https://github.com/8-Sync-Dev/su-code>
+- **Discussions**: <https://github.com/orgs/8-Sync-Dev/discussions>
+- **AI engine**: [omp](https://omp.sh) (oh-my-pi) — `8sync` wrap quanh `omp --continue` để giữ session per-project.
 
 ---
 
-## VI — Tổng quan nhanh
+## TL;DR
 
-`8sync` **không thay terminal của bạn** và cũng **không ép bạn vào “AI terminal” riêng**.
+```bash
+# Cài lần đầu (Arch/CachyOS, đã có git)
+git clone https://github.com/8-Sync-Dev/su-code.git
+cd su-code
+bash scripts/bootstrap.sh        # → ~/.local/bin/8sync
+8sync setup --dry-run            # xem plan trước
+8sync setup                      # cài harness + chọn profile y/N
+8sync doctor                     # verify
 
-Bạn vẫn:
-- mở terminal như thường ngày,
-- `cd` vào thư mục bất kỳ,
-- chạy lệnh dev/build/test như bình thường.
-
-AI agent sẽ:
-- bám theo ngữ cảnh thư mục/project hiện tại,
-- đọc memory trong `agents/*` + `AGENTS.md`,
-- hỗ trợ phân tích, code, review, refactor, ship,
-- học dần theo quyết định kỹ thuật và phong cách làm việc của bạn.
-
-Nói ngắn gọn: **terminal-first, AI-observed, memory-driven**.
-
----
-
-## VI — Cách hoạt động (đúng ý “đi tới đâu AI quan sát tới đó”)
-
-Khi bạn vào project và chạy `8sync .`:
-
-1. Xác định root project (`.git` / `Cargo.toml` / `package.json` / ...).
-2. Tạo hoặc cập nhật memory dùng chung (`AGENTS.md`, `agents/*`).
-3. Mở layout làm việc trong Kitty để bạn code nhanh hơn.
-4. AI nạp ngữ cảnh từ memory, theo sát project hiện tại.
-
-Khi bạn di chuyển qua project khác (`cd` sang thư mục khác + `8sync .`), AI sẽ dùng context của project đó.
+# Dùng hằng ngày
+cd <project>
+8sync .                          # mở session (kitty 3-pane + omp trong abduco)
+8sync ai "explain this codebase" # one-shot prompt; bỏ trống để resume session
+8sync ship "feat: ..."           # add + commit + push + gh pr create
+```
 
 ---
 
-## VI — Cài đặt
+## Cài đặt
+
+### 1. Bootstrap (máy mới)
+
+`scripts/bootstrap.sh` cài rustup (nếu thiếu) → `cargo build --release --locked` → copy binary vào `~/.local/bin/8sync`.
 
 ```bash
 git clone https://github.com/8-Sync-Dev/su-code.git
@@ -46,129 +45,180 @@ cd su-code
 bash scripts/bootstrap.sh
 ```
 
-Sau đó:
+Đảm bảo `~/.local/bin` trong `$PATH`:
 
 ```bash
-8sync setup --dry-run
-# kiểm tra trước khi cài thật (khuyên dùng)
-
-8sync setup
-forge login
-8sync doctor
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc   # hoặc ~/.bashrc
 ```
+
+### 2. `8sync setup` — cài phần còn lại
+
+Stage A (harness, luôn idempotent):
+
+- `pacman -S --needed helix lazygit abduco github-cli`
+- omp CLI qua `curl -fsSL https://omp.sh/install | sh` (skip nếu đã có)
+- ghi config: `~/.config/helix/`, `~/.config/kitty/8sync.session`, `~/.config/8sync/{global,skills}.toml`
+- ghi skill: `~/.omp/skills/{karpathy-guidelines,8sync-cli,image-routing}/SKILL.md` + `00-force-load.md`
+
+Stage B (profile cá nhân, opt-in y/N từng cái): `vietnamese`, `hardware-cooling`, `hardware-lianli`, `displaylink`, `apps-personal`, `warp`, hoặc bundle `alexdev`.
+
+Cờ thường dùng:
+
+| Cờ | Hiệu ứng |
+|---|---|
+| `8sync setup --dry-run` | In plan, không thay đổi gì |
+| `8sync setup --no-profile` | Chỉ Stage A |
+| `8sync setup --yall` | Stage A + apply tất cả profile, không hỏi |
+| `8sync setup --profile <name>` | Stage A + apply 1 profile cụ thể |
+| `8sync setup profile list \| show <n> \| apply <n>` | Quản lý profile sau setup |
+
+### 3. Update
+
+```bash
+8sync up                         # self-update binary (GitHub release) + omp update
+```
+
+Hoặc rebuild thủ công từ source:
+
+```bash
+cd su-code && git pull
+cargo build --release
+install -m755 target/release/8sync ~/.local/bin/8sync
+```
+
+System packages (`pacman -Syu`) **không** tự chạy — bạn tự quyết khi nào update CachyOS rolling.
 
 ---
 
-## VI — Lệnh chính (daily workflow)
+## Lệnh chính
+
+### Vibe loop (hằng ngày)
 
 | Lệnh | Mô tả |
 |---|---|
-| `8sync .` | Vào/attach session của project hiện tại |
-| `8sync ai [prompt]` | Gọi AI theo ngữ cảnh đang làm |
-| `8sync find <kw>` | Tìm code nhanh (rg/fzf + mở editor) |
-| `8sync run [dev\|build\|test\|fmt\|lint]` | Chạy tác vụ chuẩn theo project |
-| `8sync ship "msg"` | Add/commit/push/PR flow |
-| `8sync end` | Chốt phiên, đúc kết knowledge vào memory |
-| `8sync setup` | Cài môi trường dev đầy đủ (idempotent) |
-| `8sync up` | Cập nhật tool |
-| `8sync doctor` | Kiểm tra sức khỏe môi trường |
+| `8sync .` | Mở/attach session project hiện tại. Kitty có `allow_remote_control yes` → 3-pane; nếu không → soft 1-pane + `omp --continue` trong abduco |
+| `8sync ai [prompt]` | Trống/`continue` → `omp --continue`; có prompt → `omp -p "..."` |
+| `8sync find <kw>` | rg/fd + fzf preview → mở editor tại `file:line` |
+| `8sync note "msg" [-t tag]` | Append `agents/NOTES.md` |
+| `8sync run [dev\|build\|test\|fmt\|lint]` | Project runner theo recipe |
+| `8sync ship "msg"` | `git add -A && commit && push && gh pr create` |
+
+### Session quản lý (sub của `.`)
+
+`8sync . ls` / `to <n>` / `new <n> [cmd]` / `rm <n>` / `wipe` / `kick`
+
+### Skill system
+
+| Lệnh | Mô tả |
+|---|---|
+| `8sync skill` | List skill global (`~/.omp/skills/`) + local project (`agents/skills/`) |
+| `8sync skill add <github-url>` | Clone repo skill vào **cả** `~/.omp/skills/<name>/` (omp đọc) **và** `<project>/agents/skills/<name>/` (memory dự án). Rewrite block `<!-- 8sync:skills:* -->` trong `AGENTS.md` |
+| `8sync skill add gh:owner/repo` | Short form |
+| `8sync skill add path:/abs/path` | Symlink từ local dir |
+| `8sync skill sync` | Refresh `~/.omp/skills/00-force-load.md` từ asset bundle |
+
+Idempotent: chạy lại `add` cùng URL → `git pull --ff-only` thay vì clone lại.
+
+### Lifecycle
+
+| Lệnh | Mô tả |
+|---|---|
+| `8sync setup` | Cài harness + profile (xem mục Cài đặt) |
+| `8sync up` | Self-update binary + `omp update` |
+| `8sync doctor` | Health check (kitty remote, omp, helix, gh, configs, profiles, WARP/ufw) |
+| `8sync flow` | Workflow help theo thứ tự dùng |
+| `8sync help` | Cheatsheet (alias của `8sync` không tham số) |
+
+### AI tooling
+
+| Lệnh | Mô tả |
+|---|---|
+| `8sync shot <url\|file>` | Render web/file → PNG (cho image-routing skill) |
+| `8sync diff-img [ref]` | Git diff → PNG |
+| `8sync pdf-img <file>` | PDF page → PNG |
+
+### Security
+
+`8sync sec [on\|off\|toggle\|status]` — bật/tắt cùng lúc Cloudflare WARP VPN + ufw firewall. Sub: `sec warp …`, `sec ufw …`.
+
+Mọi verb hỗ trợ `-h` / `--help` với block `EXAMPLES` chi tiết.
 
 ---
 
-## VI — Memory dự án (điểm mạnh cốt lõi)
+## Memory project
 
-Trong mỗi project, `8sync` dùng thư mục `agents/` để lưu “trí nhớ làm việc”:
+Khi `8sync .` lần đầu trong project, file/folder sau được seed:
 
-- `agents/PROJECT.md`
-- `agents/KNOWLEDGE.md`
-- `agents/DECISIONS.md`
-- `agents/PREFERENCES.md`
-- `agents/STATE.md`
-- `agents/NOTES.md`
-
-Nhờ vậy AI không chỉ trả lời theo prompt hiện tại mà còn bám lịch sử quyết định kỹ thuật của chính project đó.
-
----
-
-## VI — Hình ảnh minh hoạ
-
-> Bạn có thể thêm ảnh demo vào phần này (screenshot layout, before/after, flow thực tế) để README trực quan hơn.
-
-Gợi ý ảnh nên có:
-1. Session layout khi chạy `8sync .`
-2. Flow `find -> edit -> run -> ship`
-3. Ví dụ memory `agents/*` sau vài phiên làm việc
-
-Khi có ảnh, thêm theo mẫu Markdown:
-
-```md
-![8sync session layout](https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/assets/demo/session-layout.png)
-![8sync workflow](https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/assets/demo/workflow.png)
+```
+<repo>/
+├── AGENTS.md                    ← anchor cho mọi AI tool, chứa block force-load skills
+└── agents/                      ← memory shared (omp/claude-code/cursor/opencode/aider)
+    ├── PROJECT.md               facts cố định (stack, entrypoint)
+    ├── KNOWLEDGE.md             append-only: AI học được gì
+    ├── DECISIONS.md             append-only: quyết định kiến trúc
+    ├── PREFERENCES.md           append-only: style user
+    ├── STATE.md                 việc đang dở
+    ├── NOTES.md                 quick notes via `8sync note`
+    └── skills/                  project-local skills (clone qua `8sync skill add <url>`)
 ```
 
----
-
-## VI — GitHub mô tả, links cộng đồng & hashtag (để dễ discover)
-
-Bạn có thể dùng đoạn mô tả ngắn này cho repo:
-
-> **Terminal-first AI coding harness for CachyOS/Arch + Kitty + Helix. Keep your normal CLI workflow while AI agents observe project context, learn memory, and execute tasks.**
-
-Links chính thức:
-
-- Website: https://8-sync-dev.github.io/su-code
-- GitHub Org: https://github.com/8-Sync-Dev
-- Repo `su-code`: https://github.com/8-Sync-Dev/su-code
-- Community Discussions: https://github.com/orgs/8-Sync-Dev/discussions
-
-GitHub Pages (project site):
-
-- URL: https://8-sync-dev.github.io/su-code
-- Source: `docs/index.html`
-- Auto deploy workflow: `.github/workflows/pages.yml`
-- Cập nhật link tác giả (Facebook/YouTube/TikTok): sửa tại `docs/index.html` mục `Author &amp; Social`
-
-Hashtag gợi ý:
-
-`#8sync #AIAgent #VibeCoding #CodingHarness #TerminalWorkflow #DeveloperTools #RustLang #KittyTerminal #HelixEditor #ArchLinux #CachyOS #OpenSource`
+`omp` tự quản session memory (`retain` / `recall` / auto-compact) — bạn **không** sửa tay `agents/*.md`. `8sync note` là exception duy nhất (append vào `NOTES.md`).
 
 ---
 
-## EN — Quick Overview
+## Documentation site
 
-`8sync` is a **terminal-first AI coding harness**.
+Trang web tĩnh trong `docs/index.html`, deploy tự động qua GitHub Pages:
 
-You keep your normal CLI workflow (`cd`, edit, run, test, ship). AI agents then:
-- observe the active project context,
-- load shared memory from `AGENTS.md` + `agents/*`,
-- execute coding tasks on request,
-- improve continuity across sessions.
+- **Source**: [`docs/index.html`](docs/index.html)
+- **Workflow**: [`.github/workflows/pages.yml`](.github/workflows/pages.yml) (trigger: push `main` hoặc workflow_dispatch)
+- **URL**: <https://8-sync-dev.github.io/su-code>
 
-It is not a separate “AI-only terminal”; it augments your existing terminal practice.
+Sửa `docs/index.html` → push `main` → Pages tự rebuild trong ~1 phút.
 
-### Install
+---
+
+## Stack & contribute
+
+Rust workspace 1 binary (`8sync` ≈ 1.3 MB stripped). Toolchain pin tại `rust-toolchain.toml`.
+
+Bố cục source:
+
+```
+crates/cli/src/
+├── main.rs                       clap router
+├── ui.rs · env_detect.rs · pkg.rs · assets.rs
+└── verbs/                        1 file / 1 verb
+    ├── root.rs flow.rs setup.rs doctor.rs up.rs selfup.rs
+    ├── here.rs ai.rs ship.rs run.rs find.rs note.rs
+    ├── skill.rs shot.rs diff_img.rs pdf_img.rs
+    ├── profile.rs sec.rs
+assets/                           embed vào binary qua rust-embed
+├── configs/                      kitty.session, helix-config, fish-config, 8sync/*.toml
+├── presets/                      kitty preset themes
+├── skills/                       built-in skills (karpathy, 8sync-cli, image-routing)
+└── wallpapers/
+```
+
+Khi thêm verb mới: tạo `verbs/<new>.rs` với `pub fn run(a: Args) -> Result<()>`, thêm `pub mod <new>;` vào `verbs/mod.rs`, và variant `<New>` + match arm trong `main.rs`.
+
+Smoke test:
 
 ```bash
-git clone https://github.com/8-Sync-Dev/su-code.git
-cd su-code
-bash scripts/bootstrap.sh
-8sync setup --dry-run
-8sync setup
-forge login
-8sync doctor
+cargo build --release
+./target/release/8sync --version
+./target/release/8sync help
+./target/release/8sync flow
+./target/release/8sync doctor
+./target/release/8sync skill
 ```
 
-### Core commands
-
-- `8sync .` — open/attach project session
-- `8sync ai [prompt]` — run AI in current context
-- `8sync find <kw>` — fast code search + jump
-- `8sync run [dev|build|test|fmt|lint]` — standard tasks
-- `8sync ship "msg"` — commit/push/PR flow
-- `8sync end` — capture session knowledge
+Xem [`AGENTS.md`](AGENTS.md) cho hướng dẫn chi tiết dành cho AI agent / contributor.
 
 ---
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [`LICENSE`](LICENSE).
+
+`#8sync #AIAgent #VibeCoding #omp #CodingHarness #TerminalWorkflow #DeveloperTools #RustLang #KittyTerminal #HelixEditor #ArchLinux #CachyOS #OpenSource`

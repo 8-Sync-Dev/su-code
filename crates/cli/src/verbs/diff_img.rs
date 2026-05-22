@@ -11,7 +11,7 @@ use crate::ui;
       8sync diff-img -o /tmp/review.png       custom output path
 
     USE CASE
-      Turn `git diff` into a PNG so forge can review code changes visually.
+      Turn `git diff` into a PNG so omp can review code changes visually.
       Useful when the diff is too large to fit in the AI context window as text.
 
     STATUS

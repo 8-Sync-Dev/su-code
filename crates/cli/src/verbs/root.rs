@@ -3,19 +3,18 @@ use owo_colors::OwoColorize;
 pub fn print_cheatsheet() {
     println!(
         "{}",
-        "8sync — vibe coding harness for CachyOS + Kitty + Helix + Forge".bold().cyan()
+        "8sync — vibe coding harness for CachyOS + Kitty + Helix + omp".bold().cyan()
     );
     println!("{}\n", "Run any verb with `-h` for detailed help and examples.".dimmed());
 
     println!("{}", "Vibe loop (daily):".bold().yellow());
     rows(&[
-        (".",      "open/attach project session (kitty 3-pane + forge in abduco)"),
-        ("ai",     "AI session — one-shot prompt or resume last forge chat"),
+        (".",      "open/attach project session (kitty 3-pane + omp --continue in abduco)"),
+        ("ai",     "AI session — one-shot prompt or resume last omp chat"),
         ("find",   "search code (rg) or files (fd), preview in fzf, open at file:line"),
         ("note",   "append a timestamped line to <repo>/agents/NOTES.md"),
         ("run",    "project runner: dev | build | test | fmt | lint"),
         ("ship",   "git add -A + commit + push + `gh pr create` in one shot"),
-        ("end",    "capture session knowledge into agents/{STATE,KNOWLEDGE,...}.md"),
     ]);
 
     println!("\n{}", "Session management (subcommands of `.`):".bold().yellow());
@@ -46,14 +45,14 @@ pub fn print_cheatsheet() {
                            "install harness + apply one profile non-interactively"),
         ("setup --dry-run","print the plan without changing anything"),
         ("setup profile",  "manage profiles: list | show <name> | apply <name>"),
-        ("up",             "update 8sync binary + forge (system pkgs not touched)"),
+        ("up",             "update 8sync binary + omp (system pkgs not touched)"),
         ("doctor",         "health check: tools, configs, VPN/firewall, profiles"),
         ("flow",           "workflow help in chronological order"),
     ]);
 
-    println!("\n{}", "AI tooling (for forge):".bold().yellow());
+    println!("\n{}", "AI tooling (for omp):".bold().yellow());
     rows(&[
-        ("skill",    "list / add / sync forge skills (karpathy, image-routing, 8sync-cli)"),
+        ("skill",    "list / add / sync omp skills (karpathy, image-routing, 8sync-cli)"),
         ("shot",     "render a URL or HTML file to PNG (cheap visual context for AI)"),
         ("diff-img", "render `git diff` to PNG"),
         ("pdf-img",  "render PDF pages to PNG"),

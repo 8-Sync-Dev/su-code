@@ -3,7 +3,7 @@ use clap::Args as ClapArgs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::{env_detect, ui};
+use crate::{env_detect, ui, verbs::skill};
 
 #[derive(ClapArgs, Debug)]
 #[command(
@@ -12,7 +12,7 @@ use crate::{env_detect, ui};
           8sync .                       attach (or create) the session for the current project
           8sync . ls                    list every live session that belongs to this project
           8sync . to other-project      switch / attach a different named session
-          8sync . new hotfix forge      spawn a new detached session named `hotfix` running forge
+          8sync . new hotfix omp        spawn a new detached session named `hotfix` running omp
           8sync . new logs              detached session named `logs`, default shell
           8sync . rm hotfix             kill session `hotfix` and free its abduco socket
           8sync . mv hotfix bugfix      rename a session
@@ -22,10 +22,10 @@ use crate::{env_detect, ui};
         BEHAVIOR
           · If kitty `allow_remote_control yes` is set → opens a 3-pane layout:
               pane 1: editor ($EDITOR or hx/helix)
-              pane 2: forge running inside `abduco` (survives terminal close)
+              pane 2: omp --continue running inside `abduco` (survives terminal close)
               pane 3: shell for `8sync run`, lazygit, etc.
-          · Otherwise → soft 1-pane mode: forge runs in `abduco` in the current terminal.
-          · Either way: forge auto-reads AGENTS.md + agents/* in the project root.
+          · Otherwise → soft 1-pane mode: omp --continue runs in `abduco` in the current terminal.
+          · Either way: omp auto-reads AGENTS.md + agents/* in the project root.
     "}
 )]
 pub struct Args {
@@ -70,26 +70,26 @@ fn open_or_attach() -> Result<()> {
         ui::ok(&format!("stack: {}", stack.join(", ")));
     }
 
-    seed_project_context(&root, &stack)?;
+    seed_project_context(&env, &root, &stack)?;
 
     let has_abduco = which::which("abduco").is_ok();
-    let has_forge = which::which("forge").is_ok();
+    let has_omp = which::which("omp").is_ok();
 
-    if !has_forge {
-        ui::warn("forge not installed — run `8sync setup` first. Falling back to fish shell.");
+    if !has_omp {
+        ui::warn("omp not installed — run `8sync setup` first. Falling back to zsh shell.");
     }
 
     // Open Kitty layout (3 panes) only when running inside kitty AND remote control is enabled.
     let in_kitty = env.kitty && std::env::var("KITTY_PID").is_ok();
     let remote_on = env_detect::kitty_remote_on();
     if in_kitty && remote_on {
-        open_kitty_layout(&root, &session_name, has_abduco, has_forge)?;
+        open_kitty_layout(&root, &session_name, has_abduco, has_omp)?;
     } else {
         if in_kitty && !remote_on {
             ui::info("kitty allow_remote_control off — using soft 1-pane mode (add `allow_remote_control yes` to ~/.config/kitty/kitty.conf for full 3-pane)");
         }
         // Soft mode: just attach/create in current terminal
-        exec_forge_in_session(&root, &session_name, has_abduco, has_forge)?;
+        exec_omp_in_session(&root, &session_name, has_abduco, has_omp)?;
     }
     Ok(())
 }
@@ -103,17 +103,28 @@ fn list_sessions() -> Result<()> {
         ui::warn("abduco missing — run `8sync setup` to install");
         return Ok(());
     }
+
+    let cwd = std::env::current_dir()?;
+    let root = detect_project_root(&cwd).unwrap_or(cwd);
+    let current = project_session_name(&root);
+
+    let current_prefix = if let Some((prefix, _)) = current.rsplit_once('-') {
+        format!("{}-", prefix)
+    } else {
+        current
+    };
+
     let out = Command::new("abduco").output()?;
     let s = String::from_utf8_lossy(&out.stdout);
     let mut found = false;
     for line in s.lines() {
-        if line.contains("8sync-") {
+        if line.contains(&current_prefix) {
             println!("  {}", line);
             found = true;
         }
     }
     if !found {
-        ui::info("no 8sync sessions");
+        ui::info(&format!("no live sessions for current project ({})", root.display()));
     }
     Ok(())
 }
@@ -141,7 +152,7 @@ fn new_session(rest: Vec<String>) -> Result<()> {
     let cmd: Vec<&str> = if rest.len() > 1 {
         rest[1..].iter().map(|s| s.as_str()).collect()
     } else {
-        vec!["forge"]
+        vec!["zsh", "-lc", "omp --continue"]
     };
     ui::info(&format!("create detached → {}", name));
     let mut a = Command::new("abduco");
@@ -172,7 +183,6 @@ fn rm_session(name: Option<String>) -> Result<()> {
 fn mv_session(old: Option<String>, new: Option<String>) -> Result<()> {
     let _o = old.ok_or_else(|| anyhow::anyhow!("usage: 8sync . mv <old> <new>"))?;
     let _n = new.ok_or_else(|| anyhow::anyhow!("usage: 8sync . mv <old> <new>"))?;
-    // abduco doesn't support rename — workaround: kill old, attach new with same cmd
     ui::warn("abduco không hỗ trợ rename trực tiếp.");
     ui::info("Cách thủ công: `8sync . rm <old>` rồi `8sync . new <new> [cmd]`");
     Ok(())
@@ -205,8 +215,6 @@ fn kick_detach(name: Option<String>) -> Result<()> {
         }
     };
     let full = if n.starts_with("8sync-") { n } else { format!("8sync-{}", n) };
-    // abduco sends SIGHUP to attached clients via -k (varies by version);
-    // safer: pkill the attached abduco -a client
     let _ = Command::new("pkill")
         .args(["-f", &format!("abduco -a.*{}", full)])
         .status();
@@ -224,13 +232,11 @@ pub fn project_session_name(root: &Path) -> String {
         .and_then(|s| s.to_str())
         .unwrap_or("proj")
         .replace(['/', ' '], "_");
-    // include a short hash of the full path so two folders with same name don't collide
     let h = short_hash(root.to_string_lossy().as_bytes());
     format!("8sync-{}-{}", base, h)
 }
 
 fn short_hash(bytes: &[u8]) -> String {
-    // dependency-free FNV-1a 32-bit
     let mut h: u32 = 0x811c9dc5;
     for b in bytes {
         h ^= *b as u32;
@@ -275,7 +281,7 @@ fn detect_stack(root: &Path) -> Vec<String> {
     s
 }
 
-fn seed_project_context(root: &Path, stack: &[String]) -> Result<()> {
+fn seed_project_context(env: &env_detect::Env, root: &Path, stack: &[String]) -> Result<()> {
     let agents = root.join("AGENTS.md");
     if !agents.exists() {
         let name = root.file_name().and_then(|s| s.to_str()).unwrap_or("project");
@@ -287,18 +293,11 @@ fn seed_project_context(root: &Path, stack: &[String]) -> Result<()> {
         let content = format!(
             r#"# AGENTS.md — guidance for AI working in `{name}`
 
-> Managed by **8sync**. AI tooling (forge, claude-code, cursor, opencode) MUST
+> Managed by **8sync**. AI tooling (omp, claude-code, cursor, opencode) MUST
 > read this file at the start of every session.
 
-## ⛔ FORCE-LOAD SKILLS (đọc theo thứ tự, không bỏ qua)
-
-1. **`~/.forge/skills/karpathy-guidelines/SKILL.md`** — kỷ luật suy nghĩ.
-2. **`~/.forge/skills/8sync-cli/SKILL.md`** — bạn đang chạy trong 8sync harness,
-   dùng đúng các tool 8sync (shot/find/note/ship/diff-img/pdf-img/...).
-3. **`~/.forge/skills/image-routing/SKILL.md`** — chọn đọc image hay text để
-   tiết kiệm token.
-
-Sau đó đọc memory project (mục dưới).
+<!-- 8sync:skills:begin -->
+<!-- 8sync:skills:end -->
 
 ## Stack (auto-detected)
 {stack_lines}
@@ -312,9 +311,9 @@ Sau đó đọc memory project (mục dưới).
 | `agents/DECISIONS.md`   | append-only: quyết định kiến trúc |
 | `agents/PREFERENCES.md` | append-only: user style preferences |
 | `agents/STATE.md`       | việc đang dở, next-step concrete |
+| `agents/NOTES.md`       | quick notes appended via `8sync note` |
 
-**KHÔNG modify `agents/*.md` trực tiếp.** Chỉ append qua `8sync end` capture format
-(xem `~/.forge/skills/8sync-cli/SKILL.md` mục 4).
+Session memory được omp tự quản (retain/recall/auto-compact). Không cần capture tay.
 
 ## Conventions
 
@@ -324,12 +323,6 @@ Sau đó đọc memory project (mục dưới).
   dump text (tiết kiệm token 3-10×).
 - Tìm symbol/file: `8sync find <kw>` (không gọi `rg`/`fd` thô).
 - Ghi nhớ ý tưởng nhanh: `8sync note "..."` (append vào `agents/NOTES.md`).
-
-## Session boundary
-
-- `8sync .` = session bắt đầu → AI đọc tất cả file trên.
-- `8sync end` = session kết thúc → AI output 4 block `<DECISIONS>`,
-  `<KNOWLEDGE>`, `<PREFERENCES>`, `<STATE>` để 8sync append vào `agents/*.md`.
 "#
         );
         std::fs::write(&agents, content)?;
@@ -359,6 +352,12 @@ Sau đó đọc memory project (mục dưới).
             )?;
         }
     }
+
+    // Re-inject the dynamic skills block so it reflects whatever is currently
+    // installed under ~/.omp/skills/ and agents/skills/.
+    if let Err(e) = skill::inject_agents_md(&env.home, root) {
+        ui::warn(&format!("could not inject AGENTS.md skills block: {}", e));
+    }
     Ok(())
 }
 
@@ -366,10 +365,9 @@ fn open_kitty_layout(
     root: &Path,
     session_name: &str,
     has_abduco: bool,
-    has_forge: bool,
+    has_omp: bool,
 ) -> Result<()> {
-    let editor = pick_editor();
-    let shell = pick_shell();
+    let editor = if which::which("hx").is_ok() { "hx" } else if which::which("helix").is_ok() { "helix" } else { "zsh" };
 
     // Pane 1: editor (current tab → new tab so the chat session is preserved)
     let _ = Command::new("kitty")
@@ -382,73 +380,44 @@ fn open_kitty_layout(
         ])
         .status();
 
-    // Pane 2: forge inside abduco (detached, survives close)
-    let forge_cmd = forge_invocation(root, session_name, has_abduco, has_forge);
+    // Pane 2: zsh (vertical split)
     let _ = Command::new("kitty")
         .args([
             "@", "launch",
             "--cwd", root.to_str().unwrap(),
             "--location=vsplit",
-            &shell, "-c", &forge_cmd,
+            "zsh",
         ])
         .status();
 
-    // Pane 3: shell for logs / run
-    let _ = Command::new("kitty")
-        .args([
-            "@", "launch",
-            "--cwd", root.to_str().unwrap(),
-            "--location=hsplit",
-            &shell,
-        ])
-        .status();
-
-    let bg = if has_abduco { " (detached via abduco)" } else { " (no abduco — exec direct)" };
-    ui::ok(&format!("kitty layout: {} | forge{} | {}", editor, bg, shell));
+    let _ = (session_name, has_abduco, has_omp);
+    ui::ok(&format!("kitty layout: {} | zsh (vsplit)", editor));
     Ok(())
 }
 
-fn pick_editor() -> String {
-    if let Ok(e) = std::env::var("VISUAL") { if !e.is_empty() && which::which(&e).is_ok() { return e; } }
-    if let Ok(e) = std::env::var("EDITOR") { if !e.is_empty() && which::which(&e).is_ok() { return e; } }
-    if which::which("hx").is_ok()    { return "hx".to_string(); }
-    if which::which("helix").is_ok() { return "helix".to_string(); }
-    pick_shell()
-}
-
-fn pick_shell() -> String {
-    if let Ok(s) = std::env::var("SHELL") {
-        if !s.is_empty() {
-            // strip path
-            return s.rsplit('/').next().unwrap_or(&s).to_string();
-        }
-    }
-    if which::which("zsh").is_ok()  { return "zsh".to_string(); }
-    if which::which("fish").is_ok() { return "fish".to_string(); }
-    "bash".to_string()
-}
-
-fn exec_forge_in_session(
+fn exec_omp_in_session(
     root: &Path,
     session_name: &str,
     has_abduco: bool,
-    has_forge: bool,
+    has_omp: bool,
 ) -> Result<()> {
-    let cmd = forge_invocation(root, session_name, has_abduco, has_forge);
-    let shell = pick_shell();
-    Command::new(&shell).arg("-c").arg(&cmd).current_dir(root).status()?;
+    let cmd = omp_invocation(root, session_name, has_abduco, has_omp);
+    Command::new("zsh").arg("-lc").arg(&cmd).current_dir(root).status()?;
     Ok(())
 }
 
-fn forge_invocation(root: &Path, session_name: &str, has_abduco: bool, has_forge: bool) -> String {
-    let shell = pick_shell();
-    let inner = if has_forge { "forge".to_string() } else { shell.clone() };
+fn omp_invocation(root: &Path, session_name: &str, has_abduco: bool, has_omp: bool) -> String {
     let cd = format!("cd {}", shell_quote(root.to_str().unwrap()));
-    if has_abduco {
-        // abduco -A name cmd → attach if exists, else create
-        format!("{cd} && abduco -A {session_name} {inner}")
+    let inner_cmd = if has_omp {
+        "omp --continue".to_string()
     } else {
-        format!("{cd} && {inner}")
+        "zsh".to_string()
+    };
+    let run_cmd = format!("{cd} && {inner_cmd}");
+    if has_abduco {
+        format!("abduco -A {session_name} zsh -lc {}", shell_quote(&run_cmd))
+    } else {
+        run_cmd
     }
 }
 

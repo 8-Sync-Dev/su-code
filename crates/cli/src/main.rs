@@ -31,11 +31,10 @@ QUICK START
   8sync flow                        same as above but ordered by workflow
   8sync setup                       install harness, then ask y/N per profile
   8sync setup --yall                install harness + ALL profiles, no prompts
-  8sync .                           open project session (kitty 3-pane + forge)
+  8sync .                           open project session (kitty 3-pane + omp)
   8sync ai \"add dark mode toggle\"   one-shot AI prompt (or resume with `8sync ai`)
   8sync find \"useAuth\"              rg + fzf preview, open at file:line
   8sync ship \"feat: dark mode\"      commit + push + open a GitHub PR
-  8sync end                         AI captures knowledge into agents/*.md
   8sync sec on                      enable WARP VPN + ufw firewall
   8sync sec off                     disable both
 
@@ -45,7 +44,7 @@ Every verb supports -h / --help for detailed help with examples:
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Install harness (helix/lazygit/abduco/gh + forge + configs + skills) then prompt per personal profile
+    /// Install harness (helix/lazygit/abduco/gh + omp + configs + skills) then prompt per personal profile
     Setup(verbs::setup::Args),
 
     /// Update managed tools (only if newer version available). Self-updates 8sync binary from GitHub first.
@@ -55,11 +54,11 @@ enum Cmd {
     /// Health-check; report what's installed and what's missing
     Doctor,
 
-    /// Open project session: kitty 3-pane (if remote control on) + forge in abduco. Subcommands: ls/to/new/rm/mv/wipe/kick
+    /// Open project session: kitty 3-pane (if remote control on) + omp in abduco. Subcommands: ls/to/new/rm/mv/wipe/kick
     #[command(name = ".", alias = "here")]
     Here(verbs::here::Args),
 
-    /// AI session / one-shot prompt (forge)
+    /// AI session / one-shot prompt (omp)
     Ai(verbs::ai::Args),
 
     /// Commit + push + PR (smart shortcut)
@@ -70,9 +69,6 @@ enum Cmd {
 
     /// Security toggle: WARP VPN + ufw firewall (on/off/status/toggle)
     Sec(verbs::sec::Args),
-
-    /// Capture session knowledge, save state, close panes
-    End,
 
     /// Manage skill library (list/add/sync)
     Skill(verbs::skill::Args),
@@ -122,7 +118,6 @@ fn main() -> Result<()> {
         Some(Cmd::Ship(a))    => verbs::ship::run(a),
         Some(Cmd::Run(a))     => verbs::run::run(a),
         Some(Cmd::Sec(a))     => verbs::sec::run(a),
-        Some(Cmd::End)        => verbs::end::run(),
         Some(Cmd::Skill(a))   => verbs::skill::run(a),
         Some(Cmd::Shot(a))    => verbs::shot::run(a),
         Some(Cmd::DiffImg(a)) => verbs::diff_img::run(a),

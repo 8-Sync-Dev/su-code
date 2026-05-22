@@ -18,7 +18,7 @@ use crate::ui;
 
         WHERE IT'S WRITTEN
           Notes are appended to <repo>/agents/NOTES.md with a timestamp + tag.
-          AI tools (forge / claude-code / aider) read NOTES.md via AGENTS.md anchor
+          AI tools (omp / claude-code / aider) read NOTES.md via AGENTS.md anchor
           on the next session, so use this to leave context for future-you.
 
         COMMON TAGS

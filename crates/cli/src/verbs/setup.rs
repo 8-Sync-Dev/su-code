@@ -20,10 +20,10 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
 
         STAGE A — HARNESS (always run, idempotent)
           · pacman -S --needed helix lazygit abduco github-cli   (4 pkgs, official repo)
-          · forge AI CLI (curl installer, only if missing)
+          · omp AI CLI (curl installer from omp.sh, only if missing)
           · write configs: helix + kitty/8sync.session + 8sync/{global,skills}.toml
-          · write skills:  ~/.forge/skills/{karpathy-guidelines, image-routing, 8sync-cli}/SKILL.md
-                           + ~/.forge/skills/00-force-load.md  (auto-injected on every forge session)
+          · write skills:  ~/.omp/skills/{karpathy-guidelines, image-routing, 8sync-cli}/SKILL.md
+                           + ~/.omp/skills/00-force-load.md  (auto-injected on every omp session)
 
         STAGE B — PROFILES (opt-in personal customization)
           vietnamese        fcitx5 + Unikey input method
@@ -85,12 +85,12 @@ pub fn run(a: Args) -> Result<()> {
     ui::step("Stage A — coding harness");
     if a.dry_run {
         ui::info("would install: helix lazygit abduco github-cli");
-        ui::info("would install forge (curl) if missing");
+        ui::info("would install omp (curl) if missing");
         ui::info("would write: configs + skills");
     } else {
         let core = ["helix", "lazygit", "abduco", "github-cli"];
         pkg::pacman_install_safe(&core, true)?;
-        install_forge()?;
+        install_omp()?;
         install_configs(&env)?;
         install_skills(&env)?;
     }
@@ -168,18 +168,17 @@ pub fn run(a: Args) -> Result<()> {
 fn finish_msg() {
     ui::header("Done — next steps");
     println!("  · 8sync doctor               — verify");
-    println!("  · forge login                — connect AI provider");
     println!("  · cd <project> && 8sync .    — start a session");
 }
 
-fn install_forge() -> Result<()> {
-    ui::step("forge AI CLI");
-    if which::which("forge").is_ok() {
-        let v = env_detect::cmd_version("forge", &["--version"]).unwrap_or_default();
-        ui::skip("forge", &format!("present ({})", v));
+fn install_omp() -> Result<()> {
+    ui::step("omp AI CLI");
+    if which::which("omp").is_ok() {
+        let v = env_detect::cmd_version("omp", &["--version"]).unwrap_or_default();
+        ui::skip("omp", &format!("present ({})", v));
         return Ok(());
     }
-    pkg::run_loud("sh", &["-c", "curl -fsSL https://forgecode.dev/cli | sh"])?;
+    pkg::run_loud("sh", &["-c", "curl -fsSL https://omp.sh/install | sh"])?;
     Ok(())
 }
 
@@ -205,8 +204,8 @@ fn install_configs(env: &env_detect::Env) -> Result<()> {
 }
 
 fn install_skills(env: &env_detect::Env) -> Result<()> {
-    ui::step("Skills (~/.forge/skills/)");
-    let skills_dir = env.home.join(".forge/skills");
+    ui::step("Skills (~/.omp/skills/)");
+    let skills_dir = env.home.join(".omp/skills");
     std::fs::create_dir_all(&skills_dir)?;
     let trio = [
         ("skills/karpathy/SKILL.md",      "karpathy-guidelines/SKILL.md"),

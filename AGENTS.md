@@ -1,6 +1,6 @@
 # AGENTS.md — Hướng dẫn cho AI agent làm việc với `su-code`
 
-> File này dành cho AI tool (forge, claude-code, cursor, opencode, aider, …)
+> File này dành cho AI tool (omp, claude-code, cursor, opencode, aider, …)
 > Đây là **install + usage guide** dạng deterministic — đọc xong là biết phải làm gì.
 
 ---
@@ -11,7 +11,7 @@
 - **CachyOS / Arch Linux** (target chính, hỗ trợ Manjaro/EndeavourOS)
 - **Kitty terminal** (cần `allow_remote_control yes`)
 - **Helix editor** (`hx` hoặc `helix`)
-- **Forge AI engine** (forgecode.dev)
+- **omp** (oh-my-pi.sh) — AI engine, `~/.bun/bin/omp`
 
 Stack: **Rust** (single workspace, 1 binary `8sync` ≈ 1.3 MB stripped).
 
@@ -33,7 +33,7 @@ Sau đó:
 8sync setup --no-profile         # chỉ harness (không hỏi profile)
 8sync setup --profile alexdev    # apply bundle cá nhân hóa của alexdev
 
-forge login                      # paste API key của forge
+# omp được cài tự động bởi setup; cấu hình API key theo hướng dẫn omp
 8sync doctor                     # verify
 ```
 
@@ -92,13 +92,12 @@ su-code/
 ### Vibe loop (daily, dùng liên tục)
 | Verb | Mô tả |
 |---|---|
-| `8sync .` | Mở/attach session. Nếu kitty có `allow_remote_control yes` → 3-pane; nếu không → soft 1-pane + forge trong abduco |
-| `8sync ai [prompt]` | AI session (resume hoặc one-shot, wrap forge) |
+| `8sync .` | Mở/attach session. Nếu kitty có `allow_remote_control yes` → 3-pane; nếu không → soft 1-pane + omp trong abduco |
+| `8sync ai [prompt]` | AI session (resume hoặc one-shot, wrap omp) |
 | `8sync find <kw>` | rg/fd + fzf preview → mở bằng `$EDITOR` (fallback hx/helix/vi) tại `file:line` |
 | `8sync note "msg" [-t tag]` | Append `agents/NOTES.md` |
 | `8sync run [dev\|build\|test\|fmt\|lint]` | Project command theo recipe |
 | `8sync ship "msg"` | `git add -A && commit && push && gh pr create` |
-| `8sync end` | AI capture knowledge → `agents/*.md` |
 
 ### Session mgmt (sub của `.`)
 `8sync . ls` / `to <n>` / `new <n> [cmd]` / `rm <n>` / `wipe` / `kick`
@@ -116,13 +115,13 @@ su-code/
 ### Lifecycle
 | Verb | Mô tả |
 |---|---|
-| `8sync setup` | Stage A (harness slim: helix/lazygit/abduco/gh + forge + configs + skills) + Stage B (hỏi y/N từng profile) |
+| `8sync setup` | Stage A (harness slim: helix/lazygit/abduco/gh + omp + configs + skills) + Stage B (hỏi y/N từng profile) |
 | `8sync setup --yall` | Auto-yes — cài harness + ALL profiles (bundle `alexdev`) không prompt |
 | `8sync setup --no-profile` | Chỉ harness, không hỏi profile |
 | `8sync setup --profile <name>` | Apply 1 profile cụ thể non-interactive |
 | `8sync setup --dry-run` | Preview, không thay đổi gì |
 | `8sync setup profile list\|show\|apply <name>` | Quan lý profile sau khi setup |
-| `8sync up` | Self-update binary + forge (KHÔNG chạy `pacman -Syu` — user tự lo) |
+| `8sync up` | Self-update binary + omp (KHÔNG chạy `pacman -Syu` — user tự lo) |
 | `8sync doctor` | Health check (HyDE detect, kitty remote, gh hard-check, sec status, profiles applied) |
 | `8sync flow` | Workflow help theo thứ tự dùng |
 | `8sync help` | Cheatsheet |
@@ -130,7 +129,7 @@ su-code/
 ### AI tooling
 | Verb | Mô tả |
 |---|---|
-| `8sync skill [add\|sync]` | Quản lý skill cho forge |
+| `8sync skill [add <url>\|sync]` | Quản lý skill cho omp; `add` clone từ GitHub URL vào `~/.omp/skills/` và `agents/skills/`, ghi block force-load trong AGENTS.md |
 | `8sync shot <url\|file>` | Render web/file → PNG (cho image-routing) |
 | `8sync diff-img [ref]` | Git diff → PNG |
 | `8sync pdf-img <file>` | PDF page → PNG |
@@ -168,7 +167,7 @@ Khi user gõ `8sync .` trong project, `here.rs` seed:
 ```
 <repo>/
 ├── AGENTS.md              ← do here.rs sinh, link tới agents/*
-└── agents/                ← AI memory shared giữa các tool (forge/claude/cursor/aider/opencode)
+└── agents/                ← AI memory shared giữa các tool (omp/claude/cursor/aider/opencode)
     ├── PROJECT.md         facts (stack, entrypoint)
     ├── KNOWLEDGE.md       append-only: AI học được gì
     ├── DECISIONS.md       append-only: quyết định kiến trúc
@@ -179,21 +178,25 @@ Khi user gõ `8sync .` trong project, `here.rs` seed:
 
 **`agents/`** (visible folder, không phải `.gsd/` hidden) — cố ý đặt tên này để mọi AI tool đọc được qua `AGENTS.md` anchor.
 
-`8sync end` yêu cầu AI output 4 XML block `<DECISIONS>`/`<KNOWLEDGE>`/`<PREFERENCES>`/`<STATE>` → 8sync parse & append vào file tương ứng.
+Session memory được `omp` tự quản (retain/recall/auto-compact). 8sync chỉ seed file khung — không capture nhân tạo. Quick notes vẫn ghi qua `8sync note`.
 
 ---
 
 ## 7. Skill system (force-load)
 
-Khi `8sync setup` chạy, 3 skill được copy vào `~/.forge/skills/`:
+Khi `8sync setup` chạy, 3 skill bundled được copy vào `~/.omp/skills/` theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) (SKILL.md với YAML frontmatter `name`+`description`):
 
-| Skill | Trigger | File |
+| Skill | Trigger | Mô tả |
 |---|---|---|
-| `karpathy-guidelines` | `always` | từ repo karpathy guidelines |
-| `8sync-cli` | `always` | dạy AI dùng đúng tool 8sync |
-| `image-routing` | `always` | dạy AI khi nào nên đọc image vs text |
+|`karpathy-guidelines`|`always`|kỷ luật engineering Karpathy-style|
+|`8sync-cli`|`always`|dạy AI ưu tiên verb 8sync hơn shell thô|
+|`image-routing`|`always`|chọn image vs text reads để tiết kiệm token|
 
-Master force-load file: `~/.forge/skills/00-force-load.md` — forge tự đọc đầu tiên mỗi session.
+Master force-load file: `~/.omp/skills/00-force-load.md` — omp đọc đầu tiên mỗi session.
+
+**Project-local skills**: `8sync skill add <https://github.com/owner/repo>` clone vào **cả** `~/.omp/skills/<name>/` (global) **và** `<repo>/agents/skills/<name>/` (per-project). Sau đó rewrite block giữa `<!-- 8sync:skills:begin -->` / `<!-- 8sync:skills:end -->` trong `AGENTS.md` với mandatory language + description từ frontmatter — AI bắt buộc đọc trước khi sửa code.
+
+Repo chưa theo spec (không có `SKILL.md`)? 8sync fallback: phát hiện `CLAUDE.md` / `README.md` / `AGENTS.md` và liệt kê file đó làm entrypoint kèm warning.
 
 ---
 

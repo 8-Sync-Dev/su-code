@@ -12,7 +12,7 @@ use crate::ui;
       8sync pdf-img book.pdf --page 12 -o /tmp/p  render one page to a custom dir
 
     USE CASE
-      Convert PDF pages to PNGs so forge can read figures, diagrams, scanned docs
+      Convert PDF pages to PNGs so omp can read figures, diagrams, scanned docs
       etc. visually — much cheaper than OCR + sending raw text.
 
     REQUIREMENTS

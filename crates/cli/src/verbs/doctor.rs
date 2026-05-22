@@ -28,7 +28,7 @@ pub fn run() -> Result<()> {
     check_cmd("git",     &["--version"]);
     check_cmd("abduco",  &["-v"]);
     check_cmd("lazygit", &["--version"]);
-    check_cmd("forge",   &["--version"]);
+    check_cmd("omp",     &["--version"]);
 
     // gh is REQUIRED for `8sync ship`
     match env_detect::cmd_version("gh", &["--version"]) {
@@ -44,7 +44,7 @@ pub fn run() -> Result<()> {
         env.xdg_config.join("helix/config.toml"),
         env.xdg_config.join("8sync/global.toml"),
         env.xdg_config.join("8sync/skills.toml"),
-        env.home.join(".forge/skills/00-force-load.md"),
+        env.home.join(".omp/skills/00-force-load.md"),
     ] {
         if path.exists() {
             ui::ok(&format!("{}", path.display()));
