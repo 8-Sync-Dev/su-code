@@ -624,6 +624,23 @@ fn mirror_global_to_local(home: &Path, root: &Path) -> Result<usize> {
             None => continue,
         };
         let local_target = local_dir.join(name);
+
+        // Self-mirror guard: if the global skill is a symlink that resolves to
+        // local_target (e.g. `path:` install with cwd == project root), refusing
+        // to remove+copy would otherwise WIPE the source. Skip cleanly.
+        let g_canon = std::fs::canonicalize(g).ok();
+        let l_canon = std::fs::canonicalize(&local_target).ok();
+        if let (Some(gc), Some(lc)) = (g_canon.as_ref(), l_canon.as_ref()) {
+            if gc == lc {
+                ui::skip(
+                    &local_target.display().to_string(),
+                    "global symlink resolves here (skipped — already source-of-truth)",
+                );
+                count += 1;
+                continue;
+            }
+        }
+
         // Always vendor-copy (no nested .git/) so the local tree is committable.
         // For git-backed skills we still call `git pull --ff-only` on the GLOBAL
         // copy elsewhere; here we just refresh local files from whatever global has.
