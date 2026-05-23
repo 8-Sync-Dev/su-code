@@ -130,3 +130,33 @@ pub fn run_self_update(force: bool) -> Result<bool> {
     ui::ok(&format!("installed {} → {}", tag, bin_dst.display()));
     Ok(true)
 }
+
+/// Install a specific tag (e.g. `v0.6.10`). Used by `8sync up --to <tag>`
+/// for reproducibility / explicit downgrade.
+pub fn install_tag(tag: &str) -> Result<bool> {
+    ui::step(&format!("Self-update → pinned tag {}", tag));
+    let tag = tag.strip_prefix('v').map(|t| format!("v{}", t)).unwrap_or_else(|| format!("v{}", tag));
+    let asset_url = format!(
+        "https://github.com/{}/{}/releases/download/{}/{}{}{}",
+        REPO_OWNER, REPO_NAME, tag, ASSET_PREFIX, tag, ASSET_SUFFIX
+    );
+    let bin_dst = dirs::home_dir()
+        .ok_or_else(|| anyhow!("no home dir"))?
+        .join(".local/bin/8sync");
+    std::fs::create_dir_all(bin_dst.parent().unwrap())?;
+    let tmp = bin_dst.with_extension(format!("new.{}", std::process::id()));
+    ui::info(&format!("$ curl -fsSL --max-time 120 -o {} {}", tmp.display(), asset_url));
+    let status = Command::new("curl")
+        .args(["-fsSL", "--max-time", "120", "-o", tmp.to_str().unwrap(), &asset_url])
+        .status()?;
+    if !status.success() {
+        let _ = std::fs::remove_file(&tmp);
+        bail!("download failed: {}", asset_url);
+    }
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    std::fs::rename(&tmp, &bin_dst)?;
+    let _ = std::fs::write(last_seen_tag_file(), &tag);
+    ui::ok(&format!("installed {} → {}", tag, bin_dst.display()));
+    Ok(true)
+}

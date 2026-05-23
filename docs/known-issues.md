@@ -1,3 +1,31 @@
+# 🛟 Stable baseline rollback (any user, any time)
+
+The known-stable baseline is **v0.6.10+ on HyDE-only, no overlay**. To
+return any machine to this state regardless of what was attempted before:
+
+```sh
+# Already have 8sync
+8sync up --to v0.6.10
+8sync setup --reset-shells
+
+# Add --purge-packages to also pacman -Rns caelestia-shell, quickshell, aubio
+8sync setup --reset-shells --purge-packages
+```
+
+Fresh install (no 8sync yet):
+
+```sh
+curl -fsSL -o ~/.local/bin/8sync \
+  https://github.com/8-Sync-Dev/su-code/releases/download/v0.6.10/8sync-v0.6.10-linux-x86_64 \
+  && chmod +x ~/.local/bin/8sync \
+  && 8sync setup --reset-shells
+```
+
+`--reset-shells` is idempotent: safe to re-run; safe on a machine that
+never had end-4 / caelestia installed in the first place.
+
+---
+
 # Known issues & resolutions
 
 Living log of HyDE / Caelestia / end-4 conflicts we've hit and the fix that

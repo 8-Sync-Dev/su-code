@@ -50,7 +50,7 @@ enum Cmd {
 
     /// Full update: 8sync + omp + system pkgs (pacman/AUR) + rustup + flatpak. See `8sync up -h`.
     #[command(alias = "update")]
-    Up,
+    Up(verbs::up::Args),
 
     /// Health-check; report what's installed and what's missing
     Doctor,
@@ -102,7 +102,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     if !matches!(
         cli.cmd,
-        Some(Cmd::Up) | Some(Cmd::Setup(_)) | Some(Cmd::Help)
+        Some(Cmd::Up(_)) | Some(Cmd::Setup(_)) | Some(Cmd::Help)
     ) {
         verbs::selfup::auto_check_notice();
     }
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Some(Cmd::Setup(a))   => verbs::setup::run(a),
-        Some(Cmd::Up)         => verbs::up::run(),
+        Some(Cmd::Up(a))      => verbs::up::run(a),
         Some(Cmd::Doctor)     => verbs::doctor::run(),
         Some(Cmd::Here(a))    => verbs::here::run(a),
         Some(Cmd::Ai(a))      => verbs::ai::run(a),
