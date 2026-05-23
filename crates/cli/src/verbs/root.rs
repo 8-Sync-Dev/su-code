@@ -3,28 +3,18 @@ use owo_colors::OwoColorize;
 pub fn print_cheatsheet() {
     println!(
         "{}",
-        "8sync — vibe coding harness for CachyOS + Kitty + Helix + omp".bold().cyan()
+        "8sync — vibe coding harness for CachyOS + omp".bold().cyan()
     );
     println!("{}\n", "Run any verb with `-h` for detailed help and examples.".dimmed());
 
     println!("{}", "Vibe loop (daily):".bold().yellow());
     rows(&[
-        (".",      "open/attach project session (kitty 3-pane + omp --continue in abduco)"),
+        (".",      "seed agents/* context, then exec `omp --continue` in the project root"),
         ("ai",     "AI session — one-shot prompt or resume last omp chat"),
         ("find",   "search code (rg) or files (fd), preview in fzf, open at file:line"),
         ("note",   "append a timestamped line to <repo>/agents/NOTES.md"),
         ("run",    "project runner: dev | build | test | fmt | lint"),
         ("ship",   "git add -A + commit + push + `gh pr create` in one shot"),
-    ]);
-
-    println!("\n{}", "Session management (subcommands of `.`):".bold().yellow());
-    rows(&[
-        (". ls",         "list live sessions (abduco-backed) for current project"),
-        (". to <name>",  "switch / attach a different named session"),
-        (". new <name>", "create a detached session (e.g. for a parallel task)"),
-        (". rm <name>",  "kill a session and remove its abduco socket"),
-        (". wipe",       "kill every session belonging to the current project"),
-        (". kick",       "detach any current attach (frees the socket)"),
     ]);
 
     println!("\n{}", "Security (VPN + firewall):".bold().yellow());
@@ -39,15 +29,19 @@ pub fn print_cheatsheet() {
 
     println!("\n{}", "Lifecycle:".bold().yellow());
     rows(&[
-        ("setup",          "install harness, then ask y/N for each personal profile"),
-        ("setup --yall",   "install harness + ALL profiles, no prompts (yes-to-all)"),
-        ("setup --profile <name>",
-                           "install harness + apply one profile non-interactively"),
-        ("setup --dry-run","print the plan without changing anything"),
-        ("setup profile",  "manage profiles: list | show <name> | apply <name>"),
-        ("up",             "update 8sync binary + omp (system pkgs not touched)"),
-        ("doctor",         "health check: tools, configs, VPN/firewall, profiles"),
-        ("flow",           "workflow help in chronological order"),
+        ("setup",                   "install harness (gh + omp), then ask y/N per personal profile"),
+        ("setup --yall",            "install harness + alexdev bundle, no prompts"),
+        ("setup --profile <name>",  "install harness + apply one profile non-interactively"),
+        ("setup --caelestia",       "auto-detect: HyDE → additive overlay, else fresh Hyprland+Caelestia (+nvidia)"),
+        ("setup --caelestia=fresh", "force fresh CachyOS path"),
+        ("setup --caelestia=hyde",  "force HyDE-additive overlay"),
+        ("setup --caelestia=rollback", "remove HyDE overlay block"),
+        ("setup --end4=<tier>",     "end-4/dots-hyprland (minimal|medium|full|rollback) — auto-yes"),
+        ("setup --dry-run",         "print the plan without changing anything"),
+        ("setup profile",           "manage profiles: list | show <name> | apply <name>"),
+        ("up",                      "update 8sync binary + omp (system pkgs not touched)"),
+        ("doctor",                  "health check: tools, configs, VPN/firewall, profiles"),
+        ("flow",                    "workflow help in chronological order"),
     ]);
 
     println!("\n{}", "AI tooling (for omp):".bold().yellow());

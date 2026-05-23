@@ -1,7 +1,0 @@
-# 8sync.session — kitty layout used by `8sync .`
-new_tab 8sync
-cd ~
-
-launch hx .
-launch --location=vsplit omp --continue
-launch --location=hsplit fish

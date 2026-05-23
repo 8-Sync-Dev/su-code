@@ -1,0 +1,60 @@
+name = "nvidia"
+description = "NVIDIA — auto-detect driver (Blackwell/Ada/Ampere/Turing → open-dkms; Maxwell/Pascal → proprietary dkms) + DRM modeset + kernel params"
+
+[packages]
+pacman = [
+  "nvidia-utils",
+  "lib32-nvidia-utils",
+  "egl-wayland",
+  "libva-nvidia-driver",
+  "vulkan-icd-loader",
+  "lib32-vulkan-icd-loader",
+  "linux-cachyos-headers",
+]
+aur = []
+
+[services]
+system_enable = []
+user_enable = []
+
+[post_install]
+commands = [
+  # 1. Detect GPU generation and install appropriate driver.
+  """bash -c 'GPU=$(lspci -nn | grep -iE "vga|3d|2d" | grep -i nvidia || true); \
+if [ -z "$GPU" ]; then echo "[nvidia] no NVIDIA GPU detected — skipping driver install"; exit 0; fi; \
+if   echo "$GPU" | grep -qiE "RTX 50|GB20[0-9]|Blackwell";        then DRV=nvidia-open-dkms; \
+elif echo "$GPU" | grep -qiE "RTX 40|AD10[0-9]|Ada";              then DRV=nvidia-open-dkms; \
+elif echo "$GPU" | grep -qiE "RTX 30|GA10[0-9]|Ampere";           then DRV=nvidia-open-dkms; \
+elif echo "$GPU" | grep -qiE "RTX 20|GTX 16|TU10[0-9]|Turing";    then DRV=nvidia-open-dkms; \
+else DRV=nvidia-dkms; fi; \
+echo "[nvidia] detected: $GPU"; echo "[nvidia] installing: $DRV"; \
+sudo pacman -S --needed --noconfirm "$DRV"'""",
+
+  # 2. DRM modeset modprobe.d entry (idempotent — overwrite is fine).
+  """bash -c 'echo "options nvidia-drm modeset=1 fbdev=1" | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null'""",
+
+  # 3. Add nvidia modules to mkinitcpio.conf (idempotent guard).
+  """bash -c 'if ! grep -q "nvidia_drm" /etc/mkinitcpio.conf; then \
+sudo sed -i "s/^MODULES=(\\(.*\\))/MODULES=(\\1 nvidia nvidia_modeset nvidia_uvm nvidia_drm)/" /etc/mkinitcpio.conf; \
+echo "[nvidia] patched /etc/mkinitcpio.conf"; \
+else echo "[nvidia] mkinitcpio.conf already has nvidia_drm — skip"; fi'""",
+
+  # 4. Kernel cmdline: GRUB if present, else systemd-boot loader entries.
+  """bash -c 'PARAM="nvidia_drm.modeset=1 nvidia_drm.fbdev=1"; \
+if [ -f /etc/default/grub ]; then \
+  if ! grep -q "nvidia_drm.modeset" /etc/default/grub; then \
+    sudo sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\\"\\(.*\\)\\"/GRUB_CMDLINE_LINUX_DEFAULT=\\"\\1 $PARAM\\"/" /etc/default/grub; \
+    sudo grub-mkconfig -o /boot/grub/grub.cfg; echo "[nvidia] patched GRUB"; \
+  else echo "[nvidia] GRUB already has nvidia_drm — skip"; fi; \
+elif ls /boot/loader/entries/*.conf >/dev/null 2>&1; then \
+  for f in /boot/loader/entries/*.conf; do \
+    if ! grep -q "nvidia_drm.modeset" "$f"; then \
+      sudo sed -i "/^options/ s/$/ $PARAM/" "$f"; echo "[nvidia] patched $f"; \
+    else echo "[nvidia] $f already patched — skip"; fi; \
+  done; \
+else echo "[nvidia] no GRUB or systemd-boot detected — set kernel params manually: $PARAM"; fi'""",
+
+  # 5. Rebuild initramfs.
+  "sudo mkinitcpio -P",
+]
+hint = "Reboot required after driver install. Verify with `nvidia-smi`. If black screen on boot, drop to TTY (Ctrl+Alt+F2) and check `journalctl -b -p err`."

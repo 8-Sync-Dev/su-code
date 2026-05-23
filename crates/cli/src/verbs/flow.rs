@@ -7,19 +7,20 @@ pub fn run() -> Result<()> {
     section("1. FIRST-TIME INSTALL (new machine)", &[
         ("git clone https://github.com/8-Sync-Dev/su-code", "clone the source"),
         ("cd su-code && bash scripts/bootstrap.sh", "installs rustup if missing, builds 8sync, drops binary into ~/.local/bin"),
-        ("8sync setup", "harness (helix/lazygit/abduco/gh + omp) then prompts y/N per personal profile"),
-        ("# or  8sync setup --yall", "install everything without prompts (good for re-imaging your own machine)"),
+        ("8sync setup", "harness (gh + omp + skills) then prompts y/N per personal profile"),
+        ("# or  8sync setup --yall", "install harness + alexdev bundle without prompts"),
         ("# or  8sync setup --profile alexdev", "apply one specific bundle non-interactively"),
+        ("# or  8sync setup --caelestia", "auto-detect: HyDE → additive overlay; else fresh Hyprland+Caelestia (+nvidia)"),
         ("gh auth login", "log into GitHub (required by `8sync ship`)"),
         ("8sync doctor", "verify everything is in place"),
     ]);
 
     section("2. VIBE LOOP — open a project, code with AI, ship a PR", &[
         ("cd ~/code/my-app", ""),
-        ("8sync .", "attach or create the project session (kitty 3-pane + omp --continue in abduco)"),
+        ("8sync .", "seed agents/* memory + run `omp --continue` (omp manages its own session)"),
         ("8sync ai \"explain this codebase\"", "AI reads AGENTS.md + agents/* automatically for memory"),
         ("8sync ai \"add login form with email + password\"", "vibe code — omp edits files directly"),
-        ("8sync run dev", "start the dev server inside the session"),
+        ("8sync run dev", "start the dev server"),
         ("8sync shot http://localhost:3000/login", "screenshot the UI so omp can review it visually (cheap on tokens)"),
         ("8sync ai \"fix the z-index on the header\"", "iterate"),
         ("8sync find \"useAuth\"", "search the codebase (rg + fzf preview), pick a match to open at file:line"),
@@ -32,22 +33,21 @@ pub fn run() -> Result<()> {
         ("8sync .", "omp re-reads AGENTS.md + agents/* and picks up where you left off"),
     ]);
 
-    section("4. PARALLEL SESSIONS (work on two things at once)", &[
-        ("8sync . ls",                "list all live sessions"),
-        ("8sync . to other-project",  "switch to another project's session"),
-        ("8sync . new hotfix omp",    "spawn a detached omp session named `hotfix`"),
-        ("8sync . rm hotfix",         "kill and remove session `hotfix`"),
-        ("8sync . wipe",              "kill all sessions belonging to the current project"),
+    section("4. CAELESTIA DESKTOP (optional)", &[
+        ("8sync setup --caelestia",          "auto-detect: HyDE present → additive; else fresh full stack"),
+        ("8sync setup --caelestia=fresh",    "force fresh CachyOS path (Hyprland + Quickshell + nvidia auto-detect)"),
+        ("8sync setup --caelestia=hyde",     "force HyDE additive overlay (caelestia-shell + userprefs override)"),
+        ("8sync setup --caelestia=rollback", "remove HyDE overlay, restart waybar"),
     ]);
 
-    section("5. LOOK & FEEL (handled by HyDE, not 8sync)", &[
-        ("hydectl wallpaper next",      "change wallpaper (HyDE built-in)"),
-        ("hydectl wallpaper select",    "pick wallpaper from gallery"),
-        ("hydectl theme set <name>",    "switch theme (propagates to kitty/gtk/qt via wallbash)"),
-        ("hydectl theme next",          "rotate to next theme"),
+    section("4b. END-4/DOTS-HYPRLAND (optional)", &[
+        ("8sync setup --end4",          "default medium tier (Hyprland + Quickshell, skip fish/fonts/misc)"),
+        ("8sync setup --end4=minimal",  "bare Hyprland keybinds, no widget shell"),
+        ("8sync setup --end4=full",     "everything upstream installs"),
+        ("8sync setup --end4=rollback", "run upstream `./setup uninstall -f`"),
     ]);
 
-    section("6. SECURITY (VPN + firewall)", &[
+    section("5. SECURITY (VPN + firewall)", &[
         ("8sync sec",                   "show current status of WARP and ufw"),
         ("8sync sec on",                "enable WARP VPN + ufw firewall (going to a cafe)"),
         ("8sync sec off",               "disable both (back home)"),
@@ -56,7 +56,7 @@ pub fn run() -> Result<()> {
         ("8sync sec ufw status",        "show ufw status only"),
     ]);
 
-    section("7. MAINTENANCE", &[
+    section("6. MAINTENANCE", &[
         ("8sync up",                       "self-update the 8sync binary and omp (no `pacman -Syu`)"),
         ("8sync doctor",                   "full health check"),
         ("8sync skill",                    "list installed skills + project-local skills"),

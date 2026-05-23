@@ -1,7 +1,8 @@
 name = "alexdev"
-description = "alexdev's full personal setup (bundle)"
+description = "alexdev full bundle — Caelestia stack (fresh) + all personal profiles"
 
 extends = [
+  "caelestia",
   "vietnamese",
   "hardware-cooling",
   "hardware-lianli",
@@ -20,4 +21,4 @@ user_enable = []
 
 [post_install]
 commands = []
-hint = ""
+hint = "Reboot sau khi NVIDIA driver + SDDM được bật. Trên máy đã có HyDE: dùng `8sync setup --caelestia=hyde` thay vì bundle này."
