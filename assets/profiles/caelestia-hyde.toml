@@ -33,9 +33,10 @@ printf "\\n# === CAELESTIA-SHELL-OVERRIDE ===\\n# Managed by `8sync setup --cael
 echo "[caelestia-hyde] injected override block into $CONF"'""",
 
   # 3. Live reload if Hyprland is running.
-  """bash -c 'if pgrep -x Hyprland >/dev/null; then \
+  """bash -c 'systemctl --user stop hyde-Hyprland-bar.service 2>/dev/null; systemctl --user mask waybar.service 2>/dev/null; \
+if pgrep -x Hyprland >/dev/null; then \
 hyprctl reload >/dev/null || true; pkill -x waybar || true; (setsid qs -c caelestia >/dev/null 2>&1 &) || true; \
-echo "[caelestia-hyde] hyprctl reload + waybar killed + caelestia launched"; \
+echo "[caelestia-hyde] waybar masked, hyprctl reload + caelestia launched"; \
 else echo "[caelestia-hyde] Hyprland not running — changes apply on next session"; fi'""",
 ]
 hint = "Conflict keybind Super+Space/Super+D — edit ~/.config/hypr/keybindings.conf nếu cần. HyDE update có thể overwrite userprefs → chạy lại `8sync setup --caelestia=hyde`. Rollback: `8sync setup --caelestia=rollback`."

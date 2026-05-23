@@ -421,7 +421,8 @@ fn rollback_caelestia_hyde(dry_run: bool) -> Result<()> {
     let cmds = [
         sed_cmd.as_str(),
         "pkill -f 'qs -c caelestia' || true",
-        "command -v waybar >/dev/null && (setsid waybar >/dev/null 2>&1 &) || true",
+        // Unmask + restart HyDE waybar service (symmetric with apply).
+        "systemctl --user unmask waybar.service 2>/dev/null; systemctl --user start hyde-Hyprland-bar.service 2>/dev/null || (command -v waybar >/dev/null && (setsid waybar >/dev/null 2>&1 &) || true)",
         "pgrep -x Hyprland >/dev/null && hyprctl reload >/dev/null || true",
     ];
     for c in &cmds {
@@ -580,8 +581,10 @@ fn apply_end4_overlay(dry_run: bool) -> Result<()> {
         ),
         "pgrep -x Hyprland >/dev/null && hyprctl reload >/dev/null || true".to_string(),
         // Stop HyDE's transient waybar service (otherwise systemd respawns it
-        // after a plain pkill). Falls back to pkill for non-HyDE setups.
-        "systemctl --user stop hyde-Hyprland-bar.service 2>/dev/null; pkill -x waybar || true".to_string(),
+        // after a plain pkill). `mask waybar.service` survives reboot so HyDE
+        // doesn't respawn it on next session. Falls back to pkill for
+        // non-HyDE setups. See docs/known-issues.md#hyde-waybar-respawn.
+        "systemctl --user stop hyde-Hyprland-bar.service 2>/dev/null; systemctl --user mask waybar.service 2>/dev/null; pkill -x waybar || true".to_string(),
         "command -v qs >/dev/null && (setsid qs -c ii >/dev/null 2>&1 &) || true".to_string(),
     ];
     for c in &cmds {
@@ -611,8 +614,9 @@ fn rollback_end4_overlay(dry_run: bool) -> Result<()> {
         ),
         "pkill -f 'qs -c ii' || true".to_string(),
         // Prefer restarting HyDE's transient service if it exists; fall back to
-        // a plain waybar spawn (non-HyDE setups).
-        "systemctl --user start hyde-Hyprland-bar.service 2>/dev/null || (command -v waybar >/dev/null && (setsid waybar >/dev/null 2>&1 &) || true)".to_string(),
+        // a plain waybar spawn (non-HyDE setups). Unmask waybar.service so HyDE
+        // can spawn it again on next reboot.
+        "systemctl --user unmask waybar.service 2>/dev/null; systemctl --user start hyde-Hyprland-bar.service 2>/dev/null || (command -v waybar >/dev/null && (setsid waybar >/dev/null 2>&1 &) || true)".to_string(),
         "pgrep -x Hyprland >/dev/null && hyprctl reload >/dev/null || true".to_string(),
     ];
     for c in &cmds {
