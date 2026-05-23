@@ -381,14 +381,15 @@ const END4_REPO: &str = "https://github.com/end-4/dots-hyprland.git";
 const END4_DIR_REL: &str = ".local/share/dots-hyprland";
 
 fn end4_flags(tier: &str) -> Result<&'static [&'static str]> {
-    // All tiers pass `-f` (no interactive confirm) + skip the greeting pause.
+    // All tiers pass: -f (force, no confirm) -s (skip pacman -Syu) --skip-allgreeting
+    // --skip-backup --ignore-outdate → fully unattended, no prompts anywhere.
     Ok(match tier {
         // Bare Hyprland config, no widget shell, no fish/fonts/plasma/misc.
-        "minimal" => &["install", "-f", "--skip-allgreeting", "--core", "--skip-quickshell"],
+        "minimal" => &["install", "-f", "-s", "--skip-allgreeting", "--skip-backup", "--ignore-outdate", "--core", "--skip-quickshell"],
         // Hyprland + Quickshell widget shell; still skip fish/fonts/plasma/misc apps.
-        "medium"  => &["install", "-f", "--skip-allgreeting", "--core"],
+        "medium"  => &["install", "-f", "-s", "--skip-allgreeting", "--skip-backup", "--ignore-outdate", "--core"],
         // Everything upstream installs.
-        "full"    => &["install", "-f", "--skip-allgreeting"],
+        "full"    => &["install", "-f", "-s", "--skip-allgreeting", "--skip-backup", "--ignore-outdate"],
         other     => bail!("--end4 accepts: minimal|medium|full|rollback (got `{}`)", other),
     })
 }

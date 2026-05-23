@@ -5,62 +5,109 @@ pub fn print_cheatsheet() {
         "{}",
         "8sync — vibe coding harness for CachyOS + omp".bold().cyan()
     );
+    println!("{}", "Single Rust binary. Embeds configs, profiles, skills. Every verb is idempotent.".dimmed());
     println!("{}\n", "Run any verb with `-h` for detailed help and examples.".dimmed());
 
-    println!("{}", "Vibe loop (daily):".bold().yellow());
+    println!("{}", "FIRST TIME (new machine)".bold().green());
+    println!("  {}", "1. clone + bootstrap — installs rustup if missing, builds binary into ~/.local/bin".dimmed());
+    println!("     {}", "git clone https://github.com/8-Sync-Dev/su-code && cd su-code && bash scripts/bootstrap.sh".cyan());
+    println!("  {}", "2. install harness + pick personal profiles (asks y/N for each)".dimmed());
+    println!("     {}", "8sync setup".cyan());
+    println!("  {}", "3. log in to GitHub (so `8sync ship` can open PRs)".dimmed());
+    println!("     {}", "gh auth login".cyan());
+    println!("  {}", "4. verify".dimmed());
+    println!("     {}\n", "8sync doctor".cyan());
+
+    println!("{}", "DAILY VIBE LOOP (inside a project)".bold().yellow());
     rows(&[
-        (".",      "seed agents/* context, then exec `omp --continue` in the project root"),
-        ("ai",     "AI session — one-shot prompt or resume last omp chat"),
-        ("find",   "search code (rg) or files (fd), preview in fzf, open at file:line"),
-        ("note",   "append a timestamped line to <repo>/agents/NOTES.md"),
-        ("run",    "project runner: dev | build | test | fmt | lint"),
-        ("ship",   "git add -A + commit + push + `gh pr create` in one shot"),
+        ("8sync .",                "seed agents/* (PROJECT, KNOWLEDGE, DECISIONS, …) + run `omp --continue`"),
+        ("8sync ai \"<prompt>\"",  "one-shot AI prompt (resume last chat if no prompt)"),
+        ("8sync find <kw>",        "rg over code (or fd over filenames) → fzf preview → open at file:line"),
+        ("8sync note \"<msg>\"",   "append timestamped line to agents/NOTES.md"),
+        ("8sync run dev|build|test|fmt|lint", "project runner via per-stack recipe"),
+        ("8sync ship \"<msg>\"",   "git add -A + commit + push + `gh pr create` in one shot"),
+    ]);
+    println!("  {}", "→ each project gets an AGENTS.md (managed) + agents/ folder (memory) on first `8sync .`".dimmed());
+
+    println!("\n{}", "DESKTOP / DOTFILES (one of these — they don't mix)".bold().yellow());
+    rows(&[
+        ("8sync setup --caelestia",          "auto-detect: HyDE → additive overlay, else fresh Hyprland+Caelestia (+nvidia)"),
+        ("8sync setup --caelestia=fresh",    "force fresh: full Hyprland + Quickshell + SDDM + nvidia auto-detect"),
+        ("8sync setup --caelestia=hyde",     "force HyDE-additive overlay (just caelestia-shell + userprefs.conf block)"),
+        ("8sync setup --caelestia=rollback", "strip overlay block from userprefs.conf + restart waybar"),
+        ("8sync setup --end4",               "end-4/dots-hyprland — medium tier (Hyprland + Quickshell)"),
+        ("8sync setup --end4=minimal",       "bare Hyprland keybinds (skip Quickshell + fish + fonts + misc)"),
+        ("8sync setup --end4=full",          "everything upstream installs (incl. fish/fonts/plasma-browser-integration)"),
+        ("8sync setup --end4=rollback",      "run upstream `./setup uninstall -f`"),
+    ]);
+    println!("  {}", "→ all --end4 tiers pass `-f -s --skip-allgreeting --skip-backup --ignore-outdate` (zero prompts)".dimmed());
+
+    println!("\n{}", "PROFILES (opt-in personal customization, idempotent)".bold().yellow());
+    rows(&[
+        ("8sync setup --yall",           "install harness + `alexdev` bundle, no prompts"),
+        ("8sync setup --no-profile",     "install harness only, skip the y/N profile stage"),
+        ("8sync setup --profile <name>", "install harness + apply ONE profile non-interactively"),
+        ("8sync setup --dry-run",        "print the full plan, change nothing (combine with any flag)"),
+        ("8sync setup profile list",     "show every available profile (✓ = applied)"),
+        ("8sync setup profile show <n>", "show resolved packages + services + post-install of a profile"),
+        ("8sync setup profile apply <n>", "(re-)apply one profile idempotently"),
+    ]);
+    println!("  {}", "Built-in profiles (in priority order of independence):".dimmed());
+    println!("  {}", "  vietnamese · hardware-cooling · hardware-lianli · displaylink · apps-personal · warp".dimmed());
+    println!("  {}", "  nvidia (auto-detect: Blackwell→Turing→open-dkms; Maxwell/Pascal→dkms)".dimmed());
+    println!("  {}", "  caelestia (extends nvidia) · caelestia-hyde · alexdev (bundle: caelestia + all 6 personal)".dimmed());
+    println!("  {}", "Override any built-in: drop a TOML into ~/.config/8sync/profiles/<name>.toml".dimmed());
+
+    println!("\n{}", "SECURITY (VPN + firewall)".bold().yellow());
+    rows(&[
+        ("8sync sec",          "show WARP and ufw status"),
+        ("8sync sec on|off",   "enable/disable BOTH WARP and ufw"),
+        ("8sync sec toggle",   "flip both based on current state"),
+        ("8sync sec warp on|off|status", "control WARP only"),
+        ("8sync sec ufw  on|off|status", "control ufw only"),
+    ]);
+    println!("  {}", "→ requires `warp` profile applied (8sync setup --profile warp) for WARP control".dimmed());
+
+    println!("\n{}", "AI TOOLING (cheap visual context for omp)".bold().yellow());
+    rows(&[
+        ("8sync shot <url|file>", "render web page or HTML file → PNG (saves tokens vs dumping text)"),
+        ("8sync diff-img [ref]",  "render `git diff` → PNG"),
+        ("8sync pdf-img <file>",  "render PDF pages → PNG"),
+        ("8sync skill",           "list ~/.omp/skills/ + project agents/skills/"),
+        ("8sync skill add <url>", "clone a skill repo into both global + project skill dirs, update AGENTS.md"),
+        ("8sync skill sync",      "regenerate ~/.omp/skills/00-force-load.md from installed skills"),
     ]);
 
-    println!("\n{}", "Security (VPN + firewall):".bold().yellow());
+    println!("\n{}", "LIFECYCLE".bold().yellow());
     rows(&[
-        ("sec",         "show WARP and ufw status"),
-        ("sec on",      "enable both WARP VPN and ufw firewall"),
-        ("sec off",     "disable both"),
-        ("sec toggle",  "flip both based on their current state"),
-        ("sec warp on", "control WARP only (also: off | status)"),
-        ("sec ufw on",  "control ufw only (also: off | status)"),
+        ("8sync up",      "self-update binary + omp (system pkgs NOT touched — run `paru -Syu` yourself)"),
+        ("8sync doctor",  "health check: tools, configs, VPN/firewall, applied profiles, overlay status"),
+        ("8sync flow",    "same content as this page, ordered by workflow step"),
+        ("8sync help",    "show this page (alias of `8sync` with no args)"),
     ]);
 
-    println!("\n{}", "Lifecycle:".bold().yellow());
-    rows(&[
-        ("setup",                   "install harness (gh + omp), then ask y/N per personal profile"),
-        ("setup --yall",            "install harness + alexdev bundle, no prompts"),
-        ("setup --profile <name>",  "install harness + apply one profile non-interactively"),
-        ("setup --caelestia",       "auto-detect: HyDE → additive overlay, else fresh Hyprland+Caelestia (+nvidia)"),
-        ("setup --caelestia=fresh", "force fresh CachyOS path"),
-        ("setup --caelestia=hyde",  "force HyDE-additive overlay"),
-        ("setup --caelestia=rollback", "remove HyDE overlay block"),
-        ("setup --end4=<tier>",     "end-4/dots-hyprland (minimal|medium|full|rollback) — auto-yes"),
-        ("setup --dry-run",         "print the plan without changing anything"),
-        ("setup profile",           "manage profiles: list | show <name> | apply <name>"),
-        ("up",                      "update 8sync binary + omp (system pkgs not touched)"),
-        ("doctor",                  "health check: tools, configs, VPN/firewall, profiles"),
-        ("flow",                    "workflow help in chronological order"),
-    ]);
+    println!("\n{}", "WHERE THINGS LIVE".bold().yellow());
+    println!("  {:<38}  {}", "~/.local/bin/8sync".cyan(),                 "the binary itself");
+    println!("  {:<38}  {}", "~/.config/8sync/{global,skills}.toml".cyan(), "8sync own config (idempotent install)");
+    println!("  {:<38}  {}", "~/.config/8sync/profile.toml".cyan(),       "state: which profiles are applied");
+    println!("  {:<38}  {}", "~/.config/8sync/profiles/*.toml".cyan(),    "user-defined / overriding profiles");
+    println!("  {:<38}  {}", "~/.omp/skills/{name}/SKILL.md".cyan(),      "global omp skills (always-on)");
+    println!("  {:<38}  {}", "~/.omp/skills/00-force-load.md".cyan(),     "master force-load (regenerated by `skill sync`)");
+    println!("  {:<38}  {}", "<repo>/AGENTS.md".cyan(),                   "project entry point — every AI reads this first");
+    println!("  {:<38}  {}", "<repo>/agents/{PROJECT,STATE,…}.md".cyan(), "per-project memory (committed, shared with team)");
+    println!("  {:<38}  {}", "<repo>/agents/skills/<name>/".cyan(),       "per-project skills (cloned by `skill add`)");
+    println!("  {:<38}  {}", "~/.local/share/caelestia/".cyan(),          "Caelestia dotfiles (cloned by --caelestia=fresh)");
+    println!("  {:<38}  {}", "~/.local/share/dots-hyprland/".cyan(),      "end-4 dotfiles (cloned by --end4)");
 
-    println!("\n{}", "AI tooling (for omp):".bold().yellow());
-    rows(&[
-        ("skill",    "list / add / sync omp skills (karpathy, image-routing, 8sync-cli)"),
-        ("shot",     "render a URL or HTML file to PNG (cheap visual context for AI)"),
-        ("diff-img", "render `git diff` to PNG"),
-        ("pdf-img",  "render PDF pages to PNG"),
-    ]);
-
-    println!("\n{}", "Tips:".bold().yellow());
-    println!("  · Every verb has {} and {} flags.", "-h".bold().green(), "--help".bold().green());
-    println!("  · First time?         run {}", "8sync setup".bold().cyan());
-    println!("  · Want workflow tour? run {}", "8sync flow".bold().cyan());
-    println!("  · Show this page:     run {} or {}", "8sync".bold().cyan(), "8sync help".bold().cyan());
+    println!("\n{}", "TIPS".bold().yellow());
+    println!("  · Every verb has {} and {} with EXAMPLES.", "-h".bold().green(), "--help".bold().green());
+    println!("  · Stuck? run {} to verify, or {} for a workflow walkthrough.", "8sync doctor".cyan(), "8sync flow".cyan());
+    println!("  · Inspect before installing: any setup flag combines with {}.", "--dry-run".bold().green());
+    println!("  · Repo: {}", "https://github.com/8-Sync-Dev/su-code".cyan().underline());
 }
 
 fn rows(items: &[(&str, &str)]) {
-    let w = items.iter().map(|(k, _)| k.len()).max().unwrap_or(8);
+    let w = items.iter().map(|(k, _)| k.len()).max().unwrap_or(8).min(38);
     for (k, v) in items {
         println!("  {:<width$}  {}", k.cyan().bold(), v, width = w);
     }
