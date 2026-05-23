@@ -40,7 +40,8 @@ pub fn print_cheatsheet() {
         ("8sync setup --end4=full",          "everything upstream installs (incl. fish/fonts/plasma-browser-integration)"),
         ("8sync setup --end4=rollback",      "run upstream `./setup uninstall -f`"),
     ]);
-    println!("  {}", "→ all --end4 tiers pass `-f -s --skip-allgreeting --skip-backup --ignore-outdate` (zero prompts)".dimmed());
+    println!("  {}", "→ minimal/medium use --skip-hyprland-entry (HyDE keybinds preserved). `full` overwrites entry — refused on HyDE.".dimmed());
+    println!("  {}", "→ all tiers pass `-f -s --skip-allgreeting --ignore-outdate` (zero prompts). Backup ENABLED (recoverable).".dimmed());
 
     println!("\n{}", "PROFILES (opt-in personal customization, idempotent)".bold().yellow());
     rows(&[

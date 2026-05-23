@@ -111,6 +111,9 @@ pub fn run(a: Args) -> Result<()> {
     if a.end4.as_deref() == Some("rollback") {
         return rollback_end4(a.dry_run);
     }
+    if a.end4.as_deref() == Some("rollback-overlay") {
+        return rollback_end4_overlay(a.dry_run);
+    }
 
     ui::header("8sync setup");
     let env = env_detect::Env::detect()?;
@@ -160,7 +163,11 @@ pub fn run(a: Args) -> Result<()> {
 
     // ── end-4/dots-hyprland shortcut ─────────────────────────────
     if let Some(tier) = a.end4.as_deref() {
-        run_end4(tier, a.dry_run)?;
+        if tier == "overlay" {
+            apply_end4_overlay(a.dry_run)?;
+        } else {
+            run_end4(tier, a.dry_run)?;
+        }
         finish_msg();
         return Ok(());
     }
@@ -445,14 +452,23 @@ const END4_DIR_REL: &str = ".local/share/dots-hyprland";
 
 fn end4_flags(tier: &str) -> Result<&'static [&'static str]> {
     // All tiers pass: -f (force, no confirm) -s (skip pacman -Syu) --skip-allgreeting
-    // --skip-backup --ignore-outdate → fully unattended, no prompts anywhere.
+    // --ignore-outdate. Backup is LEFT ENABLED — end-4 will move overwritten
+    // files into `~/.config/<x>.bak.<ts>/` (or rename to `.old`) so a botched
+    // install never destroys the user's existing keybinds silently.
+    // minimal+medium also pass --skip-hyprland-entry so HyDE's hyprland.conf
+    // (or any custom entry) stays the active one. Use `--end4=overlay` to
+    // additionally launch end-4's Quickshell shell on top of an HyDE session.
     Ok(match tier {
-        // Bare Hyprland config, no widget shell, no fish/fonts/plasma/misc.
-        "minimal" => &["install", "-f", "-s", "--skip-allgreeting", "--skip-backup", "--ignore-outdate", "--core", "--skip-quickshell"],
-        // Hyprland + Quickshell widget shell; still skip fish/fonts/plasma/misc apps.
-        "medium"  => &["install", "-f", "-s", "--skip-allgreeting", "--skip-backup", "--ignore-outdate", "--core"],
-        // Everything upstream installs.
-        "full"    => &["install", "-f", "-s", "--skip-allgreeting", "--skip-backup", "--ignore-outdate"],
+        // Bare Hyprland config, no widget shell — preserve user's existing entry
+        // config (HyDE's hyprland.conf etc. stays untouched).
+        "minimal" => &["install", "-f", "-s", "--skip-allgreeting", "--ignore-outdate", "--core", "--skip-quickshell", "--skip-hyprland-entry"],
+        // Hyprland + Quickshell widget shell — also preserve entry. Caveat: user
+        // must opt in to end-4's entry manually (rename hyprland.lua back) if
+        // they want the full end-4 keybinds.
+        "medium"  => &["install", "-f", "-s", "--skip-allgreeting", "--ignore-outdate", "--core", "--skip-hyprland-entry"],
+        // Everything upstream installs — DOES overwrite the entry config (this
+        // is the "I'm starting fresh, use end-4 as my main DE" mode).
+        "full"    => &["install", "-f", "-s", "--skip-allgreeting", "--ignore-outdate"],
         other     => bail!("--end4 accepts: minimal|medium|full|rollback (got `{}`)", other),
     })
 }
@@ -463,6 +479,22 @@ fn run_end4(tier: &str, dry_run: bool) -> Result<()> {
     let dir = home.join(END4_DIR_REL);
 
     ui::step(&format!("end-4/dots-hyprland → tier `{}`", tier));
+    // Warn when end-4 will collide with HyDE. On `full` tier the entry config IS
+    // overwritten and HyDE keybinds will be inactive — bail loudly unless user
+    // re-runs with a non-full tier. minimal+medium pass --skip-hyprland-entry
+    // so they're safe to co-exist.
+    if env_detect::is_hyde() {
+        if tier == "full" {
+            ui::err("HyDE detected + --end4=full → end-4 WILL overwrite hyprland.conf entry.");
+            ui::err("HyDE keybinds will stop working. Recover with `mv ~/.config/hypr/hyprland.conf.old ~/.config/hypr/hyprland.conf`.");
+            ui::err("If you really want this, run: 8sync setup --end4=rollback first, then re-run --end4=full.");
+            bail!("refusing --end4=full on a HyDE system without explicit rollback");
+        }
+        ui::warn("HyDE detected — using --skip-hyprland-entry so HyDE keybinds stay active.");
+        ui::warn("end-4's `hyprland.lua` entry will NOT be installed. To switch to end-4 keybinds later:");
+        ui::warn("  mv ~/.config/hypr/hyprland.conf ~/.config/hypr/hyprland.conf.hyde");
+        ui::warn("  cd ~/.local/share/dots-hyprland && ./setup install-files");
+    }
     if dry_run {
         if dir.exists() {
             ui::info(&format!("would: git -C {} pull --ff-only", dir.display()));
@@ -516,5 +548,81 @@ fn rollback_end4(dry_run: bool) -> Result<()> {
         let _ = std::process::Command::new("sh").arg("-c").arg(&cmd).status();
     }
     ui::ok("end-4 uninstall invoked");
+    Ok(())
+}
+
+// ─── `--end4=overlay` (HyDE-side-by-side: end-4 Quickshell over HyDE keybinds) ─
+
+/// Inject an idempotent block into `~/.config/hypr/userprefs.conf` that kills
+/// waybar and launches end-4's Quickshell config (`qs -c ii`). Mirrors the
+/// `caelestia-hyde` overlay pattern. Triggers a live reload + spawn when
+/// Hyprland is already running.
+fn apply_end4_overlay(dry_run: bool) -> Result<()> {
+    ui::header("8sync setup --end4=overlay");
+    if which::which("qs").is_err() {
+        ui::warn("`qs` (Quickshell) not on PATH — install end-4 deps first: `8sync setup --end4=medium`");
+    }
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
+    let conf = home.join(".config/hypr/userprefs.conf");
+
+    let cmds = [
+        format!(
+            "[ -f {0} ] && cp {0} {0}.bak.$(date +%s) || (mkdir -p $(dirname {0}) && touch {0})",
+            shell_quote(conf.to_str().unwrap_or(""))
+        ),
+        format!(
+            "sed -i '/# === END4-SHELL-OVERLAY ===/,/# === END-END4-OVERLAY ===/d' {}",
+            shell_quote(conf.to_str().unwrap_or(""))
+        ),
+        format!(
+            "printf '\\n# === END4-SHELL-OVERLAY ===\\n# Managed by `8sync setup --end4=overlay`. Re-run to refresh, or `8sync setup --end4=rollback-overlay` to remove.\\nexec-once = pkill -x waybar\\nexec-once = qs -c ii\\n# === END-END4-OVERLAY ===\\n' >> {}",
+            shell_quote(conf.to_str().unwrap_or(""))
+        ),
+        "pgrep -x Hyprland >/dev/null && hyprctl reload >/dev/null || true".to_string(),
+        // Stop HyDE's transient waybar service (otherwise systemd respawns it
+        // after a plain pkill). Falls back to pkill for non-HyDE setups.
+        "systemctl --user stop hyde-Hyprland-bar.service 2>/dev/null; pkill -x waybar || true".to_string(),
+        "command -v qs >/dev/null && (setsid qs -c ii >/dev/null 2>&1 &) || true".to_string(),
+    ];
+    for c in &cmds {
+        if dry_run {
+            ui::info(&format!("would run: {}", c));
+        } else {
+            ui::info(&format!("$ {}", c));
+            let _ = std::process::Command::new("sh").arg("-c").arg(c).status();
+        }
+    }
+    ui::ok("end-4 overlay applied — Quickshell `ii` running over HyDE keybinds");
+    Ok(())
+}
+
+fn rollback_end4_overlay(dry_run: bool) -> Result<()> {
+    ui::header("8sync setup --end4=rollback-overlay");
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
+    let conf = home.join(".config/hypr/userprefs.conf");
+    if !conf.exists() {
+        ui::info(&format!("{} not found — nothing to roll back", conf.display()));
+        return Ok(());
+    }
+    let cmds = [
+        format!(
+            "sed -i '/# === END4-SHELL-OVERLAY ===/,/# === END-END4-OVERLAY ===/d' {}",
+            shell_quote(conf.to_str().unwrap_or(""))
+        ),
+        "pkill -f 'qs -c ii' || true".to_string(),
+        // Prefer restarting HyDE's transient service if it exists; fall back to
+        // a plain waybar spawn (non-HyDE setups).
+        "systemctl --user start hyde-Hyprland-bar.service 2>/dev/null || (command -v waybar >/dev/null && (setsid waybar >/dev/null 2>&1 &) || true)".to_string(),
+        "pgrep -x Hyprland >/dev/null && hyprctl reload >/dev/null || true".to_string(),
+    ];
+    for c in &cmds {
+        if dry_run {
+            ui::info(&format!("would run: {}", c));
+        } else {
+            ui::info(&format!("$ {}", c));
+            let _ = std::process::Command::new("sh").arg("-c").arg(c).status();
+        }
+    }
+    ui::ok("end-4 overlay removed — waybar restored");
     Ok(())
 }
