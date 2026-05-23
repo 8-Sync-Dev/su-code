@@ -82,6 +82,17 @@ pub struct Args {
     )]
     pub caelestia: Option<String>,
 
+    /// Nuke every desktop-shell customisation 8sync ever applied (end-4 +
+    /// caelestia overlays, bridge keybinds, palette cycler, masked services,
+    /// cloned dotfiles) and restore HyDE-only state. Combine with --dry-run.
+    #[arg(long)]
+    pub reset_shells: bool,
+
+    /// With --reset-shells: also pacman -Rns the shell packages
+    /// (caelestia-shell, quickshell, aubio). Off by default — packages stay.
+    #[arg(long)]
+    pub purge_packages: bool,
+
     /// Apply end-4/dots-hyprland (minimal|medium|full|rollback). Auto-yes — no prompts.
     #[arg(
         long = "end4",
@@ -98,6 +109,11 @@ pub struct Args {
 
 pub fn run(a: Args) -> Result<()> {
     // Sub-command: `8sync setup profile <action>`
+    // Short-circuit: full nuke of every shell customisation we ever applied.
+    if a.reset_shells {
+        return reset_shells(a.purge_packages, a.dry_run);
+    }
+
     if a.action.as_deref() == Some("profile") {
         return profile_sub(a.rest, a.yall, a.dry_run);
     }
@@ -695,4 +711,145 @@ fn rollback_end4_overlay(dry_run: bool) -> Result<()> {
     }
     ui::ok("end-4 overlay removed — waybar restored");
     Ok(())
+}
+
+// ─── `--reset-shells` ───────────────────────────────────────────
+//
+// Idempotent "undo everything we ever did to the desktop shell". Safe to
+// run multiple times; safe to run on a machine that never had end-4 /
+// caelestia installed (every step `|| true`s).
+
+fn reset_shells(purge_packages: bool, dry_run: bool) -> Result<()> {
+    ui::header("8sync setup --reset-shells");
+    if dry_run { ui::info("DRY RUN — no changes will be made"); }
+
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
+    let userprefs = home.join(".config/hypr/userprefs.conf");
+    let userprefs_q = shell_quote(userprefs.to_str().unwrap_or(""));
+
+    // Step-by-step plan. Each cmd is independent, errors swallowed via `|| true`.
+    let mut cmds: Vec<String> = Vec::new();
+
+    // 1. Strip sentinel blocks from userprefs.conf (both end-4 and caelestia).
+    if userprefs.exists() {
+        cmds.push(format!(
+            "cp {0} {0}.reset.$(date +%s).bak 2>/dev/null || true",
+            userprefs_q
+        ));
+        cmds.push(format!(
+            "sed -i '/# === END4-SHELL-OVERLAY ===/,/# === END-END4-OVERLAY ===/d' {}",
+            userprefs_q
+        ));
+        cmds.push(format!(
+            "sed -i '/# === CAELESTIA-SHELL-OVERRIDE ===/,/# === END-CAELESTIA-OVERRIDE ===/d' {}",
+            userprefs_q
+        ));
+    }
+
+    // 2. Kill every Quickshell instance.
+    cmds.push("pkill -f 'qs -c ii' || true".into());
+    cmds.push("pkill -f 'qs -c caelestia' || true".into());
+    cmds.push("pkill -x quickshell || true".into());
+
+    // 3. Remove the bridge / glass / palette assets + cycler script.
+    cmds.push("rm -f \
+        $HOME/.config/hypr/8sync-end4-bridge.conf \
+        $HOME/.config/hypr/8sync-end4-glass.conf \
+        $HOME/.config/hypr/8sync-palette.conf \
+        $HOME/.config/hypr/.8sync-palette-index".into());
+    cmds.push("rm -f $HOME/.local/share/8sync/8sync-palette-cycle.sh".into());
+
+    // 4. Remove cloned upstream dotfiles.
+    cmds.push("rm -rf $HOME/.local/share/dots-hyprland".into());
+    cmds.push("rm -rf $HOME/.local/share/caelestia".into());
+
+    // 5. Remove Caelestia config symlinks (its installer drops these via
+    //    `ln -s` to ~/.local/share/caelestia). Only unlink symlinks, never
+    //    delete real dirs — guards user data on HyDE-only setups.
+    for d in ["hypr", "foot", "fish", "fastfetch", "uwsm", "btop",
+              "spicetify", "starship.toml"] {
+        cmds.push(format!(
+            "[ -L $HOME/.config/{0} ] && rm -f $HOME/.config/{0} || true", d
+        ));
+    }
+
+    // 6. Restore HyDE's waybar — unmask + restart its transient service.
+    cmds.push("systemctl --user unmask waybar.service 2>/dev/null || true".into());
+    // HyDE's `hyde-Hyprland-bar.service` is transient (created by systemd-run
+    // at session start) — `systemctl start` can't recreate it. Plain waybar
+    // spawn is the reliable fallback that works on both HyDE and bare Hyprland.
+    cmds.push("pkill -x waybar 2>/dev/null; sleep 0.3; (setsid waybar >/dev/null 2>&1 &) 2>/dev/null || true".into());
+
+    // 7. Reload Hyprland so all of the above takes effect immediately.
+    cmds.push("pgrep -x Hyprland >/dev/null && hyprctl reload >/dev/null || true".into());
+    cmds.push("pgrep -x Hyprland >/dev/null && hyprctl dismissnotify -1 >/dev/null || true".into());
+
+    // 8. Optional package purge.
+    if purge_packages {
+        cmds.push("sudo pacman -Rns --noconfirm caelestia-shell quickshell aubio 2>/dev/null || true".into());
+    }
+
+    // Run.
+    for c in &cmds {
+        if dry_run {
+            ui::info(&format!("would run: {}", c));
+        } else {
+            ui::info(&format!("$ {}", c));
+            let _ = std::process::Command::new("sh").arg("-c").arg(c).status();
+        }
+    }
+
+    // 9. Report any backups still on disk so user can restore manually.
+    if !dry_run {
+        let candidates = [
+            ".config.bak.caelestia.",
+            ".config/hypr/userprefs.conf.bak.",
+            ".config/hypr/userprefs.conf.reset.",
+            ".config/hypr/hyprland.conf.old",
+            ".config/hypr/hypridle.conf.old",
+            ".config/hypr/hyprlock.conf.old",
+            ".config/hypr.end4-stash.",
+        ];
+        let found: Vec<String> = candidates.iter()
+            .flat_map(|stem| {
+                let pattern = home.join(stem.trim_start_matches('/'));
+                glob_like(&pattern.display().to_string())
+            })
+            .collect();
+        if !found.is_empty() {
+            ui::info("backups still on disk (delete or restore manually):");
+            for b in &found {
+                println!("    {}", b);
+            }
+        }
+    }
+
+    ui::ok("desktop shells reset — HyDE-only state restored");
+    if !purge_packages {
+        ui::info("packages NOT removed (rerun with --purge-packages to also \
+            `pacman -Rns caelestia-shell quickshell aubio`)");
+    }
+    Ok(())
+}
+
+/// Lightweight glob — returns paths matching `pattern` where `*` is wildcard.
+/// Avoids pulling in the `glob` crate for this one use site.
+fn glob_like(pattern: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let (dir, prefix) = match pattern.rfind('/') {
+        Some(i) => (&pattern[..i], &pattern[i + 1..]),
+        None => (".", pattern),
+    };
+    let Ok(entries) = std::fs::read_dir(dir) else { return out; };
+    for e in entries.flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        if prefix.ends_with('.') {
+            if name.starts_with(prefix) {
+                out.push(e.path().display().to_string());
+            }
+        } else if name == prefix {
+            out.push(e.path().display().to_string());
+        }
+    }
+    out
 }
