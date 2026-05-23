@@ -1,0 +1,41 @@
+name = "caelestia-hyde"
+description = "Caelestia shell on top of existing HyDE base — additive, rollback-able (does NOT install hyprland/sddm/driver)"
+
+[packages]
+pacman = []
+aur = [
+  "caelestia-shell",
+  "quickshell",
+  "cli11",
+  "aubio",
+  "ttf-material-symbols-variable-git",
+  "ttf-caskaydia-cove-nerd",
+]
+
+[requires]
+aur_helper = true
+
+[services]
+system_enable = []
+user_enable = []
+
+[post_install]
+commands = [
+  # 1. Backup existing userprefs.conf (skip if missing).
+  """bash -c 'CONF="$HOME/.config/hypr/userprefs.conf"; \
+if [ -f "$CONF" ]; then cp "$CONF" "$CONF.bak.$(date +%s)"; echo "[caelestia-hyde] backed up $CONF"; \
+else echo "[caelestia-hyde] $CONF not found — will create"; mkdir -p "$(dirname "$CONF")"; touch "$CONF"; fi'""",
+
+  # 2. Inject override block (idempotent — strip old block first).
+  """bash -c 'CONF="$HOME/.config/hypr/userprefs.conf"; \
+sed -i "/# === CAELESTIA-SHELL-OVERRIDE ===/,/# === END-CAELESTIA-OVERRIDE ===/d" "$CONF"; \
+printf "\\n# === CAELESTIA-SHELL-OVERRIDE ===\\n# Managed by `8sync setup --caelestia=hyde`. Re-run to refresh, or `8sync setup --caelestia=rollback` to remove.\\nexec-once = pkill -x waybar\\nexec-once = qs -c caelestia\\n# === END-CAELESTIA-OVERRIDE ===\\n" >> "$CONF"; \
+echo "[caelestia-hyde] injected override block into $CONF"'""",
+
+  # 3. Live reload if Hyprland is running.
+  """bash -c 'if pgrep -x Hyprland >/dev/null; then \
+hyprctl reload >/dev/null || true; pkill -x waybar || true; (setsid qs -c caelestia >/dev/null 2>&1 &) || true; \
+echo "[caelestia-hyde] hyprctl reload + waybar killed + caelestia launched"; \
+else echo "[caelestia-hyde] Hyprland not running — changes apply on next session"; fi'""",
+]
+hint = "Conflict keybind Super+Space/Super+D — edit ~/.config/hypr/keybindings.conf nếu cần. HyDE update có thể overwrite userprefs → chạy lại `8sync setup --caelestia=hyde`. Rollback: `8sync setup --caelestia=rollback`."

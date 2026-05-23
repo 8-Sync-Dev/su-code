@@ -74,28 +74,3 @@ pub fn aur_helper() -> Option<&'static str> {
     None
 }
 
-/// Kitty `allow_remote_control` enabled? Detected from `kitty.conf` chain.
-pub fn kitty_remote_on() -> bool {
-    let home = match dirs::home_dir() { Some(h) => h, None => return false };
-    let main = home.join(".config/kitty/kitty.conf");
-    let candidates: Vec<PathBuf> = vec![
-        main.clone(),
-        home.join(".config/kitty/hyde.conf"),
-    ];
-    for p in candidates {
-        if let Ok(c) = std::fs::read_to_string(&p) {
-            for line in c.lines() {
-                let l = line.trim();
-                if l.starts_with('#') { continue; }
-                if let Some(rest) = l.strip_prefix("allow_remote_control") {
-                    let v = rest.trim().to_lowercase();
-                    if v.starts_with("yes") || v.starts_with("socket") || v.starts_with("password") {
-                        return true;
-                    }
-                    if v.starts_with("no") { return false; }
-                }
-            }
-        }
-    }
-    false
-}

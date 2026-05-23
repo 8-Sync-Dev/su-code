@@ -1,4 +1,4 @@
-// 8sync — vibe coding harness for CachyOS + Kitty + Helix
+// 8sync — vibe coding harness for CachyOS + omp
 // Org: 8-Sync-Dev
 
 mod ui;
@@ -15,7 +15,7 @@ use clap::{Parser, Subcommand};
     name = "8sync",
     bin_name = "8sync",
     version,
-    about = "vibe coding harness for CachyOS + Kitty + Helix",
+    about = "vibe coding harness for CachyOS + omp",
     long_about = None,
     disable_help_subcommand = true,
     after_help = HELP_AFTER,
@@ -30,8 +30,9 @@ QUICK START
   8sync                             show this overview (any time)
   8sync flow                        same as above but ordered by workflow
   8sync setup                       install harness, then ask y/N per profile
-  8sync setup --yall                install harness + ALL profiles, no prompts
-  8sync .                           open project session (kitty 3-pane + omp)
+  8sync setup --yall                install harness + alexdev bundle, no prompts
+  8sync setup --caelestia           auto-detect Caelestia: HyDE overlay vs fresh full stack
+  8sync .                           seed agents/* context and run `omp --continue`
   8sync ai \"add dark mode toggle\"   one-shot AI prompt (or resume with `8sync ai`)
   8sync find \"useAuth\"              rg + fzf preview, open at file:line
   8sync ship \"feat: dark mode\"      commit + push + open a GitHub PR
@@ -44,7 +45,7 @@ Every verb supports -h / --help for detailed help with examples:
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Install harness (helix/lazygit/abduco/gh + omp + configs + skills) then prompt per personal profile
+    /// Install harness (gh + omp + configs + skills) then prompt per personal profile
     Setup(verbs::setup::Args),
 
     /// Full update: 8sync + omp + system pkgs (pacman/AUR) + rustup + flatpak. See `8sync up -h`.
@@ -54,7 +55,7 @@ enum Cmd {
     /// Health-check; report what's installed and what's missing
     Doctor,
 
-    /// Open project session: kitty 3-pane (if remote control on) + omp in abduco. Subcommands: ls/to/new/rm/mv/wipe/kick
+    /// Seed agents/* context for the current project and exec `omp --continue`
     #[command(name = ".", alias = "here")]
     Here(verbs::here::Args),
 

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args as ClapArgs;
 
 use crate::{assets, env_detect, pkg, ui, verbs::profile};
@@ -14,25 +14,39 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
           8sync setup --profile warp           install harness + apply just the WARP profile
           8sync setup --dry-run                print the full plan without changing anything
 
+          8sync setup --caelestia              auto-detect: HyDE present → additive overlay, else fresh full stack
+          8sync setup --caelestia=fresh        force fresh CachyOS path (Hyprland + Quickshell + nvidia auto-detect)
+          8sync setup --caelestia=hyde         force HyDE-additive path (caelestia-shell + userprefs.conf overlay)
+          8sync setup --caelestia=rollback     remove HyDE overlay block, restore waybar
+
+          8sync setup --end4                   end-4/dots-hyprland medium tier (Hyprland + Quickshell, no fish/fonts/misc)
+          8sync setup --end4=minimal           bare Hyprland keybinds only, skip Quickshell + fish + fonts + misc
+          8sync setup --end4=medium            Hyprland + Quickshell (default tier when bare --end4 is given)
+          8sync setup --end4=full              everything upstream installs (incl. fish/fonts/plasma-browser-integration)
+          8sync setup --end4=rollback          run upstream `./setup uninstall -f`
+
           8sync setup profile list             list every available profile (✓ = applied)
           8sync setup profile show alexdev     show resolved packages + services + post-install of a profile
           8sync setup profile apply warp       idempotently (re-)apply one profile
 
         STAGE A — HARNESS (always run, idempotent)
-          · pacman -S --needed helix lazygit abduco github-cli   (4 pkgs, official repo)
-          · omp AI CLI (curl installer from omp.sh, only if missing)
-          · write configs: helix + kitty/8sync.session + 8sync/{global,skills}.toml
+          · pacman -S --needed github-cli       (gh — required by `8sync ship`)
+          · omp AI CLI                          (curl installer from omp.sh, only if missing)
+          · write configs: 8sync/{global,skills}.toml
           · write skills:  ~/.omp/skills/{karpathy-guidelines, image-routing, 8sync-cli}/SKILL.md
                            + ~/.omp/skills/00-force-load.md  (auto-injected on every omp session)
 
         STAGE B — PROFILES (opt-in personal customization)
           vietnamese        fcitx5 + Unikey input method
           hardware-cooling  CoolerControl + OpenRGB + liquidctl
-          hardware-lianli   lianli-linux-git from AUR (yay/paru auto-pulls build deps)
-          displaylink      evdi-dkms (DisplayLink USB monitor driver)
+          hardware-lianli   lianli-linux-git from AUR
+          displaylink       evdi-dkms (DisplayLink USB monitor driver)
           apps-personal     Bitwarden
-          warp              Cloudflare WARP + DoH + MASQUE + malware DNS  (toggle daily via `8sync sec`)
-          alexdev           BUNDLE — extends all of the above
+          warp              Cloudflare WARP + DoH + MASQUE  (toggle daily via `8sync sec`)
+          nvidia            auto-detect driver (Blackwell→Turing: open-dkms; Maxwell/Pascal: dkms)
+          caelestia         fresh Hyprland + Quickshell + caelestia-shell  (extends nvidia)
+          caelestia-hyde    additive overlay for existing HyDE installs
+          alexdev           BUNDLE — caelestia + all personal profiles
 
         SAFETY
           · Every install is transactional: if pacman/AUR fails halfway, packages installed in
@@ -59,6 +73,24 @@ pub struct Args {
     #[arg(long)]
     pub profile: Option<String>,
 
+    /// Apply the Caelestia profile (auto|fresh|hyde|rollback). Plain `--caelestia` = auto-detect.
+    #[arg(
+        long,
+        value_name = "MODE",
+        num_args = 0..=1,
+        default_missing_value = "auto",
+    )]
+    pub caelestia: Option<String>,
+
+    /// Apply end-4/dots-hyprland (minimal|medium|full|rollback). Auto-yes — no prompts.
+    #[arg(
+        long = "end4",
+        value_name = "TIER",
+        num_args = 0..=1,
+        default_missing_value = "medium",
+    )]
+    pub end4: Option<String>,
+
     /// Print the plan without making any changes.
     #[arg(long)]
     pub dry_run: bool,
@@ -70,6 +102,16 @@ pub fn run(a: Args) -> Result<()> {
         return profile_sub(a.rest, a.yall, a.dry_run);
     }
 
+    // Special: `--caelestia=rollback` — no Stage A, just undo the HyDE overlay.
+    if a.caelestia.as_deref() == Some("rollback") {
+        return rollback_caelestia_hyde(a.dry_run);
+    }
+
+    // Special: `--end4=rollback` — no Stage A, just uninstall upstream.
+    if a.end4.as_deref() == Some("rollback") {
+        return rollback_end4(a.dry_run);
+    }
+
     ui::header("8sync setup");
     let env = env_detect::Env::detect()?;
     if !env.is_cachyos_or_arch() {
@@ -78,21 +120,45 @@ pub fn run(a: Args) -> Result<()> {
         ));
     }
     if env_detect::is_hyde() {
-        ui::ok("HyDE detected — will skip kitty/theme/wallpaper (HyDE manages them)");
+        ui::ok("HyDE detected — `--caelestia` (auto) will use the additive overlay path");
     }
 
     // ── Stage A: Harness (always run) ────────────────────────────
     ui::step("Stage A — coding harness");
     if a.dry_run {
-        ui::info("would install: helix lazygit abduco github-cli");
+        ui::info("would install: github-cli");
         ui::info("would install omp (curl) if missing");
         ui::info("would write: configs + skills");
     } else {
-        let core = ["helix", "lazygit", "abduco", "github-cli"];
+        let core = ["github-cli"];
         pkg::pacman_install_safe(&core, true)?;
         install_omp()?;
         install_configs(&env)?;
         install_skills(&env)?;
+    }
+
+    // ── Caelestia shortcut (resolves to a profile name, applied yall-style) ──
+    if let Some(mode) = a.caelestia.as_deref() {
+        let chosen = match mode {
+            "auto"  => if env_detect::is_hyde() { "caelestia-hyde" } else { "caelestia" },
+            "hyde"  => "caelestia-hyde",
+            "fresh" => "caelestia",
+            other   => bail!("--caelestia accepts: auto|fresh|hyde|rollback (got `{}`)", other),
+        };
+        ui::step(&format!("Stage B — --caelestia={} → profile `{}`", mode, chosen));
+        let all = profile::load_all()?;
+        let resolved = profile::resolve(chosen, &all)?;
+        profile::apply(&resolved, true, a.dry_run)?;
+        if !a.dry_run { profile::mark_applied(chosen)?; }
+        finish_msg();
+        return Ok(());
+    }
+
+    // ── end-4/dots-hyprland shortcut ─────────────────────────────
+    if let Some(tier) = a.end4.as_deref() {
+        run_end4(tier, a.dry_run)?;
+        finish_msg();
+        return Ok(());
     }
 
     // ── Stage B: Profiles (optional) ─────────────────────────────
@@ -117,7 +183,6 @@ pub fn run(a: Args) -> Result<()> {
     // --yall: apply all non-bundle profiles
     if a.yall {
         ui::step("Stage B — --yall: applying ALL profiles");
-        // Apply alexdev bundle if present (covers everything), else apply each
         let name = if all.contains_key("alexdev") { "alexdev" } else {
             ui::warn("no `alexdev` bundle — applying every profile individually");
             for (n, _) in &all {
@@ -168,7 +233,7 @@ pub fn run(a: Args) -> Result<()> {
 fn finish_msg() {
     ui::header("Done — next steps");
     println!("  · 8sync doctor               — verify");
-    println!("  · cd <project> && 8sync .    — start a session");
+    println!("  · cd <project> && 8sync .    — seed agents/ + start omp --continue");
 }
 
 fn install_omp() -> Result<()> {
@@ -183,17 +248,10 @@ fn install_omp() -> Result<()> {
 }
 
 fn install_configs(env: &env_detect::Env) -> Result<()> {
-    ui::step("Configs (helix + 8sync session/global)");
-    // Only safe, non-HyDE-conflicting configs:
-    //   • helix config + theme  (only written if user doesn't have one)
-    //   • kitty/8sync.session   (separate file, NOT kitty.conf)
-    //   • 8sync/global.toml + skills.toml
+    ui::step("Configs (8sync/{global,skills}.toml)");
     let pairs = [
-        ("configs/helix-config.toml",      env.xdg_config.join("helix/config.toml")),
-        ("configs/helix-glass_black.toml", env.xdg_config.join("helix/themes/glass_black.toml")),
-        ("configs/kitty.session",          env.xdg_config.join("kitty/8sync.session")),
-        ("configs/global.toml",            env.xdg_config.join("8sync/global.toml")),
-        ("configs/skills.toml",            env.xdg_config.join("8sync/skills.toml")),
+        ("configs/global.toml", env.xdg_config.join("8sync/global.toml")),
+        ("configs/skills.toml", env.xdg_config.join("8sync/skills.toml")),
     ];
     for (asset, target) in &pairs {
         let changed = assets::install(asset, target, false)?;
@@ -272,4 +330,127 @@ fn profile_sub(rest: Vec<String>, yall: bool, dry_run: bool) -> Result<()> {
             Ok(())
         }
     }
+}
+
+// ─── `--caelestia=rollback` ────────────────────────────────────
+
+fn rollback_caelestia_hyde(dry_run: bool) -> Result<()> {
+    ui::header("8sync setup --caelestia=rollback");
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
+    let conf = home.join(".config/hypr/userprefs.conf");
+
+    if !conf.exists() {
+        ui::info(&format!("{} not found — nothing to roll back", conf.display()));
+        return Ok(());
+    }
+
+    let sed_cmd = format!(
+        "sed -i '/# === CAELESTIA-SHELL-OVERRIDE ===/,/# === END-CAELESTIA-OVERRIDE ===/d' {}",
+        shell_quote(conf.to_str().unwrap_or(""))
+    );
+    let cmds = [
+        sed_cmd.as_str(),
+        "pkill -f 'qs -c caelestia' || true",
+        "command -v waybar >/dev/null && (setsid waybar >/dev/null 2>&1 &) || true",
+        "pgrep -x Hyprland >/dev/null && hyprctl reload >/dev/null || true",
+    ];
+    for c in &cmds {
+        if dry_run {
+            ui::info(&format!("would run: {}", c));
+        } else {
+            ui::info(&format!("$ {}", c));
+            let _ = std::process::Command::new("sh").arg("-c").arg(c).status();
+        }
+    }
+    ui::ok("caelestia-hyde overlay removed");
+    Ok(())
+}
+
+fn shell_quote(s: &str) -> String {
+    let mut out = String::from("'");
+    for c in s.chars() {
+        if c == '\'' { out.push_str(r"'\''"); } else { out.push(c); }
+    }
+    out.push('\'');
+    out
+}
+
+// ─── `--end4=<tier>` ────────────────────────────────────────────
+
+const END4_REPO: &str = "https://github.com/end-4/dots-hyprland.git";
+const END4_DIR_REL: &str = ".local/share/dots-hyprland";
+
+fn end4_flags(tier: &str) -> Result<&'static [&'static str]> {
+    // All tiers pass `-f` (no interactive confirm) + skip the greeting pause.
+    Ok(match tier {
+        // Bare Hyprland config, no widget shell, no fish/fonts/plasma/misc.
+        "minimal" => &["install", "-f", "--skip-allgreeting", "--core", "--skip-quickshell"],
+        // Hyprland + Quickshell widget shell; still skip fish/fonts/plasma/misc apps.
+        "medium"  => &["install", "-f", "--skip-allgreeting", "--core"],
+        // Everything upstream installs.
+        "full"    => &["install", "-f", "--skip-allgreeting"],
+        other     => bail!("--end4 accepts: minimal|medium|full|rollback (got `{}`)", other),
+    })
+}
+
+fn run_end4(tier: &str, dry_run: bool) -> Result<()> {
+    let args = end4_flags(tier)?;
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
+    let dir = home.join(END4_DIR_REL);
+
+    ui::step(&format!("end-4/dots-hyprland → tier `{}`", tier));
+    if dry_run {
+        if dir.exists() {
+            ui::info(&format!("would: git -C {} pull --ff-only", dir.display()));
+        } else {
+            ui::info(&format!("would: git clone {} {}", END4_REPO, dir.display()));
+        }
+        ui::info(&format!("would: cd {} && ./setup {}", dir.display(), args.join(" ")));
+        return Ok(());
+    }
+
+    if !which::which("git").is_ok() {
+        bail!("git missing — install it first (`sudo pacman -S git`)");
+    }
+
+    if dir.exists() {
+        ui::info(&format!("$ git -C {} pull --ff-only", dir.display()));
+        let _ = std::process::Command::new("git")
+            .args(["-C", dir.to_str().unwrap_or(""), "pull", "--ff-only"])
+            .status();
+    } else {
+        if let Some(parent) = dir.parent() { std::fs::create_dir_all(parent)?; }
+        pkg::run_loud("git", &["clone", END4_REPO, dir.to_str().unwrap_or("")])?;
+    }
+
+    ui::info(&format!("$ cd {} && ./setup {}", dir.display(), args.join(" ")));
+    let status = std::process::Command::new("./setup")
+        .args(args.iter().copied())
+        .current_dir(&dir)
+        .status()?;
+    if !status.success() {
+        bail!("end-4 setup exited with {}", status);
+    }
+    ui::ok(&format!("end-4/dots-hyprland `{}` applied", tier));
+    Ok(())
+}
+
+fn rollback_end4(dry_run: bool) -> Result<()> {
+    ui::header("8sync setup --end4=rollback");
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
+    let dir = home.join(END4_DIR_REL);
+
+    if !dir.exists() {
+        ui::info(&format!("{} not found — nothing to roll back", dir.display()));
+        return Ok(());
+    }
+    let cmd = format!("cd {} && ./setup uninstall -f", shell_quote(dir.to_str().unwrap_or("")));
+    if dry_run {
+        ui::info(&format!("would run: {}", cmd));
+    } else {
+        ui::info(&format!("$ {}", cmd));
+        let _ = std::process::Command::new("sh").arg("-c").arg(&cmd).status();
+    }
+    ui::ok("end-4 uninstall invoked");
+    Ok(())
 }

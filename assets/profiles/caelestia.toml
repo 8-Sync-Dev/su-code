@@ -1,0 +1,76 @@
+name = "caelestia"
+description = "Caelestia desktop on fresh CachyOS — Hyprland + Quickshell + SDDM + caelestia-shell (extends `nvidia`)"
+
+extends = ["nvidia"]
+
+[packages]
+pacman = [
+  # Wayland / Hyprland stack
+  "hyprland",
+  "xdg-desktop-portal-hyprland",
+  "qt5-wayland",
+  "qt6-wayland",
+  "polkit-gnome",
+  "pipewire",
+  "pipewire-pulse",
+  "pipewire-alsa",
+  "wireplumber",
+  "networkmanager",
+  "network-manager-applet",
+  "bluez",
+  "bluez-utils",
+  "blueman",
+  # Display + login manager
+  "sddm",
+  # Terminal + base apps
+  "kitty",
+  "firefox",
+  "thunar",
+  "thunar-archive-plugin",
+  "file-roller",
+  "btop",
+  "fastfetch",
+  "fish",
+  "starship",
+  # Wayland tools
+  "grim",
+  "slurp",
+  "wl-clipboard",
+  "cliphist",
+  "brightnessctl",
+  "pamixer",
+  "playerctl",
+  "pavucontrol",
+  "swww",
+  # Fonts
+  "ttf-jetbrains-mono-nerd",
+  "noto-fonts",
+  "noto-fonts-emoji",
+  "noto-fonts-cjk",
+]
+aur = [
+  "quickshell",
+  "cli11",
+  "aubio",
+  "ttf-material-symbols-variable-git",
+  "ttf-caskaydia-cove-nerd",
+  "caelestia-shell",
+]
+
+[requires]
+aur_helper = true
+
+[services]
+system_enable = ["sddm", "bluetooth", "NetworkManager"]
+user_enable = []
+
+[post_install]
+commands = [
+  # Clone caelestia-dots (idempotent).
+  """bash -c 'if [ ! -d "$HOME/.local/share/caelestia" ]; then \
+git clone https://github.com/caelestia-dots/caelestia.git "$HOME/.local/share/caelestia"; \
+else echo "[caelestia] dots already cloned — skip"; fi'""",
+  # Run the upstream installer (may prompt — let user respond).
+  """bash -c 'cd "$HOME/.local/share/caelestia" && ./install.sh'""",
+]
+hint = "Reboot → SDDM → chọn Hyprland session. Caelestia shell sẽ auto-launch. `nvidia-smi` để verify driver."

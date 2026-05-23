@@ -6,28 +6,19 @@ pub fn run() -> Result<()> {
     let env = env_detect::Env::detect()?;
 
     // OS / desktop stack
-    check("OS", &format!("{} (kitty TERM: {})", env.os_id, env.kitty));
+    check("OS", &env.os_id);
     if env_detect::is_hyde() {
         ui::ok("HyDE detected (Hyprland + wallbash theme engine)");
-    }
-    if env_detect::kitty_remote_on() {
-        ui::ok("kitty allow_remote_control: yes (3-pane layout available)");
-    } else {
-        ui::info("kitty allow_remote_control: no — `8sync .` will use soft 1-pane mode");
     }
 
     // AUR helper
     match env_detect::aur_helper() {
         Some(h) => ui::ok(&format!("AUR helper: {}", h)),
-        None    => ui::info("AUR helper: none (paru or yay needed for hardware-lianli/warp profiles)"),
+        None    => ui::info("AUR helper: none (paru or yay needed for AUR profiles: caelestia, hardware-lianli, warp, ...)"),
     }
 
     // Core harness
-    check_cmd("kitty",   &["--version"]);
-    check_cmd_any(&[("hx", &["--version"]), ("helix", &["--version"])], "helix");
     check_cmd("git",     &["--version"]);
-    check_cmd("abduco",  &["-v"]);
-    check_cmd("lazygit", &["--version"]);
     check_cmd("omp",     &["--version"]);
 
     // gh is REQUIRED for `8sync ship`
@@ -41,7 +32,6 @@ pub fn run() -> Result<()> {
 
     // Configs present?
     for path in [
-        env.xdg_config.join("helix/config.toml"),
         env.xdg_config.join("8sync/global.toml"),
         env.xdg_config.join("8sync/skills.toml"),
         env.home.join(".omp/skills/00-force-load.md"),
@@ -50,6 +40,14 @@ pub fn run() -> Result<()> {
             ui::ok(&format!("{}", path.display()));
         } else {
             ui::warn(&format!("missing: {}", path.display()));
+        }
+    }
+
+    // Caelestia overlay marker
+    let userprefs = env.home.join(".config/hypr/userprefs.conf");
+    if let Ok(c) = std::fs::read_to_string(&userprefs) {
+        if c.contains("CAELESTIA-SHELL-OVERRIDE") {
+            ui::ok("caelestia-hyde overlay: installed (remove via `8sync setup --caelestia=rollback`)");
         }
     }
 
@@ -76,14 +74,4 @@ fn check_cmd(name: &str, args: &[&str]) {
         Some(v) => ui::ok(&format!("{}: {}", name, v)),
         None => ui::warn(&format!("{}: missing", name)),
     }
-}
-
-fn check_cmd_any(candidates: &[(&str, &[&str])], label: &str) {
-    for (name, args) in candidates {
-        if let Some(v) = env_detect::cmd_version(name, args) {
-            ui::ok(&format!("{} ({}): {}", label, name, v));
-            return;
-        }
-    }
-    ui::warn(&format!("{}: missing", label));
 }
