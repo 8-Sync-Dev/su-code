@@ -113,9 +113,31 @@ pub fn aur_install_safe(helper: &str, pkgs: &[&str], noconfirm: bool) -> Result<
     ui::step(&format!("{} install: {}", helper, new_pkgs.join(" ")));
     let mut cmd = Command::new(helper);
     cmd.arg("-S").arg("--needed");
-    if noconfirm { cmd.arg("--noconfirm"); }
+    if noconfirm {
+        cmd.arg("--noconfirm");
+        // paru/yay still prompt for provider choice (e.g. "caelestia-shell vs
+        // caelestia-shell-git") and for PKGBUILD review. Suppress both.
+        cmd.arg("--skipreview");
+        cmd.arg("--mflags=--noconfirm");
+        // Pipe a stream of newlines to stdin so the provider-choice prompt
+        // accepts its default (1) without blocking. `yes ""` runs forever;
+        // paru only reads what it needs.
+        use std::process::Stdio;
+        cmd.stdin(Stdio::piped());
+        let mut child = cmd.spawn()?;
+        if let Some(stdin) = child.stdin.as_mut() {
+            use std::io::Write;
+            let _ = stdin.write_all(b"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+        }
+        let status = child.wait()?;
+        return aur_install_finish(helper, &new_pkgs, status, noconfirm);
+    }
     cmd.args(&new_pkgs);
     let status = cmd.status()?;
+    aur_install_finish(helper, &new_pkgs, status, noconfirm)
+}
+
+fn aur_install_finish(helper: &str, new_pkgs: &[&str], status: std::process::ExitStatus, noconfirm: bool) -> Result<()> {
 
     if !status.success() {
         let installed_now: Vec<&str> = new_pkgs.iter().copied()

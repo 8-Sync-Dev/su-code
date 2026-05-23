@@ -47,13 +47,13 @@ pacman = [
   "noto-fonts",
   "noto-fonts-emoji",
   "noto-fonts-cjk",
+  "ttf-cascadia-code-nerd",
 ]
 aur = [
   "quickshell",
   "cli11",
   "aubio",
   "ttf-material-symbols-variable-git",
-  "ttf-caskaydia-cove-nerd",
   "caelestia-shell",
 ]
 

@@ -2,14 +2,13 @@ name = "caelestia-hyde"
 description = "Caelestia shell on top of existing HyDE base — additive, rollback-able (does NOT install hyprland/sddm/driver)"
 
 [packages]
-pacman = []
+pacman = ["ttf-cascadia-code-nerd"]
 aur = [
   "caelestia-shell",
   "quickshell",
   "cli11",
   "aubio",
   "ttf-material-symbols-variable-git",
-  "ttf-caskaydia-cove-nerd",
 ]
 
 [requires]

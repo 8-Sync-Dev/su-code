@@ -139,6 +139,7 @@ pub fn run(a: Args) -> Result<()> {
         pkg::pacman_install_safe(&core, true)?;
         install_omp()?;
         install_codegraph()?;
+        install_aur_helper()?;
         install_configs(&env)?;
         install_skills(&env)?;
         register_codegraph_skill(&env)?;
@@ -258,6 +259,23 @@ fn install_omp() -> Result<()> {
     Ok(())
 }
 
+fn install_aur_helper() -> Result<()> {
+    ui::step("AUR helper (paru)");
+    if let Some(h) = env_detect::aur_helper() {
+        ui::skip(h, "present");
+        return Ok(());
+    }
+    // Bootstrap paru from source — no AUR helper exists yet, so we can't
+    // pacman/AUR-install it directly. Standard makepkg flow.
+    pkg::pacman_install_safe(&["git", "base-devel"], true)?;
+    let cmd = "cd /tmp && rm -rf paru-bootstrap && \
+        git clone https://aur.archlinux.org/paru.git paru-bootstrap && \
+        cd paru-bootstrap && makepkg -si --noconfirm && \
+        cd .. && rm -rf paru-bootstrap";
+    pkg::run_loud("sh", &["-c", cmd])?;
+    ui::ok("paru installed");
+    Ok(())
+}
 fn install_codegraph() -> Result<()> {
     ui::step("codegraph (semantic code index for omp / claude / cursor)");
     if which::which("codegraph").is_ok() {
