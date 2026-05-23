@@ -1,17 +1,19 @@
+// `8sync up` — update the 8sync binary from the latest GitHub Release.
+//
+// Decoupled from omp on purpose: omp self-updates via `omp update` (or its
+// own installer). Touching it here would silently change a runtime the user
+// is actively in the middle of a chat with. System pkgs (pacman/AUR) are
+// untouched too — user runs `paru -Syu` on their own schedule.
+
 use anyhow::Result;
-use crate::{pkg, ui, verbs::selfup};
+use crate::{ui, verbs::selfup};
 
 pub fn run() -> Result<()> {
     ui::header("8sync up");
-    // 1. Self-update 8sync binary first
-    let _ = selfup::run_self_update(false);
-    // 2. omp CLI: prefer its own self-update if available, else re-run installer.
-    if which::which("omp").is_ok() {
-        let st = std::process::Command::new("omp").arg("update").status();
-        if !matches!(st, Ok(s) if s.success()) {
-            let _ = pkg::run_loud("sh", &["-c", "curl -fsSL https://omp.sh/install | sh"]);
-        }
+    let updated = selfup::run_self_update(true)?;
+    if updated {
+        ui::info("done — re-run any 8sync command to pick up the new binary");
     }
-    ui::ok("up complete (system pkgs untouched — run `paru -Syu` manually if needed)");
+    ui::info("note: `8sync up` only updates 8sync. For omp run `omp update`; for system pkgs run `paru -Syu`.");
     Ok(())
 }

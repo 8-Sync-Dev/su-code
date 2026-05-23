@@ -1,33 +1,43 @@
 # 00 — Force Load Skills (managed by `8sync skill sync`)
 
-## ⛔ MANDATORY RULE — đọc trước mọi việc khác
+## 🔴 RULE #0 — CODEGRAPH FIRST, ALWAYS
 
-Trước khi bắt đầu **bất kỳ** task không tầm thường, bạn (AI) PHẢI đọc theo thứ tự:
+Before any other tool call in a session, run **`codegraph`** to answer codebase questions whenever the project has a `.codegraph/` directory (or one can be initialized). CodeGraph is a pre-indexed knowledge graph: ~35% cheaper, ~70% fewer tool calls than grep/find/Read for code exploration.
 
-1. **`~/.omp/skills/karpathy-guidelines/SKILL.md`** — kỷ luật suy nghĩ (always first, no exception).
-2. **`~/.omp/skills/8sync-cli/SKILL.md`** — bạn đang chạy trong 8sync harness, dùng đúng tool 8sync.
-3. **`~/.omp/skills/image-routing/SKILL.md`** — chọn đọc image hay text để tiết kiệm token.
+- **Default to `codegraph` queries** for: "how does X work", "where is X defined", "who calls X", "what depends on X", impact analysis, route → handler mapping (Django/Flask/FastAPI/Express/NestJS/Laravel/Rails/Spring/Gin/Axum/etc.).
+- **Initialize once per repo** with `cd <repo> && codegraph init -i` if `.codegraph/` is missing.
+- **Skill file**: `~/.omp/skills/codegraph/SKILL.md` (or `CLAUDE.md`) — read it.
+- Falling back to `rg`/`fd`/`Read` without checking codegraph first is a **violation** of this rule on any non-trivial exploration.
 
-Sau đó (nếu trong 1 project):
+## ⛔ MANDATORY READING ORDER — before any non-trivial task
 
-4. **`<repo>/AGENTS.md`** — guidance riêng project. Lưu ý block giữa `<!-- 8sync:skills:begin -->` …
-   `<!-- 8sync:skills:end -->` liệt kê **project-local skills** dưới `<repo>/agents/skills/<name>/`.
-   Đọc các skill local đó nếu task chạm vào lĩnh vực tương ứng.
-5. **`<repo>/agents/PROJECT.md`** + **`KNOWLEDGE.md`** + **`DECISIONS.md`** + **`PREFERENCES.md`** + **`STATE.md`** — memory tích lũy.
+Read these in order. No skipping, no skimming, no shortcuts.
 
-## Bảng tra cứu nhanh
+1. **`~/.omp/skills/codegraph/SKILL.md`** (or `CLAUDE.md`) — semantic code intelligence. Always-on.
+2. **`~/.omp/skills/karpathy-guidelines/SKILL.md`** — engineering discipline (read-before-write, test-before-refactor, small steps).
+3. **`~/.omp/skills/8sync-cli/SKILL.md`** — you're running inside the 8sync harness; prefer 8sync verbs over raw shell.
+4. **`~/.omp/skills/image-routing/SKILL.md`** — image vs text routing for cheap visual context.
 
-| Task type | Skills đọc theo thứ tự |
+If inside a project (cwd has `.git` / `Cargo.toml` / `package.json` / …):
+
+5. **`<repo>/AGENTS.md`** — project-specific guidance. Note the `<!-- 8sync:skills:begin -->` … `<!-- 8sync:skills:end -->` block listing project-local skills under `<repo>/agents/skills/<name>/`. Read those that match the task.
+6. **`<repo>/agents/{PROJECT,KNOWLEDGE,DECISIONS,PREFERENCES,STATE}.md`** — accumulated project memory.
+
+## Fast lookup table
+
+| Task type | Order to read |
 |---|---|
-| Mọi task coding | karpathy → **8sync-cli** → image-routing → project-local skills |
-| Review UI / PDF / diff | karpathy → **image-routing** trước khi fetch |
-| Trong project 8sync | tất cả + `agents/*.md` + `agents/skills/*/` |
-| Câu hỏi đơn giản (1 câu) | karpathy (vẫn bắt buộc) |
+| ANY code exploration (how does X work? where is X?) | **codegraph → karpathy → 8sync-cli → project-local** |
+| Refactor / impact analysis | **codegraph (callers/callees) → karpathy → project-local** |
+| Review UI / PDF / diff | karpathy → **image-routing** before fetching |
+| Inside an 8sync repo | all 4 globals + `agents/*.md` + `agents/skills/*/` |
+| Simple one-liner question | codegraph if codebase-related, else karpathy |
 
-## Quy tắc bất biến
+## Invariants (no exceptions)
 
-- **Không skip karpathy.** Nếu không chắc skill nào áp dụng → vẫn đọc karpathy trước.
-- **Không skip 8sync-cli** khi `AGENTS.md` của project đề cập 8sync.
-- **Project-local skill** trong `agents/skills/<name>/` được AGENTS.md liệt kê — ưu tiên đọc trước khi đụng vùng tương ứng.
-- **Không dump output dài** vào context. Tóm tắt trước.
-- **Cite code dạng** `path:line` hoặc `path:start-end`. Không dùng natural language line ref.
+- **NEVER skip codegraph for code exploration.** It exists because grep wastes 3-10× tokens.
+- **NEVER skip karpathy.** Engineering discipline is non-negotiable.
+- **NEVER skip 8sync-cli** when AGENTS.md mentions 8sync — using raw shell instead of `8sync` verbs misses memory + skill auto-load.
+- **Project-local skill in `agents/skills/<name>/` matches the task description?** Read it BEFORE touching code.
+- **Cite code as `path:line` or `path:start-end`.** Never natural language ("around line 50").
+- **Never dump long tool output** into context. Summarize, then keep the artifact ID for retrieval.

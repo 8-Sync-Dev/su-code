@@ -128,13 +128,17 @@ pub fn run(a: Args) -> Result<()> {
     if a.dry_run {
         ui::info("would install: github-cli");
         ui::info("would install omp (curl) if missing");
+        ui::info("would install codegraph (curl) if missing");
         ui::info("would write: configs + skills");
+        ui::info("would register codegraph as a global+local skill");
     } else {
         let core = ["github-cli"];
         pkg::pacman_install_safe(&core, true)?;
         install_omp()?;
+        install_codegraph()?;
         install_configs(&env)?;
         install_skills(&env)?;
+        register_codegraph_skill(&env)?;
     }
 
     // ── Caelestia shortcut (resolves to a profile name, applied yall-style) ──
@@ -244,6 +248,65 @@ fn install_omp() -> Result<()> {
         return Ok(());
     }
     pkg::run_loud("sh", &["-c", "curl -fsSL https://omp.sh/install | sh"])?;
+    Ok(())
+}
+
+fn install_codegraph() -> Result<()> {
+    ui::step("codegraph (semantic code index for omp / claude / cursor)");
+    if which::which("codegraph").is_ok() {
+        let v = env_detect::cmd_version("codegraph", &["--version"]).unwrap_or_default();
+        ui::skip("codegraph", &format!("present ({})", v));
+        return Ok(());
+    }
+    pkg::run_loud(
+        "sh",
+        &["-c", "curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh"],
+    )?;
+    ensure_local_bin_on_path();
+    Ok(())
+}
+
+/// Ensure `~/.local/bin` is on PATH in ~/.zshrc and ~/.bashrc (idempotent).
+/// codegraph's installer drops its binary there; without PATH the AI cannot
+/// invoke it from new shells.
+fn ensure_local_bin_on_path() {
+    let Some(home) = dirs::home_dir() else { return; };
+    let local_bin = home.join(".local/bin");
+    let marker = "# 8sync: ensure ~/.local/bin on PATH (for codegraph + 8sync)";
+    let snippet = format!(
+        "\n{marker}\ncase \":$PATH:\" in *\":{lb}:\"*) ;; *) export PATH=\"{lb}:$PATH\" ;; esac\n",
+        lb = local_bin.display(),
+    );
+    for rc in [home.join(".zshrc"), home.join(".bashrc")] {
+        if !rc.exists() { continue; }
+        let existing = std::fs::read_to_string(&rc).unwrap_or_default();
+        if existing.contains(marker) { continue; }
+        if let Err(e) = std::fs::OpenOptions::new().append(true).open(&rc)
+            .and_then(|mut f| { use std::io::Write; f.write_all(snippet.as_bytes()) })
+        {
+            ui::warn(&format!("could not patch {}: {}", rc.display(), e));
+            continue;
+        }
+        ui::ok(&format!("patched {} (added ~/.local/bin to PATH)", rc.display()));
+    }
+}
+
+/// Register codegraph as a skill (global ~/.omp/skills/codegraph/ + project local).
+/// Synthesizes SKILL.md with proper YAML frontmatter from upstream README, so
+/// AI auto-discovery (Agent Skills open standard) works.
+fn register_codegraph_skill(env: &env_detect::Env) -> Result<()> {
+    ui::step("Register codegraph skill (force-load)");
+    let skills_toml = env.xdg_config.join("8sync/skills.toml");
+    // Reuse the same code path as `8sync skill add gh:colbymchenry/codegraph`
+    // so we get the README-as-skill synthesis (proper SKILL.md frontmatter)
+    // and skills.toml registration in one shot.
+    if let Err(e) = crate::verbs::skill::add_spec(
+        env,
+        &skills_toml,
+        "gh:colbymchenry/codegraph",
+    ) {
+        ui::warn(&format!("could not auto-register codegraph: {} (skill will still work but missing frontmatter)", e));
+    }
     Ok(())
 }
 

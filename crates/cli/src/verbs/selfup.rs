@@ -1,15 +1,17 @@
-// Self-update: pull latest source from GitHub, rebuild, install to ~/.local/bin
+// Self-update: pull the prebuilt binary from the latest GitHub Release.
 // Also exposes a rate-limited auto-check used from main() before dispatch.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{Duration, SystemTime};
 
 use crate::ui;
 
-const REPO_URL: &str = "https://github.com/8-Sync-Dev/su-code.git";
-const REPO_REF: &str = "main";
+const REPO_OWNER: &str = "8-Sync-Dev";
+const REPO_NAME: &str = "su-code";
+const ASSET_SUFFIX: &str = "-linux-x86_64"; // architecture suffix for the release asset
+const ASSET_PREFIX: &str = "8sync-";
 const CHECK_INTERVAL: Duration = Duration::from_secs(6 * 3600); // 6h
 
 fn cache_dir() -> PathBuf {
@@ -19,10 +21,9 @@ fn cache_dir() -> PathBuf {
 }
 
 fn last_check_file() -> PathBuf { cache_dir().join("last_check") }
-fn remote_commit_file() -> PathBuf { cache_dir().join("remote_commit") }
-fn src_dir() -> PathBuf { cache_dir().join("src") }
+fn last_seen_tag_file() -> PathBuf { cache_dir().join("last_seen_tag") }
 
-fn build_commit() -> &'static str { env!("GIT_COMMIT_HASH") }
+fn build_version() -> &'static str { env!("CARGO_PKG_VERSION") }
 
 fn should_check() -> bool {
     let p = last_check_file();
@@ -39,85 +40,93 @@ fn touch_check() {
     let _ = std::fs::write(last_check_file(), "");
 }
 
-fn fetch_remote_commit() -> Option<String> {
-    // Short timeout so it never blocks. `timeout 3 git ls-remote ...`
-    let out = Command::new("timeout")
-        .args(["3", "git", "ls-remote", REPO_URL, REPO_REF])
+/// Strip leading `v` from a release tag so it can be compared to CARGO_PKG_VERSION.
+fn strip_v(s: &str) -> &str { s.strip_prefix('v').unwrap_or(s) }
+
+/// Query GitHub for the latest release. Returns `(tag_name, asset_browser_download_url)`.
+/// Short timeout so it never blocks. Silent on offline / no-curl.
+fn fetch_latest_release() -> Option<(String, String)> {
+    if which::which("curl").is_err() { return None; }
+    let url = format!(
+        "https://api.github.com/repos/{}/{}/releases/latest",
+        REPO_OWNER, REPO_NAME
+    );
+    let out = Command::new("curl")
+        .args([
+            "-fsSL",
+            "--max-time", "5",
+            "-H", "Accept: application/vnd.github+json",
+            "-H", "User-Agent: 8sync-selfup",
+            &url,
+        ])
         .output()
         .ok()?;
     if !out.status.success() { return None; }
-    let s = String::from_utf8_lossy(&out.stdout);
-    s.split_whitespace().next().map(|s| s.to_string())
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+    let tag = v.get("tag_name")?.as_str()?.to_string();
+    let assets = v.get("assets")?.as_array()?;
+    let want_name = format!("{}{}{}", ASSET_PREFIX, tag, ASSET_SUFFIX);
+    for a in assets {
+        let name = a.get("name").and_then(|n| n.as_str()).unwrap_or("");
+        if name == want_name {
+            let dl = a.get("browser_download_url").and_then(|u| u.as_str())?;
+            return Some((tag, dl.to_string()));
+        }
+    }
+    None
 }
 
-/// Cheap auto-check called from main(). Prints a 1-line notice if newer
-/// upstream commit exists. Never blocks for long (3s timeout via `timeout`).
-/// Silently fails for offline/no-git users.
+/// Cheap auto-check called from main(). Prints a 1-line notice if a newer
+/// release exists. Never blocks for long (5s timeout). Silent on offline.
 pub fn auto_check_notice() {
     if std::env::var("SUSYNC_NO_AUTO_CHECK").is_ok() { return; }
     if !should_check() { return; }
     touch_check();
-    let local = build_commit();
-    if local.is_empty() { return; }
-    let Some(remote) = fetch_remote_commit() else { return; };
-    if remote.starts_with(local) || local.starts_with(&remote) { return; }
-    let _ = std::fs::write(remote_commit_file(), &remote);
+    let local = build_version();
+    let Some((tag, _url)) = fetch_latest_release() else { return; };
+    let remote = strip_v(&tag);
+    if remote == local { return; }
+    let _ = std::fs::write(last_seen_tag_file(), &tag);
     eprintln!(
-        "\x1b[33m! 8sync update available: {} → {} — run `8sync up` to install\x1b[0m",
-        &local[..local.len().min(7)],
-        &remote[..remote.len().min(7)]
+        "\x1b[33m! 8sync update available: v{} → {} — run `8sync up` to install\x1b[0m",
+        local, tag
     );
 }
 
-/// Force self-update: git clone/pull, cargo build --release, install binary.
+/// Force self-update: download the latest release asset and install it.
+/// Returns Ok(true) when a new binary was written, Ok(false) when already up-to-date.
 pub fn run_self_update(force: bool) -> Result<bool> {
-    ui::step("Self-update (8sync binary from GitHub)");
-    let local = build_commit();
-    let remote = fetch_remote_commit().unwrap_or_default();
-    if !force && !local.is_empty() && !remote.is_empty()
-        && (remote.starts_with(local) || local.starts_with(&remote))
-    {
-        ui::skip("8sync", &format!("up to date ({})", &local[..7.min(local.len())]));
+    ui::step("Self-update — GitHub Releases");
+    let local = build_version();
+
+    let (tag, asset_url) = fetch_latest_release()
+        .ok_or_else(|| anyhow!("could not query latest release from github.com/{}/{}", REPO_OWNER, REPO_NAME))?;
+    let remote = strip_v(&tag);
+    if !force && remote == local {
+        ui::skip("8sync", &format!("up to date (v{})", local));
         return Ok(false);
     }
 
-    let dir = src_dir();
-    std::fs::create_dir_all(dir.parent().unwrap_or(&dir))?;
-    if dir.join(".git").exists() {
-        Command::new("git")
-            .args(["-C", dir.to_str().unwrap(), "fetch", "--depth=1", "origin", REPO_REF])
-            .status()?;
-        Command::new("git")
-            .args(["-C", dir.to_str().unwrap(), "reset", "--hard", &format!("origin/{}", REPO_REF)])
-            .status()?;
-    } else {
-        let _ = std::fs::remove_dir_all(&dir);
-        Command::new("git")
-            .args(["clone", "--depth=1", "--branch", REPO_REF, REPO_URL, dir.to_str().unwrap()])
-            .status()?;
-    }
-
-    // Build
-    let status = Command::new("cargo")
-        .args(["build", "--release"])
-        .current_dir(&dir)
-        .status()?;
-    if !status.success() {
-        return Err(anyhow!("cargo build failed in {}", dir.display()));
-    }
-
-    // Install
-    let bin_src = dir.join("target/release/8sync");
+    ui::info(&format!("local v{} → {} ({})", local, tag, asset_url));
     let bin_dst = dirs::home_dir()
         .ok_or_else(|| anyhow!("no home dir"))?
         .join(".local/bin/8sync");
     std::fs::create_dir_all(bin_dst.parent().unwrap())?;
-    std::fs::copy(&bin_src, &bin_dst)?;
-    use std::os::unix::fs::PermissionsExt;
-    let _ = std::fs::set_permissions(&bin_dst, std::fs::Permissions::from_mode(0o755));
-    if !remote.is_empty() {
-        let _ = std::fs::write(remote_commit_file(), &remote);
+
+    // Atomic-ish replace: download to a sibling temp file then rename.
+    let tmp = bin_dst.with_extension(format!("new.{}", std::process::id()));
+    let status = Command::new("curl")
+        .args(["-fsSL", "--max-time", "120", "-o", tmp.to_str().unwrap(), &asset_url])
+        .status()?;
+    if !status.success() {
+        let _ = std::fs::remove_file(&tmp);
+        bail!("download failed: {}", asset_url);
     }
-    ui::ok(&format!("installed → {}", bin_dst.display()));
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    std::fs::rename(&tmp, &bin_dst)?;
+
+    let _ = std::fs::write(last_seen_tag_file(), &tag);
+    ui::ok(&format!("installed {} → {}", tag, bin_dst.display()));
     Ok(true)
 }

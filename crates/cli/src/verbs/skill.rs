@@ -1,3 +1,9 @@
+// Public, programmatic entrypoint used from setup.rs to register codegraph
+// (and any other always-on skill) without going through the CLI.
+pub fn add_spec(env: &crate::env_detect::Env, toml_path: &std::path::Path, spec: &str) -> anyhow::Result<()> {
+    add_skill(env, toml_path, Some(spec))
+}
+
 use anyhow::{anyhow, Result};
 use clap::Args as ClapArgs;
 use std::path::{Path, PathBuf};
@@ -948,21 +954,38 @@ fn find_line(hay: &str, needle: &str) -> Option<usize> {
     None
 }
 
-/// Rewrite (or insert) the force-load block in `<root>/AGENTS.md`.
+/// Rewrite (or insert) the force-load block in **every** agent entry file at
+/// the project root: AGENTS.md, CLAUDE.md, GEMINI.md, .cursorrules, .windsurfrules.
+/// Each existing file gets the block injected. Each missing well-known file gets
+/// stub-created so future agents can't avoid the block.
 ///
-/// The block lists **both** global skills under `~/.omp/skills/` and project-local
-/// skills under `<root>/agents/skills/`, each annotated with the description
-/// extracted from its `SKILL.md` YAML frontmatter. The wording is intentionally
-/// strong ("MUST", "BEFORE any code touch") so the AI cannot reasonably skip.
+/// The block leads with explicit `READ NOW: <absolute SKILL.md path>` lines so
+/// agents that index headings see the exact files to open before anything else.
 pub fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
-    let agents = root.join("AGENTS.md");
-
     let global_dir = home.join(".omp/skills");
     let local_dir = root.join("agents/skills");
 
-    let globals = list_installed_skill_dirs(&global_dir).unwrap_or_default();
-    let locals = list_installed_skill_dirs(&local_dir).unwrap_or_default();
+    let mut globals = list_installed_skill_dirs(&global_dir).unwrap_or_default();
+    let mut locals = list_installed_skill_dirs(&local_dir).unwrap_or_default();
+    // Force-rank: codegraph is always first (rule #0 of force-load).
+    pin_skill_first(&mut globals, "codegraph");
+    pin_skill_first(&mut locals, "codegraph");
 
+    // --- 1. READ NOW header: explicit absolute paths agents must open right now.
+    let mut read_now = String::new();
+    read_now.push_str("**READ NOW (in order). Do NOT skip. Open each file BEFORE the first tool call:**\n\n");
+    let mut idx = 1usize;
+    for p in globals.iter().chain(locals.iter()) {
+        let (_, entry) = meta_for_dir(p);
+        let file = p.join(entry);
+        read_now.push_str(&format!("  {}. `{}`\n", idx, file.display()));
+        idx += 1;
+    }
+    if idx == 1 {
+        read_now.push_str("  _(no skills installed yet — run `8sync skill sync`)_\n");
+    }
+
+    // --- 2. Annotated list with descriptions (for humans + indexing agents).
     let mut g_lines = String::new();
     if globals.is_empty() {
         g_lines.push_str("- _(none — run `8sync skill sync` after `8sync setup`)_\n");
@@ -973,11 +996,7 @@ pub fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
             let dirname = p.file_name().and_then(|s| s.to_str()).unwrap_or("?");
             g_lines.push_str(&format!(
                 "{}. **`{}`** — `~/.omp/skills/{}/{}`\n     _{}_\n",
-                i + 1,
-                m.name,
-                dirname,
-                entry,
-                desc,
+                i + 1, m.name, dirname, entry, desc,
             ));
         }
     }
@@ -992,11 +1011,7 @@ pub fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
             let dirname = p.file_name().and_then(|s| s.to_str()).unwrap_or("?");
             l_lines.push_str(&format!(
                 "{}. **`{}`** — `agents/skills/{}/{}`\n     _{}_\n",
-                i + 1,
-                m.name,
-                dirname,
-                entry,
-                desc,
+                i + 1, m.name, dirname, entry, desc,
             ));
         }
     }
@@ -1007,7 +1022,8 @@ pub fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
 \n\
 Bạn (AI) **PHẢI** đọc đầy đủ các skill liệt kê dưới đây **trước dòng code đầu tiên** trong session này. Không skip, không suy đoán, không viết tắt.\n\
 \n\
-Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview): `SKILL.md` ở root có YAML frontmatter (`name`, `description`). Description đã liệt kê dưới — nó cho biết **khi nào** dùng skill.\n\
+{read_now}\n\
+Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview): `SKILL.md` ở root có YAML frontmatter (`name`, `description`). Description cho biết **khi nào** dùng skill.\n\
 \n\
 ### Global skills (always-on — `~/.omp/skills/`)\n\
 {g_lines}\n\
@@ -1015,42 +1031,92 @@ Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.c
 {l_lines}\n\
 ### Quy tắc bất biến\n\
 \n\
-- Đọc tất cả `SKILL.md` ở 2 list trên **TRƯỚC** khi gọi tool đầu tiên.\n\
+- Đọc TẤT CẢ `SKILL.md` / `CLAUDE.md` ở 2 list trên **TRƯỚC** khi gọi tool đầu tiên.\n\
+- **Codegraph FIRST** cho mọi câu hỏi explore code: `codegraph` thay vì grep/find/Read.\n\
 - Nếu skill có thư mục `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.\n\
 - Nếu skill có `references/` → đọc on-demand khi task chạm vào chủ đề tương ứng.\n\
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.\n\
-- Nếu một skill local có vẻ liên quan đến task hiện tại (theo description), bạn **MUST** đọc nó trước khi sửa code — không được \"chắc là không cần\".\n\
+- Nếu một skill local có vẻ liên quan đến task hiện tại (theo description), bạn **MUST** đọc nó trước khi sửa code.\n\
 {END}"
     );
 
-    let existing = std::fs::read_to_string(&agents).unwrap_or_default();
+    // --- 3. Inject into every known agent entry file.
+    //   *.md       → markdown skeleton with H1 + block after it (uses sentinel rewrite)
+    //   .cursorrules / .windsurfrules → plain-text rule files; the sentinel HTML
+    //     comments are tolerated as inert text by Cursor/Windsurf
+    let targets: &[(&str, EntryKind)] = &[
+        ("AGENTS.md",       EntryKind::Markdown { h1: "AGENTS.md — guidance for AI" }),
+        ("CLAUDE.md",       EntryKind::Markdown { h1: "CLAUDE.md — guidance for Claude Code" }),
+        ("GEMINI.md",       EntryKind::Markdown { h1: "GEMINI.md — guidance for Gemini" }),
+        (".cursorrules",    EntryKind::Plain),
+        (".windsurfrules",  EntryKind::Plain),
+    ];
 
-    // Match sentinels only when they appear as a standalone line (start of file
-    // or preceded by '\n'). Inline mentions of the sentinel strings inside prose
-    // — e.g. documentation describing this very feature — must not trigger a
-    // mid-paragraph rewrite.
-    let new_contents = if let (Some(b), Some(e)) = (find_line(&existing, BEGIN), find_line(&existing, END)) {
+    let mut written = 0usize;
+    for (name, kind) in targets {
+        let path = root.join(name);
+        let existing = std::fs::read_to_string(&path).unwrap_or_default();
+        // Only stub-create AGENTS.md + CLAUDE.md by default — the others stay
+        // opt-in (created only if they already exist). This avoids polluting
+        // every repo with .cursorrules / GEMINI.md the user never asked for.
+        let stub_create = matches!(*name, "AGENTS.md" | "CLAUDE.md");
+        if existing.is_empty() && !stub_create { continue; }
+
+        let new_contents = match kind {
+            EntryKind::Markdown { h1 } => rewrite_md_with_block(&existing, &block, h1),
+            EntryKind::Plain => rewrite_plain_with_block(&existing, &block),
+        };
+        if new_contents != existing {
+            std::fs::write(&path, &new_contents)?;
+            ui::ok(&format!("injected force-load → {}", path.display()));
+            written += 1;
+        }
+    }
+
+    ui::info(&format!(
+        "force-load: {} global skills, {} local skills, written into {} file(s)",
+        globals.len(), locals.len(), written,
+    ));
+    Ok(())
+}
+
+enum EntryKind {
+    Markdown { h1: &'static str },
+    Plain,
+}
+
+/// Markdown injection: replace existing sentinel block, or insert after the first
+/// H1, or create a minimal skeleton if the file is empty.
+fn rewrite_md_with_block(existing: &str, block: &str, h1_title: &str) -> String {
+    if let (Some(b), Some(e)) = (find_line(existing, BEGIN), find_line(existing, END)) {
         if b < e {
             let mut s = String::with_capacity(existing.len() + block.len());
             s.push_str(&existing[..b]);
-            s.push_str(&block);
+            s.push_str(block);
             s.push_str(&existing[e + END.len()..]);
-            s
-        } else {
-            insert_block_after_h1(&existing, &block)
+            return s;
         }
-    } else {
-        insert_block_after_h1(&existing, &block)
-    };
+    }
+    if existing.is_empty() {
+        return format!("# {h1_title}\n\n{block}\n");
+    }
+    insert_block_after_h1(existing, block)
+}
 
-    std::fs::write(&agents, new_contents)?;
-    ui::ok(&format!(
-        "injected force-load block into {} ({} global, {} local)",
-        agents.display(),
-        globals.len(),
-        locals.len(),
-    ));
-    Ok(())
+/// Plain-text injection (.cursorrules / .windsurfrules): replace existing
+/// sentinel block, or prepend the block at the top of the file.
+fn rewrite_plain_with_block(existing: &str, block: &str) -> String {
+    if let (Some(b), Some(e)) = (find_line(existing, BEGIN), find_line(existing, END)) {
+        if b < e {
+            let mut s = String::with_capacity(existing.len() + block.len());
+            s.push_str(&existing[..b]);
+            s.push_str(block);
+            s.push_str(&existing[e + END.len()..]);
+            return s;
+        }
+    }
+    let sep = if existing.is_empty() { "" } else { "\n\n" };
+    format!("{block}{sep}{existing}")
 }
 
 fn insert_block_after_h1(existing: &str, block: &str) -> String {
@@ -1083,4 +1149,18 @@ fn insert_block_after_h1(existing: &str, block: &str) -> String {
         return s;
     }
     out
+}
+
+/// Reorder `dirs` so the directory whose basename equals `name` is first.
+/// Used to force codegraph (and any future always-on skill) to the top of
+/// the AGENTS.md force-load list — agents read top-down, so position == priority.
+fn pin_skill_first(dirs: &mut Vec<PathBuf>, name: &str) {
+    if let Some(idx) = dirs.iter().position(|p| {
+        p.file_name().and_then(|s| s.to_str()) == Some(name)
+    }) {
+        if idx != 0 {
+            let p = dirs.remove(idx);
+            dirs.insert(0, p);
+        }
+    }
 }
