@@ -565,6 +565,23 @@ fn apply_end4_overlay(dry_run: bool) -> Result<()> {
     }
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
     let conf = home.join(".config/hypr/userprefs.conf");
+    let bridge = home.join(".config/hypr/8sync-end4-bridge.conf");
+
+    // 1. Write the bridge keybinds asset (embedded). Skipped on dry-run.
+    if !dry_run {
+        if let Some(body) = crate::assets::read("configs/end4-bridge-keybinds.conf") {
+            if let Some(parent) = bridge.parent() { let _ = std::fs::create_dir_all(parent); }
+            if let Err(e) = std::fs::write(&bridge, body) {
+                ui::warn(&format!("could not write {}: {}", bridge.display(), e));
+            } else {
+                ui::ok(&format!("wrote {}", bridge.display()));
+            }
+        } else {
+            ui::warn("bridge keybinds asset missing from binary");
+        }
+    } else {
+        ui::info(&format!("would write: {}", bridge.display()));
+    }
 
     let cmds = [
         format!(
@@ -576,8 +593,9 @@ fn apply_end4_overlay(dry_run: bool) -> Result<()> {
             shell_quote(conf.to_str().unwrap_or(""))
         ),
         format!(
-            "printf '\\n# === END4-SHELL-OVERLAY ===\\n# Managed by `8sync setup --end4=overlay`. Re-run to refresh, or `8sync setup --end4=rollback-overlay` to remove.\\nexec-once = pkill -x waybar\\nexec-once = qs -c ii\\n# === END-END4-OVERLAY ===\\n' >> {}",
-            shell_quote(conf.to_str().unwrap_or(""))
+            "printf '\\n# === END4-SHELL-OVERLAY ===\\n# Managed by `8sync setup --end4=overlay`. Re-run to refresh, or `8sync setup --end4=rollback-overlay` to remove.\\nsource = {bridge}\\nexec-once = qs -c ii\\n# === END-END4-OVERLAY ===\\n' >> {conf}",
+            bridge = shell_quote(bridge.to_str().unwrap_or("")),
+            conf = shell_quote(conf.to_str().unwrap_or(""))
         ),
         "pgrep -x Hyprland >/dev/null && hyprctl reload >/dev/null || true".to_string(),
         // Stop HyDE's transient waybar service (otherwise systemd respawns it
@@ -595,7 +613,9 @@ fn apply_end4_overlay(dry_run: bool) -> Result<()> {
             let _ = std::process::Command::new("sh").arg("-c").arg(c).status();
         }
     }
-    ui::ok("end-4 overlay applied — Quickshell `ii` running over HyDE keybinds");
+    ui::ok("end-4 overlay applied — Quickshell `ii` running, bridge keybinds sourced");
+    ui::info("press Super+Shift+/ for the merged bridge keybind cheatsheet (Super+/ still shows HyDE's)");
+    ui::info("AI: Super+O → settings cog → set Gemini/OpenAI/Mistral API key (or export GOOGLE_AI_API_KEY / OPENAI_API_KEY / MISTRAL_API_KEY)");
     Ok(())
 }
 
@@ -613,6 +633,7 @@ fn rollback_end4_overlay(dry_run: bool) -> Result<()> {
             shell_quote(conf.to_str().unwrap_or(""))
         ),
         "pkill -f 'qs -c ii' || true".to_string(),
+        "rm -f $HOME/.config/hypr/8sync-end4-bridge.conf".to_string(),
         // Prefer restarting HyDE's transient service if it exists; fall back to
         // a plain waybar spawn (non-HyDE setups). Unmask waybar.service so HyDE
         // can spawn it again on next reboot.

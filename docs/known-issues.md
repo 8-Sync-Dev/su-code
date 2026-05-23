@@ -8,6 +8,7 @@ landed. **Read this before adding a new desktop-shell integration to `setup.rs`.
 | [KI-001](#ki-001) | v0.5.1 | v0.6.1 | `--end4` keybind destruction | 🔴 critical |
 | [KI-002](#ki-002) | v0.6.0 | v0.6.1 | HyDE waybar respawn (stop) | 🟡 medium |
 | [KI-003](#ki-003) | v0.6.0 | v0.6.2 | HyDE waybar respawn (reboot) | 🟡 medium |
+| [KI-004](#ki-004---end4overlay-ran-quickshell-with-no-usable-keybinds) | v0.6.2 | v0.6.3 | end-4 overlay had no usable keybinds | 🟡 medium |
 
 ---
 
@@ -129,3 +130,37 @@ verify each of these against a HyDE-base machine:
 | `~/.config/hypr/*.bak.<ts>` | created by upstream on overwrite | manual restore |
 | `~/.local/share/dots-hyprland/` | cloned by `--end4` | `--end4=rollback` |
 | `~/.local/share/caelestia/` | cloned by `--caelestia=fresh` | manual `rm -rf` |
+
+---
+
+## KI-004 — `--end4=overlay` ran Quickshell with no usable keybinds
+
+**Symptom**
+After `--end4=overlay`, end-4's bar/sidebars are visible but **nothing
+triggers them**. Super+/ still shows HyDE's keybind list. Super+O,
+Super+N, Super+Tab do nothing — end-4 sidebars never open.
+
+**Root cause**
+Because we pass `--skip-hyprland-entry` (rightly — see KI-001), end-4's
+`hyprland.lua` entry is never loaded. That Lua file is what registers
+the `quickshell:<name>` global dispatch binds (Super+O, Super+N, etc.).
+The shell process runs and renders, but Hyprland never knows which keys
+should call into it.
+
+**Fix** — `assets/configs/end4-bridge-keybinds.conf` + `apply_end4_overlay`
+- Ship a **curated bridge keybind file** containing only end-4 binds that
+  do NOT collide with HyDE's `keybindings.conf`:
+  - safe: `Super+O/N/M/Tab`, `Ctrl+Super+T/R`, `Ctrl+Super+Shift+D`,
+    `Super+Shift+X/C/N/B/M`, `Super+Alt+M`, `Super+Shift+Alt+T`.
+  - omitted (HyDE wins): `Super+A/B/J/K/G/V/Slash/Period`,
+    `Super+Shift+S/T/P/R`.
+- Asset is embedded in the binary via `rust-embed`; `apply_end4_overlay`
+  writes it to `~/.config/hypr/8sync-end4-bridge.conf` and the sentinel
+  block in `userprefs.conf` now ends with
+  `source = ~/.config/hypr/8sync-end4-bridge.conf` so Hyprland registers
+  them on `hyprctl reload`.
+- `Super+Shift+/` bound to `notify-send` summarising the bridge keys +
+  the AI auth instructions (the AI sidebar at Super+O reads
+  `GOOGLE_AI_API_KEY` / `OPENAI_API_KEY` / `MISTRAL_API_KEY` env vars or
+  in-sidebar settings).
+- Rollback (`--end4=rollback-overlay`) removes the bridge file too.
