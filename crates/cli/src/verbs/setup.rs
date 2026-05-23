@@ -566,21 +566,46 @@ fn apply_end4_overlay(dry_run: bool) -> Result<()> {
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
     let conf = home.join(".config/hypr/userprefs.conf");
     let bridge = home.join(".config/hypr/8sync-end4-bridge.conf");
+    let glass = home.join(".config/hypr/8sync-end4-glass.conf");
+    let palette_init = home.join(".config/hypr/8sync-palette.conf");
+    let cycler_dir = home.join(".local/share/8sync");
+    let cycler = cycler_dir.join("8sync-palette-cycle.sh");
 
-    // 1. Write the bridge keybinds asset (embedded). Skipped on dry-run.
+    // 1. Write embedded assets (bridge keybinds + glass theme + palette cycler).
+    let assets_to_write: &[(&str, &std::path::Path, bool)] = &[
+        ("configs/end4-bridge-keybinds.conf", &bridge, false),
+        ("configs/end4-glass-theme.conf",     &glass,  false),
+        ("configs/8sync-palette-cycle.sh",    &cycler, true), // chmod +x
+    ];
     if !dry_run {
-        if let Some(body) = crate::assets::read("configs/end4-bridge-keybinds.conf") {
-            if let Some(parent) = bridge.parent() { let _ = std::fs::create_dir_all(parent); }
-            if let Err(e) = std::fs::write(&bridge, body) {
-                ui::warn(&format!("could not write {}: {}", bridge.display(), e));
-            } else {
-                ui::ok(&format!("wrote {}", bridge.display()));
+        let _ = std::fs::create_dir_all(&cycler_dir);
+        for (asset, target, executable) in assets_to_write {
+            let Some(body) = crate::assets::read(asset) else {
+                ui::warn(&format!("asset missing: {}", asset));
+                continue;
+            };
+            if let Some(parent) = target.parent() { let _ = std::fs::create_dir_all(parent); }
+            if let Err(e) = std::fs::write(target, &body) {
+                ui::warn(&format!("could not write {}: {}", target.display(), e));
+                continue;
             }
-        } else {
-            ui::warn("bridge keybinds asset missing from binary");
+            if *executable {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(target, std::fs::Permissions::from_mode(0o755));
+            }
+            ui::ok(&format!("wrote {}", target.display()));
         }
+        // Seed an initial palette file so the sourced `source = 8sync-palette.conf`
+        // line in glass theme has something to read. Idempotent (script reads
+        // existing index from ~/.config/hypr/.8sync-palette-index).
+        let _ = std::process::Command::new("sh").arg("-c")
+            .arg(format!("{} show", shell_quote(cycler.to_str().unwrap_or(""))))
+            .status();
+        let _ = palette_init; // initialized by the script above
     } else {
-        ui::info(&format!("would write: {}", bridge.display()));
+        for (_, target, _) in assets_to_write {
+            ui::info(&format!("would write: {}", target.display()));
+        }
     }
 
     let cmds = [
@@ -593,7 +618,8 @@ fn apply_end4_overlay(dry_run: bool) -> Result<()> {
             shell_quote(conf.to_str().unwrap_or(""))
         ),
         format!(
-            "printf '\\n# === END4-SHELL-OVERLAY ===\\n# Managed by `8sync setup --end4=overlay`. Re-run to refresh, or `8sync setup --end4=rollback-overlay` to remove.\\nsource = {bridge}\\nexec-once = qs -c ii\\n# === END-END4-OVERLAY ===\\n' >> {conf}",
+            "printf '\\n# === END4-SHELL-OVERLAY ===\\n# Managed by `8sync setup --end4=overlay`. Re-run to refresh, or `8sync setup --end4=rollback-overlay` to remove.\\nsource = {glass}\\nsource = {bridge}\\nexec-once = qs -c ii\\n# === END-END4-OVERLAY ===\\n' >> {conf}",
+            glass = shell_quote(glass.to_str().unwrap_or("")),
             bridge = shell_quote(bridge.to_str().unwrap_or("")),
             conf = shell_quote(conf.to_str().unwrap_or(""))
         ),
@@ -633,7 +659,8 @@ fn rollback_end4_overlay(dry_run: bool) -> Result<()> {
             shell_quote(conf.to_str().unwrap_or(""))
         ),
         "pkill -f 'qs -c ii' || true".to_string(),
-        "rm -f $HOME/.config/hypr/8sync-end4-bridge.conf".to_string(),
+        "rm -f $HOME/.config/hypr/8sync-end4-bridge.conf $HOME/.config/hypr/8sync-end4-glass.conf $HOME/.config/hypr/8sync-palette.conf $HOME/.config/hypr/.8sync-palette-index".to_string(),
+        "rm -f $HOME/.local/share/8sync/8sync-palette-cycle.sh".to_string(),
         // Prefer restarting HyDE's transient service if it exists; fall back to
         // a plain waybar spawn (non-HyDE setups). Unmask waybar.service so HyDE
         // can spawn it again on next reboot.
