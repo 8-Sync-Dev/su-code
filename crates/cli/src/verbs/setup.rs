@@ -99,6 +99,12 @@ pub struct Args {
     #[arg(long)]
     pub purge: bool,
 
+    /// Auto-reboot after install completes (10s countdown — Ctrl-C cancels).
+    /// Needed when a new kernel module landed (NVIDIA driver upgrade, etc.).
+    /// Otherwise a logout is enough to reach the new Hyprland session.
+    #[arg(long)]
+    pub reboot: bool,
+
     /// Print the plan without making any changes.
     #[arg(long)]
     pub dry_run: bool,
@@ -172,14 +178,14 @@ pub fn run(a: Args) -> Result<()> {
             other => bail!("--caelestia accepts: auto|fresh|coexist|rollback (got `{}`)", other),
         };
         let r = apply_caelestia(resolved_mode, a.dry_run);
-        finish_summary(&failures, log_path.as_ref());
+        finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return r;
     }
 
     // ── Stage B: Profiles (optional) ─────────────────────────────
     if a.no_profile {
         ui::info("--no-profile → skipping personal profiles");
-        finish_summary(&failures, log_path.as_ref());
+        finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return Ok(());
     }
 
@@ -196,7 +202,7 @@ pub fn run(a: Args) -> Result<()> {
             }
             Ok(())
         })?;
-        finish_summary(&failures, log_path.as_ref());
+        finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return Ok(());
     }
 
@@ -228,14 +234,14 @@ pub fn run(a: Args) -> Result<()> {
                 })?;
             }
         }
-        finish_summary(&failures, log_path.as_ref());
+        finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return Ok(());
     }
 
     // Interactive y/N per profile (skip bundle profiles)
     if !env_detect::has_tty() {
         ui::info("no TTY — skipping interactive profile prompt (use --full / --caelestia / --profile)");
-        finish_summary(&failures, log_path.as_ref());
+        finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return Ok(());
     }
 
@@ -267,7 +273,7 @@ pub fn run(a: Args) -> Result<()> {
         }
     }
 
-    finish_summary(&failures, log_path.as_ref());
+    finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
     Ok(())
 }
 
@@ -279,7 +285,8 @@ fn finish_msg() {
 
 /// Print final summary: log path (if any) + list of failures (if any).
 /// Always prints `finish_msg` next-steps at the end.
-fn finish_summary(failures: &[String], log_path: Option<&PathBuf>) {
+/// If `reboot=true` and no failures, triggers a 10s-cancellable reboot.
+fn finish_summary(failures: &[String], log_path: Option<&PathBuf>, reboot: bool, dry_run: bool) {
     if let Some(p) = log_path {
         ui::info(&format!("full log: {}", p.display()));
     }
@@ -295,6 +302,28 @@ fn finish_summary(failures: &[String], log_path: Option<&PathBuf>) {
     }
     ui::close_log_file();
     finish_msg();
+
+    if reboot && !dry_run {
+        if !failures.is_empty() {
+            ui::warn("--reboot requested but some steps failed — aborting reboot. Fix or re-run, then reboot manually.");
+            return;
+        }
+        do_reboot_with_countdown(10);
+    }
+}
+
+/// Print a `secs`-second countdown then `systemctl reboot`. Ctrl-C cancels.
+fn do_reboot_with_countdown(secs: u32) {
+    use std::io::Write;
+    println!();
+    ui::warn(&format!("rebooting in {}s — press Ctrl-C to cancel", secs));
+    for i in (1..=secs).rev() {
+        print!("\r  ⏱  {}s remaining... ", i);
+        std::io::stdout().flush().ok();
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+    println!("\r  ⏱  rebooting now              ");
+    let _ = Command::new("systemctl").arg("reboot").status();
 }
 
 // ─────────────────────────────────────────────────────────────────
