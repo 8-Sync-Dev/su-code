@@ -392,7 +392,10 @@ fn detect_caelestia_mode() -> CaelestiaMode {
     // A lone ~/.config/hypr is NOT enough (user may have tinkered manually then
     // wiped) — forcing coexist on that case would skip sddm.service enable and
     // drop the user at a TTY after reboot.
-    let has_dm = ["sddm", "gdm", "lightdm", "greetd"]
+    // `display-manager.service` is the canonical alias every DM symlinks to —
+    // it catches plasmalogin (CachyOS KDE), ly, entrance, and anything else
+    // we'd otherwise miss in the per-DM list.
+    let has_dm = ["display-manager", "sddm", "plasmalogin", "gdm", "lightdm", "greetd"]
         .iter()
         .any(|d| systemctl_is_enabled(d));
     let has_other_sessions = has_non_hyprland_session();
