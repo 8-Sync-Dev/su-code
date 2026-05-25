@@ -112,6 +112,18 @@ pub fn run(a: Args) -> Result<()> {
         ));
     }
 
+    // ── YOLO mode setup (--yall): logging + skip-on-error ────────
+    let yolo = a.yall;
+    let log_path = if yolo && !a.dry_run {
+        init_yall_log().ok()
+    } else {
+        None
+    };
+    if yolo {
+        preflight(&env);
+    }
+    let mut failures: Vec<String> = Vec::new();
+
     // ── Stage A: Harness (always run) ────────────────────────────
     ui::step("Stage A — coding harness");
     if a.dry_run {
@@ -122,14 +134,15 @@ pub fn run(a: Args) -> Result<()> {
         ui::info("would write: configs + skills");
         ui::info("would register codegraph as a global+local skill");
     } else {
-        let core = ["github-cli"];
-        pkg::pacman_install_safe(&core, true)?;
-        install_omp()?;
-        install_aur_helper()?;
-        install_codegraph()?;
-        install_configs(&env)?;
-        install_skills(&env)?;
-        register_codegraph_skill(&env)?;
+        try_step("github-cli", yolo, &mut failures, || {
+            pkg::pacman_install_safe(&["github-cli"], true)
+        })?;
+        try_step("omp",        yolo, &mut failures, install_omp)?;
+        try_step("paru",       yolo, &mut failures, install_aur_helper)?;
+        try_step("codegraph",  yolo, &mut failures, install_codegraph)?;
+        try_step("configs",    yolo, &mut failures, || install_configs(&env))?;
+        try_step("skills",     yolo, &mut failures, || install_skills(&env))?;
+        try_step("codegraph-skill", yolo, &mut failures, || register_codegraph_skill(&env))?;
     }
 
     // ── Caelestia shortcut ───────────────────────────────────────
@@ -140,13 +153,15 @@ pub fn run(a: Args) -> Result<()> {
             "coexist" => CaelestiaMode::Coexist,
             other => bail!("--caelestia accepts: auto|fresh|coexist|rollback (got `{}`)", other),
         };
-        return apply_caelestia(resolved_mode, a.dry_run);
+        let r = apply_caelestia(resolved_mode, a.dry_run);
+        finish_summary(&failures, log_path.as_ref());
+        return r;
     }
 
     // ── Stage B: Profiles (optional) ─────────────────────────────
     if a.no_profile {
         ui::info("--no-profile → skipping personal profiles");
-        finish_msg();
+        finish_summary(&failures, log_path.as_ref());
         return Ok(());
     }
 
@@ -155,47 +170,57 @@ pub fn run(a: Args) -> Result<()> {
     // explicit --profile <name>
     if let Some(name) = a.profile.as_ref() {
         ui::step(&format!("Stage B — applying profile `{}`", name));
-        let resolved = profile::resolve(name, &all)?;
-        profile::apply(&resolved, true, a.dry_run)?;
-        if !a.dry_run {
-            profile::mark_applied(name)?;
-        }
-        finish_msg();
+        try_step(&format!("profile:{}", name), yolo, &mut failures, || {
+            let resolved = profile::resolve(name, &all)?;
+            profile::apply(&resolved, true, a.dry_run)?;
+            if !a.dry_run {
+                profile::mark_applied(name)?;
+            }
+            Ok(())
+        })?;
+        finish_summary(&failures, log_path.as_ref());
         return Ok(());
     }
 
-    // --yall: apply alexdev bundle (or every individual profile if no bundle)
+    // --yall: apply alexdev bundle + auto-trigger --caelestia (full YOLO)
     if a.yall {
-        ui::step("Stage B — --yall: applying ALL profiles");
-        let name = if all.contains_key("alexdev") {
-            "alexdev"
-        } else {
-            ui::warn("no `alexdev` bundle — applying every profile individually");
-            for (n, _) in &all {
-                let res = profile::resolve(n, &all)?;
-                let _ = profile::apply(&res, true, a.dry_run);
+        let bundle = if all.contains_key("alexdev") { "alexdev" } else { "" };
+        if !bundle.is_empty() {
+            ui::step(&format!("Stage B — --yall: applying `{}` bundle", bundle));
+            try_step(&format!("profile:{}", bundle), yolo, &mut failures, || {
+                let resolved = profile::resolve(bundle, &all)?;
+                profile::apply(&resolved, true, a.dry_run)?;
                 if !a.dry_run {
-                    let _ = profile::mark_applied(n);
+                    profile::mark_applied(bundle)?;
                 }
+                Ok(())
+            })?;
+        } else {
+            ui::warn("no `alexdev` bundle — applying every non-bundle profile individually");
+            let mut names: Vec<&String> = all.keys().collect();
+            names.sort();
+            for n in &names {
+                let p = match all.get(*n) { Some(p) => p, None => continue };
+                if !p.extends.is_empty() { continue; } // skip bundles
+                try_step(&format!("profile:{}", n), yolo, &mut failures, || {
+                    let resolved = profile::resolve(n, &all)?;
+                    profile::apply(&resolved, true, a.dry_run)?;
+                    if !a.dry_run { profile::mark_applied(n)?; }
+                    Ok(())
+                })?;
             }
-            finish_msg();
-            return Ok(());
-        };
-        let resolved = profile::resolve(name, &all)?;
-        profile::apply(&resolved, true, a.dry_run)?;
-        if !a.dry_run {
-            profile::mark_applied(name)?;
         }
-        finish_msg();
+        finish_summary(&failures, log_path.as_ref());
         return Ok(());
     }
 
     // Interactive y/N per profile (skip bundle profiles)
     if !env_detect::has_tty() {
         ui::info("no TTY — skipping interactive profile prompt (use --yall or --profile)");
-        finish_msg();
+        finish_summary(&failures, log_path.as_ref());
         return Ok(());
     }
+
 
     ui::step("Stage B — personal profiles (y/N each)");
     let mut names: Vec<&String> = all.keys().collect();
@@ -224,7 +249,7 @@ pub fn run(a: Args) -> Result<()> {
         }
     }
 
-    finish_msg();
+    finish_summary(&failures, log_path.as_ref());
     Ok(())
 }
 
@@ -232,6 +257,26 @@ fn finish_msg() {
     ui::header("Done — next steps");
     println!("  · 8sync doctor               — verify");
     println!("  · cd <project> && 8sync .    — seed agents/ + start omp --continue");
+}
+
+/// Print final summary: log path (if any) + list of failures (if any).
+/// Always prints `finish_msg` next-steps at the end.
+fn finish_summary(failures: &[String], log_path: Option<&PathBuf>) {
+    if let Some(p) = log_path {
+        ui::info(&format!("full log: {}", p.display()));
+    }
+    if failures.is_empty() {
+        ui::ok("all steps succeeded (no failures recorded)");
+    } else {
+        ui::warn(&format!(
+            "{} step(s) failed but were skipped (--yall): {}",
+            failures.len(),
+            failures.join(", ")
+        ));
+        ui::info("re-run `8sync setup --yall` to retry — every step is idempotent");
+    }
+    ui::close_log_file();
+    finish_msg();
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -638,5 +683,116 @@ fn profile_sub(rest: Vec<String>, yall: bool, dry_run: bool) -> Result<()> {
             ));
             Ok(())
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// YOLO mode helpers (--yall)
+// ─────────────────────────────────────────────────────────────────
+
+/// Open `~/.cache/8sync/setup-<unix_ts>.log` and wire `ui::*` to tee into it.
+/// Idempotent across runs (timestamped filename).
+fn init_yall_log() -> Result<PathBuf> {
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let path = home.join(format!(".cache/8sync/setup-{}.log", ts));
+    let final_path = ui::set_log_file(path)?;
+    ui::ok(&format!("logging to {}", final_path.display()));
+    Ok(final_path)
+}
+
+/// Quick read-only probe of system state. Prints what's already installed so
+/// the install plan below is predictable. No side effects.
+fn preflight(env: &env_detect::Env) {
+    ui::step("Preflight — detecting current system state");
+
+    // OS + DM
+    ui::info(&format!("OS: {} ({})", env.os_id, if env.is_cachyos_or_arch() { "supported" } else { "best-effort" }));
+    let dm = ["display-manager", "sddm", "plasmalogin", "gdm", "lightdm", "greetd"]
+        .iter()
+        .find(|d| systemctl_is_enabled(d));
+    match dm {
+        Some(d) => ui::info(&format!("display manager: {}.service enabled", d)),
+        None => ui::info("display manager: none enabled (fresh install path)"),
+    }
+
+    // Wayland / X sessions
+    let sessions = enumerate_sessions();
+    if sessions.is_empty() {
+        ui::info("desktop sessions: none registered");
+    } else {
+        ui::info(&format!("desktop sessions: {}", sessions.join(", ")));
+    }
+
+    // Core tools
+    for (label, bin) in [
+        ("omp", "omp"),
+        ("paru", "paru"),
+        ("yay", "yay"),
+        ("codegraph", "codegraph"),
+        ("gh", "gh"),
+        ("hyprland", "Hyprland"),
+        ("quickshell", "qs"),
+        ("caelestia-shell", "caelestia-shell"),
+    ] {
+        let present = which::which(bin).is_ok();
+        if present {
+            let v = env_detect::cmd_version(bin, &["--version"]).unwrap_or_default();
+            ui::skip(label, if v.is_empty() { "present" } else { &v });
+        } else {
+            ui::info(&format!("{}: missing — will be installed", label));
+        }
+    }
+
+    // GPU
+    if let Ok(out) = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("lspci -nn 2>/dev/null | grep -iE 'vga|3d' | head -3")
+        .output()
+    {
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !s.is_empty() {
+            for line in s.lines() {
+                ui::info(&format!("gpu: {}", line.trim()));
+            }
+        }
+    }
+}
+
+fn enumerate_sessions() -> Vec<String> {
+    let mut out = Vec::new();
+    for dir in ["/usr/share/wayland-sessions", "/usr/share/xsessions"] {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for e in entries.flatten() {
+                if let Some(n) = e.file_name().to_str() {
+                    if let Some(stripped) = n.strip_suffix(".desktop") {
+                        out.push(stripped.to_string());
+                    }
+                }
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// In YOLO mode: log the error and continue. In strict mode: propagate.
+/// `failures` tracks step labels that errored, surfaced in the summary.
+fn try_step<F>(label: &str, yolo: bool, failures: &mut Vec<String>, f: F) -> Result<()>
+where
+    F: FnOnce() -> Result<()>,
+{
+    match f() {
+        Ok(()) => Ok(()),
+        Err(e) if yolo => {
+            ui::err(&format!("[{}] failed: {} — continuing (--yall)", label, e));
+            failures.push(label.to_string());
+            Ok(())
+        }
+        Err(e) => Err(e),
     }
 }
