@@ -1,9 +1,20 @@
 # CLAUDE.md — guidance for Claude Code
 
 <!-- 8sync:skills:begin -->
-## 🚨 MANDATORY — đọc TRƯỚC khi làm bất cứ task gì
+## 🚨 STEP 0 — `codegraph` FIRST (mandatory, no exception)
 
-Bạn (AI) **PHẢI** đọc đầy đủ các skill liệt kê dưới đây **trước dòng code đầu tiên** trong session này. Không skip, không suy đoán, không viết tắt.
+`codegraph` là **core tool** cho mọi câu hỏi liên quan đến code trong repo này. Bạn (AI) **PHẢI**:
+
+1. Chạy `codegraph index .` **1 lần** đầu session để build/refresh semantic index.
+2. Dùng `codegraph search "<query>"` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob`.
+3. Dùng `codegraph deps <file>` thay cho `Read` toàn file để hiểu dependency graph.
+4. Dùng `codegraph callers <symbol>` / `codegraph defs <symbol>` thay cho find-references thủ công.
+
+Lý do: ~35% rẻ hơn token, ~70% ít tool call hơn, 100% local. Dump cả file = đốt token vô ích.
+
+## 🚨 STEP 1 — đọc TẤT CẢ skill dưới TRƯỚC khi gọi tool đầu tiên
+
+Không skip, không suy đoán, không viết tắt. AGENTS.md chỉ là index — nội dung thực ở các `SKILL.md` được liệt kê.
 
 **READ NOW (in order). Do NOT skip. Open each file BEFORE the first tool call:**
 
@@ -11,10 +22,10 @@ Bạn (AI) **PHẢI** đọc đầy đủ các skill liệt kê dưới đây **
   2. `/home/alexdev/.omp/skills/8sync-cli/SKILL.md`
   3. `/home/alexdev/.omp/skills/image-routing/SKILL.md`
   4. `/home/alexdev/.omp/skills/karpathy-guidelines/SKILL.md`
-  5. `/home/alexdev/Projects/su-code/agents/skills/codegraph/SKILL.md`
-  6. `/home/alexdev/Projects/su-code/agents/skills/8sync-cli/SKILL.md`
-  7. `/home/alexdev/Projects/su-code/agents/skills/image-routing/SKILL.md`
-  8. `/home/alexdev/Projects/su-code/agents/skills/karpathy-guidelines/SKILL.md`
+  5. `/home/alexdev/Projects/tools-agentic-coding/su-code/agents/skills/codegraph/SKILL.md`
+  6. `/home/alexdev/Projects/tools-agentic-coding/su-code/agents/skills/8sync-cli/SKILL.md`
+  7. `/home/alexdev/Projects/tools-agentic-coding/su-code/agents/skills/image-routing/SKILL.md`
+  8. `/home/alexdev/Projects/tools-agentic-coding/su-code/agents/skills/karpathy-guidelines/SKILL.md`
 
 Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview): `SKILL.md` ở root có YAML frontmatter (`name`, `description`). Description cho biết **khi nào** dùng skill.
 
@@ -40,10 +51,10 @@ Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.c
 
 ### Quy tắc bất biến
 
-- Đọc TẤT CẢ `SKILL.md` / `CLAUDE.md` ở 2 list trên **TRƯỚC** khi gọi tool đầu tiên.
-- **Codegraph FIRST** cho mọi câu hỏi explore code: `codegraph` thay vì grep/find/Read.
-- Nếu skill có thư mục `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.
-- Nếu skill có `references/` → đọc on-demand khi task chạm vào chủ đề tương ứng.
+- **`codegraph` FIRST** cho mọi câu hỏi explore code (Step 0). Bypass = bug.
+- Đọc TẤT CẢ `SKILL.md` / `CLAUDE.md` ở 2 list trên TRƯỚC khi gọi tool đầu tiên.
+- Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.
+- Nếu skill có `references/` → đọc on-demand khi task chạm chủ đề.
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.
-- Nếu một skill local có vẻ liên quan đến task hiện tại (theo description), bạn **MUST** đọc nó trước khi sửa code.
+- Nếu skill local có description match task hiện tại, bạn **MUST** đọc nó trước khi sửa code.
 <!-- 8sync:skills:end -->

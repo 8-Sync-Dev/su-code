@@ -577,12 +577,14 @@ fn sync_skills(env: &env_detect::Env) -> Result<()> {
     //    get the built-ins installed globally.
     install_bundled_global(env)?;
 
-    // 3. If we're inside a project, mirror every global skill into
+    // 3. Ensure codegraph is installed AND has a synthesized SKILL.md. This
+    //    makes `sync` self-sufficient — running it on a fresh machine brings
+    //    every always-on skill into place without requiring `8sync setup`.
+    ensure_codegraph(env)?;
+
+    // 4. If we're inside a project, mirror every global skill into
     //    <root>/agents/skills/<name>/ so the project gets a committable,
-    //    vendored copy that AI loads via AGENTS.md. Mirroring strategy:
-    //      - If the global dir is a git clone: `git clone <origin>` locally
-    //        (kept as an independent clone, `git pull --ff-only` on re-sync).
-    //      - Otherwise (builtin / path:): plain recursive copy.
+    //    vendored copy that AI loads via AGENTS.md.
     if let Some(root) = detect_current_project_root() {
         let count = mirror_global_to_local(&env.home, &root)?;
         if count > 0 {
@@ -591,6 +593,43 @@ fn sync_skills(env: &env_detect::Env) -> Result<()> {
         inject_agents_md(&env.home, &root)?;
     } else {
         ui::info("not inside a project — skipped local agents/skills/ mirror");
+    }
+    Ok(())
+}
+
+/// Make sure the `codegraph` binary is installed (curl installer) and that
+/// `~/.omp/skills/codegraph/SKILL.md` exists with valid YAML frontmatter
+/// (synthesised from the upstream README via `8sync skill add gh:…`).
+fn ensure_codegraph(env: &env_detect::Env) -> Result<()> {
+    // Install binary if missing.
+    if which::which("codegraph").is_err() {
+        ui::step("codegraph (binary missing — running upstream curl installer)");
+        let url = "https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh";
+        let st = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("curl -fsSL {} | sh", url))
+            .status();
+        match st {
+            Ok(s) if s.success() => ui::ok("codegraph installed"),
+            Ok(s) => ui::warn(&format!("codegraph installer exited {} — skill registration will still proceed", s)),
+            Err(e) => ui::warn(&format!("could not run installer: {} — continuing", e)),
+        }
+    } else {
+        let v = env_detect::cmd_version("codegraph", &["--version"]).unwrap_or_default();
+        ui::skip("codegraph", &format!("present ({})", v));
+    }
+
+    // Register / refresh the SKILL.md (idempotent — `add_spec` re-fetches the
+    // README and rewrites SKILL.md if changed).
+    let skill_md = env.home.join(".omp/skills/codegraph/SKILL.md");
+    let needs_register = read_skill_meta(&skill_md).map(|m| m.is_none()).unwrap_or(true);
+    if needs_register {
+        ui::step("codegraph skill — synthesising SKILL.md from upstream README");
+        if let Err(e) = add_spec(env, &env.xdg_config.join("8sync/skills.toml"), "gh:colbymchenry/codegraph") {
+            ui::warn(&format!("could not register codegraph skill: {} (run `8sync skill add gh:colbymchenry/codegraph` manually)", e));
+        }
+    } else {
+        ui::skip("codegraph SKILL.md", "frontmatter valid");
     }
     Ok(())
 }
@@ -1016,11 +1055,32 @@ pub fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
         }
     }
 
+    // Detect if codegraph is installed locally (binary on PATH) so we can tune
+    // the STEP 0 hint between "run it" vs "install + run it".
+    let has_codegraph_bin = which::which("codegraph").is_ok();
+    let codegraph_install_hint: &str = if has_codegraph_bin {
+        ""
+    } else {
+        "> ⚠ `codegraph` binary chưa cài. Chạy `8sync skill sync` (auto curl installer) HOẶC `npx -y @colbymchenry/codegraph install` rồi quay lại đọc tiếp.\n\n"
+    };
+
     let block = format!(
         "{BEGIN}\n\
-## 🚨 MANDATORY — đọc TRƯỚC khi làm bất cứ task gì\n\
+## 🚨 STEP 0 — `codegraph` FIRST (mandatory, no exception)\n\
 \n\
-Bạn (AI) **PHẢI** đọc đầy đủ các skill liệt kê dưới đây **trước dòng code đầu tiên** trong session này. Không skip, không suy đoán, không viết tắt.\n\
+`codegraph` là **core tool** cho mọi câu hỏi liên quan đến code trong repo này. Bạn (AI) **PHẢI**:\n\
+\n\
+1. Chạy `codegraph index .` **1 lần** đầu session để build/refresh semantic index.\n\
+2. Dùng `codegraph search \"<query>\"` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob`.\n\
+3. Dùng `codegraph deps <file>` thay cho `Read` toàn file để hiểu dependency graph.\n\
+4. Dùng `codegraph callers <symbol>` / `codegraph defs <symbol>` thay cho find-references thủ công.\n\
+\n\
+Lý do: ~35% rẻ hơn token, ~70% ít tool call hơn, 100% local. Dump cả file = đốt token vô ích.\n\
+\n\
+{codegraph_install_hint}\
+## 🚨 STEP 1 — đọc TẤT CẢ skill dưới TRƯỚC khi gọi tool đầu tiên\n\
+\n\
+Không skip, không suy đoán, không viết tắt. AGENTS.md chỉ là index — nội dung thực ở các `SKILL.md` được liệt kê.\n\
 \n\
 {read_now}\n\
 Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview): `SKILL.md` ở root có YAML frontmatter (`name`, `description`). Description cho biết **khi nào** dùng skill.\n\
@@ -1031,25 +1091,35 @@ Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.c
 {l_lines}\n\
 ### Quy tắc bất biến\n\
 \n\
-- Đọc TẤT CẢ `SKILL.md` / `CLAUDE.md` ở 2 list trên **TRƯỚC** khi gọi tool đầu tiên.\n\
-- **Codegraph FIRST** cho mọi câu hỏi explore code: `codegraph` thay vì grep/find/Read.\n\
-- Nếu skill có thư mục `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.\n\
-- Nếu skill có `references/` → đọc on-demand khi task chạm vào chủ đề tương ứng.\n\
+- **`codegraph` FIRST** cho mọi câu hỏi explore code (Step 0). Bypass = bug.\n\
+- Đọc TẤT CẢ `SKILL.md` / `CLAUDE.md` ở 2 list trên TRƯỚC khi gọi tool đầu tiên.\n\
+- Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.\n\
+- Nếu skill có `references/` → đọc on-demand khi task chạm chủ đề.\n\
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.\n\
-- Nếu một skill local có vẻ liên quan đến task hiện tại (theo description), bạn **MUST** đọc nó trước khi sửa code.\n\
+- Nếu skill local có description match task hiện tại, bạn **MUST** đọc nó trước khi sửa code.\n\
 {END}"
     );
 
-    // --- 3. Inject into every known agent entry file.
-    //   *.md       → markdown skeleton with H1 + block after it (uses sentinel rewrite)
-    //   .cursorrules / .windsurfrules → plain-text rule files; the sentinel HTML
-    //     comments are tolerated as inert text by Cursor/Windsurf
+    // --- 3. Inject into every known agent entry file. Tools that read these
+    //     files at session start, by convention:
+    //       AGENTS.md                              — omp, generic agents (open standard)
+    //       CLAUDE.md                              — Claude Code
+    //       GEMINI.md                              — Gemini CLI
+    //       OPENCODE.md                            — opencode CLI (sst/opencode)
+    //       .github/copilot-instructions.md        — GitHub Copilot (per-repo rules)
+    //       .cursorrules                           — Cursor (legacy single-file)
+    //       .windsurfrules                         — Windsurf (Cascade)
+    //
+    //     Markdown: skeleton with H1 + block after it (sentinel rewrite).
+    //     Plain text: sentinel HTML comments are inert; Cursor/Windsurf parse text.
     let targets: &[(&str, EntryKind)] = &[
-        ("AGENTS.md",       EntryKind::Markdown { h1: "AGENTS.md — guidance for AI" }),
-        ("CLAUDE.md",       EntryKind::Markdown { h1: "CLAUDE.md — guidance for Claude Code" }),
-        ("GEMINI.md",       EntryKind::Markdown { h1: "GEMINI.md — guidance for Gemini" }),
-        (".cursorrules",    EntryKind::Plain),
-        (".windsurfrules",  EntryKind::Plain),
+        ("AGENTS.md",                       EntryKind::Markdown { h1: "AGENTS.md — guidance for AI" }),
+        ("CLAUDE.md",                       EntryKind::Markdown { h1: "CLAUDE.md — guidance for Claude Code" }),
+        ("GEMINI.md",                       EntryKind::Markdown { h1: "GEMINI.md — guidance for Gemini" }),
+        ("OPENCODE.md",                     EntryKind::Markdown { h1: "OPENCODE.md — guidance for opencode" }),
+        (".github/copilot-instructions.md", EntryKind::Markdown { h1: "GitHub Copilot instructions" }),
+        (".cursorrules",                    EntryKind::Plain),
+        (".windsurfrules",                  EntryKind::Plain),
     ];
 
     let mut written = 0usize;
@@ -1067,6 +1137,10 @@ Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.c
             EntryKind::Plain => rewrite_plain_with_block(&existing, &block),
         };
         if new_contents != existing {
+            // .github/copilot-instructions.md and friends live in subdirs.
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
             std::fs::write(&path, &new_contents)?;
             ui::ok(&format!("injected force-load → {}", path.display()));
             written += 1;
