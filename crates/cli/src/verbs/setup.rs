@@ -8,19 +8,23 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
 #[derive(ClapArgs, Debug)]
 #[command(
     after_help = indoc::indoc! {"
-        EXAMPLES
-          8sync setup                          install harness, then ask y/N for EACH personal profile
-          8sync setup --yall                   install harness + alexdev bundle (yes-to-all, no prompts)
-          8sync setup --no-profile             install harness only (skip the profile stage)
-          8sync setup --profile warp           install harness + apply just one profile non-interactively
-          8sync setup --dry-run                print the full plan without changing anything
+        EXAMPLES — strict mode (errors bail, no log)
+          8sync setup                          interactive y/N per personal profile
+          8sync setup --no-profile             harness only (skip profile stage)
+          8sync setup --dry-run                print the full plan, change nothing
 
-          8sync setup --caelestia              auto-detect fresh vs coexist, install Caelestia stack
-          8sync setup --caelestia=rollback     restore ~/.config/hypr from latest backup (optional --purge)
+        EXAMPLES — unattended mode (auto-yes, preflight, log file, skip-on-error)
+          8sync setup --caelestia              ONLY Caelestia: Hyprland + Quickshell + SDDM (auto fresh|coexist)
+          8sync setup --full                   ALL profiles: caelestia + vietnamese + hardware-* + displaylink + apps-personal + warp
+          8sync setup --profile warp           just one named profile
+          8sync setup --caelestia=rollback     restore ~/.config/hypr from backup (optional --purge to remove pkgs)
 
-          8sync setup profile list             list every available profile (✓ = applied)
-          8sync setup profile show alexdev     show resolved packages + services + post-install of a profile
-          8sync setup profile apply warp       idempotently (re-)apply one profile
+          (`--yall` and `--yes` / `-y` are kept as aliases of `--full` for muscle memory)
+
+        EXAMPLES — profile management
+          8sync setup profile list             every available profile (✓ = applied)
+          8sync setup profile show alexdev     resolved packages + services + post-install
+          8sync setup profile apply warp       (re-)apply one profile idempotently
 
         STAGE A — HARNESS (always run, idempotent)
           · pacman -S --needed github-cli       (gh — required by `8sync ship`)
@@ -39,6 +43,12 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
           nvidia            auto-detect driver (Blackwell→Turing: open-dkms; Maxwell/Pascal: dkms)
           caelestia         Hyprland + Quickshell + caelestia-shell + SDDM  (extends `nvidia`)
           alexdev           BUNDLE — caelestia + all personal profiles
+
+        UNATTENDED MODE BEHAVIOUR (auto-on when --caelestia / --full / --profile is given)
+          1. Preflight: print OS, display manager, registered sessions, tool presence, GPU
+          2. Log every step to ~/.cache/8sync/setup-<unix_ts>.log (UI level, timestamped)
+          3. On any step failure: log + track + CONTINUE (no bail) — re-run to retry
+          4. Auto-yes (--noconfirm) for every pacman / AUR install
 
         CAELESTIA MODES (auto-detected from system state)
           fresh    no display manager + no ~/.config/hypr → installs hyprland+sddm+caelestia,
@@ -61,9 +71,11 @@ pub struct Args {
     /// Arguments for the sub-command.
     pub rest: Vec<String>,
 
-    /// Yes-to-all: install every profile (or the `alexdev` bundle) with --noconfirm.
-    #[arg(long = "yall", alias = "yes", short = 'y')]
-    pub yall: bool,
+    /// Install EVERYTHING unattended (alexdev bundle = caelestia + all personal profiles).
+    /// Equivalent to applying the `alexdev` bundle. Aliases: `--yall`, `--yes`, `-y`.
+    /// Implies preflight + log + skip-on-error.
+    #[arg(long = "full", alias = "yall", alias = "yes", short = 'y')]
+    pub full: bool,
 
     /// Skip Stage B entirely (harness only — no profile prompts).
     #[arg(long)]
@@ -95,7 +107,7 @@ pub struct Args {
 pub fn run(a: Args) -> Result<()> {
     // Sub-command: `8sync setup profile <action>`
     if a.action.as_deref() == Some("profile") {
-        return profile_sub(a.rest, a.yall, a.dry_run);
+        return profile_sub(a.rest, a.full, a.dry_run);
     }
 
     // Special: `--caelestia=rollback` — restore backup, optionally purge pkgs.
@@ -112,10 +124,16 @@ pub fn run(a: Args) -> Result<()> {
         ));
     }
 
-    // ── YOLO mode setup (--yall): logging + skip-on-error ────────
-    let yolo = a.yall;
+    // ── YOLO mode setup: auto-on for any unattended path ─────────
+    // Triggers when user requests an unambiguous install path:
+    //   --full          → alexdev bundle
+    //   --caelestia     → caelestia profile only
+    //   --profile <n>   → just one profile
+    // Strict mode (default `8sync setup` with no flags) keeps existing
+    // behaviour: interactive prompts, errors bail, no log file.
+    let yolo = a.full || a.caelestia.is_some() || a.profile.is_some();
     let log_path = if yolo && !a.dry_run {
-        init_yall_log().ok()
+        init_yolo_log().ok()
     } else {
         None
     };
@@ -182,11 +200,11 @@ pub fn run(a: Args) -> Result<()> {
         return Ok(());
     }
 
-    // --yall: apply alexdev bundle + auto-trigger --caelestia (full YOLO)
-    if a.yall {
+    // --full: apply alexdev bundle (caelestia + all personal profiles)
+    if a.full {
         let bundle = if all.contains_key("alexdev") { "alexdev" } else { "" };
         if !bundle.is_empty() {
-            ui::step(&format!("Stage B — --yall: applying `{}` bundle", bundle));
+            ui::step(&format!("Stage B — --full: applying `{}` bundle", bundle));
             try_step(&format!("profile:{}", bundle), yolo, &mut failures, || {
                 let resolved = profile::resolve(bundle, &all)?;
                 profile::apply(&resolved, true, a.dry_run)?;
@@ -216,7 +234,7 @@ pub fn run(a: Args) -> Result<()> {
 
     // Interactive y/N per profile (skip bundle profiles)
     if !env_detect::has_tty() {
-        ui::info("no TTY — skipping interactive profile prompt (use --yall or --profile)");
+        ui::info("no TTY — skipping interactive profile prompt (use --full / --caelestia / --profile)");
         finish_summary(&failures, log_path.as_ref());
         return Ok(());
     }
@@ -269,11 +287,11 @@ fn finish_summary(failures: &[String], log_path: Option<&PathBuf>) {
         ui::ok("all steps succeeded (no failures recorded)");
     } else {
         ui::warn(&format!(
-            "{} step(s) failed but were skipped (--yall): {}",
+            "{} step(s) failed but were skipped (unattended mode): {}",
             failures.len(),
             failures.join(", ")
         ));
-        ui::info("re-run `8sync setup --yall` to retry — every step is idempotent");
+        ui::info("re-run the same command to retry — every step is idempotent");
     }
     ui::close_log_file();
     finish_msg();
@@ -625,7 +643,7 @@ fn rollback_caelestia(purge: bool, dry_run: bool) -> Result<()> {
 
 // ─── `8sync setup profile <sub>` ────────────────────────────────
 
-fn profile_sub(rest: Vec<String>, yall: bool, dry_run: bool) -> Result<()> {
+fn profile_sub(rest: Vec<String>, yes_to_all: bool, dry_run: bool) -> Result<()> {
     let action = rest.first().map(|s| s.as_str()).unwrap_or("list");
     let all = profile::load_all()?;
     let state = profile::load_state();
@@ -670,7 +688,7 @@ fn profile_sub(rest: Vec<String>, yall: bool, dry_run: bool) -> Result<()> {
                 .get(1)
                 .ok_or_else(|| anyhow::anyhow!("usage: 8sync setup profile apply <name>"))?;
             let resolved = profile::resolve(name, &all)?;
-            profile::apply(&resolved, yall, dry_run)?;
+            profile::apply(&resolved, yes_to_all, dry_run)?;
             if !dry_run {
                 profile::mark_applied(name)?;
             }
@@ -687,12 +705,12 @@ fn profile_sub(rest: Vec<String>, yall: bool, dry_run: bool) -> Result<()> {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// YOLO mode helpers (--yall)
+// YOLO mode helpers (auto-on for --full / --caelestia / --profile)
 // ─────────────────────────────────────────────────────────────────
 
 /// Open `~/.cache/8sync/setup-<unix_ts>.log` and wire `ui::*` to tee into it.
 /// Idempotent across runs (timestamped filename).
-fn init_yall_log() -> Result<PathBuf> {
+fn init_yolo_log() -> Result<PathBuf> {
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -789,7 +807,7 @@ where
     match f() {
         Ok(()) => Ok(()),
         Err(e) if yolo => {
-            ui::err(&format!("[{}] failed: {} — continuing (--yall)", label, e));
+            ui::err(&format!("[{}] failed: {} — continuing (unattended mode)", label, e));
             failures.push(label.to_string());
             Ok(())
         }
