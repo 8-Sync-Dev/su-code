@@ -31,7 +31,7 @@ QUICK START
   8sync flow                        same as above but ordered by workflow
   8sync setup                       install harness, then ask y/N per profile
   8sync setup --yall                install harness + alexdev bundle, no prompts
-  8sync setup --caelestia           auto-detect Caelestia: HyDE overlay vs fresh full stack
+  8sync setup --caelestia           auto-detect Caelestia: fresh vs coexist with existing DE
   8sync .                           seed agents/* context and run `omp --continue`
   8sync ai \"add dark mode toggle\"   one-shot AI prompt (or resume with `8sync ai`)
   8sync find \"useAuth\"              rg + fzf preview, open at file:line

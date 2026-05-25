@@ -1,60 +1,46 @@
 name = "caelestia"
-description = "Caelestia desktop on fresh CachyOS — Hyprland + Quickshell + SDDM + caelestia-shell (extends `nvidia`)"
+description = "Caelestia desktop — Hyprland + Quickshell + caelestia-shell + SDDM (extends `nvidia`)"
 
 extends = ["nvidia"]
 
 [packages]
 pacman = [
-  # Wayland / Hyprland stack
+  # Minimum Wayland session stack (Caelestia upstream README, "Manual installation")
   "hyprland",
   "xdg-desktop-portal-hyprland",
-  "qt5-wayland",
-  "qt6-wayland",
+  "xdg-desktop-portal-gtk",
   "polkit-gnome",
   "pipewire",
   "pipewire-pulse",
   "pipewire-alsa",
   "wireplumber",
   "networkmanager",
-  "network-manager-applet",
   "bluez",
   "bluez-utils",
-  "blueman",
-  # Display + login manager
+  # Display + login manager (Caelestia ships no DM; SDDM is the standard choice)
   "sddm",
-  # Terminal + base apps
-  "kitty",
-  "firefox",
-  "thunar",
-  "thunar-archive-plugin",
-  "file-roller",
-  "btop",
-  "fastfetch",
+  "qt6-svg",
+  # Caelestia upstream deps (fish needed to run install.fish)
   "fish",
+  "foot",
+  "fastfetch",
   "starship",
-  # Wayland tools
-  "grim",
-  "slurp",
+  "btop",
+  "jq",
+  "eza",
   "wl-clipboard",
   "cliphist",
-  "brightnessctl",
-  "pamixer",
-  "playerctl",
-  "pavucontrol",
-  "swww",
-  # Fonts
+  "inotify-tools",
+  "trash-cli",
+  "hyprpicker",
+  "adw-gtk-theme",
+  "papirus-icon-theme",
   "ttf-jetbrains-mono-nerd",
-  "noto-fonts",
-  "noto-fonts-emoji",
-  "noto-fonts-cjk",
-  "ttf-cascadia-code-nerd",
 ]
 aur = [
-  "quickshell",
-  "cli11",
-  "aubio",
-  "ttf-material-symbols-variable-git",
-  "caelestia-shell",
+  # Single AUR meta-package — pulls in quickshell + caelestia-shell + caelestia-cli
+  # + app2unit + qtengine-git + all transitive deps. Saves listing 8+ pkgs.
+  "caelestia-meta",
 ]
 
 [requires]
@@ -66,18 +52,12 @@ user_enable = []
 
 [post_install]
 commands = [
-  # Clone caelestia-dots (idempotent).
+  # Clone caelestia-dots if missing (idempotent).
   """bash -c 'if [ ! -d "$HOME/.local/share/caelestia" ]; then \
 git clone https://github.com/caelestia-dots/caelestia.git "$HOME/.local/share/caelestia"; \
 else echo "[caelestia] dots already cloned — skip"; fi'""",
-  # Safety backup of ~/.config BEFORE upstream's installer touches anything.
-  # `--noconfirm` below skips upstream's own backup prompt, so we make one here.
-  """bash -c 'TS=$(date +%s); [ ! -d "$HOME/.config.bak.caelestia" ] && cp -r "$HOME/.config" "$HOME/.config.bak.caelestia.$TS" && echo "[caelestia] backed up ~/.config → ~/.config.bak.caelestia.$TS" || echo "[caelestia] backup already exists — skip"'""",
-  # Ensure fish is on PATH (upstream installer is a fish script).
-  """bash -c 'command -v fish >/dev/null || sudo pacman -S --needed --noconfirm fish'""",
-  # Run upstream installer NON-INTERACTIVELY. `install.fish --noconfirm` is the
-  # official auto-yes flag (skips every overwrite/backup prompt). `--aur-helper`
-  # picks the helper we installed via the profile's pkg list.
+  # Run upstream installer non-interactively. `install.fish --noconfirm` is the
+  # official auto-yes flag (skips every overwrite/backup prompt).
   """bash -c 'cd "$HOME/.local/share/caelestia" && fish ./install.fish --noconfirm --aur-helper=paru'""",
 ]
-hint = "Reboot → SDDM → chọn Hyprland session. Caelestia shell sẽ auto-launch. `nvidia-smi` để verify driver."
+hint = "Fresh: reboot → SDDM → Hyprland session. Coexist: log out → pick `Hyprland` at your DM. Rollback: `8sync setup --caelestia=rollback`."

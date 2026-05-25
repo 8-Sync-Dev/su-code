@@ -21,4 +21,4 @@ user_enable = []
 
 [post_install]
 commands = []
-hint = "Reboot sau khi NVIDIA driver + SDDM được bật. Trên máy đã có HyDE: dùng `8sync setup --caelestia=hyde` thay vì bundle này."
+hint = "Reboot sau khi NVIDIA driver + SDDM được bật. Existing DE? Dùng `8sync setup --caelestia` để add Caelestia làm parallel session."

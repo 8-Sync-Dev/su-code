@@ -43,12 +43,14 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // Caelestia overlay marker
-    let userprefs = env.home.join(".config/hypr/userprefs.conf");
-    if let Ok(c) = std::fs::read_to_string(&userprefs) {
-        if c.contains("CAELESTIA-SHELL-OVERRIDE") {
-            ui::ok("caelestia-hyde overlay: installed (remove via `8sync setup --caelestia=rollback`)");
-        }
+
+    // Caelestia presence — check both global SDDM session entry and the dots clone.
+    let caelestia_session = std::path::Path::new("/usr/share/wayland-sessions/hyprland.desktop");
+    let caelestia_dots = env.home.join(".local/share/caelestia");
+    if caelestia_session.exists() && caelestia_dots.exists() {
+        ui::ok("caelestia: installed (Hyprland session + dots cloned)");
+    } else if caelestia_dots.exists() {
+        ui::ok("caelestia: dots cloned but no Hyprland .desktop session — re-run `8sync setup --caelestia`");
     }
 
     // Security (warp + ufw) — compact one-liners

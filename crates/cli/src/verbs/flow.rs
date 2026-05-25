@@ -34,17 +34,8 @@ pub fn run() -> Result<()> {
     ]);
 
     section("4. CAELESTIA DESKTOP (optional)", &[
-        ("8sync setup --caelestia",          "auto-detect: HyDE present → additive; else fresh full stack"),
-        ("8sync setup --caelestia=fresh",    "force fresh CachyOS path (Hyprland + Quickshell + nvidia auto-detect)"),
-        ("8sync setup --caelestia=hyde",     "force HyDE additive overlay (caelestia-shell + userprefs override)"),
-        ("8sync setup --caelestia=rollback", "remove HyDE overlay, restart waybar"),
-    ]);
-
-    section("4b. END-4/DOTS-HYPRLAND (optional)", &[
-        ("8sync setup --end4",          "default medium tier (Hyprland + Quickshell, skip fish/fonts/misc)"),
-        ("8sync setup --end4=minimal",  "bare Hyprland keybinds, no widget shell"),
-        ("8sync setup --end4=full",     "everything upstream installs"),
-        ("8sync setup --end4=rollback", "run upstream `./setup uninstall -f`"),
+        ("8sync setup --caelestia",          "auto-detect fresh vs coexist, install Hyprland + Caelestia + SDDM"),
+        ("8sync setup --caelestia=rollback", "restore ~/.config/hypr from latest backup (+ --purge to remove pkgs)"),
     ]);
 
     section("5. SECURITY (VPN + firewall)", &[

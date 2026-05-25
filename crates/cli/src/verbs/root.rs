@@ -29,19 +29,14 @@ pub fn print_cheatsheet() {
     ]);
     println!("  {}", "→ each project gets an AGENTS.md (managed) + agents/ folder (memory) on first `8sync .`".dimmed());
 
-    println!("\n{}", "DESKTOP / DOTFILES (one of these — they don't mix)".bold().yellow());
+    println!("\n{}", "DESKTOP — CAELESTIA".bold().yellow());
     rows(&[
-        ("8sync setup --caelestia",          "auto-detect: HyDE → additive overlay, else fresh Hyprland+Caelestia (+nvidia)"),
-        ("8sync setup --caelestia=fresh",    "force fresh: full Hyprland + Quickshell + SDDM + nvidia auto-detect"),
-        ("8sync setup --caelestia=hyde",     "force HyDE-additive overlay (just caelestia-shell + userprefs.conf block)"),
-        ("8sync setup --caelestia=rollback", "strip overlay block from userprefs.conf + restart waybar"),
-        ("8sync setup --end4",               "end-4/dots-hyprland — medium tier (Hyprland + Quickshell)"),
-        ("8sync setup --end4=minimal",       "bare Hyprland keybinds (skip Quickshell + fish + fonts + misc)"),
-        ("8sync setup --end4=full",          "everything upstream installs (incl. fish/fonts/plasma-browser-integration)"),
-        ("8sync setup --end4=rollback",      "run upstream `./setup uninstall -f`"),
+        ("8sync setup --caelestia",          "auto-detect fresh vs coexist, install Hyprland + Caelestia + SDDM"),
+        ("8sync setup --caelestia=rollback", "restore ~/.config/hypr from latest backup"),
+        ("8sync setup --caelestia=rollback --purge", "…also `pacman -Rns caelestia-shell quickshell aubio`"),
     ]);
-    println!("  {}", "→ minimal/medium use --skip-hyprland-entry (HyDE keybinds preserved). `full` overwrites entry — refused on HyDE.".dimmed());
-    println!("  {}", "→ all tiers pass `-f -s --skip-allgreeting --ignore-outdate` (zero prompts). Backup ENABLED (recoverable).".dimmed());
+    println!("  {}", "→ fresh: no DM + no ~/.config/hypr → installs full stack, enables sddm.service. Reboot → SDDM → Caelestia.".dimmed());
+    println!("  {}", "→ coexist: existing DE (Plasma/GNOME/HyDE) detected → adds parallel Hyprland session. Backs up ~/.config/hypr if present.".dimmed());
 
     println!("\n{}", "PROFILES (opt-in personal customization, idempotent)".bold().yellow());
     rows(&[
@@ -56,7 +51,7 @@ pub fn print_cheatsheet() {
     println!("  {}", "Built-in profiles (in priority order of independence):".dimmed());
     println!("  {}", "  vietnamese · hardware-cooling · hardware-lianli · displaylink · apps-personal · warp".dimmed());
     println!("  {}", "  nvidia (auto-detect: Blackwell→Turing→open-dkms; Maxwell/Pascal→dkms)".dimmed());
-    println!("  {}", "  caelestia (extends nvidia) · caelestia-hyde · alexdev (bundle: caelestia + all 6 personal)".dimmed());
+    println!("  {}", "  caelestia (extends nvidia) · alexdev (bundle: caelestia + all personal profiles)".dimmed());
     println!("  {}", "Override any built-in: drop a TOML into ~/.config/8sync/profiles/<name>.toml".dimmed());
 
     println!("\n{}", "SECURITY (VPN + firewall)".bold().yellow());
@@ -97,8 +92,8 @@ pub fn print_cheatsheet() {
     println!("  {:<38}  {}", "<repo>/AGENTS.md".cyan(),                   "project entry point — every AI reads this first");
     println!("  {:<38}  {}", "<repo>/agents/{PROJECT,STATE,…}.md".cyan(), "per-project memory (committed, shared with team)");
     println!("  {:<38}  {}", "<repo>/agents/skills/<name>/".cyan(),       "per-project skills (cloned by `skill add`)");
-    println!("  {:<38}  {}", "~/.local/share/caelestia/".cyan(),          "Caelestia dotfiles (cloned by --caelestia=fresh)");
-    println!("  {:<38}  {}", "~/.local/share/dots-hyprland/".cyan(),      "end-4 dotfiles (cloned by --end4)");
+    println!("  {:<38}  {}", "~/.local/share/caelestia/".cyan(),          "Caelestia dotfiles (cloned by --caelestia)");
+    println!("  {:<38}  {}", "~/.config/hypr.bak.caelestia.*/".cyan(), "pre-Caelestia ~/.config/hypr backup (restored by --caelestia=rollback)");
 
     println!("\n{}", "TIPS".bold().yellow());
     println!("  · Every verb has {} and {} with EXAMPLES.", "-h".bold().green(), "--help".bold().green());
