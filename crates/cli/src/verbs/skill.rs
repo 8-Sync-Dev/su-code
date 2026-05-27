@@ -592,7 +592,9 @@ fn sync_skills(env: &env_detect::Env) -> Result<()> {
         }
         inject_agents_md(&env.home, &root)?;
     } else {
-        ui::info("not inside a project — skipped local agents/skills/ mirror");
+        ui::warn("not inside a project (no AGENTS.md/.git/Cargo.toml/package.json/... in cwd or ancestors)");
+        ui::info("  → run `8sync .` first to seed agents/ + AGENTS.md, then re-run `8sync skill sync`");
+        ui::info("  → or `cd` into a recognized project root");
     }
     Ok(())
 }
@@ -953,13 +955,23 @@ fn list_installed_skill_dirs(skills_dir: &Path) -> Result<Vec<PathBuf>> {
 }
 
 fn detect_current_project_root() -> Option<PathBuf> {
+    // Markers in priority order. AGENTS.md / CLAUDE.md / agents/ catch projects
+    // already seeded by `8sync .` even when they lack a language manifest.
+    // `.git` / `.hg` catch any VCS repo. The rest cover major ecosystems.
     let markers = [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "agents",
         ".git",
+        ".hg",
         "Cargo.toml",
         "package.json",
         "pyproject.toml",
         "deno.json",
         "go.mod",
+        "composer.json",
+        "Gemfile",
+        "mix.exs",
     ];
     let mut p = std::env::current_dir().ok()?;
     loop {

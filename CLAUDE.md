@@ -12,8 +12,6 @@
 
 Lý do: ~35% rẻ hơn token, ~70% ít tool call hơn, 100% local. Dump cả file = đốt token vô ích.
 
-> ⚠ `codegraph` binary chưa cài. Chạy `8sync skill sync` (auto curl installer) HOẶC `npx -y @colbymchenry/codegraph install` rồi quay lại đọc tiếp.
-
 ## 🚨 STEP 1 — đọc TẤT CẢ skill dưới TRƯỚC khi gọi tool đầu tiên
 
 Không skip, không suy đoán, không viết tắt. AGENTS.md chỉ là index — nội dung thực ở các `SKILL.md` được liệt kê.
