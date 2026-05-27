@@ -6,6 +6,26 @@
 > **EN:** Terminal-first AI coding harness for CachyOS/Arch + Kitty + Helix + [omp](https://omp.sh).
 > Keep your normal CLI workflow; AI agents observe project context, load `agents/*` memory, and execute tasks on demand.
 
+---
+
+## ⚡ Cài Caelestia UI cho CachyOS (1 lệnh, không cần 8sync)
+
+Máy CachyOS minimal vừa cài xong, mở lên chỉ thấy TTY đen? Chạy 1 lệnh dưới để có Hyprland + Caelestia shell + SDDM + Quickshell — không cần cài 8sync trước:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/scripts/install-caelestia.sh)
+```
+
+Hoặc unattended full (auto-yes + NVIDIA driver auto-detect + reboot):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/scripts/install-caelestia.sh) --full
+```
+
+Flags: `--with-apps` (firefox/libreoffice/...), `--with-nvidia` (auto-detect GPU family), `--noconfirm` (auto-yes), `--reboot` (10s countdown rồi reboot), `--full` (= bật tất cả). Log ở `~/.cache/8sync/caelestia-install-<ts>.log`.
+
+Script standalone trong [`scripts/install-caelestia.sh`](scripts/install-caelestia.sh) — đọc trước, hoặc clone repo rồi `./install-caelestia.sh` nếu thích.
+
 - **Website / docs**: <https://8-sync-dev.github.io/su-code> (auto-deploy từ `docs/` qua [`.github/workflows/pages.yml`](.github/workflows/pages.yml))
 - **Repo**: <https://github.com/8-Sync-Dev/su-code>
 - **Discussions**: <https://github.com/orgs/8-Sync-Dev/discussions>
