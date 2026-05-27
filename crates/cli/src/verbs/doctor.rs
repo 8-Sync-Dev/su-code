@@ -43,6 +43,18 @@ pub fn run() -> Result<()> {
         }
     }
 
+    // Fish PATH bootstrap (only relevant if fish is present)
+    if which::which("fish").is_ok() {
+        let fish_snippet = env.home.join(".config/fish/conf.d/8sync-path.fish");
+        if fish_snippet.exists() {
+            ui::ok(&format!("fish PATH bootstrap: {}", fish_snippet.display()));
+        } else {
+            ui::warn(&format!(
+                "fish installed but missing {} — re-run `8sync setup`",
+                fish_snippet.display()
+            ));
+        }
+    }
 
     // Caelestia presence — check both global SDDM session entry and the dots clone.
     let caelestia_session = std::path::Path::new("/usr/share/wayland-sessions/hyprland.desktop");

@@ -1,5 +1,5 @@
 name = "nvidia"
-description = "NVIDIA — auto-detect driver (Blackwell/Ada/Ampere/Turing → open-dkms; Maxwell/Pascal → proprietary dkms) + DRM modeset + kernel params"
+description = "NVIDIA — auto-detect driver (Blackwell/Ada/Ampere/Turing → open-dkms; Maxwell/Pascal → proprietary dkms) + DRM modeset + kernel params. Skips entirely if CachyOS `chwd` already configured a driver."
 
 [packages]
 pacman = [
@@ -19,8 +19,30 @@ user_enable = []
 
 [post_install]
 commands = [
+  # 0. Skip-gate. Drops a sentinel /tmp/8sync-nvidia-skip when:
+  #    a) nvidia-smi already works (chwd installed driver at OS-install), OR
+  #    b) a driver pkg is installed but module isn't loaded (need rebuild only).
+  #    Steps 1–5 check the sentinel and short-circuit. Remove it manually +
+  #    re-run if you really want this profile to take over a chwd setup.
+  """bash -c 'rm -f /tmp/8sync-nvidia-skip; \
+if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -q >/dev/null 2>&1; then \
+  VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1); \
+  PKG=$(pacman -Qq 2>/dev/null | grep -E "^nvidia(-open)?(-dkms|-lts)?$" | paste -sd, -); \
+  echo "[nvidia] driver already active (likely CachyOS chwd) — version ${VER:-unknown}, package(s): ${PKG:-unknown}"; \
+  echo "[nvidia] skipping driver/modprobe/initramfs steps."; \
+  touch /tmp/8sync-nvidia-skip; \
+elif pacman -Qq 2>/dev/null | grep -qE "^nvidia(-open)?(-dkms|-lts)?$"; then \
+  echo "[nvidia] driver pkg installed but module not loaded — rebuilding initramfs only"; \
+  sudo mkinitcpio -P; \
+  echo "[nvidia] reboot to activate."; \
+  touch /tmp/8sync-nvidia-skip; \
+else \
+  echo "[nvidia] no existing driver — proceeding with auto-detect"; \
+fi'""",
+
   # 1. Detect GPU generation and install appropriate driver.
-  """bash -c 'GPU=$(lspci -nn | grep -iE "vga|3d|2d" | grep -i nvidia || true); \
+  """bash -c '[ -f /tmp/8sync-nvidia-skip ] && exit 0; \
+GPU=$(lspci -nn | grep -iE "vga|3d|2d" | grep -i nvidia || true); \
 if [ -z "$GPU" ]; then echo "[nvidia] no NVIDIA GPU detected — skipping driver install"; exit 0; fi; \
 if   echo "$GPU" | grep -qiE "RTX 50|GB20[0-9]|Blackwell";        then DRV=nvidia-open-dkms; \
 elif echo "$GPU" | grep -qiE "RTX 40|AD10[0-9]|Ada";              then DRV=nvidia-open-dkms; \
@@ -31,16 +53,19 @@ echo "[nvidia] detected: $GPU"; echo "[nvidia] installing: $DRV"; \
 sudo pacman -S --needed --noconfirm "$DRV"'""",
 
   # 2. DRM modeset modprobe.d entry (idempotent — overwrite is fine).
-  """bash -c 'echo "options nvidia-drm modeset=1 fbdev=1" | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null'""",
+  """bash -c '[ -f /tmp/8sync-nvidia-skip ] && exit 0; \
+echo "options nvidia-drm modeset=1 fbdev=1" | sudo tee /etc/modprobe.d/nvidia.conf >/dev/null'""",
 
   # 3. Add nvidia modules to mkinitcpio.conf (idempotent guard).
-  """bash -c 'if ! grep -q "nvidia_drm" /etc/mkinitcpio.conf; then \
+  """bash -c '[ -f /tmp/8sync-nvidia-skip ] && exit 0; \
+if ! grep -q "nvidia_drm" /etc/mkinitcpio.conf; then \
 sudo sed -i "s/^MODULES=(\\(.*\\))/MODULES=(\\1 nvidia nvidia_modeset nvidia_uvm nvidia_drm)/" /etc/mkinitcpio.conf; \
 echo "[nvidia] patched /etc/mkinitcpio.conf"; \
 else echo "[nvidia] mkinitcpio.conf already has nvidia_drm — skip"; fi'""",
 
   # 4. Kernel cmdline: GRUB if present, else systemd-boot loader entries.
-  """bash -c 'PARAM="nvidia_drm.modeset=1 nvidia_drm.fbdev=1"; \
+  """bash -c '[ -f /tmp/8sync-nvidia-skip ] && exit 0; \
+PARAM="nvidia_drm.modeset=1 nvidia_drm.fbdev=1"; \
 if [ -f /etc/default/grub ]; then \
   if ! grep -q "nvidia_drm.modeset" /etc/default/grub; then \
     sudo sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\\"\\(.*\\)\\"/GRUB_CMDLINE_LINUX_DEFAULT=\\"\\1 $PARAM\\"/" /etc/default/grub; \
@@ -54,7 +79,7 @@ elif ls /boot/loader/entries/*.conf >/dev/null 2>&1; then \
   done; \
 else echo "[nvidia] no GRUB or systemd-boot detected — set kernel params manually: $PARAM"; fi'""",
 
-  # 5. Rebuild initramfs.
-  "sudo mkinitcpio -P",
+  # 5. Rebuild initramfs (skip if sentinel set — step 0 already rebuilt).
+  """bash -c '[ -f /tmp/8sync-nvidia-skip ] && { rm -f /tmp/8sync-nvidia-skip; exit 0; }; sudo mkinitcpio -P'""",
 ]
 hint = "Reboot required after driver install. Verify with `nvidia-smi`. If black screen on boot, drop to TTY (Ctrl+Alt+F2) and check `journalctl -b -p err`."

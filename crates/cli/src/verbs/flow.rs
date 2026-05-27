@@ -7,10 +7,10 @@ pub fn run() -> Result<()> {
     section("1. FIRST-TIME INSTALL (new machine)", &[
         ("git clone https://github.com/8-Sync-Dev/su-code", "clone the source"),
         ("cd su-code && bash scripts/bootstrap.sh", "installs rustup if missing, builds 8sync, drops binary into ~/.local/bin"),
-        ("8sync setup", "harness (gh + omp + skills) then prompts y/N per personal profile"),
-        ("# or  8sync setup --yall", "install harness + alexdev bundle without prompts"),
-        ("# or  8sync setup --profile alexdev", "apply one specific bundle non-interactively"),
-        ("# or  8sync setup --caelestia", "auto-detect: HyDE → additive overlay; else fresh Hyprland+Caelestia (+nvidia)"),
+        ("8sync setup", "harness (gh + omp + skills + PATH bootstrap) then curated y/N menu (community profiles)"),
+        ("# or  8sync setup --community", "unattended: caelestia + dev-stack + bluetooth"),
+        ("# or  8sync setup --profile dev-stack", "just dev-stack (Docker + Node/Bun + Encore)"),
+        ("# or  8sync setup --caelestia", "auto-detect: existing DE → coexist; else fresh Hyprland+Caelestia (+nvidia)"),
         ("gh auth login", "log into GitHub (required by `8sync ship`)"),
         ("8sync doctor", "verify everything is in place"),
     ]);

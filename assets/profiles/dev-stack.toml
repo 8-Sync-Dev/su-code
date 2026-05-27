@@ -1,0 +1,35 @@
+name = "dev-stack"
+description = "Dev runtime cho Next.js 16 + Encore TS: Docker + Node/Bun/pnpm + Encore CLI + native build deps"
+
+[packages]
+pacman = [
+  # Container runtime
+  "docker",
+  "docker-compose",
+  "docker-buildx",
+  # JS runtimes / package managers
+  "nodejs",
+  "npm",
+  "bun",
+  "pnpm",
+  # Native module build chain (node-gyp, argon2, sharp fallback, ...)
+  "git",
+  "base-devel",
+  "python",
+  # LSP cho Helix (TS/TSX/JS)
+  "typescript-language-server",
+]
+aur = []
+
+[services]
+system_enable = ["docker.service"]
+user_enable = []
+
+[post_install]
+commands = [
+  # Idempotent
+  "sudo usermod -aG docker \"$USER\"",
+  # Encore CLI → ~/.encore/bin/encore (overwrite-safe)
+  "curl -fsSL https://encore.dev/install.sh | bash",
+]
+hint = "Logout/login (hoặc `newgrp docker`) để docker group có hiệu lực. PATH cho ~/.bun/bin + ~/.encore/bin đã được Stage A `8sync setup` patch cho zsh/bash/fish."

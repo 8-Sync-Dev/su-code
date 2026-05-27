@@ -16,6 +16,14 @@ use std::path::PathBuf;
 
 use crate::{assets, env_detect, pkg, ui};
 
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Visibility {
+    #[default]
+    Community,
+    Personal,
+}
+
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct Profile {
     pub name: String,
@@ -31,6 +39,8 @@ pub struct Profile {
     pub services: Services,
     #[serde(default)]
     pub post_install: PostInstall,
+    #[serde(default)]
+    pub visibility: Visibility,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -45,6 +55,11 @@ pub struct Packages {
     pub pacman: Vec<String>,
     #[serde(default)]
     pub aur: Vec<String>,
+    /// Packages that MUST be installed via `yay` specifically (not paru).
+    /// Used for AUR packages that ship custom yay-only build hooks or that
+    /// fail under paru's review pipeline (e.g. `lianli-linux-git`).
+    #[serde(default)]
+    pub aur_yay: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -105,6 +120,7 @@ pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
     let mut visited: BTreeSet<String> = BTreeSet::new();
     let mut pacman: Vec<String> = Vec::new();
     let mut aur: Vec<String> = Vec::new();
+    let mut aur_yay: Vec<String> = Vec::new();
     let mut sys: Vec<String> = Vec::new();
     let mut usr: Vec<String> = Vec::new();
     let mut cmds: Vec<String> = Vec::new();
@@ -118,6 +134,7 @@ pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
         visited: &mut BTreeSet<String>,
         pacman: &mut Vec<String>,
         aur: &mut Vec<String>,
+        aur_yay: &mut Vec<String>,
         sys: &mut Vec<String>,
         usr: &mut Vec<String>,
         cmds: &mut Vec<String>,
@@ -127,21 +144,22 @@ pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
         if !visited.insert(n.to_string()) { return Ok(()); }
         let p = all.get(n).ok_or_else(|| anyhow!("profile not found: {}", n))?;
         for e in &p.extends {
-            walk(e, all, visited, pacman, aur, sys, usr, cmds, hints, requires_aur)?;
+            walk(e, all, visited, pacman, aur, aur_yay, sys, usr, cmds, hints, requires_aur)?;
         }
         pacman.extend(p.packages.pacman.iter().cloned());
         aur.extend(p.packages.aur.iter().cloned());
+        aur_yay.extend(p.packages.aur_yay.iter().cloned());
         sys.extend(p.services.system_enable.iter().cloned());
         usr.extend(p.services.user_enable.iter().cloned());
         cmds.extend(p.post_install.commands.iter().cloned());
         if !p.post_install.hint.is_empty() {
             hints.push(format!("[{}] {}", p.name, p.post_install.hint));
         }
-        if p.requires.aur_helper { *requires_aur = true; }
+        if p.requires.aur_helper || !p.packages.aur_yay.is_empty() { *requires_aur = true; }
         Ok(())
     }
 
-    walk(name, all, &mut visited, &mut pacman, &mut aur, &mut sys, &mut usr, &mut cmds, &mut hints, &mut requires_aur)?;
+    walk(name, all, &mut visited, &mut pacman, &mut aur, &mut aur_yay, &mut sys, &mut usr, &mut cmds, &mut hints, &mut requires_aur)?;
 
     if let Some(p) = all.get(name) {
         description = p.description.clone();
@@ -152,12 +170,17 @@ pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
         description,
         extends: vec![],
         requires: Requires { aur_helper: requires_aur },
-        packages: Packages { pacman: dedup(pacman), aur: dedup(aur) },
+        packages: Packages {
+            pacman: dedup(pacman),
+            aur: dedup(aur),
+            aur_yay: dedup(aur_yay),
+        },
         services: Services { system_enable: dedup(sys), user_enable: dedup(usr) },
         post_install: PostInstall {
             commands: cmds,
             hint: hints.join("\n"),
         },
+        visibility: all.get(name).map(|p| p.visibility).unwrap_or_default(),
     })
 }
 
@@ -201,6 +224,19 @@ pub fn apply(p: &Profile, yes_to_all: bool, dry_run: bool) -> Result<()> {
         } else {
             let refs: Vec<&str> = p.packages.aur.iter().map(|s| s.as_str()).collect();
             pkg::aur_install_safe(helper, &refs, yes_to_all)?;
+        }
+    }
+
+    // AUR packages that REQUIRE yay specifically. Bootstrap yay if missing,
+    // even when paru is already present — some PKGBUILDs (e.g.
+    // `lianli-linux-git`) only succeed under yay.
+    if !p.packages.aur_yay.is_empty() {
+        if dry_run {
+            ui::info(&format!("would yay install (yay-only): {}", p.packages.aur_yay.join(" ")));
+        } else {
+            pkg::ensure_yay()?;
+            let refs: Vec<&str> = p.packages.aur_yay.iter().map(|s| s.as_str()).collect();
+            pkg::aur_install_safe("yay", &refs, yes_to_all)?;
         }
     }
 

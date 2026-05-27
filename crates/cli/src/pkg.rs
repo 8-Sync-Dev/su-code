@@ -117,8 +117,19 @@ pub fn aur_install_safe(helper: &str, pkgs: &[&str], noconfirm: bool) -> Result<
         cmd.arg("--noconfirm");
         // paru/yay still prompt for provider choice (e.g. "caelestia-shell vs
         // caelestia-shell-git") and for PKGBUILD review. Suppress both.
-        cmd.arg("--skipreview");
+        // Flag set differs per helper: paru has `--skipreview`; yay uses the
+        // `--answer*=None` family. Passing the wrong flag aborts the run.
+        match helper {
+            "paru" => { cmd.arg("--skipreview"); }
+            "yay"  => {
+                cmd.arg("--answerdiff=None")
+                   .arg("--answeredit=None")
+                   .arg("--answerclean=None");
+            }
+            _ => {}
+        }
         cmd.arg("--mflags=--noconfirm");
+        cmd.args(&new_pkgs);
         // Pipe a stream of newlines to stdin so the provider-choice prompt
         // accepts its default (1) without blocking. `yes ""` runs forever;
         // paru only reads what it needs.
@@ -175,3 +186,24 @@ pub fn run_loud(cmd: &str, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
+/// Ensure `yay` is installed (idempotent). Bootstraps from AUR via makepkg if
+/// missing. Distinct from the general `aur_helper()` discovery in env_detect:
+/// some profiles need yay *specifically*, even if paru is already present.
+pub fn ensure_yay() -> Result<()> {
+    if which::which("yay").is_ok() {
+        ui::skip("yay", "present");
+        return Ok(());
+    }
+    ui::step("yay (AUR helper required for this profile)");
+    pacman_install_safe(&["git", "base-devel"], true)?;
+    let cmd = "cd /tmp && rm -rf yay-bootstrap && \
+        git clone https://aur.archlinux.org/yay-bin.git yay-bootstrap && \
+        cd yay-bootstrap && makepkg -si --noconfirm && \
+        cd .. && rm -rf yay-bootstrap";
+    run_loud("sh", &["-c", cmd])?;
+    if which::which("yay").is_err() {
+        return Err(anyhow!("yay bootstrap finished but `yay` is not on PATH"));
+    }
+    ui::ok("yay installed");
+    Ok(())
+}

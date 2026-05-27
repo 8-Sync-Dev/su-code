@@ -1,5 +1,6 @@
 name = "hardware-cooling"
 description = "Cooler & RGB control (CoolerControl, OpenRGB, liquidctl)"
+visibility = "personal"
 
 [packages]
 pacman = ["coolercontrol", "openrgb", "liquidctl"]

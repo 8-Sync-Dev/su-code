@@ -1,0 +1,14 @@
+name = "bluetooth"
+description = "Bluetooth stack auto-start (bluez + bluez-utils, bluetooth.service)"
+
+[packages]
+pacman = ["bluez", "bluez-utils"]
+aur = []
+
+[services]
+system_enable = ["bluetooth.service"]
+user_enable = []
+
+[post_install]
+commands = []
+hint = "Pair device qua KDE/GNOME applet hoặc `bluetoothctl`. Service đã enable lúc boot — không cần bật tay nữa."

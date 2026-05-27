@@ -1,9 +1,14 @@
 name = "hardware-lianli"
-description = "Lian Li chassis (fan/RGB/LCD) — built from AUR"
+description = "Lian Li chassis (fan/RGB/LCD) — built from AUR via yay"
+visibility = "personal"
 
 [packages]
 pacman = []
-aur = ["lianli-linux-git"]
+aur = []
+# `lianli-linux-git` only builds cleanly under yay (paru's review pipeline
+# trips on its post-install hooks). 8sync will bootstrap yay if absent even
+# when paru is already present.
+aur_yay = ["lianli-linux-git"]
 
 [requires]
 aur_helper = true

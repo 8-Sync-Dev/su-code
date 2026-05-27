@@ -1,5 +1,6 @@
 name = "displaylink"
 description = "DisplayLink USB monitor driver (evdi-dkms)"
+visibility = "personal"
 
 [packages]
 pacman = ["evdi-dkms"]

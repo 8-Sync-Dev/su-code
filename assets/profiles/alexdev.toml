@@ -1,5 +1,6 @@
 name = "alexdev"
 description = "alexdev full bundle — Caelestia stack (fresh) + all personal profiles"
+visibility = "personal"
 
 extends = [
   "caelestia",
@@ -9,6 +10,8 @@ extends = [
   "displaylink",
   "apps-personal",
   "warp",
+  "dev-stack",
+  "bluetooth",
 ]
 
 [packages]

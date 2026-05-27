@@ -41,7 +41,9 @@ git clone https://github.com/8-Sync-Dev/su-code.git
 cd su-code
 bash scripts/bootstrap.sh        # → ~/.local/bin/8sync
 8sync setup --dry-run            # xem plan trước
-8sync setup                      # cài harness + chọn profile y/N
+8sync setup                      # cài harness + curated y/N (community profiles)
+# hoặc:
+8sync setup --community          # unattended: caelestia + dev-stack + bluetooth
 8sync doctor                     # verify
 
 # Dùng hằng ngày
@@ -65,11 +67,7 @@ cd su-code
 bash scripts/bootstrap.sh
 ```
 
-Đảm bảo `~/.local/bin` trong `$PATH`:
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc   # hoặc ~/.bashrc
-```
+`scripts/bootstrap.sh` cài rustup (nếu thiếu) → `cargo build --release --locked` → copy binary vào `~/.local/bin/8sync`. PATH cho `~/.local/bin`, `~/.cargo/bin`, `~/.bun/bin`, `~/.encore/bin` được tự patch vào zsh / bash / fish khi bạn chạy `8sync setup` lần đầu (xem Stage A).
 
 ### 2. `8sync setup` — cài phần còn lại
 
@@ -80,7 +78,15 @@ Stage A (harness, luôn idempotent):
 - ghi config: `~/.config/helix/`, `~/.config/kitty/8sync.session`, `~/.config/8sync/{global,skills}.toml`
 - ghi skill: `~/.omp/skills/{karpathy-guidelines,8sync-cli,image-routing}/SKILL.md` + `00-force-load.md`
 
-Stage B (profile cá nhân, opt-in y/N từng cái): `vietnamese`, `hardware-cooling`, `hardware-lianli`, `displaylink`, `apps-personal`, `warp`, hoặc bundle `alexdev`.
+Stage B (community profile, opt-in y/N từng cái):
+
+| Profile | Mô tả |
+|---|---|
+| `caelestia` | Hyprland + Quickshell + caelestia-shell + SDDM (extends `nvidia`) |
+| `dev-stack` | Docker + Node/npm/bun/pnpm + Encore + TS LSP + build chain |
+| `nvidia` | Auto-detect GPU family → open-dkms / dkms (skip nếu CachyOS chwd đã cài) |
+| `warp` | Cloudflare WARP VPN + DoH + MASQUE (toggle qua `8sync sec`) |
+| `bluetooth` | bluez + bluez-utils + service enable |
 
 Cờ thường dùng:
 
@@ -88,7 +94,8 @@ Cờ thường dùng:
 |---|---|
 | `8sync setup --dry-run` | In plan, không thay đổi gì |
 | `8sync setup --no-profile` | Chỉ Stage A |
-| `8sync setup --yall` | Stage A + apply tất cả profile, không hỏi |
+| `8sync setup --community` | Stage A + caelestia + dev-stack + bluetooth (không include warp) |
+| `8sync setup --caelestia` | Stage A + chỉ Caelestia (auto fresh \| coexist) |
 | `8sync setup --profile <name>` | Stage A + apply 1 profile cụ thể |
 | `8sync setup profile list \| show <n> \| apply <n>` | Quản lý profile sau setup |
 

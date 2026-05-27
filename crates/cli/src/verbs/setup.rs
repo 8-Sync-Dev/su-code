@@ -8,61 +8,52 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
 #[derive(ClapArgs, Debug)]
 #[command(
     after_help = indoc::indoc! {"
-        EXAMPLES — strict mode (errors bail, no log)
-          8sync setup                          interactive y/N per personal profile
+        EXAMPLES — quick start (community)
+          8sync setup                          harness + curated y/N menu (community profiles)
+          8sync setup --community              unattended: caelestia + dev-stack + bluetooth
+          8sync setup --caelestia              just Caelestia desktop (auto fresh|coexist)
+          8sync setup --profile dev-stack      just dev-stack (Docker + Node/Bun + Encore)
           8sync setup --no-profile             harness only (skip profile stage)
           8sync setup --dry-run                print the full plan, change nothing
 
-        EXAMPLES — unattended mode (auto-yes, preflight, log file, skip-on-error)
-          8sync setup --caelestia              ONLY Caelestia: Hyprland + Quickshell + SDDM (auto fresh|coexist)
-          8sync setup --full                   ALL profiles: caelestia + vietnamese + hardware-* + displaylink + apps-personal + warp
-          8sync setup --profile warp           just one named profile
-          8sync setup --caelestia=rollback     restore ~/.config/hypr from backup (optional --purge to remove pkgs)
-
-          (`--yall` and `--yes` / `-y` are kept as aliases of `--full` for muscle memory)
-
-        EXAMPLES — profile management
-          8sync setup profile list             every available profile (✓ = applied)
-          8sync setup profile show alexdev     resolved packages + services + post-install
-          8sync setup profile apply warp       (re-)apply one profile idempotently
-
         STAGE A — HARNESS (always run, idempotent)
-          · pacman -S --needed github-cli       (gh — required by `8sync ship`)
-          · omp AI CLI                          (curl installer from omp.sh, only if missing)
-          · paru                                (AUR helper, only if missing)
-          · codegraph                           (semantic code index for AI)
-          · write configs + skills under ~/.config/8sync/ and ~/.omp/skills/
+          · pacman -S --needed github-cli       (required by `8sync ship`)
+          · omp AI CLI                          (curl installer from omp.sh, if missing)
+          · paru                                (AUR helper, if missing)
+          · codegraph                           (semantic code index)
+          · PATH bootstrap                      (~/.local/bin, ~/.cargo/bin, ~/.bun/bin,
+                                                 ~/.encore/bin — zsh/bash + fish conf.d)
+          · configs + skills under ~/.config/8sync/ and ~/.omp/skills/
 
-        STAGE B — PROFILES (opt-in personal customization)
-          vietnamese        fcitx5 + Unikey input method
-          hardware-cooling  CoolerControl + OpenRGB + liquidctl
-          hardware-lianli   lianli-linux-git from AUR
-          displaylink       evdi-dkms (DisplayLink USB monitor driver)
-          apps-personal     Bitwarden
-          warp              Cloudflare WARP + DoH + MASQUE  (toggle daily via `8sync sec`)
-          nvidia            auto-detect driver (Blackwell→Turing: open-dkms; Maxwell/Pascal: dkms)
-          caelestia         Hyprland + Quickshell + caelestia-shell + SDDM  (extends `nvidia`)
-          alexdev           BUNDLE — caelestia + all personal profiles
+        STAGE B — PROFILES (community-visible)
+          caelestia    Hyprland + Quickshell + caelestia-shell + SDDM  (extends `nvidia`)
+          dev-stack    Docker + Node/npm/bun/pnpm + Encore + TS LSP + build chain
+          nvidia       Auto-detect GPU family → open-dkms / dkms (skipped if chwd active)
+          warp         Cloudflare WARP VPN + DoH + MASQUE  (toggle via `8sync sec`)
+          bluetooth    bluez + bluez-utils + service enable
 
-        UNATTENDED MODE BEHAVIOUR (auto-on when --caelestia / --full / --profile is given)
-          1. Preflight: print OS, display manager, registered sessions, tool presence, GPU
-          2. Log every step to ~/.cache/8sync/setup-<unix_ts>.log (UI level, timestamped)
-          3. On any step failure: log + track + CONTINUE (no bail) — re-run to retry
+        PROFILE MANAGEMENT
+          8sync setup profile list             every profile (community + personal tag)
+          8sync setup profile show <name>      resolved packages + services + post-install
+          8sync setup profile apply <name>     (re-)apply one profile idempotently
+
+        UNATTENDED MODE (auto-on with --community / --caelestia / --full / --profile)
+          1. Preflight: print OS, display manager, registered sessions, GPU, tool presence
+          2. Log every step to ~/.cache/8sync/setup-<unix_ts>.log
+          3. On any step failure: log + track + CONTINUE (re-run to retry)
           4. Auto-yes (--noconfirm) for every pacman / AUR install
 
-        CAELESTIA MODES (auto-detected from system state)
+        CAELESTIA MODES (auto-detected)
           fresh    no display manager + no ~/.config/hypr → installs hyprland+sddm+caelestia,
-                   enables sddm.service. Reboot → SDDM → Hyprland session → Caelestia.
-          coexist  existing DE (Plasma/GNOME/HyDE/etc.) detected → installs Caelestia as a
-                   parallel Hyprland session. If ~/.config/hypr exists (HyDE/dotfiles),
-                   it's backed up to ~/.config/hypr.bak.caelestia.<ts>/ before Caelestia
-                   takes over. Current DE session stays untouched in SDDM.
+                   enables sddm.service. Reboot → SDDM → Hyprland → Caelestia.
+          coexist  existing DE (Plasma/GNOME/HyDE/etc.) → installs Caelestia as a parallel
+                   Hyprland session. ~/.config/hypr is backed up to
+                   ~/.config/hypr.bak.caelestia.<ts>/ before takeover.
 
         SAFETY
-          · Every install is transactional: if pacman/AUR fails halfway, packages installed in
-            that batch are rolled back automatically (pacman -Rns).
-          · Re-running setup is idempotent — already-installed packages are skipped.
-          · `--dry-run` is always safe to inspect what would change.
+          · Every install is transactional: failed pacman/AUR batch is rolled back.
+          · Re-running setup is idempotent.
+          · `--dry-run` is always safe.
     "}
 )]
 pub struct Args {
@@ -76,6 +67,11 @@ pub struct Args {
     /// Implies preflight + log + skip-on-error.
     #[arg(long = "full", alias = "yall", alias = "yes", short = 'y')]
     pub full: bool,
+
+    /// Community bundle: caelestia + dev-stack + bluetooth (unattended).
+    /// Does NOT include `warp` — opt-in via `--profile warp`.
+    #[arg(long)]
+    pub community: bool,
 
     /// Skip Stage B entirely (harness only — no profile prompts).
     #[arg(long)]
@@ -137,7 +133,7 @@ pub fn run(a: Args) -> Result<()> {
     //   --profile <n>   → just one profile
     // Strict mode (default `8sync setup` with no flags) keeps existing
     // behaviour: interactive prompts, errors bail, no log file.
-    let yolo = a.full || a.caelestia.is_some() || a.profile.is_some();
+    let yolo = a.full || a.caelestia.is_some() || a.profile.is_some() || a.community;
     let log_path = if yolo && !a.dry_run {
         init_yolo_log().ok()
     } else {
@@ -156,6 +152,7 @@ pub fn run(a: Args) -> Result<()> {
         ui::info("would install paru (AUR helper) if missing");
         ui::info("would install codegraph (curl) if missing");
         ui::info("would write: configs + skills");
+        ui::info("would patch PATH in zsh/bash + ~/.config/fish/conf.d/8sync-path.fish");
         ui::info("would register codegraph as a global+local skill");
     } else {
         try_step("github-cli", yolo, &mut failures, || {
@@ -164,6 +161,7 @@ pub fn run(a: Args) -> Result<()> {
         try_step("omp",        yolo, &mut failures, install_omp)?;
         try_step("paru",       yolo, &mut failures, install_aur_helper)?;
         try_step("codegraph",  yolo, &mut failures, install_codegraph)?;
+        try_step("path-bootstrap", yolo, &mut failures, || { ensure_path_in_shells(); Ok(()) })?;
         try_step("configs",    yolo, &mut failures, || install_configs(&env))?;
         try_step("skills",     yolo, &mut failures, || install_skills(&env))?;
         try_step("codegraph-skill", yolo, &mut failures, || register_codegraph_skill(&env))?;
@@ -238,6 +236,26 @@ pub fn run(a: Args) -> Result<()> {
         return Ok(());
     }
 
+    // --community: caelestia + dev-stack + bluetooth (NOT warp)
+    if a.community {
+        let bundle = ["caelestia", "dev-stack", "bluetooth"];
+        ui::step("Stage B — --community: caelestia + dev-stack + bluetooth");
+        for n in &bundle {
+            if !all.contains_key(*n) {
+                ui::warn(&format!("profile `{}` not found — skipping", n));
+                continue;
+            }
+            try_step(&format!("profile:{}", n), yolo, &mut failures, || {
+                let resolved = profile::resolve(n, &all)?;
+                profile::apply(&resolved, true, a.dry_run)?;
+                if !a.dry_run { profile::mark_applied(n)?; }
+                Ok(())
+            })?;
+        }
+        finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
+        return Ok(());
+    }
+
     // Interactive y/N per profile (skip bundle profiles)
     if !env_detect::has_tty() {
         ui::info("no TTY — skipping interactive profile prompt (use --full / --caelestia / --profile)");
@@ -246,9 +264,19 @@ pub fn run(a: Args) -> Result<()> {
     }
 
 
-    ui::step("Stage B — personal profiles (y/N each)");
-    let mut names: Vec<&String> = all.keys().collect();
-    names.sort();
+    ui::step("Stage B — community profiles (y/N each)");
+    let order = ["caelestia", "dev-stack", "nvidia", "bluetooth", "warp"];
+    let mut names: Vec<&String> = all
+        .iter()
+        .filter(|(_, p)| p.extends.is_empty() && p.visibility == profile::Visibility::Community)
+        .map(|(k, _)| k)
+        .collect();
+    names.sort_by_key(|n| {
+        order
+            .iter()
+            .position(|o| o == &n.as_str())
+            .unwrap_or(usize::MAX)
+    });
     for name in &names {
         let p = match all.get(*name) {
             Some(p) => p,
@@ -371,21 +399,36 @@ fn install_codegraph() -> Result<()> {
             "curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh",
         ],
     )?;
-    ensure_local_bin_on_path();
+    ensure_path_in_shells();
     Ok(())
 }
 
-/// Ensure `~/.local/bin` is on PATH in ~/.zshrc and ~/.bashrc (idempotent).
-fn ensure_local_bin_on_path() {
+/// Ensure user-local bin dirs are on PATH in zsh/bash, and drop a fish
+/// `conf.d/` snippet that does the same via `fish_add_path`. Idempotent.
+///
+/// Paths covered (any that exist or will exist after setup):
+///   ~/.local/bin   — codegraph, 8sync, encore (most installers)
+///   ~/.cargo/bin   — rustup-installed binaries (cargo, rust-analyzer)
+///   ~/.bun/bin     — bun runtime / `bun install -g` shims
+///   ~/.encore/bin  — encore CLI
+fn ensure_path_in_shells() {
     let Some(home) = dirs::home_dir() else {
         return;
     };
-    let local_bin = home.join(".local/bin");
-    let marker = "# 8sync: ensure ~/.local/bin on PATH (for codegraph + 8sync)";
-    let snippet = format!(
-        "\n{marker}\ncase \":$PATH:\" in *\":{lb}:\"*) ;; *) export PATH=\"{lb}:$PATH\" ;; esac\n",
-        lb = local_bin.display(),
-    );
+    let dirs = [".local/bin", ".cargo/bin", ".bun/bin", ".encore/bin"];
+
+    // ── zsh / bash ────────────────────────────────────────────────
+    let marker = "# 8sync: PATH bootstrap (user-local bins for codegraph/bun/encore/cargo)";
+    let mut posix_block = String::from("\n");
+    posix_block.push_str(marker);
+    posix_block.push('\n');
+    for d in &dirs {
+        let p = home.join(d);
+        posix_block.push_str(&format!(
+            "case \":$PATH:\" in *\":{lb}:\"*) ;; *) export PATH=\"{lb}:$PATH\" ;; esac\n",
+            lb = p.display(),
+        ));
+    }
     for rc in [home.join(".zshrc"), home.join(".bashrc")] {
         if !rc.exists() {
             continue;
@@ -399,17 +442,43 @@ fn ensure_local_bin_on_path() {
             .open(&rc)
             .and_then(|mut f| {
                 use std::io::Write;
-                f.write_all(snippet.as_bytes())
+                f.write_all(posix_block.as_bytes())
             })
         {
             ui::warn(&format!("could not patch {}: {}", rc.display(), e));
             continue;
         }
-        ui::ok(&format!(
-            "patched {} (added ~/.local/bin to PATH)",
-            rc.display()
-        ));
+        ui::ok(&format!("patched {} (PATH bootstrap)", rc.display()));
     }
+
+    // ── fish (conf.d snippet — sourced on every interactive session) ─
+    let fish_dir = home.join(".config/fish/conf.d");
+    if let Err(e) = std::fs::create_dir_all(&fish_dir) {
+        ui::warn(&format!("could not create {}: {}", fish_dir.display(), e));
+        return;
+    }
+    let fish_file = fish_dir.join("8sync-path.fish");
+    let mut fish_body = String::new();
+    fish_body.push_str("# 8sync: PATH bootstrap — regenerated by `8sync setup`. Do not edit.\n");
+    fish_body.push_str("if status is-interactive\n");
+    fish_body.push_str("    fish_add_path --path \\\n");
+    let entries: Vec<String> = dirs
+        .iter()
+        .map(|d| format!("        $HOME/{}", d))
+        .collect();
+    fish_body.push_str(&entries.join(" \\\n"));
+    fish_body.push('\n');
+    fish_body.push_str("end\n");
+    let existing = std::fs::read_to_string(&fish_file).unwrap_or_default();
+    if existing == fish_body {
+        ui::skip(&fish_file.display().to_string(), "unchanged");
+        return;
+    }
+    if let Err(e) = std::fs::write(&fish_file, &fish_body) {
+        ui::warn(&format!("could not write {}: {}", fish_file.display(), e));
+        return;
+    }
+    ui::ok(&format!("wrote {} (fish PATH bootstrap)", fish_file.display()));
 }
 
 fn register_codegraph_skill(env: &env_detect::Env) -> Result<()> {
@@ -690,7 +759,11 @@ fn profile_sub(rest: Vec<String>, yes_to_all: bool, dry_run: bool) -> Result<()>
                     " "
                 };
                 let kind = if !p.extends.is_empty() { "(bundle)" } else { "" };
-                println!("  {} {:20} {} {}", marker, n, kind, p.description);
+                let vis = match p.visibility {
+                    profile::Visibility::Community => "community",
+                    profile::Visibility::Personal => "personal ",
+                };
+                println!("  {} {:20} [{}] {} {}", marker, n, vis, kind, p.description);
             }
             Ok(())
         }
@@ -701,9 +774,11 @@ fn profile_sub(rest: Vec<String>, yes_to_all: bool, dry_run: bool) -> Result<()>
             let r = profile::resolve(name, &all)?;
             println!("name         = {}", r.name);
             println!("description  = {}", r.description);
+            println!("visibility   = {:?}", r.visibility);
             println!("needs AUR    = {}", r.requires.aur_helper);
             println!("pacman       = {:?}", r.packages.pacman);
             println!("aur          = {:?}", r.packages.aur);
+            println!("aur (yay)    = {:?}", r.packages.aur_yay);
             println!("sys services = {:?}", r.services.system_enable);
             println!("user services= {:?}", r.services.user_enable);
             println!("commands     = {:?}", r.post_install.commands);

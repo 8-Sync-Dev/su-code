@@ -1,5 +1,6 @@
 name = "vietnamese"
 description = "Vietnamese input method (fcitx5 + Unikey)"
+visibility = "personal"
 
 [packages]
 pacman = ["fcitx5", "fcitx5-configtool", "fcitx5-gtk", "fcitx5-qt", "fcitx5-unikey"]

@@ -1,5 +1,6 @@
 name = "apps-personal"
 description = "Personal apps (Bitwarden)"
+visibility = "personal"
 
 [packages]
 pacman = ["bitwarden"]
