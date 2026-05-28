@@ -482,14 +482,26 @@ fn ensure_path_in_shells() {
 }
 
 fn register_codegraph_skill(env: &env_detect::Env) -> Result<()> {
-    ui::step("Register codegraph skill (force-load)");
-    let skills_toml = env.xdg_config.join("8sync/skills.toml");
-    if let Err(e) = crate::verbs::skill::add_spec(env, &skills_toml, "gh:colbymchenry/codegraph") {
-        ui::warn(&format!(
-            "could not auto-register codegraph: {} (skill will still work but missing frontmatter)",
-            e
-        ));
+    ui::step("Register codegraph skill (bundled)");
+    // SKILL.md tree is shipped from embedded assets via `install_skills`
+    // (no upstream README synthesis). Here we just append a registry entry to
+    // skills.toml so `8sync skill list` shows codegraph as an always-on skill.
+    let toml_path = env.xdg_config.join("8sync/skills.toml");
+    if let Some(parent) = toml_path.parent() {
+        std::fs::create_dir_all(parent)?;
     }
+    let existing = std::fs::read_to_string(&toml_path).unwrap_or_default();
+    if existing.contains("[codegraph]") {
+        ui::skip(&toml_path.display().to_string(), "codegraph already registered");
+        return Ok(());
+    }
+    let mut s = existing;
+    if !s.ends_with('\n') && !s.is_empty() {
+        s.push('\n');
+    }
+    s.push_str("\n[codegraph]\nsrc  = \"builtin:codegraph\"\nwhen = \"always\"\n");
+    std::fs::write(&toml_path, s)?;
+    ui::ok(&format!("registered 'codegraph' → {}", toml_path.display()));
     Ok(())
 }
 
@@ -514,18 +526,26 @@ fn install_skills(env: &env_detect::Env) -> Result<()> {
     ui::step("Skills (~/.omp/skills/)");
     let skills_dir = env.home.join(".omp/skills");
     std::fs::create_dir_all(&skills_dir)?;
-    let trio = [
-        ("skills/karpathy/SKILL.md", "karpathy-guidelines/SKILL.md"),
-        ("skills/image-routing/SKILL.md", "image-routing/SKILL.md"),
-        ("skills/8sync-cli/SKILL.md", "8sync-cli/SKILL.md"),
+    // Bundled skills: deploy entire tree (SKILL.md + scripts/ + references/).
+    let bundled: [(&str, &str); 4] = [
+        ("skills/karpathy",      "karpathy-guidelines"),
+        ("skills/image-routing", "image-routing"),
+        ("skills/8sync-cli",     "8sync-cli"),
+        ("skills/codegraph",     "codegraph"),
     ];
-    for (src, rel) in &trio {
-        let target = skills_dir.join(rel);
-        let changed = assets::install(src, &target, false)?;
-        if changed {
-            ui::ok(&format!("wrote {}", target.display()));
+    for (prefix, name) in &bundled {
+        let target = skills_dir.join(name);
+        std::fs::create_dir_all(&target)?;
+        let (written, _unchanged) = assets::install_tree(prefix, &target)?;
+        if written > 0 {
+            ui::ok(&format!("synced {} ({} file(s)) → {}", name, written, target.display()));
         } else {
             ui::skip(&target.display().to_string(), "unchanged");
+        }
+        // Ensure 3-folder layout even if the bundled tree didn't ship a
+        // `scripts/` or `references/` subdir (karpathy/image-routing/8sync-cli).
+        for sub in ["scripts", "references"] {
+            let _ = std::fs::create_dir_all(target.join(sub));
         }
     }
     let master = skills_dir.join("00-force-load.md");

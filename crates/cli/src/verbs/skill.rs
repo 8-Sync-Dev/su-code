@@ -1,9 +1,7 @@
-// Public, programmatic entrypoint used from setup.rs to register codegraph
-// (and any other always-on skill) without going through the CLI.
-pub fn add_spec(env: &crate::env_detect::Env, toml_path: &std::path::Path, spec: &str) -> anyhow::Result<()> {
-    add_skill(env, toml_path, Some(spec))
-}
-
+// Programmatic entrypoints for other modules can be added here. The previous
+// `add_spec` wrapper for synthesising codegraph from upstream README was
+// removed when codegraph became a bundled skill (deployed from embedded
+// assets via `install_bundled_global` / `install_skills`).
 use anyhow::{anyhow, Result};
 use clap::Args as ClapArgs;
 use std::path::{Path, PathBuf};
@@ -572,24 +570,38 @@ fn sync_skills(env: &env_detect::Env) -> Result<()> {
     ui::ok(&format!("synced master skill list → {}", target.display()));
     ui::info("global: every new omp session will read this file first");
 
-    // 2. Re-deploy the 3 bundled skills into ~/.omp/skills/ from embedded assets,
-    //    so users who only ran `8sync skill sync` (without `8sync setup`) still
-    //    get the built-ins installed globally.
+    // 2. Re-deploy the bundled skills into ~/.omp/skills/ from embedded assets
+    //    (karpathy, image-routing, 8sync-cli, codegraph). Each skill is deployed
+    //    as a 3-folder tree per Agent Skills open standard: SKILL.md + optional
+    //    scripts/ + optional references/.
     install_bundled_global(env)?;
 
-    // 3. Ensure codegraph is installed AND has a synthesized SKILL.md. This
-    //    makes `sync` self-sufficient — running it on a fresh machine brings
-    //    every always-on skill into place without requiring `8sync setup`.
+    // 3. Ensure codegraph binary is installed (the SKILL.md tree was deployed
+    //    in step 2 from bundled assets — no upstream README synthesis anymore).
     ensure_codegraph(env)?;
 
-    // 4. If we're inside a project, mirror every global skill into
-    //    <root>/agents/skills/<name>/ so the project gets a committable,
-    //    vendored copy that AI loads via AGENTS.md.
+    // 4. Guarantee every global skill dir has the 3-folder layout
+    //    (SKILL.md + scripts/ + references/) so future skill authors land on
+    //    a consistent shape — and so that any user-added skill that omitted
+    //    the optional subdirs still presents the canonical structure.
+    let global_dir = env.home.join(".omp/skills");
+    for d in list_installed_skill_dirs(&global_dir).unwrap_or_default() {
+        ensure_skill_layout(&d);
+    }
+
+    // 5. If we're inside a project, mirror every global skill into
+    //    <root>/agents/skills/<name>/, normalise their layout, auto-init
+    //    codegraph for the project, and refresh the AGENTS.md sentinel block.
     if let Some(root) = detect_current_project_root() {
         let count = mirror_global_to_local(&env.home, &root)?;
         if count > 0 {
             ui::ok(&format!("mirrored {} skill(s) into {}", count, root.join("agents/skills").display()));
         }
+        let local_dir = root.join("agents/skills");
+        for d in list_installed_skill_dirs(&local_dir).unwrap_or_default() {
+            ensure_skill_layout(&d);
+        }
+        ensure_codegraph_init(&root);
         inject_agents_md(&env.home, &root)?;
     } else {
         ui::warn("not inside a project (no AGENTS.md/.git/Cargo.toml/package.json/... in cwd or ancestors)");
@@ -599,11 +611,10 @@ fn sync_skills(env: &env_detect::Env) -> Result<()> {
     Ok(())
 }
 
-/// Make sure the `codegraph` binary is installed (curl installer) and that
-/// `~/.omp/skills/codegraph/SKILL.md` exists with valid YAML frontmatter
-/// (synthesised from the upstream README via `8sync skill add gh:…`).
+/// Make sure the `codegraph` binary is installed (upstream curl installer).
+/// The SKILL.md tree is deployed separately from embedded assets, so we no
+/// longer need to synthesise frontmatter from the upstream README here.
 fn ensure_codegraph(env: &env_detect::Env) -> Result<()> {
-    // Install binary if missing.
     if which::which("codegraph").is_err() {
         ui::step("codegraph (binary missing — running upstream curl installer)");
         let url = "https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh";
@@ -613,7 +624,7 @@ fn ensure_codegraph(env: &env_detect::Env) -> Result<()> {
             .status();
         match st {
             Ok(s) if s.success() => ui::ok("codegraph installed"),
-            Ok(s) => ui::warn(&format!("codegraph installer exited {} — skill registration will still proceed", s)),
+            Ok(s) => ui::warn(&format!("codegraph installer exited {} — skill SKILL.md was still deployed", s)),
             Err(e) => ui::warn(&format!("could not run installer: {} — continuing", e)),
         }
     } else {
@@ -621,43 +632,84 @@ fn ensure_codegraph(env: &env_detect::Env) -> Result<()> {
         ui::skip("codegraph", &format!("present ({})", v));
     }
 
-    // Register / refresh the SKILL.md (idempotent — `add_spec` re-fetches the
-    // README and rewrites SKILL.md if changed).
-    let skill_md = env.home.join(".omp/skills/codegraph/SKILL.md");
-    let needs_register = read_skill_meta(&skill_md).map(|m| m.is_none()).unwrap_or(true);
-    if needs_register {
-        ui::step("codegraph skill — synthesising SKILL.md from upstream README");
-        if let Err(e) = add_spec(env, &env.xdg_config.join("8sync/skills.toml"), "gh:colbymchenry/codegraph") {
-            ui::warn(&format!("could not register codegraph skill: {} (run `8sync skill add gh:colbymchenry/codegraph` manually)", e));
+    // Register codegraph in the skills.toml registry for discoverability via
+    // `8sync skill list`. Idempotent: only appends if the section is missing.
+    let toml_path = env.xdg_config.join("8sync/skills.toml");
+    if let Some(parent) = toml_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let existing = std::fs::read_to_string(&toml_path).unwrap_or_default();
+    if !existing.contains("[codegraph]") {
+        let mut s = existing;
+        if !s.ends_with('\n') && !s.is_empty() {
+            s.push('\n');
         }
-    } else {
-        ui::skip("codegraph SKILL.md", "frontmatter valid");
+        s.push_str("\n[codegraph]\nsrc  = \"builtin:codegraph\"\nwhen = \"always\"\n");
+        std::fs::write(&toml_path, s)?;
+        ui::ok(&format!("registered 'codegraph' → {}", toml_path.display()));
     }
     Ok(())
 }
 
-/// Write the 3 bundled skills (karpathy, image-routing, 8sync-cli) to
-/// ~/.omp/skills/<name>/SKILL.md from the embedded asset bundle. Overwrites
-/// existing SKILL.md to keep frontmatter up to date.
+/// Ensure a skill directory follows the Agent Skills 3-folder layout:
+///   <name>/
+///   ├── SKILL.md        (required — caller should have written this)
+///   ├── scripts/        (created empty if missing)
+///   └── references/     (created empty if missing)
+/// Idempotent. Empty dirs are intentional — git silently drops empty dirs, so
+/// no `.gitkeep` placeholders are written.
+fn ensure_skill_layout(dir: &Path) {
+    for sub in ["scripts", "references"] {
+        let p = dir.join(sub);
+        if !p.exists() {
+            let _ = std::fs::create_dir_all(&p);
+        }
+    }
+}
+
+/// If `<root>/.codegraph/` is missing and the `codegraph` binary is on PATH,
+/// run `codegraph init <root>` so the project has a semantic index ready for
+/// the first AI session. Best-effort: warns on failure, never bails.
+fn ensure_codegraph_init(root: &Path) {
+    let marker = root.join(".codegraph");
+    if marker.exists() {
+        ui::skip(&marker.display().to_string(), "codegraph already initialised");
+        return;
+    }
+    if which::which("codegraph").is_err() {
+        ui::warn("codegraph binary not on PATH — skipping `codegraph init`");
+        return;
+    }
+    ui::step(&format!("codegraph init {}", root.display()));
+    let st = Command::new("codegraph")
+        .arg("init")
+        .arg(root)
+        .status();
+    match st {
+        Ok(s) if s.success() => ui::ok(&format!("initialised {}", marker.display())),
+        Ok(s) => ui::warn(&format!("`codegraph init` exited {} — run manually", s)),
+        Err(e) => ui::warn(&format!("could not invoke codegraph: {}", e)),
+    }
+}
+
+/// Deploy every bundled skill tree under `assets/skills/<name>/` into
+/// `~/.omp/skills/<name>/`. Each tree is deployed verbatim including any
+/// `references/` or `scripts/` subdirs. Shell scripts get mode 0755.
 fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
-    let trio: [(&str, &str); 3] = [
-        ("skills/karpathy/SKILL.md",      "karpathy-guidelines"),
-        ("skills/image-routing/SKILL.md", "image-routing"),
-        ("skills/8sync-cli/SKILL.md",     "8sync-cli"),
+    // (asset prefix, target subdir name)
+    let bundled: [(&str, &str); 4] = [
+        ("skills/karpathy",      "karpathy-guidelines"),
+        ("skills/image-routing", "image-routing"),
+        ("skills/8sync-cli",     "8sync-cli"),
+        ("skills/codegraph",     "codegraph"),
     ];
-    for (asset_path, name) in trio {
-        let Some(body) = assets::read(asset_path) else {
-            ui::warn(&format!("asset missing: {}", asset_path));
-            continue;
-        };
+    for (asset_prefix, name) in bundled {
         let target_dir = skills_dir.join(name);
         std::fs::create_dir_all(&target_dir)?;
-        let target = target_dir.join("SKILL.md");
-        let prev = std::fs::read_to_string(&target).unwrap_or_default();
-        if prev != body {
-            std::fs::write(&target, body)?;
-            ui::ok(&format!("wrote {}", target.display()));
+        let (written, _unchanged) = assets::install_tree(asset_prefix, &target_dir)?;
+        if written > 0 {
+            ui::ok(&format!("synced {} ({} file(s) written) → {}", name, written, target_dir.display()));
         }
     }
     Ok(())

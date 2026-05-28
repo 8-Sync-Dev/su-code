@@ -142,9 +142,11 @@ System packages (`pacman -Syu`) **không** tự chạy — bạn tự quyết kh
 | `8sync skill add <github-url>` | Clone repo skill vào **cả** `~/.omp/skills/<name>/` (omp đọc) **và** `<project>/agents/skills/<name>/` (memory dự án). Rewrite block `<!-- 8sync:skills:* -->` trong `AGENTS.md` |
 | `8sync skill add gh:owner/repo` | Short form |
 | `8sync skill add path:/abs/path` | Symlink từ local dir |
-| `8sync skill sync` | Refresh `~/.omp/skills/00-force-load.md` từ asset bundle |
+| `8sync skill sync` | Refresh master skill list + re-deploy bundled skills (karpathy / image-routing / 8sync-cli / **codegraph**) into `~/.omp/skills/` + mirror to `agents/skills/`. Inside a project: auto-runs `codegraph init` to bootstrap `.codegraph/` if missing |
 
 Idempotent: chạy lại `add` cùng URL → `git pull --ff-only` thay vì clone lại.
+Mỗi skill dir tuân theo Agent Skills 3-folder layout: `SKILL.md` (required) + `scripts/` (helpers) + `references/` (load on demand). `8sync skill sync` tự tạo `scripts/` / `references/` nếu thiếu.
+
 
 ### Lifecycle
 
