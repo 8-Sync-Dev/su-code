@@ -10,5 +10,24 @@ system_enable = ["bluetooth.service"]
 user_enable = []
 
 [post_install]
-commands = []
-hint = "Pair device qua KDE/GNOME applet hoặc `bluetoothctl`. Service đã enable lúc boot — không cần bật tay nữa."
+commands = [
+  # Ensure the controller auto-powers-on every boot. bluez gates this behind
+  # [Policy] AutoEnable in /etc/bluetooth/main.conf — on a fresh install it may
+  # be commented or =false, so the service running isn't enough. Idempotent:
+  # rewrites a commented/false key, or inserts one under [Policy].
+  """bash -c 'CONF=/etc/bluetooth/main.conf; \
+[ -f "$CONF" ] || { echo "[bluetooth] $CONF not found — skip"; exit 0; }; \
+if grep -qE "^[[:space:]]*#?[[:space:]]*AutoEnable[[:space:]]*=" "$CONF"; then \
+  sudo sed -i -E "s/^[[:space:]]*#?[[:space:]]*AutoEnable[[:space:]]*=.*/AutoEnable=true/" "$CONF"; \
+elif grep -q "^\\[Policy\\]" "$CONF"; then \
+  sudo sed -i "/^\\[Policy\\]/a AutoEnable=true" "$CONF"; \
+else \
+  printf "\\n[Policy]\\nAutoEnable=true\\n" | sudo tee -a "$CONF" >/dev/null; \
+fi; \
+echo "[bluetooth] AutoEnable=true ensured in $CONF"'""",
+
+  # Power on the controller now so it works in the current session without a
+  # reboot. Best-effort: no controller / rfkill-blocked → just warn.
+  """bash -c 'bluetoothctl power on >/dev/null 2>&1 && echo "[bluetooth] controller powered on" || echo "[bluetooth] could not power on now (no adapter or rfkill) — auto-enables on next boot"'""",
+]
+hint = "Pair device qua KDE/GNOME applet hoặc `bluetoothctl`. Controller tự bật khi boot (AutoEnable) + đã bật sẵn cho session này — không cần thao tác tay."
