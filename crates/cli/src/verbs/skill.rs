@@ -698,11 +698,12 @@ fn ensure_codegraph_init(root: &Path) {
 fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
     // (asset prefix, target subdir name)
-    let bundled: [(&str, &str); 4] = [
+    let bundled: [(&str, &str); 5] = [
         ("skills/karpathy",      "karpathy-guidelines"),
         ("skills/image-routing", "image-routing"),
         ("skills/8sync-cli",     "8sync-cli"),
         ("skills/codegraph",     "codegraph"),
+        ("skills/last30days",    "last30days"),
     ];
     for (asset_prefix, name) in bundled {
         let target_dir = skills_dir.join(name);
