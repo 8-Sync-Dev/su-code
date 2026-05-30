@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use clap::Args as ClapArgs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::collections::BTreeSet;
 
 use crate::{assets, env_detect, ui};
 
@@ -1058,6 +1059,18 @@ fn find_line(hay: &str, needle: &str) -> Option<usize> {
     None
 }
 
+/// Always-on skills are read on EVERY session before the first tool call.
+/// These are the bundled engineering-discipline / tooling skills (the same set
+/// listed in `assets/skills/00-force-load.md`). Every other skill — including
+/// user-added ones and on-demand research tools like `last30days` — is read
+/// only when its description matches the task at hand.
+fn is_always_on(dirname: &str) -> bool {
+    matches!(
+        dirname,
+        "codegraph" | "karpathy-guidelines" | "8sync-cli" | "image-routing"
+    )
+}
+
 /// Rewrite (or insert) the force-load block in **every** agent entry file at
 /// the project root: AGENTS.md, CLAUDE.md, GEMINI.md, .cursorrules, .windsurfrules.
 /// Each existing file gets the block injected. Each missing well-known file gets
@@ -1075,50 +1088,57 @@ pub fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
     pin_skill_first(&mut globals, "codegraph");
     pin_skill_first(&mut locals, "codegraph");
 
-    // --- 1. READ NOW header: explicit absolute paths agents must open right now.
-    let mut read_now = String::new();
-    read_now.push_str("**READ NOW (in order). Do NOT skip. Open each file BEFORE the first tool call:**\n\n");
-    let mut idx = 1usize;
-    for p in globals.iter().chain(locals.iter()) {
-        let (_, entry) = meta_for_dir(p);
-        let file = p.join(entry);
-        read_now.push_str(&format!("  {}. `{}`\n", idx, file.display()));
-        idx += 1;
-    }
-    if idx == 1 {
-        read_now.push_str("  _(no skills installed yet — run `8sync skill sync`)_\n");
-    }
-
-    // --- 2. Annotated list with descriptions (for humans + indexing agents).
-    let mut g_lines = String::new();
-    if globals.is_empty() {
-        g_lines.push_str("- _(none — run `8sync skill sync` after `8sync setup`)_\n");
-    } else {
-        for (i, p) in globals.iter().enumerate() {
-            let (m, entry) = meta_for_dir(p);
-            let desc = if m.description.is_empty() { "(no description)".to_string() } else { m.description };
-            let dirname = p.file_name().and_then(|s| s.to_str()).unwrap_or("?");
-            g_lines.push_str(&format!(
-                "{}. **`{}`** — `~/.omp/skills/{}/{}`\n     _{}_\n",
-                i + 1, m.name, dirname, entry, desc,
-            ));
+    // --- 1. Dedupe global vs local (locals mirror globals): list each skill
+    //     once, preferring the committed local copy under agents/skills/. Then
+    //     split into always-on (mandatory pre-flight read) vs on-demand (read
+    //     only when the task matches the skill's description).
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let mut chosen: Vec<(PathBuf, bool)> = Vec::new(); // (dir, is_local)
+    for p in locals.iter() {
+        if let Some(n) = p.file_name().and_then(|s| s.to_str()) {
+            if seen.insert(n.to_string()) { chosen.push((p.clone(), true)); }
         }
     }
-
-    let mut l_lines = String::new();
-    if locals.is_empty() {
-        l_lines.push_str("- _(none yet — run `8sync skill add <github-url>`)_\n");
-    } else {
-        for (i, p) in locals.iter().enumerate() {
-            let (m, entry) = meta_for_dir(p);
-            let desc = if m.description.is_empty() { "(no description)".to_string() } else { m.description };
-            let dirname = p.file_name().and_then(|s| s.to_str()).unwrap_or("?");
-            l_lines.push_str(&format!(
-                "{}. **`{}`** — `agents/skills/{}/{}`\n     _{}_\n",
-                i + 1, m.name, dirname, entry, desc,
-            ));
+    for p in globals.iter() {
+        if let Some(n) = p.file_name().and_then(|s| s.to_str()) {
+            if seen.insert(n.to_string()) { chosen.push((p.clone(), false)); }
         }
     }
+    // codegraph leads the always-on list (rule #0).
+    chosen.sort_by_key(|(p, _)| match p.file_name().and_then(|s| s.to_str()) {
+        Some("codegraph") => 0,
+        _ => 1,
+    });
+
+    let mut always_lines = String::new();
+    let mut ondemand_lines = String::new();
+    let mut a_idx = 1usize;
+    let mut on_count = 0usize;
+    for (p, is_local) in chosen.iter() {
+        let (m, entry) = meta_for_dir(p);
+        let dirname = p.file_name().and_then(|s| s.to_str()).unwrap_or("?");
+        if is_always_on(dirname) {
+            let abs = p.join(entry);
+            always_lines.push_str(&format!("  {}. `{}`\n", a_idx, abs.display()));
+            a_idx += 1;
+        } else {
+            let rel = if *is_local {
+                format!("agents/skills/{}/{}", dirname, entry)
+            } else {
+                format!("~/.omp/skills/{}/{}", dirname, entry)
+            };
+            let desc = if m.description.is_empty() { "(no description)".to_string() } else { m.description };
+            ondemand_lines.push_str(&format!("- **`{}`** — `{}`\n     _{}_\n", m.name, rel, desc));
+            on_count += 1;
+        }
+    }
+    if a_idx == 1 {
+        always_lines.push_str("  _(no always-on skills — run `8sync skill sync`)_\n");
+    }
+    if on_count == 0 {
+        ondemand_lines.push_str("- _(none — add via `8sync skill add <github-url>`)_\n");
+    }
+    let always_count = a_idx - 1;
 
     // Detect if codegraph is installed locally (binary on PATH) so we can tune
     // the STEP 0 hint between "run it" vs "install + run it".
@@ -1143,25 +1163,24 @@ pub fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
 Lý do: ~35% rẻ hơn token, ~70% ít tool call hơn, 100% local. Dump cả file = đốt token vô ích.\n\
 \n\
 {codegraph_install_hint}\
-## 🚨 STEP 1 — đọc TẤT CẢ skill dưới TRƯỚC khi gọi tool đầu tiên\n\
+## 🚨 STEP 1 — skills: always-on (đọc ngay) vs on-demand (đọc khi cần)\n\
 \n\
-Không skip, không suy đoán, không viết tắt. AGENTS.md chỉ là index — nội dung thực ở các `SKILL.md` được liệt kê.\n\
+Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatter `name`+`description`. Skill vendored ở `agents/skills/<name>/` (bản commit trong repo, mirror từ `~/.omp/skills/`). Mỗi skill liệt kê 1 lần.\n\
 \n\
-{read_now}\n\
-Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview): `SKILL.md` ở root có YAML frontmatter (`name`, `description`). Description cho biết **khi nào** dùng skill.\n\
+### ⛔ Always-on — ĐỌC NGAY, trước tool call đầu tiên (không skip)\n\
 \n\
-### Global skills (always-on — `~/.omp/skills/`)\n\
-{g_lines}\n\
-### Project-local skills (BẮT BUỘC dùng cho repo này — `agents/skills/`)\n\
-{l_lines}\n\
+{always_lines}\n\
+### 🔎 On-demand — CHỈ đọc khi task khớp mô tả (bỏ qua nếu không liên quan)\n\
+\n\
+{ondemand_lines}\n\
 ### Quy tắc bất biến\n\
 \n\
 - **`codegraph` FIRST** cho mọi câu hỏi explore code (Step 0). Bypass = bug.\n\
-- Đọc TẤT CẢ `SKILL.md` / `CLAUDE.md` ở 2 list trên TRƯỚC khi gọi tool đầu tiên.\n\
+- Đọc TẤT CẢ skill **always-on** TRƯỚC khi gọi tool đầu tiên.\n\
+- Skill **on-demand**: chỉ mở khi description khớp task hiện tại — đừng đọc thừa.\n\
 - Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.\n\
 - Nếu skill có `references/` → đọc on-demand khi task chạm chủ đề.\n\
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.\n\
-- Nếu skill local có description match task hiện tại, bạn **MUST** đọc nó trước khi sửa code.\n\
 {END}"
     );
 
@@ -1213,8 +1232,8 @@ Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.c
     }
 
     ui::info(&format!(
-        "force-load: {} global skills, {} local skills, written into {} file(s)",
-        globals.len(), locals.len(), written,
+        "force-load: {} always-on, {} on-demand skill(s), written into {} file(s)",
+        always_count, on_count, written,
     ));
     Ok(())
 }

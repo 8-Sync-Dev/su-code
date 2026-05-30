@@ -12,55 +12,28 @@
 
 Lý do: ~35% rẻ hơn token, ~70% ít tool call hơn, 100% local. Dump cả file = đốt token vô ích.
 
-## 🚨 STEP 1 — đọc TẤT CẢ skill dưới TRƯỚC khi gọi tool đầu tiên
+## 🚨 STEP 1 — skills: always-on (đọc ngay) vs on-demand (đọc khi cần)
 
-Không skip, không suy đoán, không viết tắt. AGENTS.md chỉ là index — nội dung thực ở các `SKILL.md` được liệt kê.
+Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatter `name`+`description`. Skill vendored ở `agents/skills/<name>/` (bản commit trong repo, mirror từ `~/.omp/skills/`). Mỗi skill liệt kê 1 lần.
 
-**READ NOW (in order). Do NOT skip. Open each file BEFORE the first tool call:**
+### ⛔ Always-on — ĐỌC NGAY, trước tool call đầu tiên (không skip)
 
-  1. `/home/alexdev/.omp/skills/codegraph/SKILL.md`
-  2. `/home/alexdev/.omp/skills/8sync-cli/SKILL.md`
-  3. `/home/alexdev/.omp/skills/image-routing/SKILL.md`
-  4. `/home/alexdev/.omp/skills/karpathy-guidelines/SKILL.md`
-  5. `/home/alexdev/.omp/skills/last30days/SKILL.md`
-  6. `/home/alexdev/Projects/su-code/agents/skills/codegraph/SKILL.md`
-  7. `/home/alexdev/Projects/su-code/agents/skills/8sync-cli/SKILL.md`
-  8. `/home/alexdev/Projects/su-code/agents/skills/image-routing/SKILL.md`
-  9. `/home/alexdev/Projects/su-code/agents/skills/karpathy-guidelines/SKILL.md`
-  10. `/home/alexdev/Projects/su-code/agents/skills/last30days/SKILL.md`
+  1. `/home/alexdev/Projects/su-code/agents/skills/codegraph/SKILL.md`
+  2. `/home/alexdev/Projects/su-code/agents/skills/8sync-cli/SKILL.md`
+  3. `/home/alexdev/Projects/su-code/agents/skills/image-routing/SKILL.md`
+  4. `/home/alexdev/Projects/su-code/agents/skills/karpathy-guidelines/SKILL.md`
 
-Mỗi skill là 1 directory theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview): `SKILL.md` ở root có YAML frontmatter (`name`, `description`). Description cho biết **khi nào** dùng skill.
+### 🔎 On-demand — CHỈ đọc khi task khớp mô tả (bỏ qua nếu không liên quan)
 
-### Global skills (always-on — `~/.omp/skills/`)
-1. **`codegraph`** — `~/.omp/skills/codegraph/SKILL.md`
-     _Use this skill on EVERY question that touches code in a project where `.codegraph/` exists. Triggers — "where is X defined", "what calls Y", "find references to Z", "explore <subsystem>", "understand the dependency graph", "outline this file", any keyword/symbol search. Saves ~35% tokens and ~70% tool calls vs raw grep/Read/Glob. The AI MUST prefer `codegraph` commands over `rg`/`fd`/`grep`/`Read`-whole-file whenever a semantic answer is wanted._
-2. **`8sync-cli`** — `~/.omp/skills/8sync-cli/SKILL.md`
-     _Use this skill in EVERY session inside a repo whose AGENTS.md mentions 8sync. It teaches the AI which 8sync verbs (shot/diff-img/pdf-img/find/note/ship/skill/run) to use instead of raw shell equivalents — saving 3-10× tokens and keeping session memory in agents/* consistent. The AI MUST prefer the listed 8sync verbs over rg/fd/git/curl/etc when an equivalent exists._
-3. **`image-routing`** — `~/.omp/skills/image-routing/SKILL.md`
-     _Use this skill on EVERY read request to decide between text and image representation. Apply whenever the AI is about to open a PDF, screenshot a URL, review a UI, inspect a long git diff, or process diagrams — picking the wrong format wastes 3-10× tokens. The AI MUST consult the decision table here before issuing any read tool call on non-trivial content._
-4. **`karpathy-guidelines`** — `~/.omp/skills/karpathy-guidelines/SKILL.md`
-     _Use this skill before EVERY non-trivial coding task. It enforces Andrej Karpathy-style engineering discipline — read-before-write, test-before-refactor, small steps, boring-is-better, delete-more-than-you-add. Apply whenever the user asks for code, refactor, debug, or review work; the AI MUST cite a rule from this skill before claiming "done"._
-5. **`last30days`** — `~/.omp/skills/last30days/SKILL.md`
-     _Use this skill when the user asks "what are people saying about X", "research <topic> recently", "what's trending on Reddit/X/YouTube about Y", pre-meeting/pre-call briefings, "last 30 days of Z", competitor scans, or any recency-grounded social research. It runs the `/last30days` agent skill (separately installed engine) that searches Reddit, X, YouTube, TikTok, Hacker News, Polymarket, GitHub, Bluesky and the web in parallel, scores by real engagement, and synthesizes one cited brief. Prefer it over ad-hoc WebSearch when the user wants what the community actually thinks RIGHT NOW._
-
-### Project-local skills (BẮT BUỘC dùng cho repo này — `agents/skills/`)
-1. **`codegraph`** — `agents/skills/codegraph/SKILL.md`
-     _Use this skill on EVERY question that touches code in a project where `.codegraph/` exists. Triggers — "where is X defined", "what calls Y", "find references to Z", "explore <subsystem>", "understand the dependency graph", "outline this file", any keyword/symbol search. Saves ~35% tokens and ~70% tool calls vs raw grep/Read/Glob. The AI MUST prefer `codegraph` commands over `rg`/`fd`/`grep`/`Read`-whole-file whenever a semantic answer is wanted._
-2. **`8sync-cli`** — `agents/skills/8sync-cli/SKILL.md`
-     _Use this skill in EVERY session inside a repo whose AGENTS.md mentions 8sync. It teaches the AI which 8sync verbs (shot/diff-img/pdf-img/find/note/ship/skill/run) to use instead of raw shell equivalents — saving 3-10× tokens and keeping session memory in agents/* consistent. The AI MUST prefer the listed 8sync verbs over rg/fd/git/curl/etc when an equivalent exists._
-3. **`image-routing`** — `agents/skills/image-routing/SKILL.md`
-     _Use this skill on EVERY read request to decide between text and image representation. Apply whenever the AI is about to open a PDF, screenshot a URL, review a UI, inspect a long git diff, or process diagrams — picking the wrong format wastes 3-10× tokens. The AI MUST consult the decision table here before issuing any read tool call on non-trivial content._
-4. **`karpathy-guidelines`** — `agents/skills/karpathy-guidelines/SKILL.md`
-     _Use this skill before EVERY non-trivial coding task. It enforces Andrej Karpathy-style engineering discipline — read-before-write, test-before-refactor, small steps, boring-is-better, delete-more-than-you-add. Apply whenever the user asks for code, refactor, debug, or review work; the AI MUST cite a rule from this skill before claiming "done"._
-5. **`last30days`** — `agents/skills/last30days/SKILL.md`
+- **`last30days`** — `agents/skills/last30days/SKILL.md`
      _Use this skill when the user asks "what are people saying about X", "research <topic> recently", "what's trending on Reddit/X/YouTube about Y", pre-meeting/pre-call briefings, "last 30 days of Z", competitor scans, or any recency-grounded social research. It runs the `/last30days` agent skill (separately installed engine) that searches Reddit, X, YouTube, TikTok, Hacker News, Polymarket, GitHub, Bluesky and the web in parallel, scores by real engagement, and synthesizes one cited brief. Prefer it over ad-hoc WebSearch when the user wants what the community actually thinks RIGHT NOW._
 
 ### Quy tắc bất biến
 
 - **`codegraph` FIRST** cho mọi câu hỏi explore code (Step 0). Bypass = bug.
-- Đọc TẤT CẢ `SKILL.md` / `CLAUDE.md` ở 2 list trên TRƯỚC khi gọi tool đầu tiên.
+- Đọc TẤT CẢ skill **always-on** TRƯỚC khi gọi tool đầu tiên.
+- Skill **on-demand**: chỉ mở khi description khớp task hiện tại — đừng đọc thừa.
 - Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.
 - Nếu skill có `references/` → đọc on-demand khi task chạm chủ đề.
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.
-- Nếu skill local có description match task hiện tại, bạn **MUST** đọc nó trước khi sửa code.
 <!-- 8sync:skills:end -->
