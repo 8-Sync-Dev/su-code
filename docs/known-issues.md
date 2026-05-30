@@ -13,9 +13,7 @@ SDDM session). To return any machine to a clean state:
 Fresh install (no 8sync yet):
 
 ```sh
-curl -fsSL -o ~/.local/bin/8sync \
-  https://github.com/8-Sync-Dev/su-code/releases/latest/download/8sync-linux-x86_64 \
-  && chmod +x ~/.local/bin/8sync \
+curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh \
   && 8sync setup
 ```
 

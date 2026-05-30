@@ -36,10 +36,8 @@ Script standalone trong [`scripts/install-caelestia.sh`](scripts/install-caelest
 ## TL;DR
 
 ```bash
-# Cài lần đầu (Arch/CachyOS, đã có git)
-git clone https://github.com/8-Sync-Dev/su-code.git
-cd su-code
-bash scripts/bootstrap.sh        # → ~/.local/bin/8sync
+# Cài lần đầu — one-liner, tải binary prebuilt (KHÔNG cần git/rust/cargo)
+curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
 8sync setup --dry-run            # xem plan trước
 8sync setup                      # cài harness + curated y/N (community profiles)
 # hoặc:
@@ -57,9 +55,24 @@ cd <project>
 
 ## Cài đặt
 
-### 1. Bootstrap (máy mới)
+### 1. One-liner (khuyến nghị) — tải binary prebuilt
 
-`scripts/bootstrap.sh` cài rustup (nếu thiếu) → `cargo build --release --locked` → copy binary vào `~/.local/bin/8sync`.
+Không cần git, rustup, hay cargo. `install.sh` resolve release mới nhất, tải `8sync-<tag>-linux-x86_64` từ GitHub Releases, đặt vào `~/.local/bin/8sync` (replace bản cũ atomically).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
+```
+
+- **Nâng cấp**: chạy lại y hệt, hoặc `8sync up`.
+- **Pin version**: `curl -fsSL .../install.sh | SUSYNC_VERSION=v0.12.1 sh`
+- **Đổi thư mục cài**: `... | SUSYNC_BIN_DIR=~/bin sh`
+- **Gỡ**: `curl -fsSL .../install.sh | sh -s -- --uninstall`
+
+PATH cho `~/.local/bin`, `~/.cargo/bin`, `~/.bun/bin`, `~/.encore/bin` được tự patch vào zsh / bash / fish khi bạn chạy `8sync setup` lần đầu (xem Stage A). Nếu `~/.local/bin` chưa có trong PATH lúc cài, script sẽ in hint.
+
+### 2. Build từ source (contributor) — `scripts/bootstrap.sh`
+
+Dùng khi muốn build từ code (chưa có prebuilt cho arch của bạn, hoặc dev). Cài rustup (nếu thiếu) → `cargo build --release --locked` → copy binary vào `~/.local/bin/8sync`.
 
 ```bash
 git clone https://github.com/8-Sync-Dev/su-code.git
@@ -67,9 +80,7 @@ cd su-code
 bash scripts/bootstrap.sh
 ```
 
-`scripts/bootstrap.sh` cài rustup (nếu thiếu) → `cargo build --release --locked` → copy binary vào `~/.local/bin/8sync`. PATH cho `~/.local/bin`, `~/.cargo/bin`, `~/.bun/bin`, `~/.encore/bin` được tự patch vào zsh / bash / fish khi bạn chạy `8sync setup` lần đầu (xem Stage A).
-
-### 2. `8sync setup` — cài phần còn lại
+### 3. `8sync setup` — cài phần còn lại
 
 Stage A (harness, luôn idempotent):
 

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# 8sync bootstrap — install Rust toolchain, build & install `8sync` binary.
-# Chạy 1 lần trên máy mới. Sau đó dùng `8sync setup` cho phần còn lại.
+# 8sync bootstrap — build & install `8sync` from source (rustup + cargo).
+#
+# Most users want the prebuilt one-liner instead (no git/rust needed):
+#   curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
+#
+# Use this when you want a source build (no prebuilt for your arch, or dev work).
+# Sau đó dùng `8sync setup` cho phần còn lại.
 
 set -euo pipefail
 

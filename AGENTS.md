@@ -59,6 +59,10 @@ Stack: **Rust** (single workspace, 1 binary `8sync` ≈ 1.3 MB stripped).
 ## 2. Cài đặt cho user
 
 ```bash
+# Khuyến nghị — one-liner, binary prebuilt (không cần git/rust/cargo):
+curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
+
+# Hoặc build từ source (contributor / arch chưa có prebuilt):
 git clone https://github.com/8-Sync-Dev/su-code.git
 cd su-code
 bash scripts/bootstrap.sh        # cài rustup (nếu thiếu) + build + install vào ~/.local/bin
