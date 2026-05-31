@@ -38,6 +38,17 @@ pub fn print_cheatsheet() {
     ]);
     println!("  {}", "→ requires `bluetooth` profile applied (8sync setup --profile bluetooth)".dimmed());
 
+    println!("\n{}", "CLEAN / OPTIMIZE".bold().yellow());
+    rows(&[
+        ("8sync clean",          "reclaim disk (pacman/AUR/journal/tmp/thumbnails) + CPU/GPU/RAM report"),
+        ("8sync clean --deep",   "also remove orphan pkgs + regenerable dev caches (uv/pip/go/…)"),
+        ("8sync clean --ram",    "also drop pagecache (light, cosmetic)"),
+        ("8sync clean --gpu",    "NVIDIA persistence mode + GPU summary"),
+        ("8sync clean --watch",  "loop forever, clean every 1h (or --watch <secs>)"),
+        ("8sync clean --timer 1h", "install a systemd user timer (--timer off to remove)"),
+    ]);
+    println!("  {}", "→ governor is reported, NOT changed (amd-pstate powersave = efficient dynamic mode)".dimmed());
+
     println!("\n{}", "PROFILES (opt-in personal customization, idempotent)".bold().yellow());
     rows(&[
         ("8sync setup --yall",           "install harness + `alexdev` bundle, no prompts"),

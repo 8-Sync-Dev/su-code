@@ -161,6 +161,16 @@ su-code/
 | `8sync bt fix` | Troubleshoot adapter chết (rfkill, reload btusb, restart, power on, AutoEnable) |
 | `8sync bt restart` | Restart bluetooth.service + power on |
 
+### Clean / Optimize
+| Verb | Mô tả |
+|---|---|
+| `8sync clean` | Reclaim disk (paccache/paru/journal/tmpfiles/thumbnails) + report CPU/GPU/RAM |
+| `8sync clean --deep` | + gỡ orphan pkgs + xoá cache dev tái tạo được (uv/pip/go/…) |
+| `8sync clean --ram` | + drop pagecache (nhẹ, cosmetic) |
+| `8sync clean --gpu` | NVIDIA persistence mode + GPU summary |
+| `8sync clean --watch [SECS]` | Loop foreground, clean mỗi SECS (default 3600) |
+| `8sync clean --timer 1h \| off` | Cài/gỡ systemd user timer (loop định kỳ đúng cách, không phải bash loop) |
+
 **Lưu ý**: "Look & feel" (wallpaper/theme/kitty layout) đã **delegate cho HyDE** — dùng `hydectl wallpaper next` và `hydectl theme set <name>`.
 
 ### Lifecycle

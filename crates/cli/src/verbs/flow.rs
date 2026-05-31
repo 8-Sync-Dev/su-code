@@ -49,6 +49,7 @@ pub fn run() -> Result<()> {
 
     section("6. MAINTENANCE", &[
         ("8sync up",                       "self-update the 8sync binary and omp (no `pacman -Syu`)"),
+        ("8sync clean",                    "reclaim disk + tidy caches + CPU/GPU/RAM report (--deep/--timer 1h)"),
         ("8sync doctor",                   "full health check"),
         ("8sync skill",                    "list installed skills + project-local skills"),
         ("8sync skill add <url>",          "clone a skill repo into ~/.omp/skills/ and project agents/skills/"),

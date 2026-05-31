@@ -73,6 +73,9 @@ enum Cmd {
     /// Bluetooth control + troubleshoot (status/on/off/fix/restart)
     Bt(verbs::bt::Args),
 
+    /// Reclaim disk/RAM, tidy caches, report CPU/GPU (--deep/--ram/--gpu/--watch/--timer)
+    Clean(verbs::clean::Args),
+
     /// Manage skill library (list/add/sync)
     Skill(verbs::skill::Args),
 
@@ -122,6 +125,7 @@ fn main() -> Result<()> {
         Some(Cmd::Run(a))     => verbs::run::run(a),
         Some(Cmd::Sec(a))     => verbs::sec::run(a),
         Some(Cmd::Bt(a))      => verbs::bt::run(a),
+        Some(Cmd::Clean(a))   => verbs::clean::run(a),
         Some(Cmd::Skill(a))   => verbs::skill::run(a),
         Some(Cmd::Shot(a))    => verbs::shot::run(a),
         Some(Cmd::DiffImg(a)) => verbs::diff_img::run(a),
