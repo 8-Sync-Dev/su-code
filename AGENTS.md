@@ -165,7 +165,7 @@ su-code/
 | Verb | Mô tả |
 |---|---|
 | `8sync clean` | Reclaim disk (paccache/paru/journal/tmpfiles/thumbnails) + report CPU/GPU/RAM |
-| `8sync clean --deep` | + gỡ orphan pkgs + xoá cache dev tái tạo được (uv/pip/go/…) |
+| `8sync clean --deep` | + gỡ orphan pkgs + build cache thuần (go-build/tsc/node-gyp). **KHÔNG** đụng model (huggingface/torch), Playwright/Puppeteer/Electron binary, hay cache tải gói (uv/pip/yarn/pnpm/deno) — chỉ report + gợi ý lệnh xoá tay |
 | `8sync clean --ram` | + drop pagecache (nhẹ, cosmetic) |
 | `8sync clean --gpu` | NVIDIA persistence mode + GPU summary |
 | `8sync clean --watch [SECS]` | Loop foreground, clean mỗi SECS (default 3600) |

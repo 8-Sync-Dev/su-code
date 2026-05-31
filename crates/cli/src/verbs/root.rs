@@ -41,7 +41,7 @@ pub fn print_cheatsheet() {
     println!("\n{}", "CLEAN / OPTIMIZE".bold().yellow());
     rows(&[
         ("8sync clean",          "reclaim disk (pacman/AUR/journal/tmp/thumbnails) + CPU/GPU/RAM report"),
-        ("8sync clean --deep",   "also remove orphan pkgs + regenerable dev caches (uv/pip/go/…)"),
+        ("8sync clean --deep",   "+ orphan pkgs + build caches (go-build/tsc/node-gyp) — NOT models/playwright"),
         ("8sync clean --ram",    "also drop pagecache (light, cosmetic)"),
         ("8sync clean --gpu",    "NVIDIA persistence mode + GPU summary"),
         ("8sync clean --watch",  "loop forever, clean every 1h (or --watch <secs>)"),

@@ -27,7 +27,7 @@ use crate::ui;
     after_help = indoc::indoc! {"
         EXAMPLES
           8sync clean                safe reclaim + CPU/GPU/RAM report
-          8sync clean --deep         also remove orphan pkgs + regenerable dev caches
+          8sync clean --deep         + orphan pkgs + build caches (go-build/tsc/node-gyp)
           8sync clean --ram          also drop pagecache (light RAM reclaim)
           8sync clean --gpu          NVIDIA persistence mode + GPU report
           8sync clean --dry-run      preview, change nothing
@@ -36,13 +36,20 @@ use crate::ui;
           8sync clean --timer 1h     install systemd user timer (every 1h)
           8sync clean --timer off    remove the timer
 
+        NEVER auto-deleted (only reported + manual reclaim hint): AI models
+        (huggingface/torch), Playwright/Puppeteer/Cypress/Electron browser binaries,
+        and package download caches (uv/pip/yarn/pnpm/deno). Routine clean won't
+        break a project or force a big re-download.
+
         NOTE: the CPU governor is reported, never changed — on amd-pstate the
         `powersave` governor IS the efficient dynamic mode; forcing `performance`
         only raises power/heat with no real-world win for bursty desktop work.
     "}
 )]
 pub struct Args {
-    /// Deep clean: orphan packages + regenerable dev caches + tighter journal vacuum.
+    /// Deep clean: orphan packages + pure build caches (go-build/tsc/node-gyp) +
+    /// tighter journal vacuum. Does NOT touch models, browser binaries, or
+    /// package download caches (those are only reported).
     #[arg(long)]
     pub deep: bool,
 
@@ -121,17 +128,19 @@ fn clean_once(a: &Args) {
 
     // ── disk: user caches ───────────────────────────────────────────
     ui::step("user caches (~/.cache)");
-    // Always-safe: thumbnails + AUR clones are pure regenerable junk.
-    let mut safe = vec!["thumbnails", "paru", "yay"];
+    // ONLY pure junk / build artifacts with ZERO downloads, binaries, or models.
+    // Expensive caches (AI models, Playwright/Puppeteer browser binaries, package
+    // download caches) are NEVER auto-deleted — they are reported with a manual
+    // reclaim command instead. See report_caches(). This is deliberate: deleting
+    // them doesn't corrupt anything but forces slow re-downloads / breaks test
+    // runs until re-fetched, which is not what a routine `clean` should do.
+    let mut safe = vec!["thumbnails"]; // image thumbnails — regenerated on view
     if a.deep {
-        // Regenerable build/tool caches — re-created on next use, no user data.
-        safe.extend([
-            "go-build", "pip", "yarn", "node-gyp", "deno", "uv", "pre-commit",
-            "Cypress", "electron", "puppeteer", "ms-playwright", "typescript",
-        ]);
+        // Pure compiler/build artifacts: recompiled on next build, nothing fetched.
+        safe.extend(["go-build", "typescript", "node-gyp"]);
     }
     clean_cache_subdirs(dry, &safe);
-    report_cache_hogs();
+    report_caches();
 
     // ── disk: orphan packages (deep only) ───────────────────────────
     if a.deep {
@@ -199,30 +208,48 @@ fn clean_cache_subdirs(dry: bool, names: &[&str]) {
     }
 }
 
-/// Show where ~/.cache space is going so the user can decide on the rest.
-fn report_cache_hogs() {
+/// Report ~/.cache usage. Explicitly lists EXPENSIVE caches we never auto-delete
+/// (models, browser binaries, package downloads) with the manual command to
+/// reclaim each — so the user decides, and a routine clean never breaks a project.
+fn report_caches() {
     let Some(home) = dirs::home_dir() else { return };
     let cache = home.join(".cache");
-    let out = Command::new("du")
-        .args(["-sh", "--"])
-        .arg(&cache)
-        .output();
-    if let Ok(o) = out {
-        let total = String::from_utf8_lossy(&o.stdout);
-        if let Some(sz) = total.split_whitespace().next() {
+
+    // (subdir, what it is, manual reclaim command) — kept, NEVER auto-deleted.
+    let kept: &[(&str, &str, &str)] = &[
+        ("huggingface",   "AI models (HF)",        "huggingface-cli delete-cache  # or rm -rf ~/.cache/huggingface"),
+        ("torch",         "PyTorch model cache",   "rm -rf ~/.cache/torch"),
+        ("ms-playwright", "Playwright browsers",   "npx playwright uninstall --all"),
+        ("puppeteer",     "Puppeteer Chromium",    "rm -rf ~/.cache/puppeteer"),
+        ("Cypress",       "Cypress binary",        "cypress cache clear"),
+        ("electron",      "Electron binaries",     "rm -rf ~/.cache/electron"),
+        ("uv",            "uv wheel/download cache","uv cache clean"),
+        ("pip",           "pip download cache",    "pip cache purge"),
+        ("yarn",          "yarn package cache",    "yarn cache clean"),
+        ("pnpm",          "pnpm store",            "pnpm store prune"),
+        ("deno",          "deno dep cache",        "deno clean"),
+    ];
+
+    if let Ok(o) = Command::new("du").args(["-sh", "--"]).arg(&cache).output() {
+        if let Some(sz) = String::from_utf8_lossy(&o.stdout).split_whitespace().next() {
             ui::info(&format!("~/.cache total: {}", sz));
         }
     }
-    // Top 6 subdirs by size — informational, not deleted.
-    let cmd = format!(
-        "du -sh {}/* 2>/dev/null | sort -rh | head -6",
-        cache.display()
-    );
-    if let Ok(o) = Command::new("sh").arg("-c").arg(&cmd).output() {
-        let s = String::from_utf8_lossy(&o.stdout);
-        for line in s.lines() {
-            ui::info(&format!("  {}", line));
+
+    let mut any = false;
+    for (sub, what, cmd) in kept {
+        let p = cache.join(sub);
+        if !p.exists() {
+            continue;
         }
+        let sz = Command::new("du").args(["-sh", "--"]).arg(&p).output().ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).split_whitespace().next().unwrap_or("?").to_string())
+            .unwrap_or_else(|| "?".into());
+        if !any {
+            ui::info("kept (NOT deleted — models/binaries/downloads; reclaim yourself if needed):");
+            any = true;
+        }
+        ui::info(&format!("  ~/.cache/{:<13} {:>6}  {} → {}", sub, sz, what, cmd));
     }
 }
 
