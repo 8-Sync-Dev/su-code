@@ -153,14 +153,21 @@ su-code/
 | `8sync sec warp [on\|off\|status]` | Chỉ điều khiển WARP |
 | `8sync sec ufw [on\|off\|status]` | Chỉ điều khiển ufw |
 
+### Bluetooth (bluez)
+| Verb | Mô tả |
+|---|---|
+| `8sync bt` | Status: rfkill / service / controller power / paired |
+| `8sync bt on \| off` | Unblock + enable + power on / power off + stop |
+| `8sync bt fix` | Troubleshoot adapter chết (rfkill, reload btusb, restart, power on, AutoEnable) |
+| `8sync bt restart` | Restart bluetooth.service + power on |
+
 **Lưu ý**: "Look & feel" (wallpaper/theme/kitty layout) đã **delegate cho HyDE** — dùng `hydectl wallpaper next` và `hydectl theme set <name>`.
 
 ### Lifecycle
 | Verb | Mô tả |
 |---|---|
-| `8sync setup` | Stage A (harness + PATH bootstrap zsh/bash/fish) + Stage B (curated y/N: caelestia, dev-stack, nvidia, bluetooth, warp) |
-| `8sync setup --community` | Auto-yes — Stage A + caelestia + dev-stack + bluetooth (KHÔNG include warp) |
-| `8sync setup --caelestia` | Chỉ Caelestia (auto fresh \| coexist), reset rollback qua `--caelestia=rollback` |
+| `8sync setup` | Stage A (harness + PATH bootstrap zsh/bash/fish) + Stage B (curated y/N: dev-stack, nvidia, bluetooth, warp) |
+| `8sync setup --community` | Auto-yes — Stage A + dev-stack + bluetooth (KHÔNG include warp) |
 | `8sync setup --no-profile` | Chỉ harness, không hỏi profile |
 | `8sync setup --profile <name>` | Apply 1 profile cụ thể non-interactive (cả community + personal) |
 | `8sync setup --dry-run` | Preview, không thay đổi gì |

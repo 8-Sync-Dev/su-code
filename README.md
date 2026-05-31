@@ -8,28 +8,14 @@
 
 ---
 
-## ⚡ Cài Caelestia UI cho CachyOS (1 lệnh, không cần 8sync)
-
-Máy CachyOS minimal vừa cài xong, mở lên chỉ thấy TTY đen? Chạy 1 lệnh dưới để có Hyprland + Caelestia shell + SDDM + Quickshell — không cần cài 8sync trước:
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/scripts/install-caelestia.sh)
-```
-
-Hoặc unattended full (auto-yes + NVIDIA driver auto-detect + reboot):
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/scripts/install-caelestia.sh) --full
-```
-
-Flags: `--with-apps` (firefox/libreoffice/...), `--with-nvidia` (auto-detect GPU family), `--noconfirm` (auto-yes), `--reboot` (10s countdown rồi reboot), `--full` (= bật tất cả). Log ở `~/.cache/8sync/caelestia-install-<ts>.log`.
-
-Script standalone trong [`scripts/install-caelestia.sh`](scripts/install-caelestia.sh) — đọc trước, hoặc clone repo rồi `./install-caelestia.sh` nếu thích.
+## Liên kết
 
 - **Website / docs**: <https://8-sync-dev.github.io/su-code> (auto-deploy từ `docs/` qua [`.github/workflows/pages.yml`](.github/workflows/pages.yml))
 - **Repo**: <https://github.com/8-Sync-Dev/su-code>
 - **Discussions**: <https://github.com/orgs/8-Sync-Dev/discussions>
 - **AI engine**: [omp](https://omp.sh) (oh-my-pi) — `8sync` wrap quanh `omp --continue` để giữ session per-project.
+
+> Lưu ý: `8sync` là **coding harness**, không cài desktop environment. Cài Hyprland/Caelestia/HyDE riêng theo upstream của chúng.
 
 ---
 
@@ -41,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh 
 8sync setup --dry-run            # xem plan trước
 8sync setup                      # cài harness + curated y/N (community profiles)
 # hoặc:
-8sync setup --community          # unattended: caelestia + dev-stack + bluetooth
+8sync setup --community          # unattended: dev-stack + bluetooth
 8sync doctor                     # verify
 
 # Dùng hằng ngày
@@ -93,11 +79,10 @@ Stage B (community profile, opt-in y/N từng cái):
 
 | Profile | Mô tả |
 |---|---|
-| `caelestia` | Hyprland + Quickshell + caelestia-shell + SDDM (extends `nvidia`) |
 | `dev-stack` | Docker + Node/npm/bun/pnpm + Encore + TS LSP + build chain |
 | `nvidia` | Auto-detect GPU family → open-dkms / dkms (skip nếu CachyOS chwd đã cài) |
 | `warp` | Cloudflare WARP VPN + DoH + MASQUE (toggle qua `8sync sec`) |
-| `bluetooth` | bluez + bluez-utils + service enable |
+| `bluetooth` | bluez + bluez-utils + service enable (điều khiển qua `8sync bt`) |
 
 Cờ thường dùng:
 
@@ -105,8 +90,7 @@ Cờ thường dùng:
 |---|---|
 | `8sync setup --dry-run` | In plan, không thay đổi gì |
 | `8sync setup --no-profile` | Chỉ Stage A |
-| `8sync setup --community` | Stage A + caelestia + dev-stack + bluetooth (không include warp) |
-| `8sync setup --caelestia` | Stage A + chỉ Caelestia (auto fresh \| coexist) |
+| `8sync setup --community` | Stage A + dev-stack + bluetooth (không include warp) |
 | `8sync setup --profile <name>` | Stage A + apply 1 profile cụ thể |
 | `8sync setup profile list \| show <n> \| apply <n>` | Quản lý profile sau setup |
 

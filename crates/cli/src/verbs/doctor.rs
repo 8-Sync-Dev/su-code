@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::{env_detect, ui, verbs::{profile, sec}};
+use crate::{env_detect, ui, verbs::{profile, sec, bt}};
 
 pub fn run() -> Result<()> {
     ui::header("8sync doctor");
@@ -14,7 +14,7 @@ pub fn run() -> Result<()> {
     // AUR helper
     match env_detect::aur_helper() {
         Some(h) => ui::ok(&format!("AUR helper: {}", h)),
-        None    => ui::info("AUR helper: none (paru or yay needed for AUR profiles: caelestia, hardware-lianli, warp, ...)"),
+        None    => ui::info("AUR helper: none (paru or yay needed for AUR profiles: hardware-lianli, warp, ...)"),
     }
 
     // Core harness
@@ -56,14 +56,8 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // Caelestia presence — check both global SDDM session entry and the dots clone.
-    let caelestia_session = std::path::Path::new("/usr/share/wayland-sessions/hyprland.desktop");
-    let caelestia_dots = env.home.join(".local/share/caelestia");
-    if caelestia_session.exists() && caelestia_dots.exists() {
-        ui::ok("caelestia: installed (Hyprland session + dots cloned)");
-    } else if caelestia_dots.exists() {
-        ui::ok("caelestia: dots cloned but no Hyprland .desktop session — re-run `8sync setup --caelestia`");
-    }
+    // Bluetooth (bluez) — compact status
+    bt::status_quiet();
 
     // Security (warp + ufw) — compact one-liners
     sec::status_quiet();

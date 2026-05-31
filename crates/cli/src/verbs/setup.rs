@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Args as ClapArgs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -10,8 +10,7 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
     after_help = indoc::indoc! {"
         EXAMPLES — quick start (community)
           8sync setup                          harness + curated y/N menu (community profiles)
-          8sync setup --community              unattended: caelestia + dev-stack + bluetooth
-          8sync setup --caelestia              just Caelestia desktop (auto fresh|coexist)
+          8sync setup --community              unattended: dev-stack + bluetooth
           8sync setup --profile dev-stack      just dev-stack (Docker + Node/Bun + Encore)
           8sync setup --no-profile             harness only (skip profile stage)
           8sync setup --dry-run                print the full plan, change nothing
@@ -26,29 +25,21 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
           · configs + skills under ~/.config/8sync/ and ~/.omp/skills/
 
         STAGE B — PROFILES (community-visible)
-          caelestia    Hyprland + Quickshell + caelestia-shell + SDDM  (extends `nvidia`)
           dev-stack    Docker + Node/npm/bun/pnpm + Encore + TS LSP + build chain
           nvidia       Auto-detect GPU family → open-dkms / dkms (skipped if chwd active)
           warp         Cloudflare WARP VPN + DoH + MASQUE  (toggle via `8sync sec`)
-          bluetooth    bluez + bluez-utils + service enable
+          bluetooth    bluez + bluez-utils + service enable  (control via `8sync bt`)
 
         PROFILE MANAGEMENT
           8sync setup profile list             every profile (community + personal tag)
           8sync setup profile show <name>      resolved packages + services + post-install
           8sync setup profile apply <name>     (re-)apply one profile idempotently
 
-        UNATTENDED MODE (auto-on with --community / --caelestia / --full / --profile)
-          1. Preflight: print OS, display manager, registered sessions, GPU, tool presence
+        UNATTENDED MODE (auto-on with --community / --full / --profile)
+          1. Preflight: print OS, display manager, sessions, GPU, tool presence
           2. Log every step to ~/.cache/8sync/setup-<unix_ts>.log
           3. On any step failure: log + track + CONTINUE (re-run to retry)
           4. Auto-yes (--noconfirm) for every pacman / AUR install
-
-        CAELESTIA MODES (auto-detected)
-          fresh    no display manager + no ~/.config/hypr → installs hyprland+sddm+caelestia,
-                   enables sddm.service. Reboot → SDDM → Hyprland → Caelestia.
-          coexist  existing DE (Plasma/GNOME/HyDE/etc.) → installs Caelestia as a parallel
-                   Hyprland session. ~/.config/hypr is backed up to
-                   ~/.config/hypr.bak.caelestia.<ts>/ before takeover.
 
         SAFETY
           · Every install is transactional: failed pacman/AUR batch is rolled back.
@@ -62,13 +53,13 @@ pub struct Args {
     /// Arguments for the sub-command.
     pub rest: Vec<String>,
 
-    /// Install EVERYTHING unattended (alexdev bundle = caelestia + all personal profiles).
+    /// Install EVERYTHING unattended (alexdev bundle = nvidia driver + all personal profiles).
     /// Equivalent to applying the `alexdev` bundle. Aliases: `--yall`, `--yes`, `-y`.
     /// Implies preflight + log + skip-on-error.
     #[arg(long = "full", alias = "yall", alias = "yes", short = 'y')]
     pub full: bool,
 
-    /// Community bundle: caelestia + dev-stack + bluetooth (unattended).
+    /// Community bundle: dev-stack + bluetooth (unattended).
     /// Does NOT include `warp` — opt-in via `--profile warp`.
     #[arg(long)]
     pub community: bool,
@@ -81,23 +72,9 @@ pub struct Args {
     #[arg(long)]
     pub profile: Option<String>,
 
-    /// Install Caelestia (auto|rollback). Plain `--caelestia` = auto-detect fresh vs coexist.
-    #[arg(
-        long,
-        value_name = "MODE",
-        num_args = 0..=1,
-        default_missing_value = "auto",
-    )]
-    pub caelestia: Option<String>,
-
-    /// With --caelestia=rollback: also `pacman -Rns` the Caelestia packages
-    /// (caelestia-shell, quickshell, aubio). Off by default — packages stay.
-    #[arg(long)]
-    pub purge: bool,
-
     /// Auto-reboot after install completes (10s countdown — Ctrl-C cancels).
     /// Needed when a new kernel module landed (NVIDIA driver upgrade, etc.).
-    /// Otherwise a logout is enough to reach the new Hyprland session.
+    /// Otherwise a logout is enough for new sessions to pick up the change.
     #[arg(long)]
     pub reboot: bool,
 
@@ -112,11 +89,6 @@ pub fn run(a: Args) -> Result<()> {
         return profile_sub(a.rest, a.full, a.dry_run);
     }
 
-    // Special: `--caelestia=rollback` — restore backup, optionally purge pkgs.
-    if a.caelestia.as_deref() == Some("rollback") {
-        return rollback_caelestia(a.purge, a.dry_run);
-    }
-
     ui::header("8sync setup");
     let env = env_detect::Env::detect()?;
     if !env.is_cachyos_or_arch() {
@@ -129,11 +101,10 @@ pub fn run(a: Args) -> Result<()> {
     // ── YOLO mode setup: auto-on for any unattended path ─────────
     // Triggers when user requests an unambiguous install path:
     //   --full          → alexdev bundle
-    //   --caelestia     → caelestia profile only
     //   --profile <n>   → just one profile
     // Strict mode (default `8sync setup` with no flags) keeps existing
     // behaviour: interactive prompts, errors bail, no log file.
-    let yolo = a.full || a.caelestia.is_some() || a.profile.is_some() || a.community;
+    let yolo = a.full || a.profile.is_some() || a.community;
     let log_path = if yolo && !a.dry_run {
         init_yolo_log().ok()
     } else {
@@ -167,19 +138,6 @@ pub fn run(a: Args) -> Result<()> {
         try_step("codegraph-skill", yolo, &mut failures, || register_codegraph_skill(&env))?;
     }
 
-    // ── Caelestia shortcut ───────────────────────────────────────
-    if let Some(mode) = a.caelestia.as_deref() {
-        let resolved_mode = match mode {
-            "auto" => detect_caelestia_mode(),
-            "fresh" => CaelestiaMode::Fresh,
-            "coexist" => CaelestiaMode::Coexist,
-            other => bail!("--caelestia accepts: auto|fresh|coexist|rollback (got `{}`)", other),
-        };
-        let r = apply_caelestia(resolved_mode, a.dry_run);
-        finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
-        return r;
-    }
-
     // ── Stage B: Profiles (optional) ─────────────────────────────
     if a.no_profile {
         ui::info("--no-profile → skipping personal profiles");
@@ -204,7 +162,7 @@ pub fn run(a: Args) -> Result<()> {
         return Ok(());
     }
 
-    // --full: apply alexdev bundle (caelestia + all personal profiles)
+    // --full: apply alexdev bundle (nvidia + all personal profiles)
     if a.full {
         let bundle = if all.contains_key("alexdev") { "alexdev" } else { "" };
         if !bundle.is_empty() {
@@ -236,10 +194,10 @@ pub fn run(a: Args) -> Result<()> {
         return Ok(());
     }
 
-    // --community: caelestia + dev-stack + bluetooth (NOT warp)
+    // --community: dev-stack + bluetooth (NOT warp)
     if a.community {
-        let bundle = ["caelestia", "dev-stack", "bluetooth"];
-        ui::step("Stage B — --community: caelestia + dev-stack + bluetooth");
+        let bundle = ["dev-stack", "bluetooth"];
+        ui::step("Stage B — --community: dev-stack + bluetooth");
         for n in &bundle {
             if !all.contains_key(*n) {
                 ui::warn(&format!("profile `{}` not found — skipping", n));
@@ -258,14 +216,14 @@ pub fn run(a: Args) -> Result<()> {
 
     // Interactive y/N per profile (skip bundle profiles)
     if !env_detect::has_tty() {
-        ui::info("no TTY — skipping interactive profile prompt (use --full / --caelestia / --profile)");
+        ui::info("no TTY — skipping interactive profile prompt (use --full / --profile <name>)");
         finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return Ok(());
     }
 
 
     ui::step("Stage B — community profiles (y/N each)");
-    let order = ["caelestia", "dev-stack", "nvidia", "bluetooth", "warp"];
+    let order = ["dev-stack", "nvidia", "bluetooth", "warp"];
     let mut names: Vec<&String> = all
         .iter()
         .filter(|(_, p)| p.extends.is_empty() && p.visibility == profile::Visibility::Community)
@@ -554,38 +512,7 @@ fn install_skills(env: &env_detect::Env) -> Result<()> {
     Ok(())
 }
 
-// ─────────────────────────────────────────────────────────────────
-// `--caelestia` — fresh / coexist auto-detection + apply + rollback
-// ─────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CaelestiaMode {
-    /// No DE/DM detected, no ~/.config/hypr → bring up the full stack.
-    Fresh,
-    /// Existing DE detected → add Caelestia as a parallel Hyprland session.
-    /// Backs up ~/.config/hypr if present.
-    Coexist,
-}
-
-fn detect_caelestia_mode() -> CaelestiaMode {
-    // Coexist ONLY if a working desktop is already there. "Working" means a
-    // display manager is enabled OR a non-Hyprland session entry is registered.
-    // A lone ~/.config/hypr is NOT enough (user may have tinkered manually then
-    // wiped) — forcing coexist on that case would skip sddm.service enable and
-    // drop the user at a TTY after reboot.
-    // `display-manager.service` is the canonical alias every DM symlinks to —
-    // it catches plasmalogin (CachyOS KDE), ly, entrance, and anything else
-    // we'd otherwise miss in the per-DM list.
-    let has_dm = ["display-manager", "sddm", "plasmalogin", "gdm", "lightdm", "greetd"]
-        .iter()
-        .any(|d| systemctl_is_enabled(d));
-    let has_other_sessions = has_non_hyprland_session();
-    if has_dm || has_other_sessions {
-        CaelestiaMode::Coexist
-    } else {
-        CaelestiaMode::Fresh
-    }
-}
+// ─── systemd helper (used by preflight) ─────────────────────────
 
 fn systemctl_is_enabled(unit: &str) -> bool {
     Command::new("systemctl")
@@ -593,170 +520,6 @@ fn systemctl_is_enabled(unit: &str) -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
-}
-
-fn has_non_hyprland_session() -> bool {
-    for dir in [
-        "/usr/share/wayland-sessions",
-        "/usr/share/xsessions",
-    ] {
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            continue;
-        };
-        for e in entries.flatten() {
-            let name = e.file_name().to_string_lossy().to_lowercase();
-            if name.ends_with(".desktop") && !name.contains("hyprland") {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-fn apply_caelestia(mode: CaelestiaMode, dry_run: bool) -> Result<()> {
-    ui::header(&format!("8sync setup --caelestia ({})", match mode {
-        CaelestiaMode::Fresh => "fresh — first DE on this machine",
-        CaelestiaMode::Coexist => "coexist — adding parallel Hyprland session next to existing DE",
-    }));
-
-    if mode == CaelestiaMode::Coexist {
-        let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
-        let hypr = home.join(".config/hypr");
-        if hypr.exists() {
-            let ts = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            let backup = home.join(format!(".config/hypr.bak.caelestia.{}", ts));
-            if dry_run {
-                ui::info(&format!("would back up {} → {}", hypr.display(), backup.display()));
-            } else {
-                ui::step(&format!("backing up {} → {}", hypr.display(), backup.display()));
-                std::fs::rename(&hypr, &backup)?;
-                ui::ok("backup done");
-            }
-        }
-    }
-
-    // Apply the `caelestia` profile (resolves to nvidia + caelestia stack).
-    let all = profile::load_all()?;
-    let mut resolved = profile::resolve("caelestia", &all)?;
-
-    // In coexist mode: do NOT touch the existing display manager — user already
-    // has one (gdm/sddm/lightdm/greetd). Strip sddm out of system services so
-    // we don't yank their working setup. Caelestia adds itself as a parallel
-    // Hyprland session via /usr/share/wayland-sessions/hyprland.desktop, which
-    // any DM will pick up on its own.
-    if mode == CaelestiaMode::Coexist {
-        resolved.services.system_enable.retain(|s| s != "sddm");
-        ui::info("coexist: skipping sddm.service enable — your existing DM stays in charge");
-        ui::info("       at next login, pick `Hyprland` (Caelestia) from the session dropdown");
-    }
-
-    profile::apply(&resolved, true, dry_run)?;
-    if !dry_run {
-        profile::mark_applied("caelestia")?;
-    }
-
-    if !dry_run {
-        ui::header("Done — Caelestia installed");
-        match mode {
-            CaelestiaMode::Fresh => {
-                println!("  · reboot now — SDDM will appear, pick `Hyprland`");
-                println!("  · Caelestia auto-launches inside that session");
-            }
-            CaelestiaMode::Coexist => {
-                println!("  · log out (or reboot) — your DM shows a `Hyprland` session");
-                println!("  · pick it to use Caelestia; pick your old DE to stay on it");
-                println!("  · to revert: `8sync setup --caelestia=rollback` (restores ~/.config/hypr)");
-            }
-        }
-    }
-    Ok(())
-}
-
-fn rollback_caelestia(purge: bool, dry_run: bool) -> Result<()> {
-    ui::header("8sync setup --caelestia=rollback");
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no HOME"))?;
-    let config_dir = home.join(".config");
-
-    // Find the most recent ~/.config/hypr.bak.caelestia.* backup.
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(&config_dir) {
-        for e in entries.flatten() {
-            let name = e.file_name().to_string_lossy().into_owned();
-            if name.starts_with("hypr.bak.caelestia.") {
-                candidates.push(e.path());
-            }
-        }
-    }
-    candidates.sort();
-    let latest = candidates.into_iter().last();
-
-    let hypr = home.join(".config/hypr");
-    match latest {
-        Some(backup) => {
-            if dry_run {
-                ui::info(&format!("would: rm -rf {}", hypr.display()));
-                ui::info(&format!("would: mv {} {}", backup.display(), hypr.display()));
-            } else {
-                if hypr.exists() {
-                    // Move current hypr (Caelestia's) aside as a fresh backup.
-                    let ts = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0);
-                    let stash = home.join(format!(".config/hypr.caelestia-stash.{}", ts));
-                    std::fs::rename(&hypr, &stash)?;
-                    ui::info(&format!("Caelestia config stashed → {}", stash.display()));
-                }
-                std::fs::rename(&backup, &hypr)?;
-                ui::ok(&format!("restored {} from {}", hypr.display(), backup.file_name().unwrap().to_string_lossy()));
-            }
-        }
-        None => {
-            ui::info("no ~/.config/hypr.bak.caelestia.* backup found — nothing to restore");
-            ui::info("  (fresh installs have no pre-Caelestia config to restore)");
-        }
-    }
-
-    // Remove Caelestia's cloned dots repo + symlinks it created.
-    let dots = home.join(".local/share/caelestia");
-    if dots.exists() {
-        if dry_run {
-            ui::info(&format!("would: rm -rf {}", dots.display()));
-        } else {
-            std::fs::remove_dir_all(&dots).ok();
-            ui::ok(&format!("removed {}", dots.display()));
-        }
-    }
-    // Unlink (only) any Caelestia symlinks the upstream installer dropped.
-    for d in ["foot", "fish", "fastfetch", "uwsm", "btop", "starship.toml"] {
-        let p = home.join(".config").join(d);
-        if p.is_symlink() {
-            if dry_run {
-                ui::info(&format!("would: unlink {}", p.display()));
-            } else {
-                let _ = std::fs::remove_file(&p);
-            }
-        }
-    }
-
-    // Optional: purge packages.
-    if purge {
-        let cmd = "sudo pacman -Rns --noconfirm caelestia-shell quickshell caelestia-meta aubio 2>/dev/null || true";
-        if dry_run {
-            ui::info(&format!("would run: {}", cmd));
-        } else {
-            ui::info(&format!("$ {}", cmd));
-            let _ = Command::new("sh").arg("-c").arg(cmd).status();
-        }
-    } else if !dry_run {
-        ui::info("packages NOT removed (rerun with --purge to also `pacman -Rns caelestia-shell quickshell aubio`)");
-    }
-
-    ui::ok("rollback complete — reboot or restart Hyprland to apply");
-    Ok(())
 }
 
 // ─── `8sync setup profile <sub>` ────────────────────────────────
@@ -829,7 +592,7 @@ fn profile_sub(rest: Vec<String>, yes_to_all: bool, dry_run: bool) -> Result<()>
 }
 
 // ─────────────────────────────────────────────────────────────────
-// YOLO mode helpers (auto-on for --full / --caelestia / --profile)
+// YOLO mode helpers (auto-on for --full / --community / --profile)
 // ─────────────────────────────────────────────────────────────────
 
 /// Open `~/.cache/8sync/setup-<unix_ts>.log` and wire `ui::*` to tee into it.
@@ -876,9 +639,7 @@ fn preflight(env: &env_detect::Env) {
         ("yay", "yay"),
         ("codegraph", "codegraph"),
         ("gh", "gh"),
-        ("hyprland", "Hyprland"),
-        ("quickshell", "qs"),
-        ("caelestia-shell", "caelestia-shell"),
+        ("encore", "encore"),
     ] {
         let present = which::which(bin).is_ok();
         if present {

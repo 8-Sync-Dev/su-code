@@ -1,9 +1,9 @@
 name = "alexdev"
-description = "alexdev full bundle — Caelestia stack (fresh) + all personal profiles"
+description = "alexdev full bundle — all personal profiles (nvidia driver + hardware + IME + dev stack + warp)"
 visibility = "personal"
 
 extends = [
-  "caelestia",
+  "nvidia",
   "vietnamese",
   "hardware-cooling",
   "hardware-lianli",
@@ -24,4 +24,4 @@ user_enable = []
 
 [post_install]
 commands = []
-hint = "Reboot sau khi NVIDIA driver + SDDM được bật. Existing DE? Dùng `8sync setup --caelestia` để add Caelestia làm parallel session."
+hint = "Reboot sau khi NVIDIA driver được bật. Desktop environment (Hyprland/Caelestia) cài riêng — 8sync không còn quản lý."

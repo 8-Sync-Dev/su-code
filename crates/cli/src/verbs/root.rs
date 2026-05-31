@@ -29,14 +29,14 @@ pub fn print_cheatsheet() {
     ]);
     println!("  {}", "→ each project gets an AGENTS.md (managed) + agents/ folder (memory) on first `8sync .`".dimmed());
 
-    println!("\n{}", "DESKTOP — CAELESTIA".bold().yellow());
+    println!("\n{}", "BLUETOOTH (bluez)".bold().yellow());
     rows(&[
-        ("8sync setup --caelestia",          "auto-detect fresh vs coexist, install Hyprland + Caelestia + SDDM"),
-        ("8sync setup --caelestia=rollback", "restore ~/.config/hypr from latest backup"),
-        ("8sync setup --caelestia=rollback --purge", "…also `pacman -Rns caelestia-shell quickshell aubio`"),
+        ("8sync bt",         "status: rfkill / service / controller power / paired"),
+        ("8sync bt on|off",  "unblock + enable + power on  /  power off + stop service"),
+        ("8sync bt fix",     "troubleshoot a dead adapter (rfkill, btusb reload, restart, power on)"),
+        ("8sync bt restart", "restart bluetooth.service + power on"),
     ]);
-    println!("  {}", "→ fresh: no DM + no ~/.config/hypr → installs full stack, enables sddm.service. Reboot → SDDM → Caelestia.".dimmed());
-    println!("  {}", "→ coexist: existing DE (Plasma/GNOME/HyDE) detected → adds parallel Hyprland session. Backs up ~/.config/hypr if present.".dimmed());
+    println!("  {}", "→ requires `bluetooth` profile applied (8sync setup --profile bluetooth)".dimmed());
 
     println!("\n{}", "PROFILES (opt-in personal customization, idempotent)".bold().yellow());
     rows(&[
@@ -51,7 +51,7 @@ pub fn print_cheatsheet() {
     println!("  {}", "Built-in profiles (in priority order of independence):".dimmed());
     println!("  {}", "  vietnamese · hardware-cooling · hardware-lianli · displaylink · apps-personal · warp".dimmed());
     println!("  {}", "  nvidia (auto-detect: Blackwell→Turing→open-dkms; Maxwell/Pascal→dkms)".dimmed());
-    println!("  {}", "  caelestia (extends nvidia) · alexdev (bundle: caelestia + all personal profiles)".dimmed());
+    println!("  {}", "  alexdev (bundle: nvidia driver + all personal profiles)".dimmed());
     println!("  {}", "Override any built-in: drop a TOML into ~/.config/8sync/profiles/<name>.toml".dimmed());
 
     println!("\n{}", "SECURITY (VPN + firewall)".bold().yellow());
@@ -92,8 +92,6 @@ pub fn print_cheatsheet() {
     println!("  {:<38}  {}", "<repo>/AGENTS.md".cyan(),                   "project entry point — every AI reads this first");
     println!("  {:<38}  {}", "<repo>/agents/{PROJECT,STATE,…}.md".cyan(), "per-project memory (committed, shared with team)");
     println!("  {:<38}  {}", "<repo>/agents/skills/<name>/".cyan(),       "per-project skills (cloned by `skill add`)");
-    println!("  {:<38}  {}", "~/.local/share/caelestia/".cyan(),          "Caelestia dotfiles (cloned by --caelestia)");
-    println!("  {:<38}  {}", "~/.config/hypr.bak.caelestia.*/".cyan(), "pre-Caelestia ~/.config/hypr backup (restored by --caelestia=rollback)");
 
     println!("\n{}", "TIPS".bold().yellow());
     println!("  · Every verb has {} and {} with EXAMPLES.", "-h".bold().green(), "--help".bold().green());

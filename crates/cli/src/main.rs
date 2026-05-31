@@ -30,17 +30,16 @@ QUICK START
   8sync                             show this overview (any time)
   8sync flow                        same as above but ordered by workflow
   8sync setup                       install harness, then ask y/N per profile
-  8sync setup --yall                install harness + alexdev bundle, no prompts
-  8sync setup --caelestia           auto-detect Caelestia: fresh vs coexist with existing DE
+  8sync setup --community           install harness + dev-stack + bluetooth, no prompts
   8sync .                           seed agents/* context and run `omp --continue`
   8sync ai \"add dark mode toggle\"   one-shot AI prompt (or resume with `8sync ai`)
   8sync find \"useAuth\"              rg + fzf preview, open at file:line
   8sync ship \"feat: dark mode\"      commit + push + open a GitHub PR
   8sync sec on                      enable WARP VPN + ufw firewall
-  8sync sec off                     disable both
+  8sync bt fix                      troubleshoot bluetooth (unblock + restart + power on)
 
 Every verb supports -h / --help for detailed help with examples:
-  8sync setup -h    8sync ai -h    8sync sec -h    8sync find -h
+  8sync setup -h    8sync ai -h    8sync bt -h    8sync find -h
 ";
 
 #[derive(Subcommand)]
@@ -70,6 +69,9 @@ enum Cmd {
 
     /// Security toggle: WARP VPN + ufw firewall (on/off/status/toggle)
     Sec(verbs::sec::Args),
+
+    /// Bluetooth control + troubleshoot (status/on/off/fix/restart)
+    Bt(verbs::bt::Args),
 
     /// Manage skill library (list/add/sync)
     Skill(verbs::skill::Args),
@@ -119,6 +121,7 @@ fn main() -> Result<()> {
         Some(Cmd::Ship(a))    => verbs::ship::run(a),
         Some(Cmd::Run(a))     => verbs::run::run(a),
         Some(Cmd::Sec(a))     => verbs::sec::run(a),
+        Some(Cmd::Bt(a))      => verbs::bt::run(a),
         Some(Cmd::Skill(a))   => verbs::skill::run(a),
         Some(Cmd::Shot(a))    => verbs::shot::run(a),
         Some(Cmd::DiffImg(a)) => verbs::diff_img::run(a),

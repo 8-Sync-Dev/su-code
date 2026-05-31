@@ -5,12 +5,10 @@ pub fn run() -> Result<()> {
     println!("{}\n", "8sync flow — commands in the order you'll actually use them".bold().cyan());
 
     section("1. FIRST-TIME INSTALL (new machine)", &[
-        ("git clone https://github.com/8-Sync-Dev/su-code", "clone the source"),
-        ("cd su-code && bash scripts/bootstrap.sh", "installs rustup if missing, builds 8sync, drops binary into ~/.local/bin"),
+        ("curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh", "download the prebuilt binary into ~/.local/bin (no git/rust needed)"),
         ("8sync setup", "harness (gh + omp + skills + PATH bootstrap) then curated y/N menu (community profiles)"),
-        ("# or  8sync setup --community", "unattended: caelestia + dev-stack + bluetooth"),
+        ("# or  8sync setup --community", "unattended: dev-stack + bluetooth"),
         ("# or  8sync setup --profile dev-stack", "just dev-stack (Docker + Node/Bun + Encore)"),
-        ("# or  8sync setup --caelestia", "auto-detect: existing DE → coexist; else fresh Hyprland+Caelestia (+nvidia)"),
         ("gh auth login", "log into GitHub (required by `8sync ship`)"),
         ("8sync doctor", "verify everything is in place"),
     ]);
@@ -33,9 +31,11 @@ pub fn run() -> Result<()> {
         ("8sync .", "omp re-reads AGENTS.md + agents/* and picks up where you left off"),
     ]);
 
-    section("4. CAELESTIA DESKTOP (optional)", &[
-        ("8sync setup --caelestia",          "auto-detect fresh vs coexist, install Hyprland + Caelestia + SDDM"),
-        ("8sync setup --caelestia=rollback", "restore ~/.config/hypr from latest backup (+ --purge to remove pkgs)"),
+    section("4. BLUETOOTH (bluez)", &[
+        ("8sync bt",         "status: rfkill / service / controller power / paired"),
+        ("8sync bt on",      "unblock rfkill + enable service + power on"),
+        ("8sync bt fix",     "troubleshoot a dead adapter (unblock + reload btusb + restart + power on)"),
+        ("8sync bt restart", "restart bluetooth.service + power on"),
     ]);
 
     section("5. SECURITY (VPN + firewall)", &[

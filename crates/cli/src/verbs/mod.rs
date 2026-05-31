@@ -2,6 +2,7 @@ pub mod root;
 pub mod setup;
 pub mod profile;
 pub mod sec;
+pub mod bt;
 pub mod up;
 pub mod selfup;
 pub mod doctor;

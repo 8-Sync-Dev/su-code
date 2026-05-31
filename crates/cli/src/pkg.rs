@@ -115,8 +115,8 @@ pub fn aur_install_safe(helper: &str, pkgs: &[&str], noconfirm: bool) -> Result<
     cmd.arg("-S").arg("--needed");
     if noconfirm {
         cmd.arg("--noconfirm");
-        // paru/yay still prompt for provider choice (e.g. "caelestia-shell vs
-        // caelestia-shell-git") and for PKGBUILD review. Suppress both.
+        // paru/yay still prompt for provider choice (e.g. "foo vs foo-git")
+        // and for PKGBUILD review. Suppress both.
         // Flag set differs per helper: paru has `--skipreview`; yay uses the
         // `--answer*=None` family. Passing the wrong flag aborts the run.
         match helper {
