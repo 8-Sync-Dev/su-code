@@ -26,6 +26,17 @@ else \
 fi; \
 echo "[bluetooth] AutoEnable=true ensured in $CONF"'""",
 
+  # USB Bluetooth controllers (MediaTek/Realtek combo cards) wedge on a COLD
+  # boot when USB autosuspend is on — the firmware-load races and the adapter
+  # is missing until a warm reboot. Disable autosuspend persistently. Idempotent.
+  """bash -c 'CONF=/etc/modprobe.d/btusb.conf; \
+if grep -qs "enable_autosuspend=0" "$CONF"; then \
+  echo "[bluetooth] btusb autosuspend already disabled"; \
+else \
+  echo "options btusb enable_autosuspend=0" | sudo tee "$CONF" >/dev/null; \
+  echo "[bluetooth] disabled btusb USB autosuspend ($CONF) — fixes cold-boot BT loss"; \
+fi'""",
+
   # Power on the controller now so it works in the current session without a
   # reboot. Best-effort: no controller / rfkill-blocked → just warn.
   """bash -c 'bluetoothctl power on >/dev/null 2>&1 && echo "[bluetooth] controller powered on" || echo "[bluetooth] could not power on now (no adapter or rfkill) — auto-enables on next boot"'""",

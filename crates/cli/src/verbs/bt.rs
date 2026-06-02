@@ -73,6 +73,9 @@ pub fn status_quiet() {
     }
     let n = paired_count();
     if n > 0 { ui::info(&format!("paired devices: {}", n)); }
+    if btusb_autosuspend_risk() {
+        ui::warn("USB BT controller + autosuspend ON → may vanish after cold boot. Fix: `8sync bt fix`");
+    }
 }
 
 // ─── detection ──────────────────────────────────────────────────
@@ -168,16 +171,20 @@ fn bt_fix() {
     ui::header("8sync bt fix");
     // 1. Unblock radio.
     rfkill_unblock();
-    // 2. Reload the USB Bluetooth module (covers a wedged adapter after suspend).
+    // 2. Persist the cold-boot fix: USB BT controllers (MediaTek/Realtek combo
+    //    cards) wedge when USB autosuspend is on — firmware-load races on a cold
+    //    boot and the adapter is missing until a warm reboot. Disable it.
+    ensure_btusb_no_autosuspend();
+    // 3. Reload btusb so the setting + a wedged adapter are re-initialized now.
     let _ = Command::new("sudo").args(["modprobe", "-r", "btusb"]).status();
     let _ = Command::new("sudo").args(["modprobe", "btusb"]).status();
     ui::ok("btusb: reloaded");
-    // 3. Ensure the controller auto-powers on every boot (bluez [Policy] AutoEnable).
+    // 4. Ensure the controller auto-powers on every boot (bluez [Policy] AutoEnable).
     ensure_autoenable();
-    // 4. Restart the service so the new config + module take effect.
+    // 5. Restart the service so the new config + module take effect.
     let _ = Command::new("sudo").args(["systemctl", "restart", "bluetooth.service"]).status();
     ui::ok("bluetooth.service: restarted");
-    // 5. Power the controller on for this session.
+    // 6. Power the controller on for this session.
     power_on();
     ui::step("status after fix:");
     status_quiet();
@@ -199,5 +206,45 @@ fi"#;
     match st {
         Ok(s) if s.success() => ui::ok("AutoEnable=true ensured (/etc/bluetooth/main.conf)"),
         _ => ui::warn("could not update /etc/bluetooth/main.conf (sudo?)"),
+    }
+}
+
+/// Detect a USB Bluetooth controller running with USB autosuspend enabled — the
+/// cause of "BT gone after cold boot, back after a warm reboot" on MediaTek /
+/// Realtek combo cards. True only when autosuspend is on AND our persistent fix
+/// is not yet in place.
+fn btusb_autosuspend_risk() -> bool {
+    let on = std::fs::read_to_string("/sys/module/btusb/parameters/enable_autosuspend")
+        .map(|s| s.trim() == "Y")
+        .unwrap_or(false);
+    if !on {
+        return false;
+    }
+    let fixed = std::fs::read_to_string("/etc/modprobe.d/btusb.conf")
+        .map(|s| s.contains("enable_autosuspend=0"))
+        .unwrap_or(false);
+    !fixed
+}
+
+/// Persist `options btusb enable_autosuspend=0` so the USB BT controller never
+/// autosuspends — the root-cause fix for cold-boot disappearance. Idempotent.
+fn ensure_btusb_no_autosuspend() {
+    let conf = "/etc/modprobe.d/btusb.conf";
+    let already = std::fs::read_to_string(conf)
+        .map(|s| s.contains("enable_autosuspend=0"))
+        .unwrap_or(false);
+    if already {
+        ui::skip("btusb autosuspend", "already disabled");
+        return;
+    }
+    let st = Command::new("sudo")
+        .args(["sh", "-c", "echo 'options btusb enable_autosuspend=0' > /etc/modprobe.d/btusb.conf"])
+        .status();
+    match st {
+        Ok(s) if s.success() => {
+            ui::ok("disabled btusb USB autosuspend → /etc/modprobe.d/btusb.conf");
+            ui::info("fixes cold-boot BT loss on MediaTek/Realtek USB combo cards (reboot to confirm)");
+        }
+        _ => ui::warn("could not write /etc/modprobe.d/btusb.conf (sudo?)"),
     }
 }
