@@ -79,6 +79,9 @@ enum Cmd {
     /// Manage skill library (list/add/sync)
     Skill(verbs::skill::Args),
 
+    /// Stand up / refresh the agent harness (init = deploy skills+codegraph+AGENTS.md+memory; up = refresh)
+    Harness(verbs::harness::Args),
+
     /// Render web route / file to PNG (for AI image-routing)
     Shot(verbs::shot::Args),
 
@@ -127,6 +130,7 @@ fn main() -> Result<()> {
         Some(Cmd::Bt(a))      => verbs::bt::run(a),
         Some(Cmd::Clean(a))   => verbs::clean::run(a),
         Some(Cmd::Skill(a))   => verbs::skill::run(a),
+        Some(Cmd::Harness(a)) => verbs::harness::run(a),
         Some(Cmd::Shot(a))    => verbs::shot::run(a),
         Some(Cmd::DiffImg(a)) => verbs::diff_img::run(a),
         Some(Cmd::PdfImg(a))  => verbs::pdf_img::run(a),

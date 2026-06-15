@@ -73,7 +73,7 @@ Stage A (harness, luôn idempotent):
 - `pacman -S --needed helix lazygit abduco github-cli`
 - omp CLI qua `curl -fsSL https://omp.sh/install | sh` (skip nếu đã có)
 - ghi config: `~/.config/helix/`, `~/.config/kitty/8sync.session`, `~/.config/8sync/{global,skills}.toml`
-- ghi skill: `~/.omp/skills/{karpathy-guidelines,8sync-cli,image-routing}/SKILL.md` + `00-force-load.md`
+- ghi skill (15 bundled): `~/.omp/skills/{codegraph,karpathy-guidelines,ponytail,assp-skill,impeccable,taste-skill,8sync-cli,image-routing,code-review-and-quality,senior-security,senior-frontend,full-flow,encore-deploy,last30days}/SKILL.md` + `00-force-load.md` (+ `social-growth` opt-in)
 
 Stage B (community profile, opt-in y/N từng cái):
 
@@ -129,18 +129,19 @@ System packages (`pacman -Syu`) **không** tự chạy — bạn tự quyết kh
 
 `8sync . ls` / `to <n>` / `new <n> [cmd]` / `rm <n>` / `wipe` / `kick`
 
-### Skill system
+### Harness + Skill system
 
 | Lệnh | Mô tả |
 |---|---|
-| `8sync skill` | List skill global (`~/.omp/skills/`) + local project (`agents/skills/`) |
-| `8sync skill add <github-url>` | Clone repo skill vào **cả** `~/.omp/skills/<name>/` (omp đọc) **và** `<project>/agents/skills/<name>/` (memory dự án). Rewrite block `<!-- 8sync:skills:* -->` trong `AGENTS.md` |
-| `8sync skill add gh:owner/repo` | Short form |
-| `8sync skill add path:/abs/path` | Symlink từ local dir |
-| `8sync skill sync` | Refresh master skill list + re-deploy bundled skills (karpathy / image-routing / 8sync-cli / **codegraph**) into `~/.omp/skills/` + mirror to `agents/skills/`. Inside a project: auto-runs `codegraph init` to bootstrap `.codegraph/` if missing |
+| `8sync harness init` | **Một lệnh dựng harness:** deploy 15 bundled skill + codegraph binary + external packs (ponytail/addyosmani, best-effort) → `~/.omp/skills/`, mirror vào `agents/skills/`, `codegraph init`, seed `agents/*` + `CHANGELOG.md`, inject force-load vào `AGENTS.md`/`CLAUDE.md` + index mỗi sub-folder. Có progress UI |
+| `8sync harness up` | Refresh theo state hiện tại: re-inject + refresh `KNOWLEDGE.md` + re-index codegraph. `--loop 10m` (foreground) · `--timer 30m\|off` (systemd user timer, khuyến nghị cho nền) |
+| `8sync skill` | List skill global (`~/.omp/skills/`) + local (`agents/skills/`) |
+| `8sync skill add <github-url>` | Clone vào **cả** global + project; **collection-aware** (repo `skills/<name>/` → cài mọi sub-skill, vd `addyosmani/agent-skills`). Rewrite block `<!-- 8sync:skills:* -->` |
+| `8sync skill add gh:owner/repo` · `path:/abs` · `builtin:<name>` | Short form · symlink local · bật opt-in bundled skill (vd `builtin:social-growth`) |
+| `8sync skill gen <id> <id>` | Fuse N local skill thành 1 SKILL.md tổng hợp |
 
-Idempotent: chạy lại `add` cùng URL → `git pull --ff-only` thay vì clone lại.
-Mỗi skill dir tuân theo Agent Skills 3-folder layout: `SKILL.md` (required) + `scripts/` (helpers) + `references/` (load on demand). `8sync skill sync` tự tạo `scripts/` / `references/` nếu thiếu.
+Always-on (đọc theo thứ tự): codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing. `encore-deploy` chỉ hiện khi project dùng Encore; `social-growth` (social/branding/leads) **opt-in**, không auto-bật.
+Idempotent: chạy lại `add` cùng URL → re-clone/refresh. Mỗi skill dir theo Agent Skills 3-folder layout (`SKILL.md` + `scripts/` + `references/`); `harness init` tự tạo subdir thiếu.
 
 
 ### Lifecycle
@@ -204,7 +205,7 @@ Sửa `docs/index.html` → push `main` → Pages tự rebuild trong ~1 phút.
 
 ## Stack & contribute
 
-Rust workspace 1 binary (`8sync` ≈ 1.3 MB stripped). Toolchain pin tại `rust-toolchain.toml`.
+Rust workspace 1 binary (`8sync` ≈ 3.8 MB stripped — gồm 15 bundled skill, nặng nhất `impeccable`). Toolchain pin tại `rust-toolchain.toml`.
 
 Bố cục source:
 
@@ -220,7 +221,7 @@ crates/cli/src/
 assets/                           embed vào binary qua rust-embed
 ├── configs/                      kitty.session, helix-config, fish-config, 8sync/*.toml
 ├── presets/                      kitty preset themes
-├── skills/                       built-in skills (karpathy, 8sync-cli, image-routing)
+├── skills/                       15 bundled (codegraph, karpathy, ponytail, assp, impeccable, taste, 8sync-cli, image-routing, code-review, senior-security/frontend, full-flow, encore-deploy, last30days, social-growth)
 └── wallpapers/
 ```
 

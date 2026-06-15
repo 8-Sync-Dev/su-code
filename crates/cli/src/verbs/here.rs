@@ -164,10 +164,14 @@ Session memory được omp tự quản (retain/recall/auto-compact). Không c�
         }
     }
 
-    // Re-inject the dynamic skills block so it reflects whatever is currently
-    // installed under ~/.omp/skills/ and agents/skills/.
+    // Re-inject the dynamic skills block (root) + a compact index into every
+    // significant sub-folder, so an agent opening any sub-tree still sees the
+    // skill rules (progressive disclosure: nearest AGENTS.md wins).
     if let Err(e) = skill::inject_agents_md(&env.home, root) {
         ui::warn(&format!("could not inject AGENTS.md skills block: {}", e));
+    }
+    if let Err(e) = skill::inject_subfolder_indexes(root) {
+        ui::warn(&format!("could not inject sub-folder skill indexes: {}", e));
     }
     Ok(())
 }

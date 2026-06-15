@@ -20,23 +20,30 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 ### ⛔ Always-on — ĐỌC NGAY, trước tool call đầu tiên (không skip)
 
   1. `/home/alexdev/Projects/su-code/agents/skills/codegraph/SKILL.md`
-  2. `/home/alexdev/Projects/su-code/agents/skills/8sync-cli/SKILL.md`
-  3. `/home/alexdev/Projects/su-code/agents/skills/image-routing/SKILL.md`
-  4. `/home/alexdev/Projects/su-code/agents/skills/karpathy-guidelines/SKILL.md`
+  2. `/home/alexdev/Projects/su-code/agents/skills/karpathy-guidelines/SKILL.md`
+  3. `/home/alexdev/Projects/su-code/agents/skills/ponytail/SKILL.md`
+  4. `/home/alexdev/Projects/su-code/agents/skills/assp-skill/SKILL.md`
+  5. `/home/alexdev/Projects/su-code/agents/skills/impeccable/SKILL.md`
+  6. `/home/alexdev/Projects/su-code/agents/skills/taste-skill/SKILL.md`
+  7. `/home/alexdev/Projects/su-code/agents/skills/8sync-cli/SKILL.md`
+  8. `/home/alexdev/Projects/su-code/agents/skills/image-routing/SKILL.md`
 
 ### 🔎 On-demand — CHỈ đọc khi task khớp mô tả (bỏ qua nếu không liên quan)
 
-- **`last30days`** — `agents/skills/last30days/SKILL.md`
-     _Use this skill when the user asks "what are people saying about X", "research <topic> recently", "what's trending on Reddit/X/YouTube about Y", pre-meeting/pre-call briefings, "last 30 days of Z", competitor scans, or any recency-grounded social research. It runs the `/last30days` agent skill (separately installed engine) that searches Reddit, X, YouTube, TikTok, Hacker News, Polymarket, GitHub, Bluesky and the web in parallel, scores by real engagement, and synthesizes one cited brief. Prefer it over ad-hoc WebSearch when the user wants what the community actually thinks RIGHT NOW._
+- **`code-review-and-quality`**, **`senior-security`**, **`senior-frontend`** — review/quality/security/frontend chuyên sâu.
+- **`full-flow`** — self-driving fix/dev/verify loop (stack Encore + Next).
+- **`last30days`** — research social recency (Reddit/X/YouTube/HN…).
+- **`encore-deploy`** — tech-gated: chỉ hiện khi project dùng Encore.
+- _(opt-in, không auto-bật)_ **`social-growth`** — social/branding/leads; bật bằng `8sync skill add builtin:social-growth`.
 
 ### Quy tắc bất biến
 
 - **`codegraph` FIRST** cho mọi câu hỏi explore code (Step 0). Bypass = bug.
-- Đọc TẤT CẢ skill **always-on** TRƯỚC khi gọi tool đầu tiên.
+- Đọc TẤT CẢ skill **always-on** TRƯỚC tool call đầu tiên, ĐÚNG thứ tự: codegraph → karpathy → ponytail → assp → impeccable + taste → 8sync-cli → image-routing.
+- **Cách tận dụng (luôn nhớ):** `codegraph` = explore code (search/deps/callers, KHÔNG grep) · `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` = copy/offer hướng người dùng · `impeccable` + `taste` = mọi UI/frontend.
 - Skill **on-demand**: chỉ mở khi description khớp task hiện tại — đừng đọc thừa.
-- Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.
-- Nếu skill có `references/` → đọc on-demand khi task chạm chủ đề.
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.
+- **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (mục Unreleased) + ghi học được vào `agents/KNOWLEDGE.md`.
 <!-- 8sync:skills:end -->
 
 > File này dành cho AI tool (omp, claude-code, cursor, opencode, aider, …)
@@ -52,7 +59,7 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 - **Helix editor** (`hx` hoặc `helix`)
 - **omp** (oh-my-pi.sh) — AI engine, `~/.bun/bin/omp`
 
-Stack: **Rust** (single workspace, 1 binary `8sync` ≈ 1.3 MB stripped).
+Stack: **Rust** (single workspace, 1 binary `8sync` ≈ 3.8 MB stripped — gồm 15 bundled skill, nặng nhất là `impeccable` ~2 MB scripts/reference).
 
 ---
 
@@ -125,7 +132,7 @@ su-code/
 └── assets/                                                  bundled vào binary qua rust-embed
     ├── configs/                                             helix config + theme + kitty/8sync.session + 8sync/{global,skills}.toml
     ├── profiles/                                            7 personal profile TOML (vietnamese, hw-cooling, hw-lianli, displaylink, apps-personal, warp, alexdev-bundle)
-    └── skills/                                              karpathy, image-routing, 8sync-cli + 00-force-load.md
+    └── skills/                                              8 bundled (codegraph, karpathy, assp-skill, impeccable, taste-skill, 8sync-cli, image-routing, last30days) + 00-force-load.md
 ```
 
 ---
@@ -190,7 +197,8 @@ su-code/
 ### AI tooling
 | Verb | Mô tả |
 |---|---|
-| `8sync skill [add <url>\|sync]` | Quản lý skill cho omp; `add` clone từ GitHub URL vào `~/.omp/skills/` và `agents/skills/`, ghi block force-load trong AGENTS.md |
+| `8sync harness [init\|up]` | **init**: deploy toàn bộ skill + codegraph + AGENTS.md/CLAUDE.md + memory + CHANGELOG + sub-folder index (progress UI). **up**: refresh theo state hiện tại (`--loop <dur>` foreground, `--timer <dur>\|off` systemd user timer). Thay `8sync skill sync` cũ |
+| `8sync skill [add <spec>\|gen \|list]` | Quản lý skill: `add` clone GitHub (collection-aware: cài mọi `skills/<name>/`) hoặc `builtin:<name>` (bật opt-in bundled); `gen` fuse N skill |
 | `8sync shot <url\|file>` | Render web/file → PNG (cho image-routing) |
 | `8sync diff-img [ref]` | Git diff → PNG |
 | `8sync pdf-img <file>` | PDF page → PNG |
@@ -245,13 +253,25 @@ Session memory được `omp` tự quản (retain/recall/auto-compact). 8sync ch
 
 ## 7. Skill system (force-load)
 
-Khi `8sync setup` chạy, 3 skill bundled được copy vào `~/.omp/skills/` theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) (SKILL.md với YAML frontmatter `name`+`description`):
+Khi `8sync harness init` (hoặc `8sync setup`) chạy, **15 skill bundled** được deploy vào `~/.omp/skills/` theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview). 8 skill **always-on** đọc theo đúng thứ tự ưu tiên (codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing); phần còn lại on-demand; `encore-deploy` tech-gated; `social-growth` opt-in:
 
 | Skill | Trigger | Mô tả |
 |---|---|---|
+|`codegraph`|`always`|semantic code intelligence (binary + SKILL.md) — STEP 0, mọi explore code|
 |`karpathy-guidelines`|`always`|kỷ luật engineering Karpathy-style|
+|`ponytail`|`always`|"laziest senior dev" — YAGNI, làm ít nhất, xoá > thêm|
+|`assp-skill`|`always`|brand DNA 8 Sync Dev + ASSP validate-before-build (UI copy, landing/pricing, feature mới)|
+|`impeccable`|`always`|frontend design/redesign/audit production-grade (có `scripts/` + `reference/`)|
+|`taste-skill`|`always`|anti-slop frontend taste cho landing/portfolio/redesign|
 |`8sync-cli`|`always`|dạy AI ưu tiên verb 8sync hơn shell thô|
 |`image-routing`|`always`|chọn image vs text reads để tiết kiệm token|
+|`code-review-and-quality` · `senior-security` · `senior-frontend`|on-demand|review/quality/security/frontend chuyên sâu|
+|`full-flow`|on-demand|self-driving fix/dev/verify loop (Encore + Next)|
+|`encore-deploy`|tech-gated|deploy runbook — chỉ hiện khi project dùng Encore|
+|`last30days`|on-demand|research social recency (Reddit/X/YouTube/HN…)|
+|`social-growth`|opt-in|social/branding/leads — bật bằng `8sync skill add builtin:social-growth`|
+
+**External skill packs** (best-effort, `harness init` tự clone vào `~/.omp/skills/`): [`ponytail`](https://github.com/DietrichGebert/ponytail) (full: audit/debt/review/help) + [`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills) (24 production-grade eng skills). Offline thì skip; bundled vẫn đủ mạnh.
 
 Master force-load file: `~/.omp/skills/00-force-load.md` — omp đọc đầu tiên mỗi session.
 
@@ -267,8 +287,8 @@ Repo chưa theo spec (không có `SKILL.md`)? 8sync fallback: phát hiện `CLAU
 - **Không thêm dep nặng**: tránh `reqwest`, `tokio` cho phần nhỏ. Dùng shell-out (`curl`, `pkill`, `systemctl`) thay vì re-implement trong Rust.
 - **Idempotent install**: mọi thao tác cài đặt trong `setup.rs`/`pkg.rs` phải an toàn khi chạy lần 2.
 - **Smart-parse args**: 1 verb có thể nhận nhiều dạng input (vd `8sync bg 0.7` = opacity, `8sync bg /path` = file, `8sync bg cyberpunk` = search). Tránh tạo subcommand sâu.
-- **Verb count target**: giữ ≤ 20 verb flat (hiện 20).
-- **Binary size target**: < 2 MB stripped.
+- **Verb count target**: giữ ≤ 22 verb flat (hiện 21, thêm `harness`).
+- **Binary size target**: < 4 MB stripped (tăng từ 2 MB khi bundle `impeccable` — skill frontend nặng ~2 MB). Skill mới chỉ bundle nếu thật sự always-on; còn lại để `8sync skill add`.
 - **Help format**: mọi verb có `-h`/`--help` với `EXAMPLES` block (xem `setup.rs:7-15`).
 
 ---

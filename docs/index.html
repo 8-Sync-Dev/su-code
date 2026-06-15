@@ -152,7 +152,7 @@
       </article>
       <article class="card">
         <h3><span class="dot"></span>Small &amp; native</h3>
-        <p>1 binary Rust ≈ 1.3 MB stripped. Phù hợp CachyOS/Arch + Kitty + Helix + <a href="https://omp.sh">omp</a>.</p>
+        <p>1 binary Rust ≈ 3.8 MB stripped (gồm 15 bundled skill). Phù hợp CachyOS/Arch + Kitty + Helix + <a href="https://omp.sh">omp</a>.</p>
       </article>
     </section>
 
@@ -205,6 +205,8 @@ cd ~/code/my-app
               <tr><td><code>8sync setup</code></td><td>Cài harness + chọn profile</td></tr>
               <tr><td><code>8sync up</code></td><td>Self-update binary + <code>omp update</code></td></tr>
               <tr><td><code>8sync doctor</code></td><td>Health check toàn diện</td></tr>
+              <tr><td><code>8sync harness init</code></td><td>Dựng harness: skills + codegraph + AGENTS.md + memory + CHANGELOG</td></tr>
+              <tr><td><code>8sync harness up</code></td><td>Refresh state hiện tại (<code>--loop</code> / <code>--timer</code>)</td></tr>
               <tr><td><code>8sync skill</code></td><td>List + add skill (xem dưới)</td></tr>
               <tr><td><code>8sync shot &lt;url|file&gt;</code></td><td>Render web/file → PNG</td></tr>
               <tr><td><code>8sync diff-img | pdf-img</code></td><td>Diff / PDF → PNG</td></tr>
@@ -218,7 +220,7 @@ cd ~/code/my-app
     <!-- SKILLS -->
     <section id="skills">
       <h2>Skill injection</h2>
-      <p class="lede">Skill = module hướng dẫn cho AI. 8sync bundle sẵn 3 skill <code>karpathy-guidelines</code>, <code>8sync-cli</code>, <code>image-routing</code>; bạn add thêm từ GitHub.</p>
+      <p class="lede">Skill = module hướng dẫn cho AI. 8sync bundle sẵn <b>15 skill</b> (codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing · …); <code>8sync skill add</code> collection-aware kéo thêm cả bộ từ GitHub.</p>
       <div class="codeblock">
         <span class="lbl">bash</span>
 <pre><code># Clone từ URL: cài vào CẢ ~/.omp/skills/ (omp đọc global) lẫn agents/skills/ (project)
@@ -233,8 +235,9 @@ cd ~/code/my-app
 # Idempotent: chạy lại = git pull --ff-only
 8sync skill add https://github.com/colbymchenry/codegraph   # → "updated"
 
-# Refresh master force-load file
-8sync skill sync</code></pre>
+# Dựng / refresh toàn bộ harness (thay `skill sync` cũ)
+8sync harness init
+8sync harness up --timer 30m</code></pre>
       </div>
     </section>
 
