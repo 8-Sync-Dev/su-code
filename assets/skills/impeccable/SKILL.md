@@ -5,6 +5,16 @@ description: Use when the user wants to design, redesign, shape, critique, audit
 
 Designs and iterates production-grade frontend interfaces. Real working code, committed design choices, exceptional craft.
 
+## 🏠 House design references (8 Sync Dev — auto-ref, BẮT BUỘC cho design/UI)
+
+`impeccable` là **design system chuẩn của 8 Sync Dev** — cho MỌI việc design / redesign / audit / UI,
+luôn dùng skill này làm gốc. Ngoài flow dưới, auto-reference các house doc sau khi task liên quan:
+
+- `references/house/frontend-agent-workflow.md` — senior coding-agent workflow (inspect → scope → critical-path → implement → verify; smallest safe change).
+- `references/house/clouds-f.md` — senior front-end/codebase orchestration (codebase-fit first, minimal-risk, browser-verify).
+- `references/house/clouds-f-rules/*.mdc` — keyword routers: design-redesign · responsive · performance · fix · refactor · security · browser-automation.
+- `references/house/{code-review-graph-workflow,keyword-rules,skill-registry,subagent-registry}.md` — review-graph + routing notes.
+
 ## Setup
 
 You MUST do these steps before proceeding:

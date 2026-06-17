@@ -1,0 +1,49 @@
+---
+description: When the user requests browser automation or scripted web interaction, use agent-browser with snapshot refs, explicit waits, and deterministic interaction loops.
+alwaysApply: false
+---
+
+# Browser Automation Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule when the user asks to open websites, fill forms, click UI elements, capture screenshots, scrape page data, or automate browser workflows.
+
+## Required Execution Loop
+
+1. `agent-browser open <url>`
+2. `agent-browser snapshot -i`
+3. Interact with refs from snapshot
+4. Wait for async updates
+5. Re-snapshot after navigation or DOM mutations
+
+## Selector Priority
+
+1. Snapshot refs (`@e*`)
+2. Semantic locators (`find role`, `find label`, `find placeholder`, `find testid`)
+3. CSS/Text/XPath fallback only when required
+
+## Reliability Rules
+
+- Always use explicit waits for async flows (`wait --load networkidle`, `wait --url`, `wait --text`).
+- Re-snapshot after every meaningful page change.
+- Use `screenshot --annotate` for visual reference mapping.
+- Use `frame @eX` and `frame main` for iframe-scoped tasks.
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `agent-browser` | Deterministic browser automation with stable element refs |
+| Secondary | `browser-testing-with-devtools` | Runtime validation via DOM, console, network, and performance traces |
+| Secondary | `javascript-cheatsheet` | Quick syntax and scripting support for automation glue logic |
+
+## Skill Paths
+
+- `skills/agent-browser/SKILL.md`
+- `skills/browser-testing-with-devtools/SKILL.md`
+- `skills/javascript-cheatsheet/SKILL.md`
+## Subagent Candidates
+
+- `code-reviewer` when automation output must be reviewed as release evidence.
+

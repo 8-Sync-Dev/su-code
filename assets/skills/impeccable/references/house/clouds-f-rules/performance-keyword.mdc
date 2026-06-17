@@ -1,0 +1,42 @@
+---
+description: When the user asks about performance or Core Web Vitals, follow a measure-first optimization workflow.
+alwaysApply: false
+---
+
+# Performance Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule for `performance`, `slow`, `lag`, `Core Web Vitals`, `LCP`, `INP`, `CLS`, `bundle`, `rerender`, and latency optimization tasks.
+
+## Performance Rules
+
+1. Measure first, then optimize.
+2. Prioritize proven bottlenecks over speculative cleanup.
+3. Focus on render cost, bundle weight, waterfalls, and main-thread pressure.
+4. Re-measure after each meaningful optimization.
+5. Avoid regressions in accessibility and maintainability.
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `performance-optimization` | End-to-end measure-identify-fix-verify workflow |
+| Primary | `core-web-vitals` | LCP/INP/CLS diagnosis and remediation patterns |
+| Secondary | `react-best-practices` | React/Next performance patterns and anti-pattern removal |
+| Secondary | `code-optimizer` | Broad optimization audit for systemic bottlenecks |
+| Secondary | `browser-testing-with-devtools` | Real-browser performance traces and runtime evidence |
+| Secondary | `tanstack-virtual` | Virtualization strategies for large-list rendering |
+
+## Skill Paths
+
+- `skills/performance-optimization/SKILL.md`
+- `skills/core-web-vitals/SKILL.md`
+- `skills/react-best-practices/SKILL.md`
+- `skills/code-optimizer/SKILL.md`
+- `skills/browser-testing-with-devtools/SKILL.md`
+- `skills/tanstack-virtual/SKILL.md`
+## Subagent Candidates
+
+- `performance-optimizer` for bottleneck and optimization audits.
+

@@ -1,0 +1,44 @@
+---
+description: When the user asks to fix/resolve an issue, diagnose first, patch minimally, and verify with focused checks.
+alwaysApply: false
+---
+
+# Fix Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule for `fix`, `resolve`, `sua loi`, patch requests, and defect correction tasks.
+
+## Fix Rules
+
+1. Inspect before editing: related files, contracts, and usage sites.
+2. Diagnose root cause before patching.
+3. Keep changes minimal and scoped.
+4. Preserve existing behavior unless change is explicitly requested.
+5. For non-trivial multi-file fixes, present options/tradeoffs before large edits.
+6. Validate with the most relevant checks (`lint`, `typecheck`, `test`, `build`, runtime verification).
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `frontend-patterns` | Safe implementation patterns for React/Next and UI logic |
+| Primary | `code-review-and-quality` | Correctness, architecture, security, and regression checks |
+| Secondary | `javascript-cheatsheet` | Fast JS debugging and API syntax checks |
+| Secondary | `typescript-advanced-types` | Strong type-safety and type-level correctness |
+| Secondary | `explore-codebase` | Impact mapping across call sites and flows |
+| Secondary | `lint` | Rapid lint/format/type feedback loop |
+
+## Skill Paths
+
+- `skills/frontend-patterns/SKILL.md`
+- `skills/code-review-and-quality/SKILL.md`
+- `skills/javascript-cheatsheet/SKILL.md`
+- `skills/typescript-advanced-types/SKILL.md`
+- `skills/explore-codebase/SKILL.md`
+- `skills/lint/SKILL.md`
+## Subagent Candidates
+
+- `typescript-reviewer` for TS/JS correctness and type-safety review.
+- `code-reviewer` for final multi-axis quality gate.
+

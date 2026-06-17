@@ -1,0 +1,48 @@
+---
+description: When the user asks to debug, trace, diagnose, or reproduce an issue, prioritize root-cause investigation before patching.
+alwaysApply: false
+---
+
+# Debug Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule for `debug`, `trace`, `diagnose`, and reproduction-focused requests.
+
+If the user explicitly asks to patch/fix immediately (`fix`, `resolve`, `sua loi`), follow `fix-keyword.mdc`.
+
+## Debug Rules
+
+1. Reproduce the issue first.
+2. Gather concrete evidence (logs, errors, network/runtime behavior).
+3. Form and test hypotheses.
+4. Isolate root cause before proposing a fix.
+5. Apply minimal, low-risk changes only after diagnosis is clear.
+
+## Runtime Verification Preference
+
+For browser-facing bugs, validate using runtime tools (DOM, console, network, performance traces) instead of static assumptions only.
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `debug-like-expert` | Structured, evidence-driven debugging workflow |
+| Secondary | `browser-testing-with-devtools` | Runtime inspection in real browser conditions |
+| Secondary | `agent-browser` | Deterministic reproduction of UI interaction paths |
+| Secondary | `javascript-cheatsheet` | Quick JS diagnostics and utility checks |
+| Secondary | `typescript-advanced-types` | Type-level diagnosis for complex TS issues |
+
+## Skill Paths
+
+- `skills/debug-like-expert/SKILL.md`
+- `skills/browser-testing-with-devtools/SKILL.md`
+- `skills/agent-browser/SKILL.md`
+- `skills/javascript-cheatsheet/SKILL.md`
+- `skills/typescript-advanced-types/SKILL.md`
+## Subagent Candidates
+
+- `silent-failure-hunter` for swallowed errors, hidden fallbacks, and propagation gaps.
+- `code-explorer` for execution-path tracing.
+- `typescript-reviewer` for async/type-root-cause checks.
+

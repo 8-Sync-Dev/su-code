@@ -17,7 +17,7 @@ Read these in order. No skipping, no skimming, no shortcuts. Order = priority (t
 2. **`~/.omp/skills/karpathy-guidelines/SKILL.md`** — engineering discipline (read-before-write, test-before-refactor, small steps).
 3. **`~/.omp/skills/ponytail/SKILL.md`** — "laziest senior dev": YAGNI, do the least that works, delete > add, stdlib before deps.
 4. **`~/.omp/skills/assp-skill/SKILL.md`** — 8 Sync Dev brand DNA + ASSP validate-before-build framework. Mandatory for any user-facing copy (UI microcopy, landing/pricing, emails, errors) and before greenlighting a new product feature.
-5. **`~/.omp/skills/impeccable/SKILL.md`** — production-grade frontend design/redesign/audit. Run its Setup step (`scripts/context.mjs`) first when doing UI work.
+5. **`~/.omp/skills/impeccable/SKILL.md`** — **design system chuẩn của 8 Sync Dev: BẮT BUỘC cho MỌI design/redesign/audit/UI.** Run its Setup (`scripts/context.mjs`) first; auto-reference `references/house/*` (frontend-agent-workflow, clouds-f orchestration, keyword routers).
 6. **`~/.omp/skills/taste-skill/SKILL.md`** — anti-slop frontend taste for landing pages, portfolios, redesigns (brief inference, the three dials, bias correction).
 7. **`~/.omp/skills/8sync-cli/SKILL.md`** — you're running inside the 8sync harness; prefer 8sync verbs over raw shell.
 8. **`~/.omp/skills/image-routing/SKILL.md`** — image vs text routing for cheap visual context.
@@ -45,7 +45,7 @@ If inside a project (cwd has `.git` / `Cargo.toml` / `package.json` / …):
 
 - **NEVER skip codegraph for code exploration.** It exists because grep wastes 3-10× tokens.
 - **NEVER skip karpathy or ponytail.** Engineering discipline + YAGNI (do the least that works, delete > add) is non-negotiable.
-- **Building UI or writing user-facing copy?** assp (brand voice + offer/pricing) and impeccable + taste (frontend craft) are mandatory before shipping — design/copy slop is a violation.
+- **Building UI / redesign / any frontend?** `impeccable` is THE house design system — mandatory, with `references/house/*` (workflow + clouds-f). Pair with `assp` (brand voice/offer) for copy and `taste` (anti-slop). Shipping UI without impeccable is a violation.
 - **NEVER skip 8sync-cli** when AGENTS.md mentions 8sync — using raw shell instead of `8sync` verbs misses memory + skill auto-load.
 - **Project-local skill in `agents/skills/<name>/` matches the task description?** Read it BEFORE touching code.
 - **Cite code as `path:line` or `path:start-end`.** Never natural language ("around line 50").

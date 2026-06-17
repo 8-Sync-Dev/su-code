@@ -1,0 +1,41 @@
+---
+description: When the user asks for responsive or multi-screen UI behavior, enforce mobile-first, adaptive, and accessible layouts.
+alwaysApply: false
+---
+
+# Responsive Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule for `responsive`, `mobile`, `tablet`, `breakpoints`, adaptive layout, and overflow issues.
+
+## Responsive Rules
+
+1. Validate mobile-first behavior before desktop polish.
+2. Verify spacing rhythm, readable typography scaling, and stable layout flow.
+3. Verify touch target size and interaction comfort.
+4. Prevent horizontal overflow and clipped content.
+5. Check loading/empty/error states across viewport sizes.
+6. Preserve accessibility while adapting layout.
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `responsive-design` | Modern responsive techniques (container queries, fluid systems) |
+| Primary | `responsive-web-design` | Practical media-query and adaptive layout implementation |
+| Secondary | `frontend-ui-engineering` | Production-level UI behavior and state completeness |
+| Secondary | `web-component-design` | Responsive reusable component architecture |
+| Secondary | `accessibility` | Keyboard, focus, semantics, and readable interaction patterns |
+
+## Skill Paths
+
+- `skills/responsive-design/SKILL.md`
+- `skills/responsive-web-design/SKILL.md`
+- `skills/frontend-ui-engineering/SKILL.md`
+- `skills/web-component-design/SKILL.md`
+- `skills/accessibility/SKILL.md`
+## Subagent Candidates
+
+- `code-reviewer` for final responsive/a11y regression pass.
+

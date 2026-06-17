@@ -191,7 +191,7 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 \n\
 - **`codegraph` FIRST** cho mọi câu hỏi explore code (Step 0). Bypass = bug.\n\
 - Đọc TẤT CẢ skill **always-on** TRƯỚC tool call đầu tiên, ĐÚNG thứ tự: codegraph → karpathy → ponytail → assp → impeccable + taste → 8sync-cli → image-routing.\n\
-- **Cách tận dụng (luôn nhớ):** `codegraph` = explore code (search/deps/callers, KHÔNG grep) · `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` = copy/offer hướng người dùng · `impeccable` + `taste` = mọi UI/frontend.\n\
+- **Cách tận dụng (luôn nhớ):** `codegraph` = explore code (search/deps/callers, KHÔNG grep) · `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` = copy/offer hướng người dùng · **`impeccable` = design system CHUẨN, BẮT BUỘC cho MỌI UI/design/redesign/audit (đọc kèm `references/house/*`)** + `taste` chống slop.\n\
 - Skill **on-demand**: chỉ mở khi description khớp task hiện tại — đừng đọc thừa.\n\
 - Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.\n\
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.\n\

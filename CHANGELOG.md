@@ -5,6 +5,21 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.15.1] — 2026-06-17
+
+### Added
+
+- **impeccable house design references** (`assets/skills/impeccable/references/house/`): bundled
+  `frontend-agent-workflow.md` (senior coding-agent workflow) + `clouds-f.md` (senior front-end
+  orchestration) + `clouds-f-rules/*.mdc` (design-redesign / responsive / performance / fix /
+  refactor / security keyword routers). impeccable's SKILL.md auto-references them.
+
+### Changed
+
+- **Emphasised `impeccable` as THE house design system** across the force-load flow (AGENTS.md /
+  CLAUDE.md block, `00-force-load.md`, sub-folder index, KNOWLEDGE breadcrumb): mandatory for any
+  UI / design / redesign / audit, read with `references/house/*`.
+
 ## [0.15.0] — 2026-06-16
 
 ### Added

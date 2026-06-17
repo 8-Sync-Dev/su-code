@@ -1,0 +1,49 @@
+---
+description: When the user asks to explore the codebase or repository structure, build graph-aware context first, then verify with workspace files.
+alwaysApply: true
+---
+
+# Codebase Exploration Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule for requests such as `codebase`, `explore repo`, `read codebase`, `scan repository`, or architecture discovery.
+
+## Required Flow
+
+1. Start with structural context (graph-first when available).
+2. Map entry points, module boundaries, and source-of-truth files.
+3. Trace component hierarchy, state flow, props flow, and API/data flow.
+4. Confirm findings with direct file evidence before proposing edits.
+
+## Graph-First Policy
+
+- If code-review-graph is available, run graph workflow first.
+- Use `references/code-review-graph-workflow.md` as the default playbook.
+- If graph tooling is unavailable, state this explicitly and continue with file-grounded inspection.
+
+## Workspace Verification
+
+Use workspace tools (`rg`, file reads, targeted search) to confirm symbols, imports, contracts, and references.
+Do not rely on assumptions about file layout.
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `explore-codebase` | Fast structural understanding via graph-oriented exploration |
+| Secondary | `improve-codebase-architecture` | Identify boundaries, seams, and architectural friction |
+| Secondary | `refactor-safely` | Estimate blast radius and safe-change strategy |
+| Secondary | `frontend-patterns` | Align findings with existing frontend architecture patterns |
+
+## Skill Paths
+
+- `skills/explore-codebase/SKILL.md`
+- `skills/improve-codebase-architecture/SKILL.md`
+- `skills/refactor-safely/SKILL.md`
+- `skills/frontend-patterns/SKILL.md`
+## Subagent Candidates
+
+- `code-explorer` for deep flow mapping.
+- `code-architect` for architecture blueprint outputs.
+

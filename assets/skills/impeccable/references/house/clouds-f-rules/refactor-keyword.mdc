@@ -1,0 +1,43 @@
+---
+description: When the user asks to refactor or simplify code, preserve behavior and reduce complexity safely.
+alwaysApply: false
+---
+
+# Refactor Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule for `refactor`, `cleanup`, `simplify`, and maintainability-focused requests.
+
+## Refactor Rules
+
+1. Preserve behavior by default.
+2. Reduce complexity, duplication, and coupling.
+3. Avoid introducing abstraction without clear repeated need.
+4. Keep scope narrow and changes reviewable.
+5. Re-validate existing flows after refactor.
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `code-simplification` | Readability-first simplification without behavior drift |
+| Primary | `refactor-safely` | Safe refactor planning with dependency/impact awareness |
+| Secondary | `clean-code-javascript` | Naming, function boundaries, and maintainable JS patterns |
+| Secondary | `javascript-refactoring` | Practical JS modularization and refactor process |
+| Secondary | `composition-patterns` | Better component composition and API ergonomics |
+| Secondary | `code-review-and-quality` | Final safety review across correctness/security/performance |
+
+## Skill Paths
+
+- `skills/code-simplification/SKILL.md`
+- `skills/refactor-safely/SKILL.md`
+- `skills/clean-code-javascript/SKILL.md`
+- `skills/javascript-refactoring/SKILL.md`
+- `skills/composition-patterns/SKILL.md`
+- `skills/code-review-and-quality/SKILL.md`
+## Subagent Candidates
+
+- `code-simplifier` for behavior-preserving cleanup.
+- `refactor-cleaner` for dead-code and unused-export removal campaigns.
+

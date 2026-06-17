@@ -1,0 +1,42 @@
+---
+description: When the user requests security hardening, assess trust boundaries, auth flows, and dependency risk before patching.
+alwaysApply: false
+---
+
+# Security Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule for `security`, `OWASP`, `XSS`, `CSRF`, `auth`, `authz`, `secrets`, and sanitization-related requests.
+
+## Security Rules
+
+1. Treat all external/user-controlled input as untrusted.
+2. Validate at boundaries and encode output safely.
+3. Verify auth/authz checks and session/token handling paths.
+4. Prevent client-side secret exposure.
+5. Review dependency and supply-chain risk before adding packages.
+6. Keep fixes minimal while preserving existing product behavior.
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `code-review-and-quality` | Security review inside broader correctness and architecture checks |
+| Primary | `best-practices` | Web security hardening baseline (headers, CSP, dependency hygiene) |
+| Secondary | `frontend-patterns` | Safe UI/data-flow implementation patterns |
+| Secondary | `web-quality-audit` | Structured audit across security/performance/accessibility/SEO |
+| Secondary | `accessibility` | Prevent insecure custom interactions and semantic misuse in forms/UI |
+
+## Skill Paths
+
+- `skills/code-review-and-quality/SKILL.md`
+- `skills/best-practices/SKILL.md`
+- `skills/frontend-patterns/SKILL.md`
+- `skills/web-quality-audit/SKILL.md`
+- `skills/accessibility/SKILL.md`
+## Subagent Candidates
+
+- `security-reviewer` for remediation-focused review.
+- `security-auditor` for threat-model and severity-ranked audits.
+

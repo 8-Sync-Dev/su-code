@@ -86,7 +86,7 @@ pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
 - **Always-on skills (đọc trước tool call đầu tiên, đúng thứ tự):** {}.\n\
 - **Cách tận dụng:** codegraph = explore code (search/deps/callers, không grep) · \
 karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · assp = copy/offer · \
-impeccable + taste = UI/frontend.\n\
+impeccable = design system CHUẨN, BẮT BUỘC cho mọi UI/design (kèm references/house/*) + taste chống slop.\n\
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (mục Unreleased) + ghi học được vào file này.",
         now_stamp(),
         chain,

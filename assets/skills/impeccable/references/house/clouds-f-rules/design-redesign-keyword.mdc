@@ -1,0 +1,43 @@
+---
+description: When the user asks for design/redesign or layout improvements, align with existing design system and deliver production-grade UI states.
+alwaysApply: false
+---
+
+# Design / Redesign Keyword (clouds-f)
+
+Canonical source: `SKILL.md` in this skill root.
+
+Apply this rule for `design`, `redesign`, `layout`, `wireframe`, visual refresh, and UI restructuring requests.
+
+## Design Rules
+
+1. Inspect existing design tokens, spacing scale, typography, and component conventions first.
+2. Reuse existing primitives before introducing new UI layers.
+3. Preserve product consistency unless explicit redesign scope says otherwise.
+4. Validate responsive behavior and accessibility for all interactive UI.
+5. Cover loading, empty, error, hover, focus, active, and disabled states.
+
+## Skill Routing
+
+| Priority | Skill | Purpose |
+| --- | --- | --- |
+| Primary | `frontend-ui-engineering` | Production-quality UI implementation and interaction behavior |
+| Secondary | `frontend-design` | Visual direction, hierarchy, composition, and motion language |
+| Secondary | `web-component-design` | Reusable component API and composition patterns |
+| Secondary | `tailwind-design-system` | Token-driven, consistent design-system implementation |
+| Secondary | `shadcn` | Reliable component composition in shadcn-based projects |
+| Secondary | `ui-ux-pro-max` | Design-system ideation and structured UI/UX recommendations |
+
+## Skill Paths
+
+- `skills/frontend-ui-engineering/SKILL.md`
+- `skills/frontend-design/SKILL.md`
+- `skills/web-component-design/SKILL.md`
+- `skills/tailwind-design-system/SKILL.md`
+- `skills/shadcn/SKILL.md`
+- `skills/ui-ux-pro-max/SKILL.md`
+## Subagent Candidates
+
+- `code-architect` for implementation blueprint and rollout sequencing.
+- `code-reviewer` for final consistency and regression checks.
+

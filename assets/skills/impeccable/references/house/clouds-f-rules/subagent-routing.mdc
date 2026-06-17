@@ -1,0 +1,32 @@
+---
+description: Route specialized deep-analysis tasks to project-local subagents when a focused reviewer/optimizer role is needed.
+alwaysApply: false
+---
+
+# Subagent Routing (clouds-f)
+
+Canonical source: `references/subagent-registry.md`.
+
+Use this rule when task scope benefits from specialized deep review, audit, or optimization in one domain.
+
+## Routing Triggers
+
+- Deep codebase tracing -> `code-explorer`
+- Architecture blueprinting -> `code-architect`
+- TS/JS strict review -> `typescript-reviewer`
+- Type model and invariants -> `type-design-analyzer`
+- Silent failures, swallowed errors, weak fallbacks -> `silent-failure-hunter`
+- Cleanup and simplification -> `code-simplifier`
+- Dead code removal campaign -> `refactor-cleaner`
+- Performance bottleneck audits -> `performance-optimizer`
+- Security review/hardening -> `security-reviewer`
+- Security threat audit -> `security-auditor`
+- SEO technical audits -> `seo-specialist`
+- Final merge/readiness review -> `code-reviewer`
+
+## Delegation Constraints
+
+1. Keep subagent scope explicit (files/module/concern).
+2. Do not delegate architecture-wide rewrites without user approval.
+3. Preserve compatibility and existing behavior unless task says otherwise.
+4. Record assumptions and unresolved risks in final summary.

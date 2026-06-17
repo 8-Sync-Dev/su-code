@@ -114,7 +114,7 @@ SKILL.md ở `<root>/agents/skills/<name>/` hoặc `~/.omp/skills/<name>/`.\n\
 \n\
 **Cách tận dụng (bắt buộc):** `codegraph` cho mọi explore code (search/deps/callers — KHÔNG grep) · \
 `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` cho copy/offer hướng người dùng · \
-`impeccable` + `taste` cho mọi UI/frontend.\n\
+**`impeccable` = design system CHUẨN, BẮT BUỘC cho mọi UI/design/redesign/audit (kèm `references/house/*`)** + `taste` chống slop.\n\
 \n\
 **Quy tắc:** cite `path:line` · ưu tiên verb `8sync` hơn shell · sau mỗi thay đổi cập nhật `CHANGELOG.md` + `agents/KNOWLEDGE.md`.\n\
 {END}",
