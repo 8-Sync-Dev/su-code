@@ -8,7 +8,7 @@ use crate::ui;
 
 /// Source spec parsed from `add` argument.
 pub(crate) enum Source {
-    Git { url: String, name: String },
+    Git { url: String, name: String, git_ref: Option<String> },
     Path { src: PathBuf, name: String },
     Builtin { name: String },
 }
@@ -38,6 +38,7 @@ pub(crate) fn parse_spec(spec: &str) -> Result<Source> {
         return Ok(Source::Path { src: p, name: with_name(default_name) });
     }
     if let Some(rest) = core.strip_prefix("gh:") {
+        let (rest, git_ref) = split_git_ref(rest);
         let default_name = rest
             .trim_end_matches(".git")
             .rsplit('/')
@@ -47,21 +48,40 @@ pub(crate) fn parse_spec(spec: &str) -> Result<Source> {
         return Ok(Source::Git {
             url: format!("https://github.com/{}", rest.trim_end_matches(".git")),
             name: with_name(default_name),
+            git_ref,
         });
     }
     if core.starts_with("https://") || core.starts_with("http://") || core.starts_with("git@") {
-        let default_name = core
+        // Pin syntax `<url>@<ref>` for http(s)/gh; SSH `git@host:...` keeps its `@`.
+        let (base, git_ref) = if core.starts_with("git@") {
+            (core, None)
+        } else {
+            split_git_ref(core)
+        };
+        let default_name = base
             .trim_end_matches(".git")
             .rsplit('/')
             .next()
-            .ok_or_else(|| anyhow!("bad git url: {}", core))?
+            .ok_or_else(|| anyhow!("bad git url: {}", base))?
             .to_string();
-        return Ok(Source::Git { url: core.to_string(), name: with_name(default_name) });
+        return Ok(Source::Git { url: base.to_string(), name: with_name(default_name), git_ref });
     }
     Err(anyhow!(
         "unknown spec `{}` — use <https URL> | gh:owner/repo | path:/abs | builtin:name (optional #newname suffix to rename)",
         spec
     ))
+}
+
+/// Split a trailing `@<ref>` pin off an http(s)/gh git spec. The ref must be a
+/// bare token (no `/`, no `:`) so `git@host:owner/repo` and path-y refs stay
+/// intact. Returns `(base, ref)`.
+fn split_git_ref(s: &str) -> (&str, Option<String>) {
+    match s.rsplit_once('@') {
+        Some((base, r)) if !r.is_empty() && !r.contains('/') && !r.contains(':') => {
+            (base, Some(r.to_string()))
+        }
+        _ => (s, None),
+    }
 }
 
 /// Fetch the README.md of a public GitHub repo via raw.githubusercontent.com.
@@ -209,6 +229,47 @@ pub(crate) fn git_clone_shallow(url: &str, dest: &Path) -> Result<()> {
         return Err(anyhow!("git clone exited non-zero for {}", url));
     }
     Ok(())
+}
+
+/// Clone `url` into `dest`. `git_ref = None` → fast `--depth 1` default-branch
+/// clone; a ref → full clone + checkout so any commit/tag/branch resolves
+/// (pins are rare; correctness over speed).
+pub(crate) fn git_clone_at(url: &str, dest: &Path, git_ref: Option<&str>) -> Result<()> {
+    let Some(r) = git_ref else {
+        return git_clone_shallow(url, dest);
+    };
+    let st = Command::new("git")
+        .args(["clone", "--quiet", url])
+        .arg(dest)
+        .status()
+        .map_err(|e| anyhow!("git unavailable: {}", e))?;
+    if !st.success() {
+        return Err(anyhow!("git clone exited non-zero for {}", url));
+    }
+    let co = Command::new("git")
+        .arg("-C")
+        .arg(dest)
+        .args(["checkout", "--quiet", r])
+        .status()
+        .map_err(|e| anyhow!("git unavailable: {}", e))?;
+    if !co.success() {
+        return Err(anyhow!("git checkout `{}` failed for {}", r, url));
+    }
+    Ok(())
+}
+
+/// `git -C <dir> rev-parse HEAD` → resolved commit SHA (for the registry lock).
+pub(crate) fn resolve_head_sha(dir: &Path) -> Option<String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
 /// Installable skills inside a cloned repo. Single-skill repo (root SKILL.md) →

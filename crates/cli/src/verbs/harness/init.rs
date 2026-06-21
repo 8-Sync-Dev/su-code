@@ -8,7 +8,7 @@ use std::time::Instant;
 use anyhow::Result;
 
 use super::external::install_external_skill_packs;
-use super::memory::seed_harness_memory;
+use super::memory::{seed_gitleaks_hook, seed_harness_memory};
 use crate::verbs::skill::{deploy, discover, inject_agents_md, inject_subfolder_indexes};
 use crate::{assets, env_detect, ui};
 
@@ -36,7 +36,7 @@ impl Progress {
     }
 }
 
-pub(crate) fn harness_init(env: &env_detect::Env) -> Result<()> {
+pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     ui::header("8sync harness init");
     let in_project = discover::detect_current_project_root().is_some();
     let total = if in_project { 8 } else { 4 };
@@ -70,7 +70,7 @@ pub(crate) fn harness_init(env: &env_detect::Env) -> Result<()> {
     // 5-8. Project-scoped scaffolding.
     if let Some(root) = discover::detect_current_project_root() {
         p.step("mirror skills → agents/skills/");
-        let count = deploy::mirror_global_to_local(&env.home, &root)?;
+        let count = deploy::mirror_global_to_local(&env.home, &root, force)?;
         if count > 0 {
             ui::ok(&format!("mirrored {} skill(s) into {}", count, root.join("agents/skills").display()));
         }
@@ -82,6 +82,7 @@ pub(crate) fn harness_init(env: &env_detect::Env) -> Result<()> {
         p.step("codegraph init + seed memory/CHANGELOG");
         deploy::ensure_codegraph_init(&root);
         seed_harness_memory(&root)?;
+        seed_gitleaks_hook(&root);
 
         p.step("inject force-load → AGENTS.md / CLAUDE.md");
         inject_agents_md(&env.home, &root)?;
@@ -102,3 +103,4 @@ pub(crate) fn harness_init(env: &env_detect::Env) -> Result<()> {
     }
     Ok(())
 }
+

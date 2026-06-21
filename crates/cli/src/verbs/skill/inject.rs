@@ -141,8 +141,7 @@ pub(crate) fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
             } else {
                 format!("~/.omp/skills/{}/{}", dirname, entry)
             };
-            let desc = if m.description.is_empty() { "(no description)".to_string() } else { m.description };
-            ondemand_lines.push_str(&format!("- **`{}`** — `{}`\n     _{}_\n", m.name, rel, desc));
+            ondemand_lines.push_str(&format!("- `{}` — `{}`\n", m.name, rel));
             on_count += 1;
         }
     }
@@ -184,7 +183,7 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 **Thứ tự = ưu tiên (đọc top-down, không đảo).** Mở đúng file `SKILL.md` ở path bên dưới rồi mới được gọi tool đầu tiên:\n\
 \n\
 {always_lines}\n\
-### 🔎 On-demand — CHỈ đọc khi task khớp mô tả (bỏ qua nếu không liên quan)\n\
+### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)\n\
 \n\
 {ondemand_lines}\n\
 ### Quy tắc bất biến\n\

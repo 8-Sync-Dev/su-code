@@ -17,6 +17,7 @@ pub(crate) mod inject;
 pub(crate) mod list;
 pub(crate) mod meta;
 pub(crate) mod spec;
+pub(crate) mod update;
 
 // Re-exports consumed by other verbs (here, harness).
 pub(crate) use index::inject_subfolder_indexes;
@@ -34,6 +35,7 @@ pub(crate) use inject::inject_agents_md;
       8sync skill add builtin:karpathy                           register a builtin skill (already shipped)
       8sync skill gen 1 2                                        FUSE local skill #1 and #2 into one combined SKILL.md
       8sync skill gen karpathy-guidelines codegraph              same, but by name
+      8sync skill update [name]                                  re-pull registered skills from their source (git/builtin/path)
 
     NOTE
       Deploy + force-load + memory + CHANGELOG → `8sync harness init`
@@ -51,7 +53,7 @@ pub(crate) use inject::inject_agents_md;
       <project>/agents/skills/         project-local skills (referenced from AGENTS.md)
 "})]
 pub struct Args {
-    /// Sub-action: list (default) | help | add <spec> | gen <id> <id> …
+    /// Sub-action: list (default) | help | add <spec> | gen <id> <id> … | update [name]
     pub sub: Option<String>,
     /// Arguments for the sub-action.
     /// - `add`: source spec (one)
@@ -66,8 +68,13 @@ pub fn run(a: Args) -> Result<()> {
     match a.sub.as_deref() {
         None | Some("list") => list::list_skills(&env, &skills_toml),
         Some("help") => list::print_help(&env, &skills_toml),
-        Some("add") => add::add_skill(&env, &skills_toml, a.args.first().map(|s| s.as_str())),
+        Some("add") => {
+            let force = a.args.iter().any(|s| s == "--force" || s == "-f");
+            let spec = a.args.iter().find(|s| !s.starts_with('-')).map(|s| s.as_str());
+            add::add_skill(&env, &skills_toml, spec, force)
+        }
         Some("gen") => gen::gen_skill(&env, &a.args),
+        Some("update") => update::update_skills(&env, &skills_toml, a.args.first().map(|s| s.as_str())),
         Some(other) => {
             if other == "sync" {
                 ui::warn("`8sync skill sync` đã đổi tên → chạy `8sync harness init`.");

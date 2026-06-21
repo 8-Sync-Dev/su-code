@@ -4,11 +4,12 @@
 //! `--loop <dur>` runs it in the foreground; `--timer <dur|off>` installs a
 //! systemd user timer (the recommended background option).
 use std::process::Command;
+use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 
-use super::memory::seed_harness_memory;
+use super::memory::{consolidate_learnings, seed_gitleaks_hook, seed_harness_memory};
 use crate::verbs::skill::{discover, inject_agents_md, inject_subfolder_indexes};
 use crate::{env_detect, ui};
 
@@ -16,6 +17,8 @@ pub(crate) fn harness_up(
     env: &env_detect::Env,
     loop_every: Option<&str>,
     timer: Option<&str>,
+    pull: bool,
+    commit: bool,
 ) -> Result<()> {
     if let Some(spec) = timer {
         return manage_timer(env, spec);
@@ -25,29 +28,114 @@ pub(crate) fn harness_up(
         ui::header(&format!("8sync harness up --loop ({}s interval)", secs));
         ui::info("Ctrl-C to stop. Each pass re-injects rules + refreshes memory + re-indexes codegraph.");
         loop {
-            let _ = refresh_once(env);
+            let _ = refresh_once(env, pull, commit);
             ui::step(&format!("sleeping {}s …", secs));
             std::thread::sleep(Duration::from_secs(secs));
         }
     }
     ui::header("8sync harness up");
-    refresh_once(env)
+    refresh_once(env, pull, commit)
 }
 
-fn refresh_once(env: &env_detect::Env) -> Result<()> {
+fn refresh_once(env: &env_detect::Env, pull: bool, commit: bool) -> Result<()> {
     let Some(root) = discover::detect_current_project_root() else {
         ui::warn("not inside a project — nothing to refresh");
         return Ok(());
     };
+    if pull {
+        ui::step("re-pull registered skills (--pull)");
+        let registry = env.xdg_config.join("8sync/skills.toml");
+        let _ = crate::verbs::skill::update::update_skills(env, &registry, None);
+    }
     inject_agents_md(&env.home, &root)?;
     inject_subfolder_indexes(&root)?;
     seed_harness_memory(&root)?;
+    let _ = consolidate_learnings(&root);
+    seed_gitleaks_hook(&root);
     if which::which("codegraph").is_ok() {
         ui::step("codegraph index (re-learn current state)");
         let _ = Command::new("codegraph").arg("index").arg(&root).status();
     }
+    if commit {
+        commit_memory(&root);
+    }
     ui::ok(&format!("harness up to date → {}", root.display()));
     Ok(())
+}
+
+/// `up --commit`: stage ONLY 8sync-managed memory artifacts (never the user's
+/// code) and commit them, so learnings persist to git in the same pass. No-op
+/// when nothing changed; best-effort — warns, never bails.
+fn commit_memory(root: &Path) {
+    let candidates = ["agents", "AGENTS.md", "CLAUDE.md", "CHANGELOG.md", ".gitignore"];
+    let present: Vec<&str> = candidates
+        .into_iter()
+        .filter(|p| root.join(p).exists())
+        .collect();
+    if present.is_empty() {
+        return;
+    }
+    let added = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["add", "--"])
+        .args(&present)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !added {
+        ui::warn("git add failed — skipping memory commit (not a git repo?)");
+        return;
+    }
+    // Commit only when memory is actually staged (avoids empty-commit spam on timers).
+    let nothing_staged = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["diff", "--cached", "--quiet", "--"])
+        .args(&present)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(true);
+    if nothing_staged {
+        ui::skip("git commit", "no agent-memory changes");
+        return;
+    }
+    // Secret scan before committing (GitGuardian 2026: AI-assisted commits leak
+    // ~2× baseline). Abort only on a positive detection; tolerate tool/version
+    // errors so a quirky gitleaks build can't wedge every commit.
+    if which::which("gitleaks").is_ok() {
+        let code = Command::new("gitleaks")
+            .args(["protect", "--staged", "--no-banner"])
+            .current_dir(root)
+            .status()
+            .ok()
+            .and_then(|s| s.code());
+        match code {
+            Some(0) => {}
+            Some(1) => {
+                ui::err("gitleaks detected a secret in staged memory — commit ABORTED. Remove it, then retry.");
+                return;
+            }
+            other => ui::warn(&format!(
+                "gitleaks scan inconclusive (exit {:?}) — committing without scan; verify manually",
+                other
+            )),
+        }
+    } else {
+        ui::warn("gitleaks not installed — committing memory WITHOUT secret scan (install gitleaks to harden)");
+    }
+    let committed = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["commit", "-m", "chore(8sync): refresh agent memory + harness"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if committed {
+        ui::ok("committed agent memory (portable)");
+    } else {
+        ui::warn("git commit failed — memory left staged");
+    }
 }
 
 /// Parse a human duration (`10m`, `1h`, `30s`, or bare seconds) into seconds.

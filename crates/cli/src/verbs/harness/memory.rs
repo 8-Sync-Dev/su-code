@@ -41,6 +41,29 @@ pub(crate) fn upsert_block(path: &Path, begin: &str, end: &str, body: &str) -> R
     Ok(())
 }
 
+/// Seed/refresh a managed block in `<root>/.gitignore` so durable agent memory
+/// + skills stay committed (portable to a new machine) while derived caches and
+/// secrets are ignored. Only the sentinel-bounded block is owned; any user
+/// entries outside it (incl. a tool-repo's own `agents/skills/` rule) survive.
+pub(crate) fn seed_gitignore(root: &Path) -> Result<()> {
+    let body = concat!(
+        "# Derived / machine-local — rebuilt by `8sync harness init` + codegraph. Safe to ignore:\n",
+        ".codegraph/\n",
+        ".cache/8sync/\n",
+        "# Secrets — NEVER commit:\n",
+        ".env\n",
+        ".env.*\n",
+        "!.env.example\n",
+        "# KEEP COMMITTED (do NOT add here): agents/ (memory), agents/skills/, AGENTS.md, CHANGELOG.md",
+    );
+    upsert_block(
+        &root.join(".gitignore"),
+        "# >>> 8sync (managed) >>>",
+        "# <<< 8sync <<<",
+        body,
+    )
+}
+
 /// Ensure the project carries the 8sync agent-memory files + a CHANGELOG, and
 /// refresh the managed harness breadcrumb in agents/KNOWLEDGE.md. Memory files
 /// are seeded only when missing; the KNOWLEDGE block is a sentinel-bounded
@@ -48,13 +71,18 @@ pub(crate) fn upsert_block(path: &Path, begin: &str, end: &str, body: &str) -> R
 pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
     let agents_dir = root.join("agents");
     std::fs::create_dir_all(&agents_dir)?;
+    seed_gitignore(root)?;
     for f in ["PROJECT.md", "KNOWLEDGE.md", "DECISIONS.md", "PREFERENCES.md", "STATE.md", "NOTES.md"] {
         let p = agents_dir.join(f);
         if !p.exists() {
-            std::fs::write(
-                &p,
-                format!("# {} (8sync managed — append-only)\n\n_empty_\n", f.trim_end_matches(".md")),
-            )?;
+            // KNOWLEDGE.md carries an append-only "Learnings" zone below the managed
+            // breadcrumb block (which `harness up` overwrites) so learnings persist.
+            let content = if f == "KNOWLEDGE.md" {
+                "# KNOWLEDGE (8sync managed — append-only)\n\n## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)\n\nMỗi entry prefix `validated:` (test/build đã xác nhận) hoặc `hypothesis:` (chưa kiểm chứng).\n\n_empty_\n".to_string()
+            } else {
+                format!("# {} (8sync managed — append-only)\n\n_empty_\n", f.trim_end_matches(".md"))
+            };
+            std::fs::write(&p, content)?;
         }
     }
     // CHANGELOG.md — Keep a Changelog skeleton, created once.
@@ -87,7 +115,7 @@ pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
 - **Cách tận dụng:** codegraph = explore code (search/deps/callers, không grep) · \
 karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · assp = copy/offer · \
 impeccable = design system CHUẨN, BẮT BUỘC cho mọi UI/design (kèm references/house/*) + taste chống slop.\n\
-- **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (mục Unreleased) + ghi học được vào file này.",
+- **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (Unreleased) + ghi học được vào file này (prefix `validated:` nếu test/build xác nhận, `hypothesis:` nếu chưa).",
         now_stamp(),
         chain,
     );
@@ -98,4 +126,72 @@ impeccable = design system CHUẨN, BẮT BUỘC cho mọi UI/design (kèm refer
         &body,
     )?;
     Ok(())
+}
+
+/// Bound the append-only `## Learnings` zone in agents/KNOWLEDGE.md (anti
+/// context-rot, Hindsight 4-lever): when it exceeds the budget, archive the
+/// OLDER lines to agents/archive/ and keep the most recent, leaving a pointer.
+/// Best-effort; git history preserves the full trail.
+pub(crate) fn consolidate_learnings(root: &Path) -> Result<()> {
+    const BUDGET: usize = 200;
+    let path = root.join("agents/KNOWLEDGE.md");
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    let Some(hpos) = content.find("\n## Learnings") else {
+        return Ok(());
+    };
+    // Body = everything after the header line's trailing newline.
+    let Some(nl) = content[hpos + 1..].find('\n') else {
+        return Ok(());
+    };
+    let after_header = hpos + 1 + nl + 1;
+    let head = &content[..after_header];
+    let body_lines: Vec<&str> = content[after_header..].lines().collect();
+    if body_lines.len() <= BUDGET {
+        return Ok(());
+    }
+    let keep_from = body_lines.len() - BUDGET;
+    let archived = body_lines[..keep_from].join("\n");
+    let kept = body_lines[keep_from..].join("\n");
+    let stamp = now_stamp().trim_start_matches("epoch:").to_string();
+    let archive_dir = root.join("agents/archive");
+    std::fs::create_dir_all(&archive_dir)?;
+    std::fs::write(
+        archive_dir.join(format!("KNOWLEDGE-{}.md", stamp)),
+        format!("# Archived learnings ({})\n\n{}\n", now_stamp(), archived),
+    )?;
+    let new = format!(
+        "{}_(consolidated {} dòng cũ → agents/archive/KNOWLEDGE-{}.md)_\n{}",
+        head, keep_from, stamp, kept
+    );
+    std::fs::write(&path, new)?;
+    ui::ok(&format!(
+        "consolidated KNOWLEDGE learnings → archived {} older line(s)",
+        keep_from
+    ));
+    Ok(())
+}
+
+/// Install a gitleaks pre-commit hook so any commit (incl. `harness up --commit`)
+/// is secret-scanned. Non-destructive: only when gitleaks is installed,
+/// `.git/hooks/` exists, and no pre-commit hook is already present.
+pub(crate) fn seed_gitleaks_hook(root: &Path) {
+    let hooks = root.join(".git/hooks");
+    if !hooks.is_dir() {
+        return;
+    }
+    let hook = hooks.join("pre-commit");
+    if hook.exists() || which::which("gitleaks").is_err() {
+        return;
+    }
+    let body = "#!/bin/sh\n# 8sync: block commits containing secrets (gitleaks).\ncommand -v gitleaks >/dev/null 2>&1 || exit 0\ngitleaks protect --staged --no-banner\n";
+    if std::fs::write(&hook, body).is_ok() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755));
+        }
+        ui::ok("installed gitleaks pre-commit hook (.git/hooks/pre-commit)");
+    }
 }

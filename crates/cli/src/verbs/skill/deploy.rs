@@ -55,7 +55,7 @@ pub(crate) fn ensure_skill_layout(dir: &Path) {
 
 /// For every skill dir under `~/.omp/skills/`, create or refresh a copy under
 /// `<root>/agents/skills/<name>/`. Returns the number of skills processed.
-pub(crate) fn mirror_global_to_local(home: &Path, root: &Path) -> Result<usize> {
+pub(crate) fn mirror_global_to_local(home: &Path, root: &Path, force: bool) -> Result<usize> {
     let global_dir = home.join(".omp/skills");
     let local_dir = root.join("agents/skills");
     std::fs::create_dir_all(&local_dir)?;
@@ -84,8 +84,14 @@ pub(crate) fn mirror_global_to_local(home: &Path, root: &Path) -> Result<usize> 
             }
         }
 
-        // Always vendor-copy (no nested .git/) so the local tree is committable.
+        // Additive by default: never clobber an existing (maybe customized) local
+        // skill — only vendor missing ones. `--force` re-mirrors everything.
         let existed = local_target.exists();
+        if existed && !force {
+            ui::skip(&local_target.display().to_string(), "exists (use --force to refresh)");
+            count += 1;
+            continue;
+        }
         if existed {
             let _ = std::fs::remove_dir_all(&local_target);
         }

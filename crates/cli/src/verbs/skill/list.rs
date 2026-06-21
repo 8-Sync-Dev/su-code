@@ -88,6 +88,7 @@ pub(crate) fn print_help(env: &env_detect::Env, toml_path: &Path) -> Result<()> 
     println!("  8sync skill help");
     println!("  8sync skill add <https URL|gh:owner/repo|path:/abs|builtin:name>");
     println!("  8sync skill gen <id1> <id2> [id3 …]   # fuse N local skills into one combined SKILL.md");
+    println!("  8sync skill update [name]              # re-pull registered skills from skills.toml src");
     println!("  (deploy + force-load + memory + CHANGELOG → `8sync harness init`)");
 
     println!("\nSPEC (Agent Skills open standard)");

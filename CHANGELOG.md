@@ -5,6 +5,61 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-06-21
+
+### Added
+
+- **`8sync harness` (bare) = ONE command** — idempotent driver that makes a project
+  agent-ready in a single pass: deploy/update skills + mirror (additive) + inject
+  force-load + seed memory & gitleaks hook + consolidate learnings + re-index codegraph.
+  `harness init` = explicit full bootstrap (progress UI); `harness up` = light refresh;
+  `harness up --timer 30m` = background loop.
+- **Additive skill mirror + `--force`** — `harness`/`harness init` never clobber an
+  already-vendored (possibly edited) `agents/skills/<name>`; only missing skills are
+  written. `harness init --force` re-mirrors everything. `harness up` now also seeds
+  the gitleaks pre-commit hook.
+- **`8sync skill update [name]`** — re-pull registered skills from their recorded
+  source in `skills.toml` (git URL / `builtin:` / `path:`). Git sources are deduped
+  per URL (a collection repo is cloned once, all sub-skills reinstalled); best-effort
+  per source (offline / missing `git` warns + skips, exit 0). `name` updates just one.
+- **`8sync harness up --pull`** — refresh AND re-pull every registered skill before
+  re-injecting. Default `up` stays network-free + fast (timer/loop unaffected).
+- **`8sync harness up --commit`** — close the self-learning loop: stage + `git commit`
+  ONLY the refreshed agent memory (`agents/`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md`,
+  `.gitignore`; never your code) so learnings persist to git in the same pass. No-op
+  when nothing changed (no empty-commit spam on `--timer`); default off.
+- **`8sync harness help`** — one-screen cheatsheet: commands, skill tiers, the
+  commit-vs-ignore file taxonomy, and the new-machine runbook.
+- **Portability**: `harness init`/`up` seed a managed `.gitignore` block (between
+  `# >>> 8sync (managed) >>>` sentinels) — ignore derived (`.codegraph/`, `.cache/8sync/`)
+  + secrets (`.env`, `.env.*`, keep `!.env.example`), keep agent memory + `agents/skills/`
+  committed. `8sync doctor` now errors if any durable `agents/*.md` / `AGENTS.md` /
+  `CHANGELOG.md` is gitignored (learnings wouldn't survive a move to a new machine).
+- **`agents/KNOWLEDGE.md`** seeded with an append-only `## Learnings` zone below the
+  managed breadcrumb block (overwritten each `harness up`) so learnings persist.
+
+### Hardened (research-driven — see `outputs/harness-selfimprove-research-brief.md`)
+
+- **Lean force-load context** — the injected on-demand skill list is now names+path
+  only (one line each); full descriptions live in each `SKILL.md` (progressive
+  disclosure). `8sync doctor` warns if the `AGENTS.md` force-load block exceeds 120
+  lines. *Why:* Gloaguen et al. arXiv 2602.11988 (138 repos) — bloated/duplicative
+  context files cut agent success and add >20% inference cost.
+- **Skill version pinning (lockfile)** — `8sync skill add <url>@<ref>` pins a git
+  commit/tag/branch; the resolved SHA is recorded as `rev` in `skills.toml` and
+  `skill update` checks out exactly that rev (reproducible). Unpinned entries track
+  latest. *Why:* mirrors Claude Code plugin marketplace (SHA pin = reproducible).
+- **Secret-scanned auto-commit** — `harness up --commit` runs `gitleaks protect
+  --staged` (if installed) and ABORTS on detection; `harness init` installs a
+  gitleaks pre-commit hook (non-destructive); `8sync doctor` reports gitleaks.
+  *Why:* GitGuardian 2026 — AI-assisted commits leak secrets ~2× baseline.
+- **Bounded memory (anti context-rot)** — `harness up` consolidates the
+  `## Learnings` zone past ~200 lines, archiving older entries to `agents/archive/`
+  with a pointer. *Why:* 4-lever consolidation; "remember everything → remember nothing".
+- **Verifier-gated learnings** — seeded `KNOWLEDGE.md` instructs prefixing entries
+  `validated:` (test/build confirmed) vs `hypothesis:`. *Why:* Reflexion verifiability
+  constraint — no reliable improvement beyond what's objectively verified.
+
 ## [0.15.1] — 2026-06-17
 
 ### Added

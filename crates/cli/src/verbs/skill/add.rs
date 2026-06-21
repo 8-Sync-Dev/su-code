@@ -12,12 +12,13 @@ use super::discover::detect_current_project_root;
 use super::inject::inject_agents_md;
 use super::meta::audit_skill_layout;
 use super::spec::{
-    collect_repo_skills, fetch_github_readme, git_clone_shallow, github_owner_repo,
-    install_path_skill, parse_spec, synthesize_skill_md, write_synth_skill, Source,
+    collect_repo_skills, fetch_github_readme, git_clone_at, github_owner_repo,
+    install_path_skill, parse_spec, resolve_head_sha, synthesize_skill_md, write_synth_skill,
+    Source,
 };
 use crate::{assets, env_detect, ui};
 
-pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&str>) -> Result<()> {
+pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&str>, force: bool) -> Result<()> {
     let Some(spec) = spec else {
         ui::err("usage: 8sync skill add <https URL|gh:owner/repo|path:/abs|builtin:name>");
         return Ok(());
@@ -36,9 +37,12 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
     let global_target = env.home.join(".omp/skills").join(&name);
     // Every skill name actually installed (a collection repo yields many).
     let mut installed: Vec<String> = Vec::new();
+    // Resolved commit SHA when the user pinned a ref (`<url>@<ref>`) → recorded
+    // in skills.toml as a lockfile so updates/new machines reproduce it.
+    let mut git_rev: Option<String> = None;
 
     match &src {
-        Source::Git { url, .. } => {
+        Source::Git { url, git_ref, .. } => {
             // Clone shallow, then install every SKILL.md the repo carries:
             //   • repo-root SKILL.md      → single skill `<name>`
             //   • skills/<sub>/SKILL.md   → collection (addyosmani, ponytail, …)
@@ -47,7 +51,7 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
             let _ = std::fs::remove_dir_all(&tmp);
             if let Some(p) = tmp.parent() { std::fs::create_dir_all(p)?; }
             let mut found: Vec<(String, PathBuf)> = Vec::new();
-            match git_clone_shallow(url, &tmp) {
+            match git_clone_at(url, &tmp, git_ref.as_deref()) {
                 Ok(()) => found = collect_repo_skills(&tmp, &name),
                 Err(e) => ui::warn(&format!("git clone failed ({}) — trying README synthesis", e)),
             }
@@ -69,25 +73,40 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
                 ui::ok(&format!("{} → {} skill(s)", url, found.len()));
                 for (sname, sdir) in &found {
                     let gt = env.home.join(".omp/skills").join(sname);
+                    let lt = project_root.as_ref().map(|r| r.join("agents/skills").join(sname));
+                    // Additive by default: don't clobber an already-installed skill.
+                    if (gt.exists() || lt.as_ref().is_some_and(|p| p.exists())) && !force {
+                        ui::skip(sname, "already installed (--force to overwrite)");
+                        installed.push(sname.clone());
+                        continue;
+                    }
                     let _ = std::fs::remove_dir_all(&gt);
                     copy_dir_recursive(sdir, &gt)?;
                     audit_skill_layout(&gt);
-                    if let Some(root) = project_root.as_ref() {
-                        let lt = root.join("agents/skills").join(sname);
-                        let _ = std::fs::remove_dir_all(&lt);
-                        copy_dir_recursive(sdir, &lt)?;
+                    if let Some(lt) = &lt {
+                        let _ = std::fs::remove_dir_all(lt);
+                        copy_dir_recursive(sdir, lt)?;
                     }
                     ui::ok(&format!("installed skill `{}`", sname));
                     installed.push(sname.clone());
                 }
             }
+            if git_ref.is_some() {
+                git_rev = resolve_head_sha(&tmp);
+            }
             let _ = std::fs::remove_dir_all(&tmp);
         }
         Source::Path { src, .. } => {
+            if force {
+                let _ = std::fs::remove_file(&global_target);
+            }
             install_path_skill(src, &global_target)?;
             audit_skill_layout(&global_target);
             if let Some(root) = project_root.as_ref() {
                 let local_target = root.join("agents/skills").join(&name);
+                if force {
+                    let _ = std::fs::remove_file(&local_target);
+                }
                 install_path_skill(src, &local_target)?;
                 audit_skill_layout(&local_target);
             }
@@ -100,6 +119,9 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
             let prefix = format!("skills/{}", name);
             if assets::iter_under(&format!("{}/", prefix)).is_empty() {
                 ui::warn(&format!("no bundled skill `{}` (assets/skills/{}/ not found)", name, name));
+            } else if global_target.exists() && !force {
+                ui::skip(&name, "already installed (--force to overwrite)");
+                installed.push(name.clone());
             } else {
                 let (w, _) = assets::install_tree(&prefix, &global_target)?;
                 ui::ok(&format!("enabled builtin `{}` ({} file(s)) → {}", name, w, global_target.display()));
@@ -129,7 +151,11 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
             if !registry.ends_with('\n') && !registry.is_empty() {
                 registry.push('\n');
             }
-            registry.push_str(&format!("\n[{}]\nsrc = \"{}\"\nwhen = \"on-demand\"\n", sname, src_val));
+            let rev_line = match &git_rev {
+                Some(r) => format!("rev = \"{}\"\n", r),
+                None => String::new(),
+            };
+            registry.push_str(&format!("\n[{}]\nsrc = \"{}\"\nwhen = \"on-demand\"\n{}", sname, src_val, rev_line));
         }
     }
     std::fs::write(toml_path, &registry)?;
