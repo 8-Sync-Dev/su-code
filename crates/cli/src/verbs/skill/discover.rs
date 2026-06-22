@@ -26,6 +26,29 @@ pub(crate) fn read_registry(toml_path: &Path) -> BTreeMap<String, SkillEntry> {
     toml::from_str(&s).unwrap_or_default()
 }
 
+/// Write a registry map to a TOML manifest — the committed project manifest
+/// `agents/skills.toml`, so `8sync harness` re-pulls the same skills on any
+/// machine (the global `~/.config/8sync/skills.toml` is machine-local).
+pub(crate) fn write_registry(toml_path: &Path, reg: &BTreeMap<String, SkillEntry>) -> Result<()> {
+    let mut s = String::from(
+        "# agents/skills.toml — project skill manifest (committed). `8sync harness` re-pulls these on any machine.\n",
+    );
+    for (name, e) in reg {
+        s.push_str(&format!("\n[{}]\nsrc = \"{}\"\n", name, e.src));
+        if let Some(w) = &e.when {
+            s.push_str(&format!("when = \"{}\"\n", w));
+        }
+        if let Some(r) = &e.rev {
+            s.push_str(&format!("rev = \"{}\"\n", r));
+        }
+    }
+    if let Some(p) = toml_path.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    std::fs::write(toml_path, s)?;
+    Ok(())
+}
+
 /// List immediate sub-directories of `skills_dir` (one per skill), sorted.
 pub(crate) fn list_installed_skill_dirs(skills_dir: &Path) -> Result<Vec<PathBuf>> {
     let mut out = Vec::new();

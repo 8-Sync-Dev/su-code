@@ -24,12 +24,20 @@ pub(crate) fn update_skills(
     filter: Option<&str>,
 ) -> Result<()> {
     ui::header("8sync skill update");
-    let reg = discover::read_registry(toml_path);
+    // Global registry (machine-local) ∪ project manifest (agents/skills.toml,
+    // committed) — the manifest is what makes skills reproducible on a new machine.
+    let project_root = detect_current_project_root();
+    let proj_manifest = project_root.as_ref().map(|r| r.join("agents/skills.toml"));
+    let mut reg = discover::read_registry(toml_path);
+    if let Some(pm) = &proj_manifest {
+        for (k, v) in discover::read_registry(pm) {
+            reg.entry(k).or_insert(v);
+        }
+    }
     if reg.is_empty() {
-        ui::info("no registered skills (skills.toml empty) — add some with `8sync skill add`");
+        ui::info("no registered skills — `8sync skill add <url>` (or commit agents/skills.toml)");
         return Ok(());
     }
-    let project_root = detect_current_project_root();
     let omp_skills = env.home.join(".omp/skills");
     let mut updated = 0usize;
     let mut sources = 0usize;
@@ -145,6 +153,11 @@ pub(crate) fn update_skills(
     if let Some(root) = project_root.as_ref() {
         inject_agents_md(&env.home, root)?;
         inject_subfolder_indexes(root)?;
+    }
+    // Persist the union to the committed project manifest so a fresh machine
+    // (empty global registry) re-pulls the same skills via `8sync harness`.
+    if let Some(pm) = &proj_manifest {
+        let _ = discover::write_registry(pm, &reg);
     }
     ui::info(&format!("updated {} skill(s) from {} source(s)", updated, sources));
     Ok(())

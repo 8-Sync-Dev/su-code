@@ -1,0 +1,105 @@
+# agents/skills.toml — project skill manifest (committed). `8sync harness` re-pulls these on any machine.
+
+[8sync-cli]
+src = "builtin:8sync-cli"
+when = "always"
+
+[alpha-research]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[autoresearch]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[codegraph]
+src = "builtin:codegraph"
+when = "always"
+
+[contributing]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[deep-research]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[docker]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[eli5]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[image-routing]
+src = "builtin:image-routing"
+when = "always"
+
+[impeccable]
+src = "builtin:impeccable"
+when = "on-demand"
+
+[jobs]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[karpathy]
+src = "builtin:karpathy"
+when = "always"
+
+[literature-review]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[ml-training-recipe]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[modal-compute]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[paper-code-audit]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[paper-writing]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[peer-review]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[preview]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[replication]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[runpod-compute]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[session-log]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[session-search]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[social-growth]
+src = "builtin:social-growth"
+when = "on-demand"
+
+[source-comparison]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"
+
+[watch]
+src = "https://github.com/companion-inc/feynman"
+when = "on-demand"

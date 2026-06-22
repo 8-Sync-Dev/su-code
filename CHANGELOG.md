@@ -5,6 +5,18 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.17.1] — 2026-06-21
+
+### Fixed
+
+- **Skills now propagate to other machines.** `8sync harness` / `skill update` write a
+  committed project manifest `agents/skills.toml` (mirroring the machine-local registry) and
+  read it back on any machine — so a fresh clone re-pulls the exact same skills. Previously only
+  the machine-local `~/.config/8sync/skills.toml` recorded `skill add`-ed sources, so custom
+  skills (e.g. git collections like feynman) never reached a second machine via harness — only
+  the 15 binary-embedded skills + 2 hardcoded external packs did. (`agents/skills.toml` is a
+  file, so it travels even when the `agents/skills/` directory is gitignored.)
+
 ## [0.17.0] — 2026-06-21
 
 ### Added
