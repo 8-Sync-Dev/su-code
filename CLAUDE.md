@@ -1,16 +1,15 @@
 # CLAUDE.md — guidance for Claude Code
 
 <!-- 8sync:skills:begin -->
-## 🚨 STEP 0 — `codegraph` FIRST (mandatory, no exception)
+## 🚨 STEP 0 — CODE INTELLIGENCE FIRST (codegraph + codebase-memory-mcp; bắt buộc)
 
-`codegraph` là **core tool** cho mọi câu hỏi liên quan đến code trong repo này. Bạn (AI) **PHẢI**:
+Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read (tiết kiệm ~99% token). Bạn (AI) **PHẢI**:
 
-1. Chạy `codegraph index .` **1 lần** đầu session để build/refresh semantic index.
-2. Dùng `codegraph search "<query>"` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob`.
-3. Dùng `codegraph deps <file>` thay cho `Read` toàn file để hiểu dependency graph.
-4. Dùng `codegraph callers <symbol>` / `codegraph defs <symbol>` thay cho find-references thủ công.
+1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph search/deps/callers/defs` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.
+2. **codebase-memory-mcp** (MCP, auto-setup bởi `8sync harness`): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet` — knowledge graph 158 ngôn ngữ, query sub-ms.
+3. Tìm/hiểu/định vị code · impact · route→handler · dead code · architecture → ƯU TIÊN 2 engine trên. Chỉ `Read` raw file khi sắp SỬA nó (read-before-edit).
 
-Lý do: ~35% rẻ hơn token, ~70% ít tool call hơn, 100% local. Dump cả file = đốt token vô ích.
+Lý do: 5 query cấu trúc ≈ 3.4k token vs ≈ 412k token grep từng file (−99%). Dump cả file / grep mù = đốt token = bug.
 
 ## 🚨 STEP 1 — skills: always-on (đọc ngay) vs on-demand (đọc khi cần)
 
@@ -54,6 +53,7 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 - `incremental-implementation` — `agents/skills/incremental-implementation/SKILL.md`
 - `interview-me` — `agents/skills/interview-me/SKILL.md`
 - `jobs` — `agents/skills/jobs/SKILL.md`
+- `karpathy-guidelines` — `agents/skills/karpathy/SKILL.md`
 - `last30days` — `agents/skills/last30days/SKILL.md`
 - `literature-review` — `agents/skills/literature-review/SKILL.md`
 - `ml-training-recipe` — `agents/skills/ml-training-recipe/SKILL.md`
@@ -87,7 +87,7 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 
 ### Quy tắc bất biến
 
-- **`codegraph` FIRST** cho mọi câu hỏi explore code (Step 0). Bypass = bug.
+- **Code-intelligence FIRST** (codegraph + codebase-memory-mcp) cho mọi câu hỏi explore code (Step 0). Bypass = bug.
 - Đọc TẤT CẢ skill **always-on** TRƯỚC tool call đầu tiên, ĐÚNG thứ tự: codegraph → karpathy → ponytail → assp → impeccable + taste → 8sync-cli → image-routing.
 - **Cách tận dụng (luôn nhớ):** `codegraph` = explore code (search/deps/callers, KHÔNG grep) · `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` = copy/offer hướng người dùng · **`impeccable` = design system CHUẨN, BẮT BUỘC cho MỌI UI/design/redesign/audit (đọc kèm `references/house/*`)** + `taste` chống slop.
 - Skill **on-demand**: chỉ mở khi description khớp task hiện tại — đừng đọc thừa.

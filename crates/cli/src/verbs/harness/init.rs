@@ -56,6 +56,7 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     // 3. codegraph binary (auto curl installer if missing).
     p.step("ensure codegraph binary");
     deploy::ensure_codegraph(env)?;
+    deploy::ensure_codebase_memory_mcp(env)?;
 
     // 4. External skill packs (ponytail full + addyosmani) — best-effort/network.
     p.step("download external skill packs (ponytail · addyosmani)");

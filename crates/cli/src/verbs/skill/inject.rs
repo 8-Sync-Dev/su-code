@@ -162,16 +162,15 @@ pub(crate) fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
 
     let block = format!(
         "{BEGIN}\n\
-## 🚨 STEP 0 — `codegraph` FIRST (mandatory, no exception)\n\
+## 🚨 STEP 0 — CODE INTELLIGENCE FIRST (codegraph + codebase-memory-mcp; bắt buộc)\n\
 \n\
-`codegraph` là **core tool** cho mọi câu hỏi liên quan đến code trong repo này. Bạn (AI) **PHẢI**:\n\
+Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read (tiết kiệm ~99% token). Bạn (AI) **PHẢI**:\n\
 \n\
-1. Chạy `codegraph index .` **1 lần** đầu session để build/refresh semantic index.\n\
-2. Dùng `codegraph search \"<query>\"` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob`.\n\
-3. Dùng `codegraph deps <file>` thay cho `Read` toàn file để hiểu dependency graph.\n\
-4. Dùng `codegraph callers <symbol>` / `codegraph defs <symbol>` thay cho find-references thủ công.\n\
+1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph search/deps/callers/defs` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.\n\
+2. **codebase-memory-mcp** (MCP, auto-setup bởi `8sync harness`): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet` — knowledge graph 158 ngôn ngữ, query sub-ms.\n\
+3. Tìm/hiểu/định vị code · impact · route→handler · dead code · architecture → ƯU TIÊN 2 engine trên. Chỉ `Read` raw file khi sắp SỬA nó (read-before-edit).\n\
 \n\
-Lý do: ~35% rẻ hơn token, ~70% ít tool call hơn, 100% local. Dump cả file = đốt token vô ích.\n\
+Lý do: 5 query cấu trúc ≈ 3.4k token vs ≈ 412k token grep từng file (−99%). Dump cả file / grep mù = đốt token = bug.\n\
 \n\
 {codegraph_install_hint}\
 ## 🚨 STEP 1 — skills: always-on (đọc ngay) vs on-demand (đọc khi cần)\n\
@@ -188,7 +187,7 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 {ondemand_lines}\n\
 ### Quy tắc bất biến\n\
 \n\
-- **`codegraph` FIRST** cho mọi câu hỏi explore code (Step 0). Bypass = bug.\n\
+- **Code-intelligence FIRST** (codegraph + codebase-memory-mcp) cho mọi câu hỏi explore code (Step 0). Bypass = bug.\n\
 - Đọc TẤT CẢ skill **always-on** TRƯỚC tool call đầu tiên, ĐÚNG thứ tự: codegraph → karpathy → ponytail → assp → impeccable + taste → 8sync-cli → image-routing.\n\
 - **Cách tận dụng (luôn nhớ):** `codegraph` = explore code (search/deps/callers, KHÔNG grep) · `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` = copy/offer hướng người dùng · **`impeccable` = design system CHUẨN, BẮT BUỘC cho MỌI UI/design/redesign/audit (đọc kèm `references/house/*`)** + `taste` chống slop.\n\
 - Skill **on-demand**: chỉ mở khi description khớp task hiện tại — đừng đọc thừa.\n\

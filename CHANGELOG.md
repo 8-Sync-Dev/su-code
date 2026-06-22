@@ -5,6 +5,21 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-06-21
+
+### Added
+
+- **codebase-memory-mcp = first-class code-intelligence engine** — `8sync harness`/`init`
+  auto-installs the binary (upstream installer, binary-only), sets `auto_index true`, and
+  registers it as an omp MCP server in `~/.omp/agent/mcp.json` (idempotent, preserves other
+  servers). `harness`/`up` index the repo. Mirrors `ensure_codegraph` — zero manual MCP config.
+- **Code intelligence FIRST (STEP 0)** — the injected force-load block + `00-force-load.md`
+  mandate codegraph + codebase-memory-mcp BEFORE grep/read for all code exploration
+  (~99% token saving); raw `Read` only for read-before-edit.
+- **Loop-engineering principles** (Addy Osmani / Boris Cherny) in `00-force-load.md`:
+  STATE/KNOWLEDGE spine, maker/checker via `task` sub-agents, verify-gate, phased
+  L1→L3 autonomy via `harness up --timer`.
+
 ## [0.16.0] — 2026-06-21
 
 ### Added

@@ -1,13 +1,13 @@
 # 00 — Force Load Skills (managed by `8sync harness init`)
 
-## 🔴 RULE #0 — CODEGRAPH FIRST, ALWAYS
+## 🔴 RULE #0 — CODE INTELLIGENCE FIRST, ALWAYS (codegraph + codebase-memory-mcp)
 
-Before any other tool call in a session, run **`codegraph`** to answer codebase questions whenever the project has a `.codegraph/` directory (or one can be initialized). CodeGraph is a pre-indexed knowledge graph: ~35% cheaper, ~70% fewer tool calls than grep/find/Read for code exploration.
+Before any other tool call, answer codebase questions with a code-intelligence engine — NOT grep/find/Read. Both are ~99% cheaper than file-by-file exploration:
 
-- **Default to `codegraph` queries** for: "how does X work", "where is X defined", "who calls X", "what depends on X", impact analysis, route → handler mapping (Django/Flask/FastAPI/Express/NestJS/Laravel/Rails/Spring/Gin/Axum/etc.).
-- **Initialize once per repo** with `cd <repo> && codegraph init -i` if `.codegraph/` is missing.
-- **Skill file**: `~/.omp/skills/codegraph/SKILL.md` (or `CLAUDE.md`) — read it.
-- Falling back to `rg`/`fd`/`Read` without checking codegraph first is a **violation** of this rule on any non-trivial exploration.
+- **codegraph** (local pre-indexed graph): `codegraph init -i` once per repo (if `.codegraph/` missing), then `codegraph search/deps/callers/defs`. Skill: `~/.omp/skills/codegraph/SKILL.md`.
+- **codebase-memory-mcp** (MCP server — auto-set-up by `8sync harness`; 158 languages, sub-ms, auto-indexes on connect): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet`, `manage_adr`.
+- **Default to these** for "how does X work / where is X / who calls X / what depends on X", impact analysis, route→handler, dead code, architecture.
+- Only `Read` a raw file when you're about to edit it (read-before-edit). Falling back to `rg`/`fd`/`Read` for exploration first is a **violation**.
 
 ## ⛔ MANDATORY READING ORDER — before any non-trivial task
 
@@ -43,7 +43,7 @@ If inside a project (cwd has `.git` / `Cargo.toml` / `package.json` / …):
 
 ## Invariants (no exceptions)
 
-- **NEVER skip codegraph for code exploration.** It exists because grep wastes 3-10× tokens.
+- **NEVER skip code intelligence (codegraph + codebase-memory-mcp) for code exploration.** Grep / Read-all wastes 10–100× tokens.
 - **NEVER skip karpathy or ponytail.** Engineering discipline + YAGNI (do the least that works, delete > add) is non-negotiable.
 - **Building UI / redesign / any frontend?** `impeccable` is THE house design system — mandatory, with `references/house/*` (workflow + clouds-f). Pair with `assp` (brand voice/offer) for copy and `taste` (anti-slop). Shipping UI without impeccable is a violation.
 - **NEVER skip 8sync-cli** when AGENTS.md mentions 8sync — using raw shell instead of `8sync` verbs misses memory + skill auto-load.
@@ -51,3 +51,13 @@ If inside a project (cwd has `.git` / `Cargo.toml` / `package.json` / …):
 - **Cite code as `path:line` or `path:start-end`.** Never natural language ("around line 50").
 - **Never dump long tool output** into context. Summarize, then keep the artifact ID for retrieval.
 - **After every change:** update `CHANGELOG.md` (Unreleased) + record what you learned in `agents/KNOWLEDGE.md`.
+
+## 🔁 Loop engineering — operate as a designed loop, not one-off prompts
+
+Inspired by Addy Osmani / Boris Cherny "loop engineering" (github.com/cobusgreyling/loop-engineering). The 8sync harness IS the loop; operate accordingly:
+
+- **Memory / STATE spine** — `agents/STATE.md` (work in flight) + `agents/KNOWLEDGE.md` (validated learnings) are the durable spine outside any chat. Read at start, update at end.
+- **Maker / checker** — use `task` sub-agents to split implement vs verify; never self-approve risky or irreversible work.
+- **Verify-gate** — a learning is `validated:` only when a test/build/benchmark confirms it; otherwise `hypothesis:`.
+- **Phased autonomy** — L1 report → L2 assisted fixes → L3 unattended. `8sync harness up --timer <dur>` schedules the loop in the background.
+- **Senses + hands** — code-intelligence (codegraph + codebase-memory-mcp) are the loop's senses; STATE/KNOWLEDGE its memory; `task` sub-agents its hands; `harness` keeps them current.

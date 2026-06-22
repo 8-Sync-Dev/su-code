@@ -192,3 +192,85 @@ pub(crate) fn ensure_codegraph_init(root: &Path) {
         Err(e) => ui::warn(&format!("could not invoke codegraph: {}", e)),
     }
 }
+
+/// Ensure the `codebase-memory-mcp` binary is installed (upstream installer,
+/// binary-only) and registered as an omp MCP server. Mirrors `ensure_codegraph`:
+/// `8sync harness` auto-sets-up code intelligence so the agent gets the graph
+/// tools (search_graph/semantic_query/trace_path/…) with zero manual config.
+pub(crate) fn ensure_codebase_memory_mcp(env: &env_detect::Env) -> Result<()> {
+    if which::which("codebase-memory-mcp").is_err() {
+        ui::step("codebase-memory-mcp (binary missing — upstream installer, binary-only)");
+        let url = "https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh";
+        let st = Command::new("sh")
+            .arg("-c")
+            .arg(format!("curl -fsSL {} | bash -s -- --skip-config", url))
+            .status();
+        match st {
+            Ok(s) if s.success() => ui::ok("codebase-memory-mcp installed"),
+            Ok(s) => ui::warn(&format!("codebase-memory-mcp installer exited {} — continuing", s)),
+            Err(e) => ui::warn(&format!("could not run installer: {} — continuing", e)),
+        }
+    } else {
+        let v = env_detect::cmd_version("codebase-memory-mcp", &["--version"]).unwrap_or_default();
+        ui::skip("codebase-memory-mcp", &format!("present ({})", v));
+    }
+    if which::which("codebase-memory-mcp").is_ok() {
+        // Self-index on every MCP connect — no manual reindex needed thereafter.
+        let _ = Command::new("codebase-memory-mcp")
+            .args(["config", "set", "auto_index", "true"])
+            .status();
+    }
+    register_omp_mcp(&env.home)
+}
+
+/// Idempotently add a `codebase-memory-mcp` stdio entry to omp's user MCP config
+/// (`~/.omp/agent/mcp.json`), preserving any servers already there.
+fn register_omp_mcp(home: &Path) -> Result<()> {
+    let mcp_path = home.join(".omp/agent/mcp.json");
+    if let Some(p) = mcp_path.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    let mut root: serde_json::Value = std::fs::read_to_string(&mcp_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    if !root.is_object() {
+        root = serde_json::json!({});
+    }
+    let obj = root.as_object_mut().unwrap();
+    obj.entry("$schema").or_insert_with(|| {
+        serde_json::Value::String(
+            "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json"
+                .to_string(),
+        )
+    });
+    let servers = obj.entry("mcpServers").or_insert_with(|| serde_json::json!({}));
+    if !servers.is_object() {
+        *servers = serde_json::json!({});
+    }
+    let smap = servers.as_object_mut().unwrap();
+    if smap.contains_key("codebase-memory-mcp") {
+        ui::skip("codebase-memory-mcp", "already in omp mcp.json");
+        return Ok(());
+    }
+    smap.insert(
+        "codebase-memory-mcp".to_string(),
+        serde_json::json!({ "type": "stdio", "command": "codebase-memory-mcp", "args": [] }),
+    );
+    std::fs::write(&mcp_path, serde_json::to_string_pretty(&root)?)?;
+    ui::ok(&format!("registered codebase-memory-mcp MCP → {}", mcp_path.display()));
+    Ok(())
+}
+
+/// Best-effort: build/refresh the codebase-memory-mcp knowledge graph for `root`.
+pub(crate) fn index_codebase_memory(root: &Path) {
+    if which::which("codebase-memory-mcp").is_err() {
+        return;
+    }
+    ui::step("codebase-memory-mcp index (knowledge graph)");
+    let arg = serde_json::json!({ "repo_path": root.display().to_string() }).to_string();
+    let _ = Command::new("codebase-memory-mcp")
+        .args(["cli", "index_repository"])
+        .arg(arg)
+        .status();
+}

@@ -56,6 +56,7 @@ fn refresh_once(env: &env_detect::Env, pull: bool, commit: bool) -> Result<()> {
         ui::step("codegraph index (re-learn current state)");
         let _ = Command::new("codegraph").arg("index").arg(&root).status();
     }
+    crate::verbs::skill::deploy::index_codebase_memory(&root);
     if commit {
         commit_memory(&root);
     }
