@@ -5,6 +5,18 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-06-21
+
+### Added
+
+- **Headroom context-compression wired as an omp MCP** — `8sync harness`/`init` auto-installs
+  `headroom-ai[mcp]` (uv → pipx → pip fallback) and registers it in `~/.omp/agent/mcp.json`
+  (`headroom mcp serve`, stdio). Tools `headroom_compress` / `headroom_retrieve` / `headroom_stats`
+  compress long tool outputs / logs / diffs 60–95% before they reach the model. Force-injected into
+  STEP 0 + `00-force-load.md`. Researched alongside PixelRAG + LocateAnything3D — **skipped**:
+  PixelRAG (screenshot-RAG) overlaps `8sync shot`/`read`/`browser`; LocateAnything3D is a 3D-vision
+  model (out of scope for a coding harness).
+
 ## [0.17.1] — 2026-06-21
 
 ### Fixed

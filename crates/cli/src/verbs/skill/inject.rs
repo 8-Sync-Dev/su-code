@@ -169,6 +169,7 @@ Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read
 1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph search/deps/callers/defs` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.\n\
 2. **codebase-memory-mcp** (MCP, auto-setup bởi `8sync harness`): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet` — knowledge graph 158 ngôn ngữ, query sub-ms.\n\
 3. Tìm/hiểu/định vị code · impact · route→handler · dead code · architecture → ƯU TIÊN 2 engine trên. Chỉ `Read` raw file khi sắp SỬA nó (read-before-edit).\n\
+4. **Output dài** (logs/diff/test/tool output) → nén bằng `headroom` MCP (`headroom_compress`) thay vì dump cả khối vào context (60–95% ít token).\n\
 \n\
 Lý do: 5 query cấu trúc ≈ 3.4k token vs ≈ 412k token grep từng file (−99%). Dump cả file / grep mù = đốt token = bug.\n\
 \n\

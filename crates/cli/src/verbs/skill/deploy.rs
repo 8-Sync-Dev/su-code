@@ -220,12 +220,12 @@ pub(crate) fn ensure_codebase_memory_mcp(env: &env_detect::Env) -> Result<()> {
             .args(["config", "set", "auto_index", "true"])
             .status();
     }
-    register_omp_mcp(&env.home)
+    register_omp_mcp(&env.home, "codebase-memory-mcp", "codebase-memory-mcp", &[])
 }
 
-/// Idempotently add a `codebase-memory-mcp` stdio entry to omp's user MCP config
-/// (`~/.omp/agent/mcp.json`), preserving any servers already there.
-fn register_omp_mcp(home: &Path) -> Result<()> {
+/// Idempotently add an MCP server `name` (stdio `command` + `args`) to omp's user
+/// MCP config (`~/.omp/agent/mcp.json`), preserving any servers already there.
+fn register_omp_mcp(home: &Path, name: &str, command: &str, args: &[&str]) -> Result<()> {
     let mcp_path = home.join(".omp/agent/mcp.json");
     if let Some(p) = mcp_path.parent() {
         std::fs::create_dir_all(p)?;
@@ -249,16 +249,16 @@ fn register_omp_mcp(home: &Path) -> Result<()> {
         *servers = serde_json::json!({});
     }
     let smap = servers.as_object_mut().unwrap();
-    if smap.contains_key("codebase-memory-mcp") {
-        ui::skip("codebase-memory-mcp", "already in omp mcp.json");
+    if smap.contains_key(name) {
+        ui::skip(name, "already in omp mcp.json");
         return Ok(());
     }
     smap.insert(
-        "codebase-memory-mcp".to_string(),
-        serde_json::json!({ "type": "stdio", "command": "codebase-memory-mcp", "args": [] }),
+        name.to_string(),
+        serde_json::json!({ "type": "stdio", "command": command, "args": args }),
     );
     std::fs::write(&mcp_path, serde_json::to_string_pretty(&root)?)?;
-    ui::ok(&format!("registered codebase-memory-mcp MCP → {}", mcp_path.display()));
+    ui::ok(&format!("registered {} MCP → {}", name, mcp_path.display()));
     Ok(())
 }
 
@@ -273,4 +273,27 @@ pub(crate) fn index_codebase_memory(root: &Path) {
         .args(["cli", "index_repository"])
         .arg(arg)
         .status();
+}
+
+/// Ensure `headroom` (context-compression MCP) is installed + registered as an
+/// omp MCP server. Headroom compresses long tool outputs / logs / diffs before
+/// they reach the model (60–95% fewer tokens) — complements codegraph/cbm.
+pub(crate) fn ensure_headroom_mcp(env: &env_detect::Env) -> Result<()> {
+    if which::which("headroom").is_err() {
+        ui::step("headroom (missing — installing headroom-ai[mcp])");
+        // Isolated installs first (Arch is PEP-668 externally-managed).
+        let cmd = "if command -v uv >/dev/null 2>&1; then uv tool install 'headroom-ai[mcp]'; \
+elif command -v pipx >/dev/null 2>&1; then pipx install 'headroom-ai[mcp]'; \
+else pip install --user 'headroom-ai[mcp]' || pip install --user --break-system-packages 'headroom-ai[mcp]'; fi";
+        let st = Command::new("sh").arg("-c").arg(cmd).status();
+        match st {
+            Ok(s) if s.success() => ui::ok("headroom installed"),
+            Ok(s) => ui::warn(&format!("headroom install exited {} — registering anyway (manual: pipx install 'headroom-ai[mcp]')", s)),
+            Err(e) => ui::warn(&format!("could not run installer: {} — continuing", e)),
+        }
+    } else {
+        let v = env_detect::cmd_version("headroom", &["--version"]).unwrap_or_default();
+        ui::skip("headroom", &format!("present ({})", v));
+    }
+    register_omp_mcp(&env.home, "headroom", "headroom", &["mcp", "serve"])
 }

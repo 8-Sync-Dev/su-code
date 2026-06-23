@@ -7,6 +7,7 @@ Before any other tool call, answer codebase questions with a code-intelligence e
 - **codegraph** (local pre-indexed graph): `codegraph init -i` once per repo (if `.codegraph/` missing), then `codegraph search/deps/callers/defs`. Skill: `~/.omp/skills/codegraph/SKILL.md`.
 - **codebase-memory-mcp** (MCP server — auto-set-up by `8sync harness`; 158 languages, sub-ms, auto-indexes on connect): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet`, `manage_adr`.
 - **Default to these** for "how does X work / where is X / who calls X / what depends on X", impact analysis, route→handler, dead code, architecture.
+- **Output dài** (logs / diffs / test output / tool dumps) → nén bằng `headroom` MCP (`headroom_compress`) thay vì dump nguyên khối — 60–95% ít token (auto-set-up bởi `8sync harness`).
 - Only `Read` a raw file when you're about to edit it (read-before-edit). Falling back to `rg`/`fd`/`Read` for exploration first is a **violation**.
 
 ## ⛔ MANDATORY READING ORDER — before any non-trivial task

@@ -1,5 +1,5 @@
 <!-- 8sync:harness:begin -->
-## 🧠 8sync harness (epoch:1782083921)
+## 🧠 8sync harness (epoch:1782173332)
 
 - **Always-on skills (đọc trước tool call đầu tiên, đúng thứ tự):** codegraph → karpathy-guidelines → ponytail → assp-skill → impeccable → taste-skill → 8sync-cli → image-routing.
 - **Cách tận dụng:** codegraph = explore code (search/deps/callers, không grep) · karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · assp = copy/offer · impeccable = design system CHUẨN, BẮT BUỘC cho mọi UI/design (kèm references/house/*) + taste chống slop.

@@ -29,6 +29,7 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
     deploy::install_bundled_global(env)?;
     deploy::ensure_codegraph(env)?;
     deploy::ensure_codebase_memory_mcp(env)?;
+    deploy::ensure_headroom_mcp(env)?;
     let _ = install_external_skill_packs(env); // best-effort; skips packs already present
     let global_dir = env.home.join(".omp/skills");
     for d in discover::list_installed_skill_dirs(&global_dir).unwrap_or_default() {
