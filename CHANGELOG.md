@@ -5,6 +5,51 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-06-23
+
+### Changed
+
+- **Loop engineering v2 — Phase A (token & stable-prefix discipline).**
+  - Force-load block (`inject.rs`) + master `00-force-load.md` split always-on skills into
+    **CORE** (codegraph · karpathy · ponytail · 8sync-cli — đọc body upfront) và **SPECIALIST**
+    (assp · impeccable · taste · image-routing — biết khả năng, đọc body khi task khớp /
+    progressive disclosure). Thu nhỏ tập đọc-ngay; `impeccable` vẫn bắt buộc ngay khi có việc UI/design.
+  - `headroom_compress` nâng từ khuyến nghị → **bắt buộc** cho output > ~50 dòng (STEP 0 + invariants).
+  - KNOWLEDGE breadcrumb (`memory.rs`) bỏ timestamp `epoch:` volatile → byte-stable giữa các lần
+    `harness` (thân thiện KV-cache, hết git churn). `now_stamp()` vẫn dùng cho tên file archive.
+  - Plan + provenance: `outputs/harness-loop-engineering-v2-plan.md`.
+- **Loop engineering v2 — Phase B (live memory & recitation).**
+  - `agents/STATE.md` seeded as a structured **live plan** (Goal · DoD · Checklist · Current ·
+    Next · Open-questions · Handoff) — recitation anchor (Manus todo.md pattern): read at session
+    start, rewritten at each phase boundary to keep the plan in recent context.
+  - Loop section (`00-force-load.md`) + generated block (`inject.rs`) gain **recitation**,
+    **compaction** (near-limit → structured handoff to STATE + lessons to KNOWLEDGE → reinit, with
+    `headroom_compress` as summarizer), and **budget-awareness** rules.
+  - `harness bench` now counts the memory spine in the upfront budget (more honest accounting).
+- **Loop engineering v2 — Phase C (maker/checker + Reflexion).**
+  - Loop section + generated block: `task` implementer ↔ **independent verifier** (build/test in
+    its own context, verify-gate before commit), explicit objective/boundaries/output per subagent,
+    share-full-trace for dependent work, parallel only when subtasks are independent.
+  - **Reflexion failure-capture**: a failed verify writes a `failure:` entry to KNOWLEDGE (symptom
+    + cause + fix); recent failures are read at session start to avoid repeating them.
+- **Loop engineering v2 — Phase D (procedural memory / playbooks).**
+  - `agents/PLAYBOOKS.md` seeded (Voyager-style skill library): validated multi-step procedures
+    distilled into reusable runbooks indexed by a `When:` line — retrieved + adapted, not re-derived.
+  - Memory tiering: KNOWLEDGE = verbal lessons · PLAYBOOKS = verified procedures · DECISIONS = ADR.
+    `harness bench` now counts PLAYBOOKS in the spine (6 files).
+- **Loop engineering v2 — Phase E (phased autonomy + guardrails).**
+  - L1 report · L2 assisted · L3 unattended defined, with guardrails (verify-gate before commit,
+    gitleaks, commit scoped to `agents/`+docs, no auto `push`/PR at L3). `harness up --timer`
+    per-tick job documented (read STATE → Next → verify → update spine → optional commit).
+
+### Added
+
+- **`8sync harness bench`** — deterministic loop-engineering benchmark (no model calls): upfront
+  context budget (force-load prefix + CORE skill bodies) vs deferred (SPECIALIST + on-demand),
+  the A2 progressive-disclosure saving, and an A1 KV-cache stable-prefix gate. Refactors a shared
+  `inject::build_force_load()` (single source of truth for inject + bench). Baseline on this repo:
+  upfront ~5.5k tok vs naive ~37.9k tok → **85% upfront cut**; A1 PASS.
+
 ## [0.18.1] — 2026-06-23
 
 ### Fixed

@@ -6,6 +6,54 @@ use std::path::Path;
 use crate::ui;
 use crate::verbs::skill::index::always_on_names_in_order;
 
+/// Structured live-plan seed for `agents/STATE.md` — the loop-engineering
+/// recitation anchor (Manus todo.md pattern): the agent rewrites it at each
+/// phase boundary and reads it at session start, keeping the plan in recent
+/// context (anti lost-in-the-middle). Seeded once; never overwritten if present.
+const STATE_TEMPLATE: &str = "\
+# STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
+
+## Goal
+_một câu: kết quả cần đạt_
+
+## Definition of Done
+- [ ] _tiêu chí nghiệm thu_
+
+## Checklist
+- [ ] _bước 1_
+
+## Current step
+_đang làm gì_
+
+## Next
+_bước kế tiếp_
+
+## Open questions / blockers
+_none_
+
+## Handoff (compaction)
+_none — khi context gần đầy: ghi Done · In-flight · Next · Open-questions vào đây + bài học vào KNOWLEDGE, rồi reinit phiên mới chỉ đọc spine._
+";
+
+/// Procedural-memory seed for `agents/PLAYBOOKS.md` (Voyager-style skill
+/// library): validated multi-step procedures distilled into reusable runbooks
+/// indexed by a `When:` line. Seeded once; appended to by the agent.
+const PLAYBOOKS_TEMPLATE: &str = "\
+# PLAYBOOKS (8sync managed — procedural memory, append-only)
+
+Runbook tái dùng cho quy trình ĐÃ `validated:`. Index theo `When:` để retrieve;
+Voyager-style: lưu cái đã chạy được, lần sau adapt thay vì suy luận lại.
+
+## Template
+### <tên ngắn>
+- **When:** _tình huống kích hoạt (1 dòng để match)_
+- **Steps:** _các bước đã verify_
+- **Verify:** _cách kiểm chứng_
+- **Pitfalls:** _bẫy đã gặp_
+
+_empty_
+";
+
 /// Epoch-seconds stamp in the repo's `epoch:<n>` convention (no chrono dep).
 pub(crate) fn now_stamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -72,13 +120,17 @@ pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
     let agents_dir = root.join("agents");
     std::fs::create_dir_all(&agents_dir)?;
     seed_gitignore(root)?;
-    for f in ["PROJECT.md", "KNOWLEDGE.md", "DECISIONS.md", "PREFERENCES.md", "STATE.md", "NOTES.md"] {
+    for f in ["PROJECT.md", "KNOWLEDGE.md", "DECISIONS.md", "PREFERENCES.md", "STATE.md", "PLAYBOOKS.md", "NOTES.md"] {
         let p = agents_dir.join(f);
         if !p.exists() {
             // KNOWLEDGE.md carries an append-only "Learnings" zone below the managed
             // breadcrumb block (which `harness up` overwrites) so learnings persist.
             let content = if f == "KNOWLEDGE.md" {
-                "# KNOWLEDGE (8sync managed — append-only)\n\n## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)\n\nMỗi entry prefix `validated:` (test/build đã xác nhận) hoặc `hypothesis:` (chưa kiểm chứng).\n\n_empty_\n".to_string()
+                "# KNOWLEDGE (8sync managed — append-only)\n\n## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)\n\nMỗi entry prefix `validated:` (test/build xác nhận) · `hypothesis:` (chưa) · `failure:` (lỗi đã gặp + cách sửa; đọc đầu phiên để khỏi lặp).\n\n_empty_\n".to_string()
+            } else if f == "STATE.md" {
+                STATE_TEMPLATE.to_string()
+            } else if f == "PLAYBOOKS.md" {
+                PLAYBOOKS_TEMPLATE.to_string()
             } else {
                 format!("# {} (8sync managed — append-only)\n\n_empty_\n", f.trim_end_matches(".md"))
             };
@@ -110,13 +162,11 @@ pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
         }
     };
     let body = format!(
-        "## 🧠 8sync harness ({})\n\n\
-- **Always-on skills (đọc trước tool call đầu tiên, đúng thứ tự):** {}.\n\
-- **Cách tận dụng:** codegraph = explore code (search/deps/callers, không grep) · \
-karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · assp = copy/offer · \
-impeccable = design system CHUẨN, BẮT BUỘC cho mọi UI/design (kèm references/house/*) + taste chống slop.\n\
+        "## 🧠 8sync harness\n\n\
+- **Always-on (đọc theo thứ tự; CORE đọc body ngay, SPECIALIST đọc khi task khớp):** {}.\n\
+- **Cách tận dụng:** codegraph = explore code (search/deps/callers, không grep) · karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · impeccable = design CHUẨN, BẮT BUỘC khi UI/design (đọc body lúc đó) + taste chống slop.\n\
+- **Output lớn (>~50 dòng) → BẮT BUỘC `headroom_compress`** trước khi vào context.\n\
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (Unreleased) + ghi học được vào file này (prefix `validated:` nếu test/build xác nhận, `hypothesis:` nếu chưa).",
-        now_stamp(),
         chain,
     );
     upsert_block(

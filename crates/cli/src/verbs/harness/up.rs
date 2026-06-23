@@ -2,7 +2,10 @@
 //! re-inject AGENTS.md + sub-folder indexes, refresh the KNOWLEDGE breadcrumb,
 //! and re-index codegraph so the agent keeps learning as the project grows.
 //! `--loop <dur>` runs it in the foreground; `--timer <dur|off>` installs a
-//! systemd user timer (the recommended background option).
+//! systemd user timer (the recommended background option). Per tick the harness
+//! refreshes context (re-inject + re-index + consolidate); the agent then drives
+//! the L1→L3 loop off STATE.md (read STATE → Next → verify-gate → update spine →
+//! `--commit`), per the loop-engineering rules in 00-force-load.md.
 use std::process::Command;
 use std::path::Path;
 use std::time::Duration;

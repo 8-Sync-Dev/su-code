@@ -55,6 +55,15 @@ pub(crate) fn is_always_on(dirname: &str) -> bool {
     always_on_rank(dirname) != usize::MAX
 }
 
+/// CORE always-on skills: small + universal, so their SKILL.md body is read
+/// upfront EVERY session. The remaining always-on skills are specialists —
+/// listed (capability noted) but their body is read lazily, only when a
+/// matching task triggers it (progressive disclosure → leaner, KV-cache-stable
+/// prefix; Anthropic "skills" + Manus KV-cache lessons).
+pub(crate) fn always_on_core(dirname: &str) -> bool {
+    matches!(dirname, "codegraph" | "karpathy-guidelines" | "ponytail" | "8sync-cli")
+}
+
 /// On-demand skills gated by a project-tech predicate: only surfaced in the
 /// force-load block when the tech is actually present (keeps a non-Encore
 /// project from listing the Encore deploy runbook). Returns true = hide it.
@@ -85,12 +94,20 @@ fn project_uses_encore(root: &Path) -> bool {
     false
 }
 
-/// Rewrite (or insert) the force-load block in **every** agent entry file at the
-/// project root: AGENTS.md, CLAUDE.md, GEMINI.md, OPENCODE.md,
-/// .github/copilot-instructions.md, .cursorrules, .windsurfrules. Always-on
-/// skills are listed in canonical order; on-demand skills only when relevant
-/// (tech-gated ones hidden unless the project uses that tech).
-pub(crate) fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
+/// Classified skill dirs + the rendered force-load block. Single source of
+/// truth shared by `inject_agents_md` (writes the block) and `harness bench`
+/// (measures it) so the benchmark never drifts from what is actually injected.
+pub(crate) struct ForceLoadStats {
+    pub(crate) block: String,
+    pub(crate) core: Vec<PathBuf>,        // CORE always-on — body read upfront every session
+    pub(crate) specialist: Vec<PathBuf>,  // SPECIALIST always-on — body read on trigger
+    pub(crate) ondemand: Vec<PathBuf>,    // on-demand visible — body read on trigger
+}
+
+/// Gather installed skills (global ∪ project-local, deduped), classify them into
+/// CORE / SPECIALIST / on-demand, and render the force-load block. Pure: reads
+/// the skill dirs, writes nothing.
+pub(crate) fn build_force_load(home: &Path, root: &Path) -> ForceLoadStats {
     let global_dir = home.join(".omp/skills");
     let local_dir = root.join("agents/skills");
 
@@ -119,17 +136,24 @@ pub(crate) fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
         always_on_rank(an).cmp(&always_on_rank(bn)).then_with(|| an.cmp(bn))
     });
 
-    let mut always_lines = String::new();
+    let mut core: Vec<PathBuf> = Vec::new();
+    let mut specialist: Vec<PathBuf> = Vec::new();
+    let mut ondemand: Vec<PathBuf> = Vec::new();
+    let mut core_lines = String::new();
+    let mut specialist_lines = String::new();
     let mut ondemand_lines = String::new();
-    let mut a_idx = 1usize;
-    let mut on_count = 0usize;
     for (p, is_local) in chosen.iter() {
         let dirname = p.file_name().and_then(|s| s.to_str()).unwrap_or("?");
         if is_always_on(dirname) {
-            let (_m, entry) = meta_for_dir(p);
+            let (m, entry) = meta_for_dir(p);
             let abs = p.join(entry);
-            always_lines.push_str(&format!("  {}. `{}`\n", a_idx, abs.display()));
-            a_idx += 1;
+            if always_on_core(dirname) {
+                core.push(p.clone());
+                core_lines.push_str(&format!("  {}. `{}`\n", core.len(), abs.display()));
+            } else {
+                specialist.push(p.clone());
+                specialist_lines.push_str(&format!("- `{}` — `{}`\n", m.name, abs.display()));
+            }
         } else {
             // Tech-gated on-demand skill in a project that doesn't use that tech → hide.
             if skill_gated_out(dirname, root) {
@@ -141,17 +165,19 @@ pub(crate) fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
             } else {
                 format!("~/.omp/skills/{}/{}", dirname, entry)
             };
+            ondemand.push(p.clone());
             ondemand_lines.push_str(&format!("- `{}` — `{}`\n", m.name, rel));
-            on_count += 1;
         }
     }
-    if a_idx == 1 {
-        always_lines.push_str("  _(no always-on skills — run `8sync harness init`)_\n");
+    if core.is_empty() {
+        core_lines.push_str("  _(no core skills — run `8sync harness init`)_\n");
     }
-    if on_count == 0 {
+    if specialist.is_empty() {
+        specialist_lines.push_str("- _(none)_\n");
+    }
+    if ondemand.is_empty() {
         ondemand_lines.push_str("- _(none — add via `8sync skill add <github-url>`)_\n");
     }
-    let always_count = a_idx - 1;
 
     let has_codegraph_bin = which::which("codegraph").is_ok();
     let codegraph_install_hint: &str = if has_codegraph_bin {
@@ -169,34 +195,53 @@ Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read
 1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph search/deps/callers/defs` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.\n\
 2. **codebase-memory-mcp** (MCP, auto-setup bởi `8sync harness`): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet` — knowledge graph 158 ngôn ngữ, query sub-ms.\n\
 3. Tìm/hiểu/định vị code · impact · route→handler · dead code · architecture → ƯU TIÊN 2 engine trên. Chỉ `Read` raw file khi sắp SỬA nó (read-before-edit).\n\
-4. **Output dài** (logs/diff/test/tool output) → nén bằng `headroom` MCP (`headroom_compress`) thay vì dump cả khối vào context (60–95% ít token).\n\
+4. **BẮT BUỘC nén output lớn:** mọi output > ~50 dòng (log/diff/test/tool dump) phải qua `headroom` MCP (`headroom_compress`) TRƯỚC khi vào context (60–95% ít token). Dump cả khối lớn vào context = vi phạm.\n\
 \n\
 Lý do: 5 query cấu trúc ≈ 3.4k token vs ≈ 412k token grep từng file (−99%). Dump cả file / grep mù = đốt token = bug.\n\
 \n\
 {codegraph_install_hint}\
-## 🚨 STEP 1 — skills: always-on (đọc ngay) vs on-demand (đọc khi cần)\n\
+## 🚨 STEP 1 — skills 2 tầng: CORE (đọc ngay) · SPECIALIST + on-demand (đọc khi cần)\n\
 \n\
 Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatter `name`+`description`. Skill vendored ở `agents/skills/<name>/` (bản commit trong repo, mirror từ `~/.omp/skills/`). Mỗi skill liệt kê 1 lần.\n\
 \n\
-### ⛔ Always-on — ĐỌC NGAY, trước tool call đầu tiên (không skip)\n\
+### ⛔ CORE always-on — ĐỌC NGAY (body), trước tool call đầu tiên (không skip)\n\
 \n\
-**Thứ tự = ưu tiên (đọc top-down, không đảo).** Mở đúng file `SKILL.md` ở path bên dưới rồi mới được gọi tool đầu tiên:\n\
+Nhỏ + dùng cho MỌI task. **Thứ tự = ưu tiên (đọc top-down).** Mở `SKILL.md` ở path dưới rồi mới gọi tool đầu tiên:\n\
 \n\
-{always_lines}\n\
+{core_lines}\n\
+### 🧩 SPECIALIST always-on — biết khả năng, đọc body KHI task khớp (progressive disclosure)\n\
+\n\
+KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF.\n\
+\n\
+{specialist_lines}\n\
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)\n\
 \n\
 {ondemand_lines}\n\
 ### Quy tắc bất biến\n\
 \n\
 - **Code-intelligence FIRST** (codegraph + codebase-memory-mcp) cho mọi câu hỏi explore code (Step 0). Bypass = bug.\n\
-- Đọc TẤT CẢ skill **always-on** TRƯỚC tool call đầu tiên, ĐÚNG thứ tự: codegraph → karpathy → ponytail → assp → impeccable + taste → 8sync-cli → image-routing.\n\
-- **Cách tận dụng (luôn nhớ):** `codegraph` = explore code (search/deps/callers, KHÔNG grep) · `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` = copy/offer hướng người dùng · **`impeccable` = design system CHUẨN, BẮT BUỘC cho MỌI UI/design/redesign/audit (đọc kèm `references/house/*`)** + `taste` chống slop.\n\
+- **Output > ~50 dòng → BẮT BUỘC `headroom_compress`** trước khi vào context — không dump thô.\n\
+- Đọc body **CORE** (codegraph → karpathy → ponytail → 8sync-cli) TRƯỚC tool call đầu tiên. **SPECIALIST** (assp · impeccable · taste · image-routing) đọc body KHI task khớp — `impeccable` bắt buộc ngay khi có việc UI/design.\n\
 - Skill **on-demand**: chỉ mở khi description khớp task hiện tại — đừng đọc thừa.\n\
 - Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.\n\
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.\n\
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (mục Unreleased) + ghi học được vào `agents/KNOWLEDGE.md`.\n\
+- **Loop / STATE spine**: đọc `agents/STATE.md` đầu phiên; rewrite ở mỗi phase-boundary (Goal·Checklist·Current·Next). Context gần đầy → handoff vào STATE + bài học vào KNOWLEDGE rồi reinit. Đo loop: `8sync harness bench`.\n\
+- **Loop discipline (C/D/E)**: implementer↔verifier qua `task` (verifier chạy build/test ĐỘC LẬP, verify-gate TRƯỚC commit); FAIL → ghi `failure:` vào KNOWLEDGE, đọc đầu phiên để khỏi lặp; quy trình `validated:` → distill vào `agents/PLAYBOOKS.md` (index theo `When:`); autonomy L1 report · L2 assisted · L3 unattended — không tự `push`/PR ở L3 mặc định.\n\
 {END}"
     );
+
+    ForceLoadStats { block, core, specialist, ondemand }
+}
+
+/// Rewrite (or insert) the force-load block in **every** agent entry file at the
+/// project root: AGENTS.md, CLAUDE.md, GEMINI.md, OPENCODE.md,
+/// .github/copilot-instructions.md, .cursorrules, .windsurfrules.
+pub(crate) fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
+    let stats = build_force_load(home, root);
+    let always_count = stats.core.len() + stats.specialist.len();
+    let on_count = stats.ondemand.len();
+    let block = stats.block;
 
     // Inject into every known agent entry file (markdown: sentinel rewrite or
     // skeleton; plain text: prepend). AGENTS.md + CLAUDE.md are stub-created;

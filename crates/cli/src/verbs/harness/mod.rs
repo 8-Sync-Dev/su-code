@@ -11,6 +11,7 @@ use clap::Args as ClapArgs;
 use crate::{env_detect, ui};
 
 mod auto;
+mod bench;
 mod external;
 mod init;
 mod memory;
@@ -28,6 +29,7 @@ mod up;
       8sync harness up --timer 30m    install a systemd USER timer (recommended for background)
       8sync harness up --timer off    remove the timer
       8sync harness help             cheatsheet: commands, skill tiers, file taxonomy, new-machine runbook
+      8sync harness bench            benchmark the loop-engineering context budget (upfront vs deferred tokens + KV-cache gate)
 
     WHAT init DEPLOYS
       always-on : codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing
@@ -36,7 +38,7 @@ mod up;
       external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)
 "})]
 pub struct Args {
-    /// init (default) | up
+    /// init (default) | up | bench | help
     pub sub: Option<String>,
     /// `up --loop <dur>`: refresh every <dur> in the foreground (e.g. 10m, 1h, 30s)
     #[arg(long = "loop", value_name = "DUR")]
@@ -64,13 +66,14 @@ pub fn run(a: Args) -> Result<()> {
         None => auto::harness_auto(&env, a.force),
         Some("init") => init::harness_init(&env, a.force),
         Some("up") => up::harness_up(&env, a.loop_every.as_deref(), a.timer.as_deref(), a.pull, a.commit),
+        Some("bench") => bench::harness_bench(&env),
         Some("help") => {
             print_help();
             Ok(())
         }
         Some(other) => {
             ui::warn(&format!("unknown subcommand: {}", other));
-            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | help");
+            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | bench | help");
             Ok(())
         }
     }

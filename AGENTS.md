@@ -9,26 +9,31 @@ Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read
 1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph search/deps/callers/defs` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.
 2. **codebase-memory-mcp** (MCP, auto-setup bởi `8sync harness`): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet` — knowledge graph 158 ngôn ngữ, query sub-ms.
 3. Tìm/hiểu/định vị code · impact · route→handler · dead code · architecture → ƯU TIÊN 2 engine trên. Chỉ `Read` raw file khi sắp SỬA nó (read-before-edit).
-4. **Output dài** (logs/diff/test/tool output) → nén bằng `headroom` MCP (`headroom_compress`) thay vì dump cả khối vào context (60–95% ít token).
+4. **BẮT BUỘC nén output lớn:** mọi output > ~50 dòng (log/diff/test/tool dump) phải qua `headroom` MCP (`headroom_compress`) TRƯỚC khi vào context (60–95% ít token). Dump cả khối lớn vào context = vi phạm.
 
 Lý do: 5 query cấu trúc ≈ 3.4k token vs ≈ 412k token grep từng file (−99%). Dump cả file / grep mù = đốt token = bug.
 
-## 🚨 STEP 1 — skills: always-on (đọc ngay) vs on-demand (đọc khi cần)
+## 🚨 STEP 1 — skills 2 tầng: CORE (đọc ngay) · SPECIALIST + on-demand (đọc khi cần)
 
 Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatter `name`+`description`. Skill vendored ở `agents/skills/<name>/` (bản commit trong repo, mirror từ `~/.omp/skills/`). Mỗi skill liệt kê 1 lần.
 
-### ⛔ Always-on — ĐỌC NGAY, trước tool call đầu tiên (không skip)
+### ⛔ CORE always-on — ĐỌC NGAY (body), trước tool call đầu tiên (không skip)
 
-**Thứ tự = ưu tiên (đọc top-down, không đảo).** Mở đúng file `SKILL.md` ở path bên dưới rồi mới được gọi tool đầu tiên:
+Nhỏ + dùng cho MỌI task. **Thứ tự = ưu tiên (đọc top-down).** Mở `SKILL.md` ở path dưới rồi mới gọi tool đầu tiên:
 
-  1. `/home/alexdev/Projects/su-code/agents/skills/codegraph/SKILL.md`
-  2. `/home/alexdev/Projects/su-code/agents/skills/karpathy-guidelines/SKILL.md`
-  3. `/home/alexdev/Projects/su-code/agents/skills/ponytail/SKILL.md`
-  4. `/home/alexdev/Projects/su-code/agents/skills/assp-skill/SKILL.md`
-  5. `/home/alexdev/Projects/su-code/agents/skills/impeccable/SKILL.md`
-  6. `/home/alexdev/Projects/su-code/agents/skills/taste-skill/SKILL.md`
-  7. `/home/alexdev/Projects/su-code/agents/skills/8sync-cli/SKILL.md`
-  8. `/home/alexdev/Projects/su-code/agents/skills/image-routing/SKILL.md`
+  1. `/home/alexdev/Projects/tools/su-code/agents/skills/codegraph/SKILL.md`
+  2. `/home/alexdev/Projects/tools/su-code/agents/skills/karpathy-guidelines/SKILL.md`
+  3. `/home/alexdev/Projects/tools/su-code/agents/skills/ponytail/SKILL.md`
+  4. `/home/alexdev/Projects/tools/su-code/agents/skills/8sync-cli/SKILL.md`
+
+### 🧩 SPECIALIST always-on — biết khả năng, đọc body KHI task khớp (progressive disclosure)
+
+KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF.
+
+- `assp-skill` — `/home/alexdev/Projects/tools/su-code/agents/skills/assp-skill/SKILL.md`
+- `impeccable` — `/home/alexdev/Projects/tools/su-code/agents/skills/impeccable/SKILL.md`
+- `design-taste-frontend` — `/home/alexdev/Projects/tools/su-code/agents/skills/taste-skill/SKILL.md`
+- `image-routing` — `/home/alexdev/Projects/tools/su-code/agents/skills/image-routing/SKILL.md`
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
@@ -90,12 +95,14 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 ### Quy tắc bất biến
 
 - **Code-intelligence FIRST** (codegraph + codebase-memory-mcp) cho mọi câu hỏi explore code (Step 0). Bypass = bug.
-- Đọc TẤT CẢ skill **always-on** TRƯỚC tool call đầu tiên, ĐÚNG thứ tự: codegraph → karpathy → ponytail → assp → impeccable + taste → 8sync-cli → image-routing.
-- **Cách tận dụng (luôn nhớ):** `codegraph` = explore code (search/deps/callers, KHÔNG grep) · `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` = copy/offer hướng người dùng · **`impeccable` = design system CHUẨN, BẮT BUỘC cho MỌI UI/design/redesign/audit (đọc kèm `references/house/*`)** + `taste` chống slop.
+- **Output > ~50 dòng → BẮT BUỘC `headroom_compress`** trước khi vào context — không dump thô.
+- Đọc body **CORE** (codegraph → karpathy → ponytail → 8sync-cli) TRƯỚC tool call đầu tiên. **SPECIALIST** (assp · impeccable · taste · image-routing) đọc body KHI task khớp — `impeccable` bắt buộc ngay khi có việc UI/design.
 - Skill **on-demand**: chỉ mở khi description khớp task hiện tại — đừng đọc thừa.
 - Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (mục Unreleased) + ghi học được vào `agents/KNOWLEDGE.md`.
+- **Loop / STATE spine**: đọc `agents/STATE.md` đầu phiên; rewrite ở mỗi phase-boundary (Goal·Checklist·Current·Next). Context gần đầy → handoff vào STATE + bài học vào KNOWLEDGE rồi reinit. Đo loop: `8sync harness bench`.
+- **Loop discipline (C/D/E)**: implementer↔verifier qua `task` (verifier chạy build/test ĐỘC LẬP, verify-gate TRƯỚC commit); FAIL → ghi `failure:` vào KNOWLEDGE, đọc đầu phiên để khỏi lặp; quy trình `validated:` → distill vào `agents/PLAYBOOKS.md` (index theo `When:`); autonomy L1 report · L2 assisted · L3 unattended — không tự `push`/PR ở L3 mặc định.
 <!-- 8sync:skills:end -->
 
 > File này dành cho AI tool (omp, claude-code, cursor, opencode, aider, …)
