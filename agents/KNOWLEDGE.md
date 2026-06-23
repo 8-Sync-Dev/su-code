@@ -21,3 +21,11 @@
   on a path INSIDE it, not the bare name.
 - **KNOWLEDGE.md managed block** (`<!-- 8sync:harness:* -->`) is overwritten every `harness up`;
   durable learnings MUST live below it in the seeded `## Learnings` zone.
+- **validated: `harness init` was NOT a superset of bare `harness`.** `init` (init.rs)
+  only deployed bundled skills + 2 hardcoded external packs (ponytail, addyosmani) and
+  never called `update_skills` — so manifest skills (feynman: deep-research, …) never
+  reached `agents/skills/` via `init`. Only bare `8sync harness` (auto.rs:46) and
+  `harness up --pull` read `agents/skills.toml`. Fix: init.rs now runs
+  `update::update_skills(env, global_toml, None)` as step 5/9 before the mirror step.
+  Verified: temp project + feynman manifest → `8sync harness init` produces
+  `agents/skills/deep-research/SKILL.md` (all 20 feynman skills vendored).

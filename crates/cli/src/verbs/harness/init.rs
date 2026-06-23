@@ -1,6 +1,7 @@
 //! `8sync harness init` — one command to stand up a maximal agent harness:
 //! deploy every bundled skill (+ codegraph binary + external skill packs),
-//! mirror them into the project, init codegraph, seed agent memory + CHANGELOG,
+//! pull registered skills (agents/skills.toml), mirror them into the project,
+//! init codegraph, seed agent memory + CHANGELOG,
 //! and inject force-load rules into the root AGENTS.md/CLAUDE.md plus a compact
 //! index into every significant sub-folder. Progress is tracked step by step.
 use std::time::Instant;
@@ -9,7 +10,7 @@ use anyhow::Result;
 
 use super::external::install_external_skill_packs;
 use super::memory::{seed_gitleaks_hook, seed_harness_memory};
-use crate::verbs::skill::{deploy, discover, inject_agents_md, inject_subfolder_indexes};
+use crate::verbs::skill::{deploy, discover, inject_agents_md, inject_subfolder_indexes, update};
 use crate::{assets, env_detect, ui};
 
 /// Lightweight stepped progress indicator (no TUI dep): `▸ [i/N] label`.
@@ -39,7 +40,7 @@ impl Progress {
 pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     ui::header("8sync harness init");
     let in_project = discover::detect_current_project_root().is_some();
-    let total = if in_project { 8 } else { 4 };
+    let total = if in_project { 9 } else { 4 };
     let mut p = Progress::new(total);
 
     // 1. Master force-load file (omp reads this first every session).
@@ -69,8 +70,13 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
         deploy::ensure_skill_layout(&d);
     }
 
-    // 5-8. Project-scoped scaffolding.
+    // 5-9. Project-scoped scaffolding.
     if let Some(root) = discover::detect_current_project_root() {
+        // Pull every skill registered in agents/skills.toml from its source
+        // (git collections like feynman, builtin:, path:) — mirrors bare
+        // `8sync harness` so init is a true superset, not a smaller bootstrap.
+        p.step("pull registered skills (agents/skills.toml: feynman, …)");
+        let _ = update::update_skills(env, &env.xdg_config.join("8sync/skills.toml"), None);
         p.step("mirror skills → agents/skills/");
         let count = deploy::mirror_global_to_local(&env.home, &root, force)?;
         if count > 0 {

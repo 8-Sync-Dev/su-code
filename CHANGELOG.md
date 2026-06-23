@@ -5,6 +5,17 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.18.1] — 2026-06-23
+
+### Fixed
+
+- **`8sync harness init` now pulls registered manifest skills** — `init` calls
+  `skill update` against `agents/skills.toml` (git collections like `feynman`:
+  deep-research, autoresearch, …) before mirroring, making it a true superset of
+  bare `8sync harness`. Previously `init` only deployed the bundled skills + 2
+  hardcoded external packs (ponytail, addyosmani), so manifest-only skills never
+  reached `agents/skills/` via `init` — only bare `8sync harness` / `up --pull` did.
+
 ## [0.18.0] — 2026-06-21
 
 ### Added
