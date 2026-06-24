@@ -1,23 +1,29 @@
 ---
 name: gs
-description: Use when the user wants an autonomous professional-team build — plan, implement, verify, commit, and advance a feature end-to-end with minimal hand-holding ("build X for me", "run the team", "autonomous", "ship this end to end", "run treo"). Explains the /gs command and the team-loop protocol so the loop runs token-lean and to spec.
+description: Use when the user wants an autonomous professional-team build — plan, implement, verify, commit, and advance a feature end-to-end with minimal hand-holding ("build X for me", "run the team", "autonomous", "ship this end to end", "run treo"). Explains the /gs command + the right-sized team-loop protocol so it runs token-lean and to spec.
 ---
 
-# gs — autonomous engineering team loop
+# gs — autonomous engineering lead (right-sized team loop)
 
-Invoke with the **`/gs`** slash command (one command, arg-routed):
+Invoke with **`/gs`** (one command, arg-routed):
 `/gs <goal>` plan+run · bare `/gs` resume · `/gs auto` unattended · `/gs status|next|stop`.
 
-**Loop** (driven off `agents/STATE.md`, the live plan): plan -> pick slice -> delegate to a specialist role (subagent, own context) -> **verify-gate** (independent build/test) -> commit -> record (STATE / KNOWLEDGE / PLAYBOOKS) -> advance. Runs until Definition-of-Done or a blocker; in `auto` it never yields between slices.
+**Right-size FIRST (most important).** Match machinery to the task — never over-engineer:
+- **trivial/small** → **solo** (codegraph/cbm → edit → lightweight verify); no team, no Closeout.
+- **medium** → solo + one independent verifier subagent.
+- **large/multi-slice** → full loop + roles + Closeout.
+A team is the exception you justify; coordination overhead that exceeds doing it yourself is the regression.
 
-**Autonomy in `auto` (no questions):** NEVER call `ask` or stop on ambiguity. Resolve unknowns by research (codegraph/cbm -> `agents/*` memory/PLAYBOOKS -> skills -> `web_search`/`autoresearch`/`deep-research`), pick the boring/reversible option, log it under `## Assumptions` in STATE, and proceed. Stop only on a TRUE blocker: missing credential, external approval, or a destructive/irreversible action.
+**Loop** (off `agents/STATE.md`): plan (large only) → pick slice → understand history before load-bearing edits (git log/blame + DECISIONS + cbm) → implement (right-sized) → **verify-gate** (independent build/test, never weaken tests) → commit → record (STATE/KNOWLEDGE/PLAYBOOKS) → **doc-hygiene** → advance to Definition-of-Done.
 
-**Token discipline (always):** explore via codegraph + codebase-memory-mcp (never grep / read-all); compress any output over ~50 lines with `headroom_compress`; load skill bodies on trigger only.
+**Delegate only when it clears the bar** — parallel-independent work · context-isolation · specialization the lead lacks; scoped objective + **summary return** (never "research X", never inline the transcript). Else solo: single-agent context beats handoff seams.
 
-**QA + Closeout (critical):** every slice's verify-gate runs tests + (where runnable) a QA pass — never skip/weaken tests. Before handing back, run **Closeout**: full test suite + end-to-end QA + an independent re-review against the Definition-of-Done + a handoff summary. QA + test are non-negotiable; never report "done" without them.
+**Autonomy (`auto`):** research → pick the **reversible/boring** option → log under `## Assumptions` in STATE → proceed; never ask on design/naming/scope. STOP only on a true blocker (missing credential · external approval · destructive/irreversible · a high-stakes hard-to-undo call you're low-confidence on). Never compound a shaky assumption onto an irreversible path.
 
-**Roles:** planner / eng-manager / designer / implementer / reviewer / QA / security / release — use gstack role skills if installed, else bundled (`plan` agent, `code-review-and-quality`, `senior-security`, `impeccable`, `taste`) + `task` subagents.
+**Token discipline:** codegraph + codebase-memory-mcp (never grep/read-all) · `headroom_compress` for output > ~50 lines · load skill bodies on trigger.
 
-**Guardrails:** verify-gate before every commit · no push/PR unless asked · L3/unattended uses an isolated git worktree + hard-stop via `/gs stop` or `.gs/STOP`. Run 24/7 with `8sync harness up --timer 30m`.
+**Doc-hygiene:** stale paths → fix · junk/superseded/duplicated → **delete** (no doc addition without the matching deletion) · keep docs lean (≤ ~150 lines, describe capability/why not structure). Stale docs poison context.
 
-Full protocol lives in the `/gs` command body: `~/.omp/agent/commands/gs.md` (project copy: `<repo>/.omp/commands/gs.md`).
+**QA + Closeout (large only):** verify-gate runs tests every slice (never skip/weaken); before handing back a large goal run the full suite + end-to-end QA + independent re-review vs DoD + doc-hygiene. Skip the full pass for trivial/small — right-size the verification too.
+
+Full protocol: `~/.omp/agent/commands/gs.md` (project copy `<repo>/.omp/commands/gs.md`).

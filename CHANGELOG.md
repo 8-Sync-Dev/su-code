@@ -5,6 +5,27 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-06-24
+
+### Changed
+
+- **`/gs` redesigned to right-size effort (fixes the post-`/gs` quality regression).** Eval +
+  deep-research (`outputs/gs-eval-improve-research-brief.md`) found the drop was process
+  over-engineering, not tokens (`harness bench`: ~8.5k upfront, 79% saved, KV-cache stable):
+  the 93-line command forced a team + full Closeout on every task and `auto` "never asked".
+  - **Right-size first** — classify trivial/small → **solo** (no team, no Closeout) · medium →
+    solo + one verifier · large → full loop + roles + Closeout. A team is the exception you justify
+    (Cognition/Anthropic: single-agent default; multi-agent only when it clears the bar).
+  - **Solo-by-default delegation** — subagents only for parallel-independent / context-isolation /
+    specialization; scoped objective + summary return (never free-form, never inline transcript).
+  - **Autonomy confidence-gated** — strong `auto`, but a high-stakes hard-to-undo low-confidence call
+    is now a blocker (Anthropic 2026: "agents learning when to ask"); prefer reversible, never compound.
+  - **Doc-hygiene step** — detect stale paths / junk / superseded docs → fix or **delete** (no addition
+    without the matching deletion); keep docs lean. Stale docs poison agent context.
+  - **Codebase-history** — `git log/blame` + DECISIONS + cbm `detect_changes` before load-bearing edits.
+  - **Leaner command** — `assets/commands/gs.md` 93 → 56 lines (lower constraint density → better
+    instruction-following); full protocol stays in the `gs` skill (progressive disclosure).
+
 ## [0.20.1] — 2026-06-23
 
 ### Fixed
