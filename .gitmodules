@@ -1,0 +1,6 @@
+[submodule "reference/gstack"]
+	path = reference/gstack
+	url = https://github.com/garrytan/gstack.git
+[submodule "reference/gsd-pi"]
+	path = reference/gsd-pi
+	url = https://github.com/open-gsd/gsd-pi.git

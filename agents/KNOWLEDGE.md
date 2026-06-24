@@ -72,3 +72,19 @@
   native precedence 100, body is a prompt template with `$ARGUMENTS`. Verified: `/gs` deploys both
   paths, valid frontmatter, gs skill on-demand (not in upfront); bench A1 PASS, upfront ~7,322 tok,
   A2 saved 81%. failure: gstack tool-backed roles (qa/ship) still need gstack `bin/` + deps installed.
+- **validated: `/gs` autonomy + hint + QA + reference submodules → v0.20.1.** (1) `/gs auto` wasn't
+  unattended because the agent kept calling `ask` — added an **Autonomy contract** (NEVER ask in
+  `auto`; research → assume → log under `## Assumptions` in STATE → proceed; "blocker" = only
+  credential/external-approval/destructive). omp default `tools.approvalMode: yolo` already auto-approves
+  tools, so the stalls were `ask`/clarifying, NOT the approval gate — a slash command can't bypass that
+  gate anyway. (2) Hint: omp shows per-arg hints only for BUILTINS; file commands surface only their
+  `description` — so front-loaded modes into description + added `argument-hint` frontmatter (YAML must
+  be quoted/clean: a value starting with `[` or containing `: ` breaks the parser). (3) QA/test made
+  first-class: per-slice verify-gate runs tests+QA, plus a mandatory **Closeout** (full suite + e2e QA +
+  independent re-review vs DoD + handoff summary) before reporting done. (4) Added `reference/gstack` +
+  `reference/gsd-pi` submodules. **failure: codegraph honors NO exclude — not `.gitignore` (even
+  `index -f`), no flag, no ignore-file; populating reference/ ballooned the index to ~3k files/110MB.**
+  Fix: commit submodule pointers but `git submodule deinit -f` the working trees (lean by default,
+  fetch on demand); cbm DOES respect `.gitignore` (it excludes `agents/skills`), so `reference/` is
+  gitignored as a cbm guard. Verified bare `8sync harness` = full auto-setup (MCP + skills + `/gs` +
+  memory + inject + index) in one command; bench A1 PASS, ~7.6k upfront, A2 80%.

@@ -5,6 +5,35 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.20.1] — 2026-06-23
+
+### Fixed
+
+- **`/gs auto` actually runs unattended now.** Added an **Autonomy contract** to the `/gs` command +
+  `gs` skill: in `auto`/L3 the agent NEVER calls `ask` or stops on ambiguity — it resolves unknowns by
+  research (codegraph/cbm → `agents/*`/PLAYBOOKS → skills → `web_search`/`autoresearch`/`deep-research`),
+  picks the boring/reversible option, logs it under a new `## Assumptions` section in `agents/STATE.md`,
+  and proceeds. "Blocker" is tightened to ONLY missing credential / external approval / destructive-
+  irreversible action; design choices, naming and scope are no longer stops. Note: a slash command
+  cannot bypass omp's approval gate — keep `tools.approvalMode: yolo` (default) for true unattended runs.
+- **`/gs` argument hint.** Added `argument-hint` frontmatter and front-loaded the description with
+  `[auto | <goal> | status | next | stop]` so the autocomplete dropdown shows the modes when you type
+  `/gs ` (omp renders per-argument hints only for built-ins; the description is what surfaces for
+  file-based commands).
+- **QA + test are now first-class gates in `/gs`.** Per-slice verify-gate explicitly runs tests + a QA
+  pass and forbids skipping/weakening tests; added a mandatory **Closeout** step — full test suite +
+  end-to-end QA + independent re-review against the Definition-of-Done + a handoff summary — that must
+  pass before the loop reports "done". Never hands back unverified work.
+
+### Added
+
+- **Reference submodules `reference/gstack` + `reference/gsd-pi`** (git submodules, MIT) for studying
+  the engineering-team + autonomous-loop patterns that informed `/gs`. Pointers are committed
+  (reproducible) but the working trees are **deinitialized by default** so they never bloat the
+  codegraph/cbm index (codegraph honors no exclude/ignore — populating them ballooned the index to
+  ~3k files / 110 MB). Study on demand: `git submodule update --init reference/<name>`; re-shrink with
+  `git submodule deinit -f reference/<name>`. `reference/` is also gitignored as a cbm-index guard.
+
 ## [0.20.0] — 2026-06-23
 
 ### Added

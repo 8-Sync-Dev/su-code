@@ -22,3 +22,5 @@ dist/
 # 8sync-managed force-load block in AGENTS.md / CLAUDE.md tracks which
 # skills the repo expects.
 agents/skills/
+
+reference/

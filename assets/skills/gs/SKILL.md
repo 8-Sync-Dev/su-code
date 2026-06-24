@@ -10,7 +10,11 @@ Invoke with the **`/gs`** slash command (one command, arg-routed):
 
 **Loop** (driven off `agents/STATE.md`, the live plan): plan -> pick slice -> delegate to a specialist role (subagent, own context) -> **verify-gate** (independent build/test) -> commit -> record (STATE / KNOWLEDGE / PLAYBOOKS) -> advance. Runs until Definition-of-Done or a blocker; in `auto` it never yields between slices.
 
+**Autonomy in `auto` (no questions):** NEVER call `ask` or stop on ambiguity. Resolve unknowns by research (codegraph/cbm -> `agents/*` memory/PLAYBOOKS -> skills -> `web_search`/`autoresearch`/`deep-research`), pick the boring/reversible option, log it under `## Assumptions` in STATE, and proceed. Stop only on a TRUE blocker: missing credential, external approval, or a destructive/irreversible action.
+
 **Token discipline (always):** explore via codegraph + codebase-memory-mcp (never grep / read-all); compress any output over ~50 lines with `headroom_compress`; load skill bodies on trigger only.
+
+**QA + Closeout (critical):** every slice's verify-gate runs tests + (where runnable) a QA pass — never skip/weaken tests. Before handing back, run **Closeout**: full test suite + end-to-end QA + an independent re-review against the Definition-of-Done + a handoff summary. QA + test are non-negotiable; never report "done" without them.
 
 **Roles:** planner / eng-manager / designer / implementer / reviewer / QA / security / release — use gstack role skills if installed, else bundled (`plan` agent, `code-review-and-quality`, `senior-security`, `impeccable`, `taste`) + `task` subagents.
 

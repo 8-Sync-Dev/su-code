@@ -28,6 +28,9 @@ _đang làm gì_
 ## Next
 _bước kế tiếp_
 
+## Assumptions (auto-decided — user can correct)
+_none — trong `/gs auto`: thay vì hỏi, research → quyết → ghi giả định ở đây (cái gì + vì sao)._
+
 ## Open questions / blockers
 _none_
 
