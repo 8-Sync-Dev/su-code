@@ -6,7 +6,7 @@
 
 Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read (tiết kiệm ~99% token). Bạn (AI) **PHẢI**:
 
-1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph search/deps/callers/defs` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.
+1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph query/callers/callees/impact` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.
 2. **codebase-memory-mcp** (MCP, auto-setup bởi `8sync harness`): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet` — knowledge graph 158 ngôn ngữ, query sub-ms.
 3. Tìm/hiểu/định vị code · impact · route→handler · dead code · architecture → ƯU TIÊN 2 engine trên. Chỉ `Read` raw file khi sắp SỬA nó (read-before-edit).
 4. **BẮT BUỘC nén output lớn:** mọi output > ~50 dòng (log/diff/test/tool dump) phải qua `headroom` MCP (`headroom_compress`) TRƯỚC khi vào context (60–95% ít token). Dump cả khối lớn vào context = vi phạm.
@@ -61,7 +61,6 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `incremental-implementation` — `agents/skills/incremental-implementation/SKILL.md`
 - `interview-me` — `agents/skills/interview-me/SKILL.md`
 - `jobs` — `agents/skills/jobs/SKILL.md`
-- `karpathy-guidelines` — `agents/skills/karpathy/SKILL.md`
 - `last30days` — `agents/skills/last30days/SKILL.md`
 - `literature-review` — `agents/skills/literature-review/SKILL.md`
 - `ml-training-recipe` — `agents/skills/ml-training-recipe/SKILL.md`
@@ -103,6 +102,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (mục Unreleased) + ghi học được vào `agents/KNOWLEDGE.md`.
+- **Doc-hygiene**: chạy `8sync harness audit` khi đụng vùng có docs — path lệch→fix, doc rác/superseded→xóa (thêm doc phải kèm xóa cái cũ), oversized→trim.
 - **Loop / STATE spine**: đọc `agents/STATE.md` đầu phiên; rewrite ở mỗi phase-boundary (Goal·Checklist·Current·Next). Context gần đầy → handoff vào STATE + bài học vào KNOWLEDGE rồi reinit. Đo loop: `8sync harness bench`.
 - **Loop discipline (C/D/E)**: implementer↔verifier qua `task` (verifier chạy build/test ĐỘC LẬP, verify-gate TRƯỚC commit); FAIL → ghi `failure:` vào KNOWLEDGE, đọc đầu phiên để khỏi lặp; quy trình `validated:` → distill vào `agents/PLAYBOOKS.md` (index theo `When:`); autonomy L1 report · L2 assisted · L3 unattended — không tự `push`/PR ở L3 mặc định.
 <!-- 8sync:skills:end -->

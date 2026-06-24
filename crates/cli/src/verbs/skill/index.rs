@@ -112,7 +112,7 @@ Bạn đang ở **sub-folder**. Rule + skill force-load đầy đủ KHÔNG lặ
 **Always-on (đọc trước tool call đầu tiên, ĐÚNG thứ tự):** {chain}.\n\
 SKILL.md ở `<root>/agents/skills/<name>/` hoặc `~/.omp/skills/<name>/`.\n\
 \n\
-**Cách tận dụng (bắt buộc):** `codegraph` cho mọi explore code (search/deps/callers — KHÔNG grep) · \
+**Cách tận dụng (bắt buộc):** `codegraph` cho mọi explore code (query/callers/callees — KHÔNG grep) · \
 `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` cho copy/offer hướng người dùng · \
 **`impeccable` = design system CHUẨN, BẮT BUỘC cho mọi UI/design/redesign/audit (kèm `references/house/*`)** + `taste` chống slop.\n\
 \n\

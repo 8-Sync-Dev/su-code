@@ -22,7 +22,7 @@ A team is the exception you justify; coordination overhead that exceeds doing it
 
 **Token discipline:** codegraph + codebase-memory-mcp (never grep/read-all) · `headroom_compress` for output > ~50 lines · load skill bodies on trigger.
 
-**Doc-hygiene:** stale paths → fix · junk/superseded/duplicated → **delete** (no doc addition without the matching deletion) · keep docs lean (≤ ~150 lines, describe capability/why not structure). Stale docs poison context.
+**Doc-hygiene:** run **`8sync harness audit`** (stale paths · oversized · 30d churn) then act — stale paths → fix · junk/superseded/duplicated → **delete** (no doc addition without the matching deletion) · keep docs lean (≤ ~150 lines, describe capability/why not structure). Stale docs poison context.
 
 **QA + Closeout (large only):** verify-gate runs tests every slice (never skip/weaken); before handing back a large goal run the full suite + end-to-end QA + independent re-review vs DoD + doc-hygiene. Skip the full pass for trivial/small — right-size the verification too.
 

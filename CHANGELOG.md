@@ -5,6 +5,41 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-06-24
+
+### Added
+
+- **`8sync harness audit` — code-backed doc-hygiene** (was prompt-only advice with zero code behind it).
+  Scans committed docs (AGENTS.md/CLAUDE.md/README/CHANGELOG + `agents/*.md`) for **stale path references**
+  (repo-relative paths in docs that no longer exist), **oversized docs** (>400 lines / >120-line force-load
+  block), and **30-day churn hotspots** (history-awareness — docs near churned code are likeliest stale).
+  Report-only: never auto-deletes (heuristic; illustrative paths flagged "review before editing"). Skips
+  absolute / `~`-rooted / URL paths so the harness's own machine-generated refs don't false-positive.
+  `8sync doctor` surfaces a one-line summary; `/gs` + the `gs` skill doc-hygiene step now run the audit
+  instead of eyeballing.
+- **`8sync doctor` AI-engine health check** — verifies the token-optimization stack is installed AND
+  registered with omp ("luôn xài"): codegraph (local index) · codebase-memory-mcp (semantic graph) ·
+  headroom (output compression). A missing or unregistered engine silently defeats STEP 0 token
+  discipline, so doctor now flags it with the one-command fix (`8sync harness`).
+
+### Fixed
+
+- **codegraph STEP 0 verbs were wrong** in the force-load prefix, the subfolder-index block, and the
+  KNOWLEDGE breadcrumb: they taught `codegraph search/deps/defs`, none of which exist. Corrected to the
+  real CLI surface `codegraph query/callers/callees/impact` (verified against codegraph 0.9.6) so the
+  agent's first explore call doesn't error out.
+- **Duplicate always-on skill in the force-load list.** A stale/external `karpathy` dir alongside the
+  canonical `karpathy-guidelines` (identical frontmatter `name`) made the skill appear twice — once in
+  CORE, once in on-demand. `build_force_load` now dedups by frontmatter name, keeping the higher-ranked
+  dir, so each logical skill is listed exactly once. Future-proof against any dir/name collision.
+- **impeccable setup scripts couldn't run under 8sync's layout.** The bundled design skill referenced
+  `.agents/skills/impeccable/scripts/*.mjs` (leading dot) but 8sync mirrors skills to `agents/skills/`
+  (no dot). Fixed 28 references across SKILL.md + 4 reference docs → `agents/skills/`.
+
+### Changed
+
+- Managed `.gitignore` block now ignores `.gs/` (per-run worktree + `/gs stop` marker — machine-local).
+
 ## [0.21.0] — 2026-06-24
 
 ### Changed

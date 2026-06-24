@@ -11,6 +11,7 @@ use clap::Args as ClapArgs;
 use crate::{env_detect, ui};
 
 mod auto;
+pub(crate) mod audit;
 mod bench;
 mod external;
 mod init;
@@ -30,6 +31,7 @@ mod up;
       8sync harness up --timer off    remove the timer
       8sync harness help             cheatsheet: commands, skill tiers, file taxonomy, new-machine runbook
       8sync harness bench            benchmark the loop-engineering context budget (upfront vs deferred tokens + KV-cache gate)
+      8sync harness audit             scan docs for stale paths / oversized / junk + churn hotspots (doc-hygiene)
 
     WHAT init DEPLOYS
       always-on : codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing
@@ -38,7 +40,7 @@ mod up;
       external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)
 "})]
 pub struct Args {
-    /// init (default) | up | bench | help
+    /// init (default) | up | audit | bench | help
     pub sub: Option<String>,
     /// `up --loop <dur>`: refresh every <dur> in the foreground (e.g. 10m, 1h, 30s)
     #[arg(long = "loop", value_name = "DUR")]
@@ -67,13 +69,14 @@ pub fn run(a: Args) -> Result<()> {
         Some("init") => init::harness_init(&env, a.force),
         Some("up") => up::harness_up(&env, a.loop_every.as_deref(), a.timer.as_deref(), a.pull, a.commit),
         Some("bench") => bench::harness_bench(&env),
+        Some("audit") => audit::harness_audit(&env),
         Some("help") => {
             print_help();
             Ok(())
         }
         Some(other) => {
             ui::warn(&format!("unknown subcommand: {}", other));
-            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | bench | help");
+            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | audit | bench | help");
             Ok(())
         }
     }
@@ -93,6 +96,7 @@ fn print_help() {
     println!("  8sync harness up --loop <dur>   foreground refresh every <dur> (10m, 1h, 30s)");
     println!("  8sync harness up --timer <dur>  install a systemd USER timer (background); `--timer off` removes it");
     println!("  8sync harness help              this cheatsheet");
+    println!("  8sync harness audit             scan docs for stale paths / oversized / junk + churn (doc-hygiene)");
     println!("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)");
 
     println!("\nSKILLS (deployed by init)");

@@ -30,6 +30,10 @@ pub fn run() -> Result<()> {
         ui::info(&format!("gh auth: {}", out));
     }
 
+    // AI engines — the token-optimization stack must be installed AND wired into
+    // omp so the loop actually uses STEP 0 (else it silently falls back to grep).
+    check_ai_engines(&env.home);
+
     // Configs present?
     for path in [
         env.xdg_config.join("8sync/global.toml"),
@@ -154,6 +158,45 @@ fn check_portability() {
                     ));
                 }
             }
+        }
+    }
+    // Doc-hygiene summary: stale path refs / oversized docs to fix or delete
+    // (full report: `8sync harness audit`).
+    let (stale, oversized) = crate::verbs::harness::audit::stale_summary(&root);
+    if stale > 0 || oversized > 0 {
+        ui::warn(&format!(
+            "docs: {} stale path(s) / {} oversized — run `8sync harness audit`",
+            stale, oversized
+        ));
+    }
+}
+
+/// Verify the token-optimization stack is installed AND registered with omp so
+/// the loop actually uses it ("luôn xài"): codegraph (local index) + the omp MCP
+/// engines codebase-memory-mcp (semantic graph) and headroom (output
+/// compression). A missing or unregistered engine silently defeats STEP 0 token
+/// discipline — flag it with the one-command fix.
+fn check_ai_engines(home: &std::path::Path) {
+    ui::info("AI engines (token-optimization stack — STEP 0):");
+    if which::which("codegraph").is_ok() {
+        let ver = env_detect::cmd_version("codegraph", &["--version"]).unwrap_or_default();
+        ui::ok(&format!("  codegraph {} (local code index)", ver.trim()));
+    } else {
+        ui::warn("  codegraph MISSING — run `8sync harness` (STEP 0 falls back to slow grep/read)");
+    }
+    let mcp = std::fs::read_to_string(home.join(".omp/agent/mcp.json")).unwrap_or_default();
+    for (bin, what) in [
+        ("codebase-memory-mcp", "semantic graph (search_graph/trace_path/cypher)"),
+        ("headroom", "output compression (>50-line dumps)"),
+    ] {
+        let has_bin = which::which(bin).is_ok();
+        let registered = mcp.contains(&format!("\"{}\"", bin));
+        if has_bin && registered {
+            ui::ok(&format!("  {} present + registered — {}", bin, what));
+        } else if has_bin {
+            ui::warn(&format!("  {} installed but NOT in ~/.omp/agent/mcp.json — run `8sync harness`, then `/mcp reload`", bin));
+        } else {
+            ui::warn(&format!("  {} MISSING — run `8sync harness` (auto-installs + registers)", bin));
         }
     }
 }

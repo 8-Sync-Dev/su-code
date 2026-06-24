@@ -142,10 +142,17 @@ pub(crate) fn build_force_load(home: &Path, root: &Path) -> ForceLoadStats {
     let mut core_lines = String::new();
     let mut specialist_lines = String::new();
     let mut ondemand_lines = String::new();
+    let mut seen_names: BTreeSet<String> = BTreeSet::new();
     for (p, is_local) in chosen.iter() {
         let dirname = p.file_name().and_then(|s| s.to_str()).unwrap_or("?");
+        let (m, entry) = meta_for_dir(p);
         if is_always_on(dirname) {
-            let (m, entry) = meta_for_dir(p);
+            // Collapse cross-dir duplicates (e.g. a stale `karpathy` dir beside
+            // the canonical `karpathy-guidelines` — same frontmatter name): list
+            // each logical skill once, keeping the higher-ranked dir (sorted first).
+            if !seen_names.insert(m.name.clone()) {
+                continue;
+            }
             let abs = p.join(entry);
             if always_on_core(dirname) {
                 core.push(p.clone());
@@ -159,7 +166,9 @@ pub(crate) fn build_force_load(home: &Path, root: &Path) -> ForceLoadStats {
             if skill_gated_out(dirname, root) {
                 continue;
             }
-            let (m, entry) = meta_for_dir(p);
+            if !seen_names.insert(m.name.clone()) {
+                continue;
+            }
             let rel = if *is_local {
                 format!("agents/skills/{}/{}", dirname, entry)
             } else {
@@ -192,7 +201,7 @@ pub(crate) fn build_force_load(home: &Path, root: &Path) -> ForceLoadStats {
 \n\
 Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read (tiết kiệm ~99% token). Bạn (AI) **PHẢI**:\n\
 \n\
-1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph search/deps/callers/defs` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.\n\
+1. **codegraph** (local index): `codegraph index .` 1 lần/session; rồi `codegraph query/callers/callees/impact` thay cho `grep`/`rg`/`fd`/`Grep`/`Glob` và `Read` toàn file.\n\
 2. **codebase-memory-mcp** (MCP, auto-setup bởi `8sync harness`): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet` — knowledge graph 158 ngôn ngữ, query sub-ms.\n\
 3. Tìm/hiểu/định vị code · impact · route→handler · dead code · architecture → ƯU TIÊN 2 engine trên. Chỉ `Read` raw file khi sắp SỬA nó (read-before-edit).\n\
 4. **BẮT BUỘC nén output lớn:** mọi output > ~50 dòng (log/diff/test/tool dump) phải qua `headroom` MCP (`headroom_compress`) TRƯỚC khi vào context (60–95% ít token). Dump cả khối lớn vào context = vi phạm.\n\
@@ -226,6 +235,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - Nếu skill có `scripts/` → ưu tiên invoke script đó thay vì viết lại logic.\n\
 - Khi áp dụng skill, **cite** rõ: ví dụ `agents/skills/<name>/SKILL.md:line`.\n\
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (mục Unreleased) + ghi học được vào `agents/KNOWLEDGE.md`.\n\
+- **Doc-hygiene**: chạy `8sync harness audit` khi đụng vùng có docs — path lệch→fix, doc rác/superseded→xóa (thêm doc phải kèm xóa cái cũ), oversized→trim.\n\
 - **Loop / STATE spine**: đọc `agents/STATE.md` đầu phiên; rewrite ở mỗi phase-boundary (Goal·Checklist·Current·Next). Context gần đầy → handoff vào STATE + bài học vào KNOWLEDGE rồi reinit. Đo loop: `8sync harness bench`.\n\
 - **Loop discipline (C/D/E)**: implementer↔verifier qua `task` (verifier chạy build/test ĐỘC LẬP, verify-gate TRƯỚC commit); FAIL → ghi `failure:` vào KNOWLEDGE, đọc đầu phiên để khỏi lặp; quy trình `validated:` → distill vào `agents/PLAYBOOKS.md` (index theo `When:`); autonomy L1 report · L2 assisted · L3 unattended — không tự `push`/PR ở L3 mặc định.\n\
 {END}"

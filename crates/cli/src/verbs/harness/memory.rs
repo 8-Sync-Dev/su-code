@@ -101,6 +101,7 @@ pub(crate) fn seed_gitignore(root: &Path) -> Result<()> {
         "# Derived / machine-local — rebuilt by `8sync harness init` + codegraph. Safe to ignore:\n",
         ".codegraph/\n",
         ".cache/8sync/\n",
+        ".gs/\n",
         "# Secrets — NEVER commit:\n",
         ".env\n",
         ".env.*\n",
@@ -167,7 +168,7 @@ pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
     let body = format!(
         "## 🧠 8sync harness\n\n\
 - **Always-on (đọc theo thứ tự; CORE đọc body ngay, SPECIALIST đọc khi task khớp):** {}.\n\
-- **Cách tận dụng:** codegraph = explore code (search/deps/callers, không grep) · karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · impeccable = design CHUẨN, BẮT BUỘC khi UI/design (đọc body lúc đó) + taste chống slop.\n\
+- **Cách tận dụng:** codegraph = explore code (query/callers/callees, không grep) · karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · impeccable = design CHUẨN, BẮT BUỘC khi UI/design (đọc body lúc đó) + taste chống slop.\n\
 - **Output lớn (>~50 dòng) → BẮT BUỘC `headroom_compress`** trước khi vào context.\n\
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (Unreleased) + ghi học được vào file này (prefix `validated:` nếu test/build xác nhận, `hypothesis:` nếu chưa).",
         chain,

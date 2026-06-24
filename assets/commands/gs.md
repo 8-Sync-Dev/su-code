@@ -42,10 +42,10 @@ STOP only on a **TRUE blocker** — missing credential · external approval · d
 8. **Doc-hygiene** (when you touched an area — §6). Compaction if near context limit (handoff → STATE, continue from spine). Loop to 2.
 
 ## 6. Doc-hygiene — keep docs honest (stale/junk docs poison context)
-Agents read docs every request with no skepticism, so a wrong doc yields plausible-but-wrong code that compounds. When you touch an area, audit its docs:
-- **Stale paths** — file paths in docs that moved/renamed (verify via codegraph); **fix them**.
+Agents read docs every request with no skepticism, so a wrong doc yields plausible-but-wrong code that compounds. When you touch an area, **run `8sync harness audit`** (stale paths · oversized docs · 30d churn hotspots) and act on it:
+- **Stale paths** — path refs the audit flags as missing (moved/renamed) → **fix them**.
 - **Junk / superseded / duplicated** — content the code/codegraph already shows, or facts a newer decision overrode → **DELETE it**. A doc addition that supersedes old content MUST remove the old (no addition without the matching deletion).
-- **Bloat** — `8sync harness bench` flags an oversized `AGENTS.md`; keep docs lean (≤ ~150 lines, describe *capability/why*, not file structure). Stale docs are worse than none.
+- **Bloat** — the audit (and `8sync harness bench`) flag an oversized `AGENTS.md`/doc; keep docs lean (≤ ~150 lines, describe *capability/why*, not file structure). Stale docs are worse than none.
 
 ## 7. Closeout (large / multi-slice only) — before reporting done
 Full test suite + end-to-end QA + independent re-review vs DoD + a doc-hygiene pass + a handoff summary; every DoD item ↔ concrete evidence. **Skip for trivial/small** — a one-line fix does not need a full acceptance pass (right-size the verification too).
