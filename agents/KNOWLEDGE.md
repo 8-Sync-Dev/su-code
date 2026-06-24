@@ -88,3 +88,39 @@
   fetch on demand); cbm DOES respect `.gitignore` (it excludes `agents/skills`), so `reference/` is
   gitignored as a cbm guard. Verified bare `8sync harness` = full auto-setup (MCP + skills + `/gs` +
   memory + inject + index) in one command; bench A1 PASS, ~7.6k upfront, A2 80%.
+- **validated: doc-hygiene + AI-engine health + loop correctness → v0.22.0.** (1) `harness/audit.rs`
+  `harness_audit` + `stale_summary`: hand-rolled path scanner (no regex crate) flags STALE repo-relative
+  doc paths, oversized docs (>400 lines / >120-line force-load block), 30d churn hotspots. **Heuristic
+  rules that matter:** trim only TRAILING sentence punctuation (leading `.`/`/` are meaningful); SKIP
+  absolute (`/home/…`), `~`-rooted/`<placeholder>`-derived `/…` fragments, URLs, and dotdir first-segs
+  (`github.com`, `.cargo`) — else the harness's own machine-generated CORE paths false-positive. Wired
+  into `doctor` (one-line summary) + `/gs` doc-hygiene. Verified: scratch repo flags only the planted
+  `src/gone.rs`; su-code 30→4 after the skip rules. (2) `doctor::check_ai_engines(home)` enforces the
+  token-optimization stack is installed AND registered in `~/.omp/agent/mcp.json`: codegraph 0.9.6 +
+  codebase-memory-mcp 0.8.1 + headroom 0.27.0 (all green here). (3) **failure: codegraph STEP 0 verbs
+  were wrong** — force-load/index/breadcrumb taught `codegraph search/deps/defs`, NONE exist; real CLI
+  (0.9.6) = `query/callers/callees/impact/context/files/affected/sync/status`. Fixed all 3 strings.
+  (4) **failure: a stale `~/.omp/skills/karpathy` dir beside canonical `karpathy-guidelines` (identical
+  frontmatter `name`) double-listed the skill** (CORE + a redundant on-demand). `build_force_load` now
+  dedups by frontmatter `name` after the rank-sort (keeps higher-ranked dir) — each logical skill once;
+  future-proof. Note: bundled `assets/skills/karpathy/` deploys to target `karpathy-guidelines` via the
+  explicit (asset,target) map in `deploy.rs`/`setup.rs` — dir name ≠ skill name is fine. (5) **failure:
+  bundled `impeccable` referenced `.agents/skills/impeccable/scripts/*.mjs` (leading dot) but 8sync
+  mirrors to `agents/skills/`** — its setup scripts couldn't run; fixed 28 refs across SKILL.md + 4
+  reference docs. Note: headroom's router PROTECTS code/recent content (`router:protected:recent_code`)
+  → won't compress small code samples (0 saved); it compresses genuine large logs.
+- **validated: harness eval + concrete /gs worktree → v0.23.0.** `harness/eval.rs` `harness_eval` runs
+  bundled `assets/eval/<name>/` fixtures through `omp -p --no-session --auto-approve --max-time 300`
+  (cwd = a fresh `.cache/8sync/eval/<name>`), scores each with the fixture's `verify.sh` (verifier OWNS
+  the assertion — agent can't game it), writes JSON scorecard + `--baseline` to the gitignored cache,
+  diffs later runs. 3 fixtures: fix-failing-test / add-fn-with-test / locate-symbol. Verified 3/3 twice;
+  baseline diff prints `3/3 → 3/3 (+0)`. **Key omp facts:** `-p` non-interactive, `--auto-approve` for
+  headless tool use, `--max-time`, `--no-session` ephemeral; `omp worktree` manages ~/.omp/wt.
+  `/gs` guardrail now spells out L3 worktree: `git worktree add .gs/wt/<slug> -b gs/<slug>` → work+verify
+  +commit there → `git worktree remove`; `.gs/` is gitignored (v0.22.0). Verified worktree add/list/remove
+  + `git check-ignore .gs/wt/slice`. **Phase 3b (gstack omp host) DEFERRED:** additive (roles fall back to
+  bundled), and the host lives inside the deinitialized gstack submodule (foreign repo, pinned SHA) — not
+  su-code's binary; out of proportion to value given the tool/skill-verification focus.
+- **note: shell PATH pollution across bash calls.** A sandbox env in one bash/eval call can drop
+  `~/.local/bin` from the persistent shell's PATH (codegraph/omp then "command not found" in a later
+  call though the binary exists). Pass an explicit `env: { PATH: "/home/alexdev/.local/bin:/home/alexdev/.bun/bin:/usr/local/bin:/usr/bin:/bin", HOME, XDG_CONFIG_HOME }` for any call that invokes 8sync/omp/codegraph.

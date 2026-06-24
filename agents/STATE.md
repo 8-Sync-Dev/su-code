@@ -5,20 +5,21 @@ Biến 8sync/omp thành một **super agent-team** token-optimal: omp = core, su
 
 ## Definition of Done
 - [x] Loop-engineering v2 (Phase A–E) shipped + đo bằng `8sync harness bench`
-- [x] `/gs` — một lệnh chạy team tự động (plan→delegate→verify→commit→advance off `agents/STATE.md`)
-- [x] `/gs auto` chạy không dừng (Autonomy contract: không hỏi, research→assume→làm); `/gs stop` để dừng
-- [x] `/gs [tab]` hiện hint `[auto | <goal> | status | next | stop]`
-- [x] QA + test là gate bắt buộc + Closeout review trước khi bàn giao
-- [x] Submodule tham khảo `reference/gstack` + `reference/gsd-pi` (deinit để giữ index lean)
+- [x] `/gs` — một lệnh chạy team tự động; `auto` không dừng; hint `[auto|<goal>|status|next|stop]`; QA+Closeout gate
 - [x] Bare `8sync harness` = auto-setup đầy đủ (MCP + skills + /gs + memory + inject + index)
+- [x] **Doc-hygiene code-backed** (`8sync harness audit`: stale paths / oversized / churn) + wired vào `doctor` + `/gs` (v0.22.0)
+- [x] **AI-engine health check** trong `doctor` — codegraph/cbm/headroom present + registered ("luôn xài") (v0.22.0)
+- [x] **Loop correctness** — codegraph verbs đúng (query/callers/callees/impact) · force-load dedup theo frontmatter name · impeccable `.agents`→`agents` path fix (v0.22.0)
+- [x] **Loop quality probe** `8sync harness eval` (omp task-suite + verify.sh + baseline diff) — verified 3/3 (v0.23.0)
+- [x] **/gs L3 worktree isolation** cụ thể hoá: `git worktree add .gs/wt/<slug> -b gs/<slug>` (v0.23.0)
 
 ## Current step
-Shipped **v0.20.1** (HEAD `c7ae2a0`). Working tree CLEAN, đã push origin/main + tag. Sẵn sàng đổi máy.
+Shipped **v0.22.0** (`a06b8ac`) + **v0.23.0** (`67be9a7`). Working tree CLEAN, đã push origin/main + 2 gh releases (binary assets). Installed `~/.local/bin/8sync` = 0.23.0.
 
 ## Next (chưa làm — tùy chọn)
-- [ ] Thêm **host `omp` cho gstack** (1 file TS theo `reference/gstack` docs/ADDING_A_HOST.md) → `./setup --host omp` để role tool-backed (`/qa`, `/ship`, browser) chạy thật trong omp; hiện `/gs` dùng role bundled nên vẫn chạy được không cần gstack.
-- [ ] (tùy) Tự động hoá **git-worktree isolation** cho `/gs auto` L3 (hiện ở mức protocol trong `gs.md`).
-- [ ] (tùy) Tìm cách loại `reference/` khỏi codegraph (codegraph KHÔNG honor exclude/gitignore — xem failure trong KNOWLEDGE); tạm thời deinit.
+- [ ] **Phase 3b — gstack host `omp`** (DEFERRED, không regression): role `/qa`,`/ship` đã fallback bundled; host nằm TRONG submodule gstack (foreign repo, pinned SHA) — KHÔNG thuộc binary su-code. Chỉ làm khi muốn role tool-backed chạy thật qua gstack: `git submodule update --init reference/gstack` → đọc `docs/ADDING_A_HOST.md` → implement → `./setup --host omp` → deinit lại.
+- [ ] (tùy) Chạy `8sync harness eval --baseline` định kỳ để theo dõi chất lượng loop qua thời gian (kết quả ở `.cache/8sync/eval/`, gitignored).
+- [ ] (tùy) Loại `reference/` khỏi codegraph (không honor exclude — xem failure trong KNOWLEDGE); tạm deinit.
 
 ## Open questions / blockers
 _none._
@@ -29,7 +30,7 @@ _none._
 
 ## Handoff (đổi máy — làm theo thứ tự)
 1. `git clone https://github.com/8-Sync-Dev/su-code.git && cd su-code`
-2. `bash scripts/bootstrap.sh` (hoặc đã có 8sync thì `8sync up`) → build + cài `8sync` ≥ 0.20.1
+2. `bash scripts/bootstrap.sh` (hoặc đã có 8sync thì `8sync up`) → build + cài `8sync` ≥ 0.23.0
 3. `8sync harness` — auto-setup hết (MCP + skills + `/gs` + memory + index)
 4. `gh auth login` (để `8sync ship` / release hoạt động)
 5. Muốn đọc repo tham khảo: `git submodule update --init reference/gstack reference/gsd-pi` (xong thì `git submodule deinit -f reference/<name>` cho index gọn)
