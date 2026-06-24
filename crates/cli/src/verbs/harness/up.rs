@@ -52,6 +52,7 @@ fn refresh_once(env: &env_detect::Env, pull: bool, commit: bool) -> Result<()> {
     }
     inject_agents_md(&env.home, &root)?;
     inject_subfolder_indexes(&root)?;
+    let _ = crate::verbs::skill::deploy::ensure_gs_command(&env.home, Some(&root));
     seed_harness_memory(&root)?;
     let _ = consolidate_learnings(&root);
     seed_gitleaks_hook(&root);

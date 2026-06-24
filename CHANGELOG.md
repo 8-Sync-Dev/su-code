@@ -5,6 +5,21 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-06-23
+
+### Added
+
+- **`/gs` — one-command autonomous engineering-team loop (omp slash command).** `/gs <goal>` plans +
+  runs, bare `/gs` resumes, `/gs auto` runs unattended (L3), `/gs status|next|stop`. Drives the loop
+  off `agents/STATE.md`: plan → delegate to specialist roles (`task` subagents / gstack roles if
+  installed) → verify-gate → commit → record (KNOWLEDGE/PLAYBOOKS) → advance until Definition-of-Done
+  or a blocker. Token-lean (codegraph + codebase-memory-mcp + headroom mandatory) and guardrailed
+  (verify-gate before commit, worktree isolation + no push/PR at L3, hard-stop via `/gs stop`).
+  Modeled on gsd-pi `/gsd auto`.
+- **Deploy + team-sharing.** `8sync harness`/`init`/`up` write it to `~/.omp/agent/commands/gs.md`
+  (global) and `<repo>/.omp/commands/gs.md` (committed → whole team gets `/gs`). New on-demand `gs`
+  skill documents the protocol; `8sync harness up --timer` runs it 24/7.
+
 ## [0.19.0] — 2026-06-23
 
 ### Changed
