@@ -51,6 +51,6 @@ Agents read docs every request with no skepticism, so a wrong doc yields plausib
 Full test suite + end-to-end QA + independent re-review vs DoD + a doc-hygiene pass + a handoff summary; every DoD item ↔ concrete evidence. **Skip for trivial/small** — a one-line fix does not need a full acceptance pass (right-size the verification too).
 
 ## Guardrails
-Verify-gate before every commit · scope to the change + `agents/` memory · L3/unattended: git-worktree isolation + NO push/PR + hard-stop via `.gs/STOP` or `/gs stop` · stop for the user only on irreversible/destructive, never on ambiguity. Unattended needs omp `tools.approvalMode: yolo` (a slash command can't bypass approval). Run 24/7: `8sync harness up --timer 30m`.
+Verify-gate before every commit · scope to the change + `agents/` memory · **L3/unattended isolation**: work each slice in its own worktree — `git worktree add .gs/wt/<slug> -b gs/<slug>`, then implement + verify + commit on that branch inside it, then `git worktree remove .gs/wt/<slug>` (merge/PR only if asked); never edit `main`'s working tree directly · NO push/PR unless asked · hard-stop via `.gs/STOP` or `/gs stop` (both under the gitignored `.gs/`) · stop for the user only on irreversible/destructive, never on ambiguity. Unattended needs omp `tools.approvalMode: yolo` (a slash command can't bypass approval). Run 24/7: `8sync harness up --timer 30m`.
 
 Begin: read the spine, **right-size**, then act on `$ARGUMENTS`.

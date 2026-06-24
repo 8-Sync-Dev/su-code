@@ -5,6 +5,26 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-06-24
+
+### Added
+
+- **`8sync harness eval` — loop quality probe.** Runs a fixed task-suite through omp non-interactively
+  (`omp -p --no-session --auto-approve`) and scores each task with a deterministic `verify.sh` (the
+  verifier OWNS the assertion, so the agent can't game the check). Three bundled fixtures:
+  `fix-failing-test` (correct a wrong impl until `cargo test` is green), `add-fn-with-test` (implement
+  `slugify`; the verifier appends the assertions), `locate-symbol` (answer `path:line` for a symbol).
+  Writes a JSON scorecard + a `--baseline` reference into the gitignored `.cache/8sync/eval/`; later
+  runs print the pass-count delta vs baseline. Model + network, non-deterministic — a periodic quality
+  SIGNAL, not a CI gate. Verified end-to-end: 3/3 on this machine.
+
+### Changed
+
+- **`/gs` L3 worktree isolation is now concrete.** The guardrail named "git-worktree isolation" with no
+  mechanism; it now prescribes the exact flow — `git worktree add .gs/wt/<slug> -b gs/<slug>`, implement
+  + verify + commit on that branch inside it, then `git worktree remove` (merge/PR only if asked); never
+  edit `main`'s working tree directly. (`.gs/` is gitignored, v0.22.0.)
+
 ## [0.22.0] — 2026-06-24
 
 ### Added

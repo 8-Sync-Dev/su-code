@@ -1,0 +1,1 @@
+Add a public function `slugify(s: &str) -> String` to `src/lib.rs`. It must: lowercase the input, replace each space with `-`, and drop any character that is not a lowercase ASCII letter, digit, or `-`. Signature exactly `pub fn slugify(s: &str) -> String`. Make sure the crate compiles (`cargo build`).
