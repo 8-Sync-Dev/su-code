@@ -111,7 +111,8 @@ pub(crate) fn harness_eval(env: &env_detect::Env, baseline: bool) -> Result<()> 
     let passed = results.iter().filter(|r| r.pass).count();
     let total = results.len();
     println!();
-    ui::info(&format!("score: {}/{} passed", passed, total));
+    let pct = if total > 0 { passed * 100 / total } else { 0 };
+    ui::info(&format!("score: {}/{} passed ({}%)", passed, total, pct));
 
     let report = EvalReport { stamp: super::memory::now_stamp(), passed, total, results };
     let json = serde_json::to_string_pretty(&report).unwrap_or_default();

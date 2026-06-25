@@ -14,11 +14,12 @@ Biến 8sync/omp thành một **super agent-team** token-optimal: omp = core, su
 - [x] **/gs L3 worktree isolation** cụ thể hoá: `git worktree add .gs/wt/<slug> -b gs/<slug>` (v0.23.0)
 
 ## Current step
-Installed 8sync = **0.24.0** (built local; chưa push/release). **Phiên này:** (1) `outputs/agent-team-workflow-automation-plan.md` + **UI/UX Design Lane** (impeccable + Clouds F + Lighthouse 4-gate); (2) declutter 20 feynman (on-demand 55→35, prefix 1998→1717, `harness eval` 3/3 +0); (3) **v0.24.0** — `8sync` help dẫn đầu **AI TEAM** (harness + `/gs`) + fix 3 dòng stale; **`/gs <goal>` scope-handshake** (đề xuất 2–4 option từ bench senior + hỏi, `auto` vẫn im). Verified: `8sync help` show AI TEAM, `gs.md` §1b deploy global+project, `8sync --version`=0.24.0, bench A1 PASS.
+Installed 8sync = **0.24.0** (built local; chưa push/release). **Phiên này:** (1) plan team workflow + UI/UX Design Lane; (2) declutter 20 feynman (on-demand 55→35); (3) v0.24.0 — help **AI TEAM** + **`/gs` scope-handshake**; (4) **eval báo `%`** (`eval.rs:114`); (5) **research omp** (`outputs/omp-customization-memory-platform-research.md`): nhớ-sâu = **Mnemopi memory (model API, `noEmbeddings`, KHÔNG local) + cbm + spine** — KHÔNG train/GGUF; su-code đã ĐÚNG base omp; submodule ≠ auto-pull. Verified: build 0.24.0, help AI TEAM, gs §1b, bench A1 PASS.
 
 ## Next (chưa làm — tùy chọn)
 - [ ] **Phase 3b — gstack host `omp`** (DEFERRED, không regression): role `/qa`,`/ship` đã fallback bundled; host nằm TRONG submodule gstack (foreign repo, pinned SHA) — KHÔNG thuộc binary su-code. Chỉ làm khi muốn role tool-backed chạy thật qua gstack: `git submodule update --init reference/gstack` → đọc `docs/ADDING_A_HOST.md` → implement → `./setup --host omp` → deinit lại.
 - [ ] (tùy) Chạy `8sync harness eval --baseline` định kỳ để theo dõi chất lượng loop qua thời gian (kết quả ở `.cache/8sync/eval/`, gitignored).
+- [ ] **(P2 — đòn bẩy "nhớ-sâu/không-quên") Bật Mnemopi memory**: `~/.omp/agent/config.yml` → `memory.backend: mnemopi` + `mnemopi.{scoping: per-project-tagged, llmMode: smol, noEmbeddings: true}` (model API, 0 local, máy yếu chạy được). Tradeoff ~5k recall token/phiên → **user chốt** vì vừa tối ưu token. Có thể wire vào `8sync harness` + báo ở `doctor`.
 - [ ] (tùy) Loại `reference/` khỏi codegraph (không honor exclude — xem failure trong KNOWLEDGE); tạm deinit.
 
 ## Open questions / blockers

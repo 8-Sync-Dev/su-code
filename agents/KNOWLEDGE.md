@@ -148,3 +148,15 @@
   `assets::read`) → sửa cần REBUILD; `8sync harness` redeploy ra `~/.omp/agent/commands/gs.md` +
   `<repo>/.omp/commands/gs.md`. Verified: `8sync --version`=0.24.0, help show AI TEAM đầu tiên, §1b deploy 2
   bản, bench A1 PASS (feature nằm trong binary + command deploy, KHÔNG phải stable-prefix → 0 prefix bloat).
+- **validated: omp docs research — memory/training/custom-command/platform/submodule.** (1) omp KHÔNG
+  train/fine-tune; local model = **ONNX q4 (transformers.js), KHÔNG GGUF**, chỉ title/memory/auto-classifier
+  (`omp://local-models.md`); mnemosyne doc: "does NOT run a local GGUF LLM". → "nhớ dự án sâu" = **Mnemopi
+  memory backend** (`memory.backend: mnemopi`, default OFF) + cbm + spine, KHÔNG phải weights. Chốt user:
+  dùng **model API** (`mnemopi.llmMode: smol` + `noEmbeddings: true` FTS) — 0 local, máy yếu vẫn chạy;
+  tradeoff ~5k recall token/phiên (`omp://mnemosyne-memory-backend.md`, `omp://config-usage.md`). (2) Custom
+  command = `.omp/commands/*.md` native prio 100 (`omp://slash-command-internals.md`) — su-code đã đúng base,
+  chỉ ghi config dirs omp → omp update KHÔNG conflict; automation sâu hơn: extensions(90)/hooks/custom-tools.
+  (3) gstack KHÔNG có team tự động (persona slash-cmd + tự mở nhiều session); team THẬT omp = `task`+`irc`.
+  (4) submodule PIN SHA ≠ auto-pull; skill auto-latest qua manifest+`harness up --pull`; reference repo nên
+  `read` on-demand (0 disk). (5) agent-reach (Panniantong 41k★) = capability layer đọc internet qua CLI+MCP+
+  SKILL.md → thêm làm skill, không phải team engine. Full: `outputs/omp-customization-memory-platform-research.md`.
