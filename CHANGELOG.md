@@ -5,6 +5,23 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added
+
+- **`outputs/agent-team-workflow-automation-plan.md`** — operating plan để vận hành su-code như một agent
+  team: map sprint 23-specialist của gstack + loop slice/auto/worktree của gsd-pi lên `/gs` + skills +
+  subagents, kèm **UI/UX Design Lane** riêng (impeccable + Clouds F + **Lighthouse 4-tiêu chí quality gate**).
+
+### Changed
+
+- **Declutter skill registry — bỏ pack research `companion-inc/feynman` (20 skill on-demand).** Manifest
+  (`agents/skills.toml` committed + `~/.config/8sync/skills.toml` machine-local) đăng ký 20 skill
+  research/ML/academia (paper-writing, ml-training-recipe, literature-review, runpod/modal-compute,
+  peer-review, jobs, eli5, …) — sai domain cho một coding harness + là prefix noise inject vào AGENTS.md
+  mỗi phiên. Cắt cả 20 (collection re-pull là all-or-nothing theo URL — `update.rs:49`, giữ 1 cái là
+  re-clone cả pack). Kết quả: on-demand 55 → 35, force-load prefix ~1998 → ~1717 tok, deferred −5k tok
+  (`8sync harness bench`), A1 stable-prefix PASS. Giữ nguyên addyosmani coding-eng + design payload
+  (impeccable/taste/assp) + bundled always-on.
+
 ## [0.23.0] — 2026-06-24
 
 ### Added

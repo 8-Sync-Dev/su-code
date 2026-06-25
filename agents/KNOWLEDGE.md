@@ -124,3 +124,17 @@
 - **note: shell PATH pollution across bash calls.** A sandbox env in one bash/eval call can drop
   `~/.local/bin` from the persistent shell's PATH (codegraph/omp then "command not found" in a later
   call though the binary exists). Pass an explicit `env: { PATH: "/home/alexdev/.local/bin:/home/alexdev/.bun/bin:/usr/local/bin:/usr/bin:/bin", HOME, XDG_CONFIG_HOME }` for any call that invokes 8sync/omp/codegraph.
+- **validated: declutter skill-registry (cắt feynman) + design lane.** Source-of-truth của skill set =
+  **`agents/skills.toml` committed** (∪ machine-local `~/.config/8sync/skills.toml`); `8sync harness`
+  re-pull từ đó (`update.rs:27-35`) và **git source reinstall MỌI sub-skill của collection**
+  (`update.rs:49`) → cắt một phần một `src=<repo>` collection là vô ích; phải cắt HẾT entry chung URL.
+  Đã bỏ 20 skill `companion-inc/feynman` khỏi cả 2 manifest + `rm` dir ở `~/.omp/skills/` +
+  `agents/skills/` (repo này gitignore `agents/skills/` — `.gitignore:25` — nên đó là regen output;
+  manifest mới là nguồn). `assets/configs/skills.toml` chỉ seed 4 builtin always-on (không feynman) → không
+  mọc lại. Re-ran `8sync harness`: on-demand 55→35, feynman trong AGENTS.md = 0, force-load 1998→1717 tok,
+  `harness bench` A1 PASS, `harness eval` 3/3 (vs baseline +0, không regression). Giữ addyosmani coding-eng
+  + impeccable/taste/assp design payload.
+- **note: chuẩn design UI/UX = impeccable (bundled always-on) + Lighthouse 4-gate (Perf/A11y/BP/SEO) +
+  full-flow verify (browser ⨉ Encore trace).** Clouds F (`/home/alexdev/Documents/clouds-f`) là skill FE
+  orchestration giàu hơn nhưng để **project-local** (không bundle vào su-code). Encode thành "UI/UX Design
+  Lane" §4b trong `outputs/agent-team-workflow-automation-plan.md`.
