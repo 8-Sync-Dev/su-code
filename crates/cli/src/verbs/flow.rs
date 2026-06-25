@@ -13,6 +13,14 @@ pub fn run() -> Result<()> {
         ("8sync doctor", "verify everything is in place"),
     ]);
 
+    section("1b. AI TEAM — harness + /gs (the autonomous lead)", &[
+        ("8sync harness", "(bare) ONE idempotent command: skills + memory loop + /gs + MCP (codegraph/cbm/headroom)"),
+        ("8sync . then /gs <goal>", "in omp: lead proposes options + asks, then plan→build→verify→commit"),
+        ("/gs auto", "unattended run to Definition-of-Done (no questions)"),
+        ("8sync harness up --timer 30m", "run the team loop in the background"),
+        ("8sync harness audit|bench|eval", "doc-hygiene · token budget · loop-quality probe"),
+    ]);
+
     section("2. VIBE LOOP — open a project, code with AI, ship a PR", &[
         ("cd ~/code/my-app", ""),
         ("8sync .", "seed agents/* memory + run `omp --continue` (omp manages its own session)"),
@@ -48,12 +56,12 @@ pub fn run() -> Result<()> {
     ]);
 
     section("6. MAINTENANCE", &[
-        ("8sync up",                       "self-update the 8sync binary and omp (no `pacman -Syu`)"),
+        ("8sync up",                       "self-update 8sync only (omp: `omp update`; no `paru -Syu`)"),
         ("8sync clean",                    "reclaim disk + tidy caches + CPU/GPU/RAM report (--deep/--timer 1h)"),
         ("8sync doctor",                   "full health check"),
         ("8sync skill",                    "list installed skills + project-local skills"),
         ("8sync skill add <url>",          "clone a skill repo into ~/.omp/skills/ and project agents/skills/"),
-        ("8sync skill sync",               "refresh ~/.omp/skills/00-force-load.md"),
+        ("8sync harness",                  "(bare) refresh skills + memory + /gs + MCP + reindex"),
         ("8sync setup profile list",       "show all profiles and which are applied"),
         ("8sync setup profile show warp",  "show resolved content of a profile"),
         ("8sync setup profile apply warp", "(re-)apply a profile idempotently"),

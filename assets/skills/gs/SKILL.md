@@ -6,7 +6,7 @@ description: Use when the user wants an autonomous professional-team build — p
 # gs — autonomous engineering lead (right-sized team loop)
 
 Invoke with **`/gs`** (one command, arg-routed):
-`/gs <goal>` plan+run · bare `/gs` resume · `/gs auto` unattended · `/gs status|next|stop`.
+`/gs <goal>` **propose options + ask, then** plan+run · bare `/gs` resume · `/gs auto` unattended (no questions) · `/gs status|next|stop`.
 
 **Right-size FIRST (most important).** Match machinery to the task — never over-engineer:
 - **trivial/small** → **solo** (codegraph/cbm → edit → lightweight verify); no team, no Closeout.

@@ -138,3 +138,13 @@
   full-flow verify (browser ⨉ Encore trace).** Clouds F (`/home/alexdev/Documents/clouds-f`) là skill FE
   orchestration giàu hơn nhưng để **project-local** (không bundle vào su-code). Encode thành "UI/UX Design
   Lane" §4b trong `outputs/agent-team-workflow-automation-plan.md`.
+- **validated: v0.24.0 — discoverability + `/gs` scope-handshake.** `8sync` help (`root.rs::print_cheatsheet`)
+  + `8sync flow` (`flow.rs`) giờ DẪN ĐẦU bằng section "AI TEAM" (`8sync harness` + `/gs`) — trước đó giấu 2
+  lệnh quan trọng nhất sau install + vibe loop. Fix dòng stale: `skill sync`→`skill update` (regen =
+  `8sync harness`), `up` ("binary + omp"→chỉ 8sync; omp qua `omp update`). **`/gs <goal>` thêm scope-handshake**
+  (`assets/commands/gs.md` §1b): goal medium+/mơ hồ → ground → đề xuất 2–4 option (scope·team·effort·tradeoff
+  rút từ bench senior) + default + 2–4 câu `AskUserQuestion` → user chọn → log STATE Assumptions → run; `auto`
+  + trivial bỏ qua. **Key:** gs source = embedded asset `assets/commands/gs.md` (`ensure_gs_command` đọc
+  `assets::read`) → sửa cần REBUILD; `8sync harness` redeploy ra `~/.omp/agent/commands/gs.md` +
+  `<repo>/.omp/commands/gs.md`. Verified: `8sync --version`=0.24.0, help show AI TEAM đầu tiên, §1b deploy 2
+  bản, bench A1 PASS (feature nằm trong binary + command deploy, KHÔNG phải stable-prefix → 0 prefix bloat).
