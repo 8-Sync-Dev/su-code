@@ -33,10 +33,12 @@ def rg(args, t=60):
 
 
 def auto_terms(repo, k):
+    pat = (r"export (?:async )?(?:function|class|const) (\w{6,})"
+           r"|pub (?:async )?fn (\w{6,})|pub (?:struct|enum|trait) (\w{6,})|^func (\w{6,})")
     out = run(["rg", "-oNI", "-g", "!node_modules", "-g", "!*.test.*", "-g", "!dist", "-g", "!.next",
-               r"export (?:async )?(?:function|class|const) (\w{6,})", repo], t=60)
+               pat, repo], t=60)
     names = []
-    for m in re.finditer(r"(?:function|class|const) (\w+)", out):
+    for m in re.finditer(r"(?:function|class|const|fn|struct|enum|trait|func) (\w+)", out):
         if m.group(1) not in names:
             names.append(m.group(1))
         if len(names) >= k:
