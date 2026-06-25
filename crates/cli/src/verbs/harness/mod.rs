@@ -66,6 +66,10 @@ pub struct Args {
     /// reference future `eval` runs diff against).
     #[arg(long)]
     pub baseline: bool,
+    /// `eval --project`: score agent-team READINESS on the current repo
+    /// (per-role capability coverage %), instead of running loop fixtures.
+    #[arg(long)]
+    pub project: bool,
 }
 
 pub fn run(a: Args) -> Result<()> {
@@ -76,6 +80,7 @@ pub fn run(a: Args) -> Result<()> {
         Some("up") => up::harness_up(&env, a.loop_every.as_deref(), a.timer.as_deref(), a.pull, a.commit),
         Some("bench") => bench::harness_bench(&env),
         Some("audit") => audit::harness_audit(&env),
+        Some("eval") if a.project => eval::harness_eval_project(&env),
         Some("eval") => eval::harness_eval(&env, a.baseline),
         Some("help") => {
             print_help();

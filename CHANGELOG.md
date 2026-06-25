@@ -9,6 +9,11 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ### Added
 
+- **`8sync harness eval --project` — agent-team readiness scorecard (% per vai).** Deterministic + offline:
+  chấm capability coverage trên repo hiện tại theo dev · qa/testing · research · ba/po · fe · be · docs ·
+  memory/learn · token-opt (engine on PATH + skill present + memory spine + stack signals). Honest READINESS
+  (team được trang bị gì Ở ĐÂY), KHÔNG phải output-quality (đó là `harness eval` loop probe model+network).
+  Run thật: su-code 89%, 8syncdev-pro-v2 79%.
 - **`token-bench` skill (bundled) — chứng minh token-saving của code-intel trên repo thật.**
   `scripts/token_bench.py` (uv/PEP723, stdlib-only): mỗi symbol thật so codegraph-query+slice vs
   grep+read-whole-file, có def-kind correctness gate. Đo trên codebase lớn thật: 8syncdev-pro-v2 −96.6%,

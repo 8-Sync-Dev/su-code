@@ -148,3 +148,62 @@ pub(crate) fn harness_eval(env: &env_detect::Env, baseline: bool) -> Result<()> 
     }
     Ok(())
 }
+
+/// `8sync harness eval --project` — agent-team READINESS scorecard for the
+/// current repo: per-role capability coverage (%), computed from real checks
+/// (engines on PATH, skills present, memory spine, stack signals). This is
+/// "what is the team equipped with HERE", NOT output quality — that is the
+/// model+network `harness eval` loop probe. Honest + deterministic + offline.
+pub(crate) fn harness_eval_project(env: &env_detect::Env) -> Result<()> {
+    use crate::verbs::skill::discover::detect_current_project_root;
+    ui::header("8sync harness eval --project — agent-team readiness scorecard");
+    let Some(root) = detect_current_project_root() else {
+        ui::warn("not inside a project — cd into a repo first");
+        return Ok(());
+    };
+    ui::info(&format!("project: {}", root.display()));
+    ui::info("readiness = capabilities the team HAS here (not output quality — that's `harness eval`)");
+    println!();
+
+    let home = &env.home;
+    let skill = |n: &str| home.join(".omp/skills").join(n).exists() || root.join("agents/skills").join(n).exists();
+    let bin = |n: &str| which::which(n).is_ok();
+    let has = |p: &str| root.join(p).exists();
+    let pkg = std::fs::read_to_string(root.join("package.json")).unwrap_or_default();
+    let cfg = std::fs::read_to_string(home.join(".omp/agent/config.yml")).unwrap_or_default();
+    let dep = |k: &str| pkg.contains(k);
+    let frontend = dep("react") || dep("vue") || dep("next") || dep("svelte") || dep("\"vite\"");
+    let backend = dep("encore.dev") || dep("express") || dep("fastify") || dep("@nestjs")
+        || has("Cargo.toml") || has("go.mod") || has("requirements.txt") || has("pyproject.toml");
+    let build_cmd = pkg.contains("\"build\"") || has("Cargo.toml") || has("Makefile") || has("go.mod");
+    let test_cmd = pkg.contains("\"test\"") || has("Cargo.toml") || pkg.contains("vitest") || pkg.contains("jest");
+    let cbm = bin("codebase-memory-mcp");
+
+    let roles: Vec<(&str, Vec<(&str, bool)>)> = vec![
+        ("dev", vec![("codegraph", has(".codegraph")), ("cbm-graph", cbm), ("build", build_cmd), ("karpathy+ponytail", skill("karpathy-guidelines") && skill("ponytail"))]),
+        ("qa/testing", vec![("test", test_cmd), ("full-flow", skill("full-flow")), ("browser-testing", skill("browser-testing-with-devtools")), ("headroom", bin("headroom"))]),
+        ("research", vec![("omp/web_search", bin("omp")), ("agent-reach|deep-research", skill("agent-reach") || skill("deep-research")), ("last30days", skill("last30days"))]),
+        ("ba/po", vec![("planning", skill("planning-and-task-breakdown")), ("spec-driven", skill("spec-driven-development")), ("STATE+DECISIONS", has("agents/STATE.md") && has("agents/DECISIONS.md"))]),
+        ("fe", vec![("frontend-stack", frontend), ("impeccable+taste", skill("impeccable") && skill("taste-skill")), ("senior-frontend", skill("senior-frontend"))]),
+        ("be", vec![("backend-stack", backend), ("api-design", skill("api-and-interface-design")), ("security", skill("senior-security") || skill("security-and-hardening"))]),
+        ("docs", vec![("docs-skill", skill("documentation-and-adrs")), ("AGENTS.md", has("AGENTS.md")), ("CHANGELOG", has("CHANGELOG.md"))]),
+        ("memory/learn", vec![("Mnemopi-ON", cfg.contains("backend: mnemopi")), ("KNOWLEDGE+PLAYBOOKS", has("agents/KNOWLEDGE.md") && has("agents/PLAYBOOKS.md")), ("cbm-graph", cbm)]),
+        ("token-opt", vec![("codegraph", bin("codegraph")), ("cbm", cbm), ("headroom", bin("headroom"))]),
+    ];
+
+    let (mut tp, mut tn) = (0usize, 0usize);
+    for (role, checks) in &roles {
+        let p = checks.iter().filter(|(_, ok)| *ok).count();
+        let n = checks.len();
+        tp += p; tn += n;
+        let pct = 100 * p / n;
+        let detail: Vec<String> = checks.iter().map(|(l, ok)| format!("{}{}", if *ok { "✓" } else { "·" }, l)).collect();
+        let line = format!("  {:<13} {:>3}%  {}", role, pct, detail.join("  "));
+        if pct == 100 { ui::ok(&line); } else if pct >= 50 { ui::info(&line); } else { ui::warn(&line); }
+    }
+    let overall = if tn > 0 { 100 * tp / tn } else { 0 };
+    println!();
+    ui::info(&format!("OVERALL team readiness: {}%  ({}/{} capabilities present)", overall, tp, tn));
+    ui::info("close gaps (·): `8sync harness` (engines+skills) · enable Mnemopi · add a stack skill · seed agents/*");
+    Ok(())
+}

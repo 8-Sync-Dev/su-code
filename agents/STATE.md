@@ -14,7 +14,7 @@ Biến 8sync/omp thành một **super agent-team** token-optimal: omp = core, su
 - [x] **/gs L3 worktree isolation** cụ thể hoá: `git worktree add .gs/wt/<slug> -b gs/<slug>` (v0.23.0)
 
 ## Current step
-Installed 8sync = **0.24.0** (built local; chưa push/release). **Phiên này:** (1) plan team workflow + UI/UX Design Lane; (2) declutter feynman; (3) help **AI TEAM** + **`/gs` scope-handshake**; (4) eval `%`; (5) research omp; (6) **Mnemopi memory wired + bật** (API-only); (7) **6 reference submodule** (+cbm, agent-reach, addyosmani, ponytail); (8) **`token-bench` skill** (bundled) — đo token-saving thật: v2 −96.6%, gsd −78.6% (range 54–98%), correctness gsd 10/10. Feynman re-removed → on-demand 54→36 (lean lại). Verified: build 0.24.0, token-bench deployed, omp load OK.
+Installed 8sync = **0.24.0** (built local; chưa push/release). **Phiên này:** (1) plan team workflow + UI/UX Design Lane; (2) declutter feynman (on-demand 36); (3) help **AI TEAM** + **`/gs` scope-handshake**; (4) eval `%`; (5) research omp; (6) **Mnemopi memory** wired+ON (API-only); (7) **6 reference submodule**; (8) **`token-bench` skill** (v2 −96.6%, gsd −78.6%, correctness 10/10); (9) **`8sync harness eval --project`** — team-readiness scorecard %/vai (su-code 89%, v2 79%; honest coverage, không phịa). Verified: build 0.24.0, scorecard chạy, omp load OK.
 
 ## Next (chưa làm — tùy chọn)
 - [ ] **Phase 3b — gstack host `omp`** (DEFERRED, không regression): role `/qa`,`/ship` đã fallback bundled; host nằm TRONG submodule gstack (foreign repo, pinned SHA) — KHÔNG thuộc binary su-code. Chỉ làm khi muốn role tool-backed chạy thật qua gstack: `git submodule update --init reference/gstack` → đọc `docs/ADDING_A_HOST.md` → implement → `./setup --host omp` → deinit lại.
