@@ -59,6 +59,7 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     deploy::ensure_codegraph(env)?;
     deploy::ensure_codebase_memory_mcp(env)?;
     deploy::ensure_headroom_mcp(env)?;
+    let _ = deploy::ensure_mnemopi_memory(&env.home);
 
     // 4. External skill packs (ponytail full + addyosmani) — best-effort/network.
     p.step("download external skill packs (ponytail · addyosmani)");

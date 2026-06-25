@@ -4,3 +4,12 @@
 [submodule "reference/gsd-pi"]
 	path = reference/gsd-pi
 	url = https://github.com/open-gsd/gsd-pi.git
+[submodule "reference/agent-reach"]
+	path = reference/agent-reach
+	url = https://github.com/Panniantong/agent-reach
+[submodule "reference/addyosmani-agent-skills"]
+	path = reference/addyosmani-agent-skills
+	url = https://github.com/addyosmani/agent-skills
+[submodule "reference/ponytail"]
+	path = reference/ponytail
+	url = https://github.com/DietrichGebert/ponytail

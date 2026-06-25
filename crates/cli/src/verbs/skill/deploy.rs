@@ -329,3 +329,45 @@ else pip install --user 'headroom-ai[mcp]' || pip install --user --break-system-
     }
     register_omp_mcp(&env.home, "headroom", "headroom", &["mcp", "serve"])
 }
+
+/// Enable omp's local long-term memory (Mnemopi) in the user's omp settings
+/// (`~/.omp/agent/config.yml`) so the agent recalls + retains durable project
+/// memory across sessions — "deep awareness that never forgets". API-only by
+/// design: `llmMode: smol` reuses the configured online model and
+/// `noEmbeddings: true` uses full-text recall, so there are NO local model
+/// downloads (runs on any machine). Idempotent + non-clobbering: skips if
+/// Mnemopi is already configured or the user authored their own `memory:` block.
+pub(crate) fn ensure_mnemopi_memory(home: &Path) -> Result<()> {
+    let cfg = home.join(".omp/agent/config.yml");
+    if let Some(p) = cfg.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    let existing = std::fs::read_to_string(&cfg).unwrap_or_default();
+    const SENTINEL: &str = "# >>> 8sync mnemopi (managed) >>>";
+    if existing.contains("backend: mnemopi") || existing.contains(SENTINEL) {
+        ui::skip("mnemopi memory", "already enabled in config.yml");
+        return Ok(());
+    }
+    // Never clobber a user-authored memory backend — they made that choice.
+    if existing.lines().any(|l| l.starts_with("memory:")) {
+        ui::warn("config.yml has its own `memory:` — left as-is; set `backend: mnemopi` manually for recall");
+        return Ok(());
+    }
+    let block = concat!(
+        "# >>> 8sync mnemopi (managed) >>>\n",
+        "# Local long-term memory: recall + retain durable project memory across sessions.\n",
+        "# API-only (no local model): llmMode smol reuses the online model; noEmbeddings = FTS recall.\n",
+        "memory:\n",
+        "  backend: mnemopi\n",
+        "mnemopi:\n",
+        "  scoping: per-project-tagged\n",
+        "  llmMode: smol\n",
+        "  noEmbeddings: true\n",
+        "  polyphonicRecall: true\n",
+        "# <<< 8sync mnemopi <<<\n",
+    );
+    let sep = if existing.is_empty() || existing.ends_with('\n') { "" } else { "\n" };
+    std::fs::write(&cfg, format!("{existing}{sep}{block}"))?;
+    ui::ok(&format!("mnemopi memory enabled (API-only) → {}", cfg.display()));
+    Ok(())
+}

@@ -199,4 +199,10 @@ fn check_ai_engines(home: &std::path::Path) {
             ui::warn(&format!("  {} MISSING — run `8sync harness` (auto-installs + registers)", bin));
         }
     }
+    let cfg = std::fs::read_to_string(home.join(".omp/agent/config.yml")).unwrap_or_default();
+    if cfg.contains("backend: mnemopi") {
+        ui::ok("  mnemopi memory ON — recall/retain across sessions (`/memory view`)");
+    } else {
+        ui::warn("  mnemopi memory OFF — `8sync harness` enables deep project recall (API-only)");
+    }
 }
