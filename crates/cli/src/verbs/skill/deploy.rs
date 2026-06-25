@@ -14,7 +14,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
     // (asset prefix, target subdir name). always-on first (read order), then
     // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
-    let bundled: [(&str, &str); 15] = [
+    let bundled: [(&str, &str); 16] = [
         ("skills/codegraph",               "codegraph"),
         ("skills/karpathy",                "karpathy-guidelines"),
         ("skills/ponytail",                "ponytail"),
@@ -30,6 +30,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
         ("skills/encore-deploy",           "encore-deploy"),
         ("skills/last30days",              "last30days"),
         ("skills/gs",                      "gs"),
+        ("skills/token-bench",             "token-bench"),
     ];
     for (asset_prefix, name) in bundled {
         let target_dir = skills_dir.join(name);

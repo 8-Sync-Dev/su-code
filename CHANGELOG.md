@@ -9,6 +9,13 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ### Added
 
+- **`token-bench` skill (bundled) — chứng minh token-saving của code-intel trên repo thật.**
+  `scripts/token_bench.py` (uv/PEP723, stdlib-only): mỗi symbol thật so codegraph-query+slice vs
+  grep+read-whole-file, có def-kind correctness gate. Đo trên codebase lớn thật: 8syncdev-pro-v2 −96.6%,
+  gsd-pi −78.6% (range 54–98%; symbol dùng rộng / file lớn → 95–98%), correctness gsd-pi 10/10. Cần
+  ANSI-strip (codegraph tô màu cả khi pipe). Bundled qua `deploy.rs` (16 skills).
+- **6 reference submodule** (inspect/track upstream; deinit, content gitignored): gstack · gsd-pi ·
+  agent-reach · addyosmani/agent-skills · DietrichGebert/ponytail · **DeusData/codebase-memory-mcp**.
 - **`outputs/agent-team-workflow-automation-plan.md`** — operating plan để vận hành su-code như một agent
   team: map sprint 23-specialist của gstack + loop slice/auto/worktree của gsd-pi lên `/gs` + skills +
   subagents, kèm **UI/UX Design Lane** riêng (impeccable + Clouds F + **Lighthouse 4-tiêu chí quality gate**).
