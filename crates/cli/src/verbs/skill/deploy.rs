@@ -390,3 +390,63 @@ pub(crate) fn ensure_recall_hook(home: &Path) -> Result<()> {
     ui::ok(&format!("recall hook → {}", target.display()));
     Ok(())
 }
+/// Best-effort: ensure the `feynman` research CLI (companion-inc/feynman) is
+/// available so the 20 feynman research skills registered in agents/skills.toml
+/// (deep-research, alpha-research, literature-review, …) are functional rather
+/// than inert — they shell out to `feynman`/`alpha`. A failed install is
+/// non-fatal (skills still list; the user can `npx @companion-ai/feynman`
+/// later). Never bails the harness run.
+pub(crate) fn ensure_feynman_cli() {
+    if which::which("feynman").is_ok() {
+        let v = env_detect::cmd_version("feynman", &["--version"]).unwrap_or_default();
+        ui::skip("feynman CLI", &format!("present ({})", v));
+        return;
+    }
+    ui::step("feynman CLI (missing — installing @companion-ai/feynman)");
+    // Global install so skills resolve `feynman` directly on PATH. `npx` remains
+    // the zero-install fallback, so a non-zero exit is only a soft failure.
+    let cmd = "npm install -g @companion-ai/feynman 2>/dev/null || true";
+    match Command::new("sh").arg("-c").arg(cmd).status() {
+        Ok(s) if s.success() && which::which("feynman").is_ok() => {
+            ui::ok("feynman CLI installed (research skills functional)");
+        }
+        _ => ui::warn(
+            "feynman global install skipped/failed — skills still list (run via `npx @companion-ai/feynman`)",
+        ),
+    }
+}
+
+/// Deploy the `8sync-workflow` omp extension — a gsd-pi-grade surface that
+/// registers model-callable workflow tools (wf_state_get/set, persisted across
+/// compaction via a custom session entry) + a `/wf` status command + a
+/// session_start state-restore handler. Lives in omp's config dir
+/// (`~/.omp/agent/extensions/` global + `<root>/.omp/extensions/` project) so it
+/// NEVER patches omp core → omp updates stay safe. The Workflow viz page
+/// (`8sync harness web`) appends exported-workflow `registerTool` blocks to the
+/// project copy. Idempotent (byte-identical skip), mirrors `ensure_gs_command`.
+pub(crate) fn ensure_workflow_extension(home: &Path, root: Option<&Path>) -> Result<()> {
+    let Some(body) = assets::read("extensions/8sync-workflow.ts") else {
+        return Ok(());
+    };
+    let global = home.join(".omp/agent/extensions/8sync-workflow.ts");
+    if let Some(p) = global.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    let changed = std::fs::read_to_string(&global).map(|s| s != body).unwrap_or(true);
+    std::fs::write(&global, &body)?;
+    if changed {
+        ui::ok(&format!("8sync-workflow extension → {}", global.display()));
+    }
+    if let Some(r) = root {
+        let proj = r.join(".omp/extensions/8sync-workflow.ts");
+        if let Some(p) = proj.parent() {
+            std::fs::create_dir_all(p)?;
+        }
+        let changed = std::fs::read_to_string(&proj).map(|s| s != body).unwrap_or(true);
+        std::fs::write(&proj, &body)?;
+        if changed {
+            ui::ok(&format!("8sync-workflow extension → {}", proj.display()));
+        }
+    }
+    Ok(())
+}

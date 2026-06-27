@@ -108,3 +108,21 @@ select, input[type=text] {
 .muted { color: var(--muted); }
 .err { color: var(--err); }
 pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+/* ---- Workflow page (react-flow) ---- */
+.wf-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
+.wf-toolbar label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--muted); }
+.wf-toolbar input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 6px; font-family: var(--mono); font-size: 12.5px; width: 130px; }
+.wf-layout { display: grid; grid-template-columns: 1fr 280px; gap: 12px; }
+.wf-canvas { height: 60vh; min-height: 420px; padding: 0; overflow: hidden; }
+.wf-side { padding: 14px; }
+.wf-side h3 { margin: 14px 0 6px; font-size: 13px; color: var(--text); }
+.wf-side label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--muted); margin-bottom: 8px; }
+.wf-side input, .wf-side select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 6px; font-family: var(--mono); font-size: 12.5px; }
+.wf-node { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; min-width: 150px; text-align: center; font-size: 12px; }
+.wf-node-kind { font-size: 10px; margin-bottom: 2px; font-weight: 600; }
+.wf-node-label { color: var(--text); }
+.wf-node-ref { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.wf-list { list-style: none; padding: 0; margin: 0; }
+.wf-list li { padding: 3px 0; }
+.link { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font-family: var(--mono); font-size: 12px; }
+.link:hover { text-decoration: underline; }

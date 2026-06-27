@@ -61,6 +61,8 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     deploy::ensure_headroom_mcp(env)?;
     let _ = deploy::ensure_omp_memory_config(&env.home);
     let _ = deploy::ensure_recall_hook(&env.home);
+    deploy::ensure_feynman_cli();
+    let _ = deploy::ensure_workflow_extension(&env.home, None);
 
     // 4. External skill packs (ponytail full + addyosmani) — best-effort/network.
     p.step("download external skill packs (ponytail · addyosmani)");
@@ -103,6 +105,7 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
             ui::ok(&format!("dropped skill-index AGENTS.md into {} sub-folder(s)", n));
         }
         let _ = deploy::ensure_gs_command(&env.home, Some(&root));
+        let _ = deploy::ensure_workflow_extension(&env.home, Some(&root));
         p.done();
         ui::info("start a session: `8sync .` or `omp --continue`");
         ui::info("refresh later: `8sync harness up`  (auto: `8sync harness up --timer 30m`)");
@@ -112,6 +115,7 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
         ui::warn("not inside a project (no AGENTS.md/.git/Cargo.toml/package.json/... in cwd or ancestors)");
         ui::info("  → `cd` into a project root, then re-run `8sync harness init`");
         let _ = deploy::ensure_gs_command(&env.home, None);
+        let _ = deploy::ensure_workflow_extension(&env.home, None);
     }
     Ok(())
 }

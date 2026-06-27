@@ -74,6 +74,9 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/rules", get(api_rules))
         .route("/api/rules/add", post(api_rule_add))
         .route("/api/rules/delete", post(api_rule_delete))
+        .route("/api/workflows", get(api_workflows))
+        .route("/api/workflows/:name", get(api_workflow_get).post(api_workflow_save).delete(api_workflow_delete))
+        .route("/api/workflows/:name/export", post(api_workflow_export))
 }
 
 async fn api_state(State(ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
@@ -659,4 +662,233 @@ async fn api_rule_delete(
     }
     std::fs::remove_file(p).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(serde_json::json!({ "ok": true })))
+}
+// ---- Workflow viz (react-flow) + export → omp extension tool ----
+//
+// Workflows are stored as react-flow node/edge JSON in <root>/agents/workflows/.
+// `export` generates a STANDALONE omp extension <root>/.omp/extensions/<name>.ts
+// (NOT appended to the harness-managed 8sync-workflow.ts, which is redeployed
+// verbatim) that registers a model-callable `<name>_run` tool dispatching the
+// steps as followUp messages.
+
+fn workflows_dir(root: &std::path::Path) -> std::path::PathBuf {
+    root.join("agents/workflows")
+}
+
+fn validate_wf_name(name: &str) -> Result<(), ApiErr> {
+    let ok = !name.is_empty()
+        && !name.starts_with('-')
+        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    if !ok {
+        return Err((StatusCode::BAD_REQUEST, "name must match ^[a-z0-9-]+$".into()));
+    }
+    Ok(())
+}
+
+async fn api_workflows(State(_ctx): State<Arc<Ctx>>) -> Result<Json<Vec<String>>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let dir = workflows_dir(&root);
+    let mut names = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for e in rd.flatten() {
+            if let Some(stem) = e.file_name().to_str().and_then(|n| n.strip_suffix(".json")) {
+                names.push(stem.to_string());
+            }
+        }
+    }
+    names.sort();
+    Ok(Json(names))
+}
+
+#[derive(Deserialize)]
+struct WfBody {
+    nodes: serde_json::Value,
+    edges: serde_json::Value,
+}
+
+async fn api_workflow_get(
+    State(_ctx): State<Arc<Ctx>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    validate_wf_name(&name)?;
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let path = workflows_dir(&root).join(format!("{}.json", name));
+    let content = std::fs::read_to_string(&path)
+        .map_err(|_| (StatusCode::NOT_FOUND, format!("workflow '{}' not found", name)))?;
+    let mut v: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if v.get("name").is_none() {
+        v["name"] = serde_json::Value::String(name);
+    }
+    Ok(Json(v))
+}
+
+async fn api_workflow_save(
+    State(_ctx): State<Arc<Ctx>>,
+    Path(name): Path<String>,
+    Json(body): Json<WfBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    validate_wf_name(&name)?;
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let dir = workflows_dir(&root);
+    std::fs::create_dir_all(&dir).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let v = serde_json::json!({ "name": name, "nodes": body.nodes, "edges": body.edges });
+    let path = dir.join(format!("{}.json", name));
+    std::fs::write(&path, serde_json::to_string_pretty(&v).unwrap())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::json!({ "ok": true, "path": path.display().to_string() })))
+}
+
+async fn api_workflow_delete(
+    State(_ctx): State<Arc<Ctx>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    validate_wf_name(&name)?;
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let path = workflows_dir(&root).join(format!("{}.json", name));
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// Export a workflow → a standalone omp extension `<root>/.omp/extensions/<name>.ts`
+/// registering a model-callable `<name>_run` tool. The tool dispatches the steps
+/// in topological order as followUp messages (subagents/skills can't be spawned
+/// directly from a tool ctx, so the lead agent executes them).
+async fn api_workflow_export(
+    State(_ctx): State<Arc<Ctx>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    validate_wf_name(&name)?;
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let path = workflows_dir(&root).join(format!("{}.json", name));
+    let content = std::fs::read_to_string(&path)
+        .map_err(|_| (StatusCode::NOT_FOUND, format!("workflow '{}' not found", name)))?;
+    let wf: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let ts = generate_workflow_extension(&name, &wf)?;
+    let ext_dir = root.join(".omp/extensions");
+    std::fs::create_dir_all(&ext_dir).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let ext_path = ext_dir.join(format!("{}.ts", name));
+    std::fs::write(&ext_path, ts).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "path": ext_path.display().to_string(),
+        "tool": format!("{}_run", name)
+    })))
+}
+
+/// Generate the TS body of a standalone omp extension for one workflow. Built
+/// via push_str to avoid format! brace-escaping churn.
+fn generate_workflow_extension(name: &str, wf: &serde_json::Value) -> Result<String, ApiErr> {
+    let nodes = wf
+        .get("nodes")
+        .and_then(|v| v.as_array())
+        .ok_or((StatusCode::BAD_REQUEST, "workflow missing nodes[]".into()))?;
+    let edges = wf
+        .get("edges")
+        .and_then(|v| v.as_array())
+        .ok_or((StatusCode::BAD_REQUEST, "workflow missing edges[]".into()))?;
+    let order = topo_order(nodes, edges);
+
+    let esc = |s: &str| -> String { s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ") };
+    let mut steps = String::new();
+    for (i, idx) in order.iter().enumerate() {
+        let n = &nodes[*idx];
+        let id = n.get("id").and_then(|v| v.as_str()).unwrap_or("?");
+        let data = n.get("data").cloned().unwrap_or_default();
+        let label = data.get("label").and_then(|v| v.as_str()).unwrap_or("(untitled)");
+        let kind = data.get("kind").and_then(|v| v.as_str()).unwrap_or("step");
+        let refv = data.get("ref").and_then(|v| v.as_str()).unwrap_or("");
+        let instr = match kind {
+            "subagent" => format!("Spawn a task subagent to: {} (use: {})", label, refv),
+            "tool" => format!("Call the `{}` tool to: {}", refv, label),
+            _ => {
+                let r = if refv.is_empty() { label } else { refv };
+                format!("Use the `{}` skill to: {}", r, label)
+            }
+        };
+        steps.push_str(&format!(
+            "  // step {}: {} ({})\n  await pi.sendUserMessage(\"{}\", {{ deliverAs: \"followUp\" }});\n",
+            i + 1,
+            id,
+            kind,
+            esc(&instr)
+        ));
+    }
+    let n = order.len();
+    let mut out = String::new();
+    out.push_str("// Auto-generated by `8sync harness web` — workflow \"");
+    out.push_str(name);
+    out.push_str("\". Do not edit by hand;\n// re-export from the Workflow page to regenerate.\n");
+    out.push_str("// Each step dispatches as a followUp message the lead agent executes\n");
+    out.push_str("// (skills/subagents can't be spawned directly from a tool ctx).\n");
+    out.push_str("import type { ExtensionAPI } from \"@oh-my-pi/pi-coding-agent\";\n\n");
+    out.push_str("export default function (pi: ExtensionAPI) {\n");
+    out.push_str("  const { z } = pi.zod;\n");
+    out.push_str("  pi.setLabel(\"workflow: ");
+    out.push_str(&esc(name));
+    out.push_str("\");\n");
+    out.push_str("  pi.registerTool({\n");
+    out.push_str("    name: \"");
+    out.push_str(name);
+    out.push_str("_run\",\n    label: \"Run workflow: ");
+    out.push_str(&esc(name));
+    out.push_str("\",\n    description: \"Execute the \\\"");
+    out.push_str(&esc(name));
+    out.push_str(&format!("\\\" workflow ({} step(s)) as queued followUp messages.\",\n", n));
+    out.push_str("    parameters: z.object({}),\n");
+    out.push_str("    async execute(_id, _p, _sig, _onUpd, ctx) {\n");
+    out.push_str(&format!("      ctx.ui.notify(\"workflow {}: dispatching {} step(s)\", \"info\");\n", esc(name), n));
+    out.push_str(&steps);
+    out.push_str(&format!(
+        "      return {{ content: [{{ type: \"text\", text: \"workflow {} dispatched ({} followUp step(s) queued)\" }}], details: {{ steps: {} }} }};\n",
+        esc(name),
+        n,
+        n
+    ));
+    out.push_str("    },\n");
+    out.push_str("  });\n");
+    out.push_str("}\n");
+    Ok(out)
+}
+
+/// Kahn's topological sort over workflow nodes/edges by id. Falls back to
+/// original array order when a cycle is detected (graceful, not an error).
+fn topo_order(nodes: &[serde_json::Value], edges: &[serde_json::Value]) -> Vec<usize> {
+    use std::collections::{HashMap, HashSet, VecDeque};
+    let id_to_idx: HashMap<&str, usize> = nodes
+        .iter()
+        .enumerate()
+        .filter_map(|(i, n)| n.get("id").and_then(|v| v.as_str()).map(|s| (s, i)))
+        .collect();
+    let mut deps: Vec<HashSet<usize>> = vec![HashSet::new(); nodes.len()];
+    let mut indeg = vec![0usize; nodes.len()];
+    for e in edges {
+        let s = e.get("source").and_then(|v| v.as_str());
+        let t = e.get("target").and_then(|v| v.as_str());
+        if let (Some(&si), Some(&ti)) = (s.and_then(|x| id_to_idx.get(x)), t.and_then(|x| id_to_idx.get(x))) {
+            if si != ti && deps[si].insert(ti) {
+                indeg[ti] += 1;
+            }
+        }
+    }
+    let mut q: VecDeque<usize> = (0..nodes.len()).filter(|&i| indeg[i] == 0).collect();
+    let mut out = Vec::with_capacity(nodes.len());
+    while let Some(i) = q.pop_front() {
+        out.push(i);
+        let next: Vec<usize> = deps[i].iter().copied().collect();
+        for j in next {
+            indeg[j] -= 1;
+            if indeg[j] == 0 {
+                q.push_back(j);
+            }
+        }
+    }
+    if out.len() == nodes.len() {
+        out
+    } else {
+        (0..nodes.len()).collect() // cycle → array order
+    }
 }

@@ -48,6 +48,12 @@ export type ContextInfo = {
 };
 export type McpServer = { name: string; command: string; args: string[]; type: string; present: boolean };
 export type Rule = { scope: string; name: string; path: string; bytes: number };
+export type WfKind = "step" | "subagent" | "tool";
+export type WfData = { label: string; kind: WfKind; ref: string };
+export type WfNode = { id: string; type?: string; position: { x: number; y: number }; data: WfData };
+export type WfEdge = { id: string; source: string; target: string };
+export type Workflow = { name: string; nodes: WfNode[]; edges: WfEdge[] };
+export type WorkflowExport = { ok: boolean; path: string; tool: string };
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, init);
@@ -89,4 +95,12 @@ export const api = {
   ruleAdd: (name: string, content: string, scope?: string) =>
     json<{ ok: boolean; path: string }>("/api/rules/add", POST_JSON({ name, content, scope })),
   ruleDelete: (path: string) => json<{ ok: boolean }>("/api/rules/delete", POST_JSON({ path })),
+  workflows: () => json<string[]>("/api/workflows"),
+  workflowGet: (name: string) => json<Workflow>(`/api/workflows/${encodeURIComponent(name)}`),
+  workflowSave: (name: string, nodes: WfNode[], edges: WfEdge[]) =>
+    json<{ ok: boolean; path: string }>(`/api/workflows/${encodeURIComponent(name)}`, POST_JSON({ nodes, edges })),
+  workflowDelete: (name: string) =>
+    json<{ ok: boolean }>(`/api/workflows/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  workflowExport: (name: string) =>
+    json<WorkflowExport>(`/api/workflows/${encodeURIComponent(name)}/export`, { method: "POST" }),
 };

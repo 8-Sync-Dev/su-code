@@ -1,0 +1,45 @@
+{
+  "edges": [],
+  "name": "demo",
+  "nodes": [
+    {
+      "data": {
+        "kind": "step",
+        "label": "Research papers",
+        "ref": "deep-research"
+      },
+      "id": "n1782604205598_1",
+      "position": {
+        "x": 158,
+        "y": 177
+      },
+      "type": "wf"
+    },
+    {
+      "data": {
+        "kind": "step",
+        "label": "New skill",
+        "ref": ""
+      },
+      "id": "n1782604205819_2",
+      "position": {
+        "x": 236,
+        "y": 190
+      },
+      "type": "wf"
+    },
+    {
+      "data": {
+        "kind": "subagent",
+        "label": "New subagent",
+        "ref": ""
+      },
+      "id": "n1782604206033_3",
+      "position": {
+        "x": 216,
+        "y": 148
+      },
+      "type": "wf"
+    }
+  ]
+}

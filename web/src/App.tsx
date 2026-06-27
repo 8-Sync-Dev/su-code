@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type SkillEntry, type Engines } from "./api";
+import { api, type SkillEntry, type Engines, type WfData, type WfKind, type WfNode, type WfEdge } from "./api";
+import {
+  ReactFlow, Background, Controls, MiniMap, addEdge, Handle, Position,
+  useNodesState, useEdgesState,
+  type Node, type Edge, type Connection, type NodeTypes, type NodeProps,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
 
-type Page = "state" | "skills" | "memory" | "engines" | "context" | "bench" | "eval" | "workspaces" | "team" | "submodules" | "mcp" | "rules";
+type Page = "state" | "skills" | "memory" | "engines" | "context" | "bench" | "eval" | "workspaces" | "team" | "submodules" | "mcp" | "rules" | "workflow";
 const NAV: { id: Page; label: string }[] = [
   { id: "state", label: "State" },
   { id: "context", label: "Context" },
@@ -16,6 +23,7 @@ const NAV: { id: Page; label: string }[] = [
   { id: "submodules", label: "Submodules" },
   { id: "mcp", label: "MCP" },
   { id: "rules", label: "Rules" },
+  { id: "workflow", label: "Workflow" },
 ];
 const MEMORY_FILES = ["STATE", "KNOWLEDGE", "PLAYBOOKS", "DECISIONS", "PROJECT", "NOTES"] as const;
 
@@ -48,6 +56,7 @@ export default function App() {
         {page === "context" && <ContextPage />}
         {page === "mcp" && <McpPage />}
         {page === "rules" && <RulesPage />}
+        {page === "workflow" && <WorkflowPage />}
       </main>
     </div>
   );
@@ -511,6 +520,161 @@ function RulesPage() {
             <button onClick={() => del.mutate(r.path)} disabled={del.isPending}>delete</button>
           </div>
         )) : null}
+      </div>
+    </>
+  );
+}
+// WorkflowPage — react-flow visual editor. Node = one workflow step (skill /
+// subagent / tool call). Export generates a standalone omp extension file
+// registering a model-callable `<name>_run` tool that dispatches the steps as
+// followUp messages (skills/subagents can't be spawned directly from a tool ctx).
+const WF_KIND_LABEL: Record<WfKind, string> = { step: "skill", subagent: "subagent", tool: "tool" };
+let wfCounter = 0;
+
+function makeWfNode(kind: WfKind): Node<WfData> {
+  wfCounter += 1;
+  return {
+    id: `n${Date.now()}_${wfCounter}`,
+    type: "wf",
+    position: { x: 80 + Math.round(Math.random() * 160), y: 80 + Math.round(Math.random() * 120) },
+    data: { label: `New ${WF_KIND_LABEL[kind]}`, kind, ref: "" },
+  };
+}
+
+function WfNodeView({ data }: NodeProps<Node<WfData>>) {
+  const color = data.kind === "subagent" ? "var(--accent)" : data.kind === "tool" ? "var(--warn)" : "var(--ok)";
+  return (
+    <div className="wf-node" style={{ borderColor: color }}>
+      <Handle type="target" position={Position.Top} />
+      <div className="wf-node-kind mono" style={{ color }}>{WF_KIND_LABEL[data.kind]}</div>
+      <div className="wf-node-label">{data.label}</div>
+      {data.ref ? <div className="wf-node-ref mono">{data.ref}</div> : null}
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+}
+
+// react-flow's NodeTypes is invariant over the Node generic, so a concrete-node
+// map cannot be assigned directly — cast through unknown (no `any`).
+const wfNodeTypes = { wf: WfNodeView } as unknown as NodeTypes;
+
+const elk = new ELK();
+
+function WorkflowPage() {
+  const qc = useQueryClient();
+  const [name, setName] = useState("demo");
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<WfData>>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [selId, setSelId] = useState<string | null>(null);
+
+  const list = useQuery({ queryKey: ["workflows"], queryFn: api.workflows });
+  const saveMut = useMutation({
+    mutationFn: (v: { name: string; nodes: WfNode[]; edges: WfEdge[] }) =>
+      api.workflowSave(v.name, v.nodes, v.edges),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["workflows"] }),
+  });
+  const exportMut = useMutation({ mutationFn: (n: string) => api.workflowExport(n) });
+
+  const selected = nodes.find((n) => n.id === selId) ?? null;
+  const onConnect = useCallback((c: Connection) => setEdges((eds) => addEdge(c, eds)), [setEdges]);
+  const addNode = (kind: WfKind) => setNodes((ns) => [...ns, makeWfNode(kind)]);
+  const updateSel = (patch: Partial<WfData>) => {
+    if (!selected) return;
+    setNodes((ns) =>
+      ns.map((n) => (n.id === selected.id ? { ...n, data: { ...n.data, ...patch } } : n)),
+    );
+  };
+  const load = async (n: string) => {
+    setName(n);
+    const wf = await api.workflowGet(n);
+    setNodes((wf.nodes ?? []).map((x) => ({ id: x.id, type: "wf", position: x.position, data: x.data })));
+    setEdges(wf.edges ?? []);
+    setSelId(null);
+  };
+  const autoLayout = async () => {
+    const graph: ElkNode = {
+      id: "root",
+      layoutOptions: { "elk.algorithm": "layered", "elk.direction": "DOWN" },
+      children: nodes.map((n) => ({ id: n.id, width: 180, height: 72 })),
+      edges: edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    };
+    const laid = await elk.layout(graph);
+    const pos = new Map((laid.children ?? []).map((c) => [c.id, { x: c.x ?? 0, y: c.y ?? 0 }]));
+    setNodes((ns) => ns.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position })));
+  };
+  const save = () => {
+    const wfNodes: WfNode[] = nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data }));
+    const wfEdges: WfEdge[] = edges.map((e) => ({ id: e.id, source: e.source, target: e.target }));
+    saveMut.mutate({ name, nodes: wfNodes, edges: wfEdges });
+  };
+
+  return (
+    <>
+      <h2>Workflow</h2>
+      <p className="sub">Visual agent workflow. Export generates a model-callable omp extension tool.</p>
+      <div className="wf-toolbar card">
+        <label className="mono">name
+          <input className="mono" value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <button onClick={() => addNode("step")}>Add skill step</button>
+        <button onClick={() => addNode("subagent")}>Add subagent</button>
+        <button onClick={() => addNode("tool")}>Add tool call</button>
+        <button onClick={autoLayout}>Auto-layout</button>
+        <button onClick={save} disabled={saveMut.isPending}>Save workflow</button>
+        <button onClick={() => exportMut.mutate(name)} disabled={exportMut.isPending}>Export to omp</button>
+      </div>
+      {exportMut.data ? (
+        <p className="ok mono" style={{ fontSize: 11 }}>exported → {exportMut.data.path} (tool: {exportMut.data.tool})</p>
+      ) : saveMut.data ? (
+        <p className="ok mono" style={{ fontSize: 11 }}>saved → {saveMut.data.path}</p>
+      ) : null}
+      <div className="wf-layout">
+        <div className="wf-canvas card">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={wfNodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={(_, n) => setSelId(n.id)}
+            fitView
+          >
+            <Background />
+            <Controls />
+            <MiniMap />
+          </ReactFlow>
+        </div>
+        <div className="wf-side card">
+          <h3>Edit node</h3>
+          {selected ? (
+            <>
+              <label className="mono">label
+                <input className="mono" value={selected.data.label} onChange={(e) => updateSel({ label: e.target.value })} />
+              </label>
+              <label className="mono">kind
+                <select value={selected.data.kind} onChange={(e) => updateSel({ kind: e.target.value as WfKind })}>
+                  <option value="step">skill</option>
+                  <option value="subagent">subagent</option>
+                  <option value="tool">tool</option>
+                </select>
+              </label>
+              <label className="mono">ref (skill / tool / subagent id)
+                <input className="mono" value={selected.data.ref} onChange={(e) => updateSel({ ref: e.target.value })} />
+              </label>
+            </>
+          ) : (
+            <p className="muted">Select a node to edit, or add one.</p>
+          )}
+          <h3>Saved workflows</h3>
+          {list.isLoading ? <p className="muted">Loading…</p> : (
+            <ul className="wf-list">
+              {(list.data ?? []).length === 0 ? <li className="muted">(none yet)</li> : list.data?.map((n) => (
+                <li key={n}><button className="link" onClick={() => load(n)}>{n}</button></li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </>
   );

@@ -3,6 +3,7 @@
 .codegraph/
 .cache/8sync/
 .gs/
+.omp/
 # Secrets — NEVER commit:
 .env
 .env.*
