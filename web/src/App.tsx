@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type SkillEntry, type Engines } from "./api";
 
-type Page = "state" | "skills" | "memory" | "engines" | "bench" | "eval";
+type Page = "state" | "skills" | "memory" | "engines" | "bench" | "eval" | "workspaces" | "team" | "submodules";
 const NAV: { id: Page; label: string }[] = [
   { id: "state", label: "State" },
   { id: "skills", label: "Skills" },
@@ -10,6 +10,9 @@ const NAV: { id: Page; label: string }[] = [
   { id: "engines", label: "Engines" },
   { id: "bench", label: "Bench" },
   { id: "eval", label: "Readiness" },
+  { id: "workspaces", label: "Workspaces" },
+  { id: "team", label: "Team" },
+  { id: "submodules", label: "Submodules" },
 ];
 const MEMORY_FILES = ["STATE", "KNOWLEDGE", "PLAYBOOKS", "DECISIONS", "PROJECT", "NOTES"] as const;
 
@@ -36,6 +39,9 @@ export default function App() {
         {page === "engines" && <EnginesPage />}
         {page === "bench" && <BenchPage />}
         {page === "eval" && <EvalPage />}
+        {page === "workspaces" && <WorkspacesPage />}
+        {page === "team" && <TeamPage />}
+        {page === "submodules" && <SubmodulesPage />}
       </main>
     </div>
   );
@@ -263,6 +269,117 @@ function EvalPage() {
             ))}
           </div>
         ) : isLoading ? <p className="muted">Not run yet.</p> : null}
+      </div>
+    </>
+  );
+}
+
+function WorkspacesPage() {
+  const { data, isLoading, error } = useQuery({ queryKey: ["workspaces"], queryFn: api.workspaces });
+  const qc = useQueryClient();
+  const activate = useMutation({
+    mutationFn: (profile: string) => api.activateWorkspace(profile),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["workspaces"] }),
+  });
+  if (isLoading) return <p className="muted">Loading…</p>;
+  if (error) return <p className="err">Error: {(error as Error).message}</p>;
+  if (!data) return <p className="muted">No data.</p>;
+  return (
+    <>
+      <h2>Workspaces</h2>
+      <p className="sub">omp profiles + current project. Activate records the choice (advisory — run omp with <code>--profile</code> in that dir to isolate).</p>
+      <div className="card">
+        <div className="row" style={{ borderBottom: 0 }}>
+          <strong>Current project</strong>
+          <span className="mono">{data.project || "—"}</span>
+        </div>
+      </div>
+      <div className="card">
+        <strong style={{ display: "block", marginBottom: 8 }}>Profiles</strong>
+        {data.profiles.map((p) => (
+          <div className="row" key={p}>
+            <span className="mono">{p}</span>
+            <button className="primary" onClick={() => activate.mutate(p)} disabled={activate.isPending}>
+              Activate
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function TeamPage() {
+  const { data, isLoading, error, refetch, isFetching } = useQuery({ queryKey: ["team"], queryFn: api.team, enabled: false });
+  return (
+    <>
+      <h2>Team</h2>
+      <p className="sub">omp subagent roster + per-project readiness.</p>
+      <div className="card">
+        <button className="primary" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? "Loading…" : "Load team"}
+        </button>
+        {error ? <p className="err" style={{ marginTop: 8 }}>Error: {(error as Error).message}</p> : null}
+        {data ? (
+          <div style={{ marginTop: 12 }}>
+            <div className="row">
+              <strong>Readiness</strong>
+              <span className="pct">{data.readiness ? `${data.readiness.overall}%` : "—"}</span>
+            </div>
+            {data.roster.map((r) => (
+              <div className="row" key={r.type}>
+                <span className="mono">{r.type} <span className="muted">— {r.role}</span></span>
+                <span className="muted mono" style={{ fontSize: 11 }}>{r.skills}</span>
+              </div>
+            ))}
+          </div>
+        ) : isLoading ? <p className="muted">Not loaded.</p> : null}
+      </div>
+    </>
+  );
+}
+
+function SubmodulesPage() {
+  const qc = useQueryClient();
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["submodules"], queryFn: api.submodules });
+  const [url, setUrl] = useState("");
+  const add = useMutation({
+    mutationFn: (u: string) => api.submoduleAdd(u),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["submodules"] }); setUrl(""); },
+  });
+  const pull = useMutation({ mutationFn: (p: string) => api.submodulePull(p), onSuccess: () => qc.invalidateQueries({ queryKey: ["submodules"] }) });
+  const remove = useMutation({ mutationFn: (p: string) => api.submoduleRemove(p), onSuccess: () => qc.invalidateQueries({ queryKey: ["submodules"] }) });
+  return (
+    <>
+      <h2>Submodules</h2>
+      <p className="sub">Reference repos (gstack · gsd-pi · agent-reach · …). Add/pull/remove.</p>
+      <div className="card">
+        <div className="row" style={{ borderBottom: 0 }}>
+          <input type="text" placeholder="https://github.com/owner/repo" value={url} onChange={(e) => setUrl(e.target.value)} style={{ flex: 1 }} aria-label="submodule URL" />
+          <button className="primary" disabled={!url || add.isPending} onClick={() => add.mutate(url)}>Add</button>
+          <button onClick={() => refetch()}>Refresh</button>
+        </div>
+        {add.isError ? <p className="err" style={{ marginTop: 8 }}>Add failed: {(add.error as Error).message}</p> : null}
+      </div>
+      <div className="card">
+        {isLoading ? <p className="muted">Loading…</p> : null}
+        {error ? <p className="err">Error: {(error as Error).message}</p> : null}
+        {data && data.length === 0 ? <p className="muted">No submodules.</p> : null}
+        {data && data.length > 0
+          ? data.map((s) => (
+              <div className="row" key={s.path}>
+                <div>
+                  <div className="mono">{s.name}</div>
+                  <div className="muted mono" style={{ fontSize: 11 }}>{s.url}</div>
+                </div>
+                <span style={{ display: "flex", gap: 6 }}>
+                  <span className={`tag ${s.initialized ? "ok" : "warn"}`}>{s.initialized ? "init" : "deinit"}</span>
+                  <button onClick={() => pull.mutate(s.path)} disabled={pull.isPending}>pull</button>
+                  <button onClick={() => remove.mutate(s.path)} disabled={remove.isPending}>remove</button>
+                </span>
+              </div>
+            ))
+          : null}
       </div>
     </>
   );

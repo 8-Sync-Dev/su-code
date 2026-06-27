@@ -5,6 +5,8 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-06-27
+
 ### Added (Phase A — anti-forget)
 
 - **Anti-forget: compaction@50% + idle + recall hook.** `8sync harness` giờ ensure
@@ -14,6 +16,25 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   compaction summary → agent giữ index skills/rules/workflow qua 50% context & sau compact.
   `8sync doctor` báo "anti-forget ON/OFF". Key-based config detection (robust khi omp
   rewrite/strip comments config.yml — bỏ sentinel strategy). Verified: omp 16.2.1 load OK.
+
+### Added (Phase B — `8sync harness web`)
+
+- **`8sync harness web`** — dashboard Vite+React (embedded qua rust-embed) do axum serve tại
+  `http://127.0.0.1:8731` (`--port`, `--no-open`). API: `/api/state` · `/api/skills` (list + toggle
+  tier qua `agents/skills.toml`) · `/api/memory/:file` (get/set, allowlist) · `/api/engines`
+  (codegraph/cbm/headroom/**serena** + mnemopi) · `/api/bench` · `/api/eval`. Refactor B5: tách
+  `bench_metrics()`/`eval_project_data()` (home: &Path) cho cả CLI lẫn web reuse. Build.rs tự build
+  FE qua pnpm khi thiếu + stub fallback. Deps: axum 0.7 + tokio + tower-http (override có chủ đích
+  rule "tránh tokio" trong AGENTS.md §8, gated `harness web`). Verified real: 6 endpoint trả data
+  sống (eval 96% 28/29, bench A1 PASS).
+
+### Added (Phase C — full manage)
+
+- **Workspace + team + submodule + skill install** qua dashboard: `/api/workspaces` (list omp
+  profiles + project + activate ghi `web-session.json`), `/api/team` (subagent roster 8 loại +
+  readiness reuse eval_project_data), `/api/submodules` (parse `.gitmodules` + add/pull/remove qua
+  git shell-out), `/api/skills/add|update` (self-shell-out `8sync skill`). FE: 3 page mới (Workspaces,
+  Team, Submodules) + nav. Verified real: workspaces/team/submodules trả data, skill add validate spec.
 
 ## [0.24.0] — 2026-06-25
 

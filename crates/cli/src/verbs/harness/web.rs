@@ -48,18 +48,28 @@ pub(crate) fn harness_web(home: &std::path::Path, port: u16, no_open: bool) -> R
     Ok(())
 }
 
+
+type ApiErr = (StatusCode, String);
+
 fn api_routes() -> Router<Arc<Ctx>> {
     Router::new()
         .route("/api/state", get(api_state))
         .route("/api/skills", get(api_skills))
         .route("/api/skills/toggle", post(api_skill_toggle))
+        .route("/api/skills/add", post(api_skill_add))
+        .route("/api/skills/update", post(api_skill_update))
         .route("/api/engines", get(api_engines))
         .route("/api/bench", get(api_bench))
         .route("/api/eval", get(api_eval))
         .route("/api/memory/:file", get(api_memory_get).post(api_memory_set))
+        .route("/api/workspaces", get(api_workspaces))
+        .route("/api/workspaces/activate", post(api_workspace_activate))
+        .route("/api/team", get(api_team))
+        .route("/api/submodules", get(api_submodules))
+        .route("/api/submodules/add", post(api_submodule_add))
+        .route("/api/submodules/pull", post(api_submodule_pull))
+        .route("/api/submodules/remove", post(api_submodule_remove))
 }
-
-type ApiErr = (StatusCode, String);
 
 async fn api_state(State(ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
     let root = detect_current_project_root().unwrap_or_default();
@@ -222,4 +232,221 @@ fn mime_for(path: &str) -> &'static str {
         Some("ico") => "image/x-icon",
         _ => "application/octet-stream",
     }
+}
+
+// ---- Phase C: workspaces / team / submodules / skill install ----
+
+async fn api_workspaces(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
+    let mut profiles = vec!["default".to_string()];
+    if let Ok(entries) = std::fs::read_dir(ctx.home.join(".omp/profiles")) {
+        for e in entries.flatten() {
+            if let Some(n) = e.file_name().to_str() {
+                if !profiles.iter().any(|p| p == n) {
+                    profiles.push(n.to_string());
+                }
+            }
+        }
+    }
+    let project = detect_current_project_root()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    let sess = std::fs::read_to_string(ctx.home.join(".config/8sync/web-session.json"))
+        .unwrap_or_default();
+    Json(serde_json::json!({ "profiles": profiles, "project": project, "session": sess }))
+}
+
+#[derive(Deserialize)]
+struct ActivateBody {
+    profile: Option<String>,
+    project: Option<String>,
+}
+
+async fn api_workspace_activate(
+    State(ctx): State<Arc<Ctx>>,
+    Json(body): Json<ActivateBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    // Advisory: records the chosen profile/project. Actual isolation happens
+    // when omp runs with `--profile <name>` in that project dir.
+    let path = ctx.home.join(".config/8sync/web-session.json");
+    if let Some(p) = path.parent() {
+        std::fs::create_dir_all(p).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+    let cur = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut obj: serde_json::Value = serde_json::from_str(&cur).unwrap_or(serde_json::json!({}));
+    if !obj.is_object() {
+        obj = serde_json::json!({});
+    }
+    if let Some(p) = body.profile {
+        obj["profile"] = serde_json::Value::String(p);
+    }
+    if let Some(p) = body.project {
+        obj["project"] = serde_json::Value::String(p);
+    }
+    std::fs::write(&path, serde_json::to_string_pretty(&obj).unwrap_or_default())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(obj))
+}
+
+async fn api_team(State(ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
+    // Static subagent roster (omp task types) + per-project readiness.
+    let roster = serde_json::json!([
+        { "type": "explore", "role": "scout", "skills": "codegraph, cbm" },
+        { "type": "plan", "role": "architect", "skills": "planning-*, spec-driven-*" },
+        { "type": "reviewer", "role": "code review", "skills": "code-review-and-quality, senior-security" },
+        { "type": "oracle", "role": "2nd opinion / debug", "skills": "debugging, performance" },
+        { "type": "designer", "role": "UI/UX", "skills": "impeccable, taste, senior-frontend" },
+        { "type": "librarian", "role": "research", "skills": "agent-reach, deep-research" },
+        { "type": "task", "role": "implementer", "skills": "full-flow, tdd" },
+        { "type": "quick_task", "role": "mechanical", "skills": "—" }
+    ]);
+    let readiness = super::eval::eval_project_data(&ctx.home);
+    Ok(Json(serde_json::json!({ "roster": roster, "readiness": readiness })))
+}
+
+async fn api_submodules(State(_ctx): State<Arc<Ctx>>) -> Result<Json<Vec<serde_json::Value>>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    Ok(Json(parse_gitmodules(&root)))
+}
+
+#[derive(Deserialize)]
+struct SubmoduleBody {
+    url: String,
+    path: Option<String>,
+}
+#[derive(Deserialize)]
+struct SubmodulePathBody {
+    path: String,
+}
+
+async fn api_submodule_add(
+    State(_ctx): State<Arc<Ctx>>,
+    Json(body): Json<SubmoduleBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let path = body.path.unwrap_or_else(|| format!("reference/{}", basename(&body.url)));
+    git(&root, &["submodule", "add", "-f", "--depth", "1", &body.url, &path])
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(serde_json::json!({ "ok": true, "path": path })))
+}
+
+async fn api_submodule_pull(
+    State(_ctx): State<Arc<Ctx>>,
+    Json(body): Json<SubmodulePathBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    git(&root, &["submodule", "update", "--init", "--remote", &body.path])
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+async fn api_submodule_remove(
+    State(_ctx): State<Arc<Ctx>>,
+    Json(body): Json<SubmodulePathBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    git(&root, &["submodule", "deinit", "-f", &body.path])
+        .and_then(|_| git(&root, &["rm", "-f", &body.path]))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+struct SkillSpecBody {
+    spec: String,
+    name: Option<String>,
+}
+
+async fn api_skill_add(
+    State(_ctx): State<Arc<Ctx>>,
+    Json(body): Json<SkillSpecBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    skill_cmd(&["skill", "add", &body.spec])
+}
+
+async fn api_skill_update(
+    State(ctx): State<Arc<Ctx>>,
+    Json(body): Json<SkillSpecBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let _ = &ctx; // touched for State symmetry
+    let args: Vec<String> = match &body.name {
+        Some(n) => vec!["skill".into(), "update".into(), n.clone()],
+        None => vec!["skill".into(), "update".into()],
+    };
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    skill_cmd(&args_ref)
+}
+
+/// Shell out to the 8sync binary itself for skill add/update (reuses the
+/// tested CLI path rather than duplicating install logic in-process).
+fn skill_cmd(args: &[&str]) -> Result<Json<serde_json::Value>, ApiErr> {
+    let exe = std::env::current_exe().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let out = std::process::Command::new(&exe)
+        .args(args)
+        .output()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    if out.status.success() {
+        Ok(Json(serde_json::json!({ "ok": true, "log": combined })))
+    } else {
+        Err((StatusCode::INTERNAL_SERVER_ERROR, combined))
+    }
+}
+
+fn git(root: &std::path::Path, args: &[&str]) -> Result<String, String> {
+    let mut cmd = std::process::Command::new("git");
+    cmd.arg("-C").arg(root).args(args);
+    let out = cmd.output().map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).to_string())
+    } else {
+        Err(format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        ))
+    }
+}
+
+fn basename(url: &str) -> String {
+    url.rsplit(['/', ':']).next().unwrap_or(url).trim_end_matches(".git").to_string()
+}
+
+fn parse_gitmodules(root: &std::path::Path) -> Vec<serde_json::Value> {
+    let s = std::fs::read_to_string(root.join(".gitmodules")).unwrap_or_default();
+    let mut out = Vec::new();
+    let mut name = String::new();
+    let mut path = String::new();
+    let mut url = String::new();
+    let flush = |out: &mut Vec<serde_json::Value>, name: &str, path: &str, url: &str| {
+        if !name.is_empty() {
+            let dir = root.join(path);
+            let initialized = dir.exists()
+                && std::fs::read_dir(&dir).map(|mut it| it.next().is_some()).unwrap_or(false);
+            out.push(serde_json::json!({
+                "name": name, "path": path, "url": url, "initialized": initialized,
+            }));
+        }
+    };
+    for line in s.lines() {
+        let l = line.trim();
+        if l.starts_with("[submodule") {
+            flush(&mut out, &name, &path, &url);
+            name.clear();
+            path.clear();
+            url.clear();
+            let start = match l.find('"') { Some(i) => i + 1, None => continue };
+            let end = match l[start..].find('"') { Some(i) => start + i, None => continue };
+            name = l[start..end].to_string();
+        } else if let Some(v) = l.strip_prefix("path = ") {
+            path = v.to_string();
+        } else if let Some(v) = l.strip_prefix("url = ") {
+            url = v.to_string();
+        }
+    }
+    flush(&mut out, &name, &path, &url);
+    out
 }
