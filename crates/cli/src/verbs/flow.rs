@@ -17,8 +17,8 @@ pub fn run() -> Result<()> {
         ("8sync harness", "(bare) ONE idempotent command: skills + memory loop + /gs + MCP (codegraph/cbm/headroom)"),
         ("8sync . then /gs <goal>", "in omp: lead proposes options + asks, then plan→build→verify→commit"),
         ("/gs auto", "unattended run to Definition-of-Done (no questions)"),
-        ("8sync harness up --timer 30m", "run the team loop in the background"),
         ("8sync harness audit|bench|eval", "doc-hygiene · token budget · loop-quality probe"),
+        ("8sync harness web",              "(bare) local dashboard — manage skills/memory/engines/team/submodules"),
     ]);
 
     section("2. VIBE LOOP — open a project, code with AI, ship a PR", &[
