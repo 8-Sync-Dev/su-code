@@ -338,37 +338,55 @@ else pip install --user 'headroom-ai[mcp]' || pip install --user --break-system-
 /// `noEmbeddings: true` uses full-text recall, so there are NO local model
 /// downloads (runs on any machine). Idempotent + non-clobbering: skips if
 /// Mnemopi is already configured or the user authored their own `memory:` block.
-pub(crate) fn ensure_mnemopi_memory(home: &Path) -> Result<()> {
+/// Ensure omp's anti-forget stack in the user's settings (`~/.omp/agent/config.yml`):
+/// (1) Mnemopi long-term memory (API-only — no local model), and (2) compaction
+/// tuned to fire at 50% context + when idle (snapcompact strategy stays the omp
+/// default), so the agent stops forgetting skills/rules/workflow past ~50%.
+/// Idempotent sentinel-block; never clobbers a user-authored `memory:` block.
+pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
     let cfg = home.join(".omp/agent/config.yml");
-    if let Some(p) = cfg.parent() {
-        std::fs::create_dir_all(p)?;
+    if let Some(p) = cfg.parent() { std::fs::create_dir_all(p)?; }
+    // omp rewrites/normalizes config.yml and strips comments, so detect by KEY
+    // presence (not sentinel markers) and only append top-level keys when absent.
+    let mut s = std::fs::read_to_string(&cfg).unwrap_or_default();
+    let mut changed = false;
+    let has_mnemopi = s.contains("backend: mnemopi");
+    let has_memory_key = s.lines().any(|l| l.starts_with("memory:"));
+    if has_mnemopi {
+        ui::skip("mnemopi memory", "backend already set");
+    } else if has_memory_key {
+        ui::warn("config.yml has its own `memory:` — left as-is");
+    } else {
+        s.push_str("\nmemory:\n  backend: mnemopi\nmnemopi:\n  scoping: per-project-tagged\n  llmMode: smol\n  noEmbeddings: true\n  polyphonicRecall: true\n");
+        changed = true;
+        ui::ok("mnemopi memory enabled (API-only)");
     }
-    let existing = std::fs::read_to_string(&cfg).unwrap_or_default();
-    const SENTINEL: &str = "# >>> 8sync mnemopi (managed) >>>";
-    if existing.contains("backend: mnemopi") || existing.contains(SENTINEL) {
-        ui::skip("mnemopi memory", "already enabled in config.yml");
+    if s.lines().any(|l| l.starts_with("compaction:")) {
+        ui::skip("compaction@50%", "key already present (user-configured)");
+    } else {
+        s.push_str("\ncompaction:\n  thresholdPercent: 50\n  idleEnabled: true\n");
+        changed = true;
+        ui::ok("compaction@50% + idle enabled (anti-forget)");
+    }
+    if changed { std::fs::write(&cfg, s)?; }
+    Ok(())
+}
+
+/// Deploy the anti-forget recall hook to `~/.omp/hooks/pre/8sync-recall.ts`.
+/// The hook injects a lean ref bundle (skill index + live STATE) at every
+/// `before_agent_start` and into every compaction summary, so the agent keeps
+/// the skill/rule/workflow index fresh even past 50% context / compaction.
+/// Idempotent: skipped if the deployed file is byte-identical to the asset.
+pub(crate) fn ensure_recall_hook(home: &Path) -> Result<()> {
+    let dir = home.join(".omp/hooks/pre");
+    std::fs::create_dir_all(&dir)?;
+    let target = dir.join("8sync-recall.ts");
+    let Some(body) = assets::read("hooks/8sync-recall.ts") else { return Ok(()); };
+    if std::fs::read(&target).ok().as_deref() == Some(body.as_bytes()) {
+        ui::skip("recall hook", "already deployed");
         return Ok(());
     }
-    // Never clobber a user-authored memory backend — they made that choice.
-    if existing.lines().any(|l| l.starts_with("memory:")) {
-        ui::warn("config.yml has its own `memory:` — left as-is; set `backend: mnemopi` manually for recall");
-        return Ok(());
-    }
-    let block = concat!(
-        "# >>> 8sync mnemopi (managed) >>>\n",
-        "# Local long-term memory: recall + retain durable project memory across sessions.\n",
-        "# API-only (no local model): llmMode smol reuses the online model; noEmbeddings = FTS recall.\n",
-        "memory:\n",
-        "  backend: mnemopi\n",
-        "mnemopi:\n",
-        "  scoping: per-project-tagged\n",
-        "  llmMode: smol\n",
-        "  noEmbeddings: true\n",
-        "  polyphonicRecall: true\n",
-        "# <<< 8sync mnemopi <<<\n",
-    );
-    let sep = if existing.is_empty() || existing.ends_with('\n') { "" } else { "\n" };
-    std::fs::write(&cfg, format!("{existing}{sep}{block}"))?;
-    ui::ok(&format!("mnemopi memory enabled (API-only) → {}", cfg.display()));
+    std::fs::write(&target, body.as_bytes())?;
+    ui::ok(&format!("recall hook → {}", target.display()));
     Ok(())
 }

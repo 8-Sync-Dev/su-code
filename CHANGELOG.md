@@ -5,6 +5,16 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added (Phase A — anti-forget)
+
+- **Anti-forget: compaction@50% + idle + recall hook.** `8sync harness` giờ ensure
+  `~/.omp/agent/config.yml` có `compaction.thresholdPercent: 50` + `idleEnabled: true`
+  (snapcompact vẫn là default), và deploy `~/.omp/hooks/pre/8sync-recall.ts` — hook inject
+  lean ref bundle (skill index + live STATE) tại mỗi `before_agent_start` + vào mọi
+  compaction summary → agent giữ index skills/rules/workflow qua 50% context & sau compact.
+  `8sync doctor` báo "anti-forget ON/OFF". Key-based config detection (robust khi omp
+  rewrite/strip comments config.yml — bỏ sentinel strategy). Verified: omp 16.2.1 load OK.
+
 ## [0.24.0] — 2026-06-25
 
 ### Added

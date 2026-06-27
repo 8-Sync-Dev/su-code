@@ -14,7 +14,7 @@ Biến 8sync/omp thành một **super agent-team** token-optimal: omp = core, su
 - [x] **/gs L3 worktree isolation** cụ thể hoá: `git worktree add .gs/wt/<slug> -b gs/<slug>` (v0.23.0)
 
 ## Current step
-Installed 8sync = **0.24.0** (built local; chưa push/release). **Phiên này:** (1) plan team workflow + UI/UX Design Lane; (2) declutter feynman (on-demand 36); (3) help **AI TEAM** + **`/gs` scope-handshake**; (4) eval `%`; (5) research omp; (6) **Mnemopi memory** wired+ON (API-only); (7) **6 reference submodule**; (8) **`token-bench` skill** (v2 −96.6%, gsd −78.6%, correctness 10/10); (9) **`8sync harness eval --project`** — team-readiness scorecard %/vai (su-code 89%, v2 79%; honest coverage, không phịa). Verified: build 0.24.0, scorecard chạy, omp load OK.
+**Executing plan `harness-web-and-recall-plan`** (3 phases). **Phase A DONE** (anti-forget): `ensure_omp_memory_config` (compaction@50% + idle) + `ensure_recall_hook` (`~/.omp/hooks/pre/8sync-recall.ts`, inject skill-index+STATE at agent-start + compaction summary) + doctor report. Key-based config detection (omp strips sentinels). Verified: omp 16.2.1 OK, doctor "anti-forget ON". Installed 8sync 0.24.0 (local, Unreleased). **Next: Phase B** (`8sync harness web` — axum+tokio + Vite FE embed) then **Phase C** (workspaces+team+submodules).
 
 ## Next (chưa làm — tùy chọn)
 - [ ] **Phase 3b — gstack host `omp`** (DEFERRED, không regression): role `/qa`,`/ship` đã fallback bundled; host nằm TRONG submodule gstack (foreign repo, pinned SHA) — KHÔNG thuộc binary su-code. Chỉ làm khi muốn role tool-backed chạy thật qua gstack: `git submodule update --init reference/gstack` → đọc `docs/ADDING_A_HOST.md` → implement → `./setup --host omp` → deinit lại.

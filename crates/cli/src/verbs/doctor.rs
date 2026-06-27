@@ -205,4 +205,10 @@ fn check_ai_engines(home: &std::path::Path) {
     } else {
         ui::warn("  mnemopi memory OFF — `8sync harness` enables deep project recall (API-only)");
     }
+    let hook = home.join(".omp/hooks/pre/8sync-recall.ts").exists();
+    if hook && cfg.contains("thresholdPercent: 50") {
+        ui::ok("  anti-forget: recall hook + compaction@50% ON");
+    } else {
+        ui::warn("  anti-forget OFF — run `8sync harness` (recall hook + compact@50%)");
+    }
 }
