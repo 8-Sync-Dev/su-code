@@ -18,6 +18,7 @@ mod external;
 mod init;
 mod memory;
 mod up;
+mod web;
 
 #[derive(ClapArgs, Debug)]
 #[command(after_help = indoc::indoc! {"
@@ -70,6 +71,15 @@ pub struct Args {
     /// (per-role capability coverage %), instead of running loop fixtures.
     #[arg(long)]
     pub project: bool,
+    /// `web`: launch the local dashboard (axum + Vite FE) at http://127.0.0.1:8731.
+    #[arg(long)]
+    pub web: bool,
+    /// `web --port <PORT>`: override the dashboard port (default 8731).
+    #[arg(long, value_name = "PORT")]
+    pub port: Option<u16>,
+    /// `web --no-open`: do not auto-open the browser.
+    #[arg(long)]
+    pub no_open: bool,
 }
 
 pub fn run(a: Args) -> Result<()> {
@@ -82,6 +92,7 @@ pub fn run(a: Args) -> Result<()> {
         Some("audit") => audit::harness_audit(&env),
         Some("eval") if a.project => eval::harness_eval_project(&env),
         Some("eval") => eval::harness_eval(&env, a.baseline),
+        Some("web") => web::harness_web(&env.home, a.port.unwrap_or(8731), a.no_open),
         Some("help") => {
             print_help();
             Ok(())

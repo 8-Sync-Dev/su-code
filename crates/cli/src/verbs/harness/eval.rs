@@ -154,18 +154,26 @@ pub(crate) fn harness_eval(env: &env_detect::Env, baseline: bool) -> Result<()> 
 /// (engines on PATH, skills present, memory spine, stack signals). This is
 /// "what is the team equipped with HERE", NOT output quality — that is the
 /// model+network `harness eval` loop probe. Honest + deterministic + offline.
-pub(crate) fn harness_eval_project(env: &env_detect::Env) -> Result<()> {
-    use crate::verbs::skill::discover::detect_current_project_root;
-    ui::header("8sync harness eval --project — agent-team readiness scorecard");
-    let Some(root) = detect_current_project_root() else {
-        ui::warn("not inside a project — cd into a repo first");
-        return Ok(());
-    };
-    ui::info(&format!("project: {}", root.display()));
-    ui::info("readiness = capabilities the team HAS here (not output quality — that's `harness eval`)");
-    println!();
+#[derive(serde::Serialize)]
+pub(crate) struct RoleScore {
+    pub role: String,
+    pub pct: usize,
+    pub detail: Vec<String>,
+}
+#[derive(serde::Serialize)]
+pub(crate) struct EvalData {
+    pub overall: usize,
+    pub total: usize,
+    pub present: usize,
+    pub roles: Vec<RoleScore>,
+}
 
-    let home = &env.home;
+/// Compute the agent-team READINESS scorecard for the current repo (per-role
+/// capability coverage %). Deterministic, offline. None if not in a project.
+/// Shared by the CLI (`harness eval --project`) and the web dashboard `/api/eval`.
+pub(crate) fn eval_project_data(home: &std::path::Path) -> Option<EvalData> {
+    use crate::verbs::skill::discover::detect_current_project_root;
+    let root = detect_current_project_root()?;
     let skill = |n: &str| home.join(".omp/skills").join(n).exists() || root.join("agents/skills").join(n).exists();
     let bin = |n: &str| which::which(n).is_ok();
     let has = |p: &str| root.join(p).exists();
@@ -178,8 +186,7 @@ pub(crate) fn harness_eval_project(env: &env_detect::Env) -> Result<()> {
     let build_cmd = pkg.contains("\"build\"") || has("Cargo.toml") || has("Makefile") || has("go.mod");
     let test_cmd = pkg.contains("\"test\"") || has("Cargo.toml") || pkg.contains("vitest") || pkg.contains("jest");
     let cbm = bin("codebase-memory-mcp");
-
-    let roles: Vec<(&str, Vec<(&str, bool)>)> = vec![
+    let roles_raw: Vec<(&str, Vec<(&str, bool)>)> = vec![
         ("dev", vec![("codegraph", has(".codegraph")), ("cbm-graph", cbm), ("build", build_cmd), ("karpathy+ponytail", skill("karpathy-guidelines") && skill("ponytail"))]),
         ("qa/testing", vec![("test", test_cmd), ("full-flow", skill("full-flow")), ("browser-testing", skill("browser-testing-with-devtools")), ("headroom", bin("headroom"))]),
         ("research", vec![("omp/web_search", bin("omp")), ("agent-reach|deep-research", skill("agent-reach") || skill("deep-research")), ("last30days", skill("last30days"))]),
@@ -190,20 +197,35 @@ pub(crate) fn harness_eval_project(env: &env_detect::Env) -> Result<()> {
         ("memory/learn", vec![("Mnemopi-ON", cfg.contains("backend: mnemopi")), ("KNOWLEDGE+PLAYBOOKS", has("agents/KNOWLEDGE.md") && has("agents/PLAYBOOKS.md")), ("cbm-graph", cbm)]),
         ("token-opt", vec![("codegraph", bin("codegraph")), ("cbm", cbm), ("headroom", bin("headroom"))]),
     ];
-
+    let mut roles_out = Vec::new();
     let (mut tp, mut tn) = (0usize, 0usize);
-    for (role, checks) in &roles {
+    for (role, checks) in &roles_raw {
         let p = checks.iter().filter(|(_, ok)| *ok).count();
         let n = checks.len();
         tp += p; tn += n;
         let pct = 100 * p / n;
         let detail: Vec<String> = checks.iter().map(|(l, ok)| format!("{}{}", if *ok { "✓" } else { "·" }, l)).collect();
-        let line = format!("  {:<13} {:>3}%  {}", role, pct, detail.join("  "));
-        if pct == 100 { ui::ok(&line); } else if pct >= 50 { ui::info(&line); } else { ui::warn(&line); }
+        roles_out.push(RoleScore { role: role.to_string(), pct, detail });
     }
     let overall = if tn > 0 { 100 * tp / tn } else { 0 };
+    Some(EvalData { overall, total: tn, present: tp, roles: roles_out })
+}
+
+/// `8sync harness eval --project` — print the readiness scorecard (CLI view).
+pub(crate) fn harness_eval_project(env: &env_detect::Env) -> Result<()> {
+    ui::header("8sync harness eval --project — agent-team readiness scorecard");
+    let Some(data) = eval_project_data(&env.home) else {
+        ui::warn("not inside a project — cd into a repo first");
+        return Ok(());
+    };
+    ui::info("readiness = capabilities the team HAS here (not output quality — that's `harness eval`)");
     println!();
-    ui::info(&format!("OVERALL team readiness: {}%  ({}/{} capabilities present)", overall, tp, tn));
+    for r in &data.roles {
+        let line = format!("  {:<13} {:>3}%  {}", r.role, r.pct, r.detail.join("  "));
+        if r.pct == 100 { ui::ok(&line); } else if r.pct >= 50 { ui::info(&line); } else { ui::warn(&line); }
+    }
+    println!();
+    ui::info(&format!("OVERALL team readiness: {}%  ({}/{} capabilities present)", data.overall, data.present, data.total));
     ui::info("close gaps (·): `8sync harness` (engines+skills) · enable Mnemopi · add a stack skill · seed agents/*");
     Ok(())
 }

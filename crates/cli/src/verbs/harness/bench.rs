@@ -144,3 +144,32 @@ pub(crate) fn harness_bench(env: &env_detect::Env) -> Result<()> {
     ));
     Ok(())
 }
+
+#[derive(serde::Serialize)]
+pub(crate) struct BenchMetrics {
+    pub upfront: usize,
+    pub deferred: usize,
+    pub force_load_prefix: usize,
+    pub a2_saved_pct: usize,
+    pub a1_pass: bool,
+}
+
+/// Summary metrics for the web dashboard (`/api/bench`). Same compute as the
+/// CLI `harness_bench` but returns a serializable struct instead of printing.
+/// None if not inside a project.
+pub(crate) fn bench_metrics(home: &std::path::Path) -> Option<BenchMetrics> {
+    let root = detect_current_project_root()?;
+    let st = build_force_load(home, &root);
+    let block_tok = tok(st.block.chars().count());
+    let core_tok = tok(sum_body(&st.core));
+    let spec_tok = tok(sum_body(&st.specialist));
+    let on_tok = tok(sum_body(&st.ondemand));
+    let spine_tok = tok(spine_chars(&root));
+    let upfront = block_tok + core_tok + spine_tok;
+    let deferred = spec_tok + on_tok;
+    let naive = block_tok + core_tok + spec_tok + spine_tok;
+    let saved = naive.saturating_sub(upfront);
+    let saved_pct = if naive > 0 { saved * 100 / naive } else { 0 };
+    let stable = build_force_load(home, &root).block == st.block;
+    Some(BenchMetrics { upfront, deferred, force_load_prefix: block_tok, a2_saved_pct: saved_pct, a1_pass: stable })
+}

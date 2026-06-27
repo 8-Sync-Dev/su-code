@@ -25,3 +25,6 @@ dist/
 agents/skills/
 
 reference/
+# `8sync harness web` FE (derived — rebuilt by build.rs / pnpm)
+web/node_modules/
+web/dist/

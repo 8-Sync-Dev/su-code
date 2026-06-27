@@ -6,6 +6,23 @@ use std::path::Path;
 #[folder = "../../assets/"]
 pub struct Assets;
 
+// Embedded `8sync harness web` dashboard (Vite build → web/dist/). Built by
+// build.rs; if absent, build.rs writes a stub index.html so this still compiles.
+#[derive(RustEmbed)]
+#[folder = "../../web/dist/"]
+pub struct WebAssets;
+
+/// Binary-safe embedded web file (JS/CSS/html). None only if the path doesn't
+/// exist in the embedded dist tree.
+pub fn web_asset(path: &str) -> Option<Vec<u8>> {
+    Some(WebAssets::get(path)?.data.into_owned())
+}
+
+/// Every embedded web-dist path (e.g. `index.html`, `assets/index-xxx.js`).
+pub fn web_asset_iter() -> Vec<String> {
+    WebAssets::iter().map(|p| p.into_owned()).collect()
+}
+
 pub fn read(path: &str) -> Option<String> {
     let f = Assets::get(path)?;
     String::from_utf8(f.data.into_owned()).ok()
