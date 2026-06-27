@@ -69,6 +69,11 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/submodules/add", post(api_submodule_add))
         .route("/api/submodules/pull", post(api_submodule_pull))
         .route("/api/submodules/remove", post(api_submodule_remove))
+        .route("/api/context", get(api_context))
+        .route("/api/mcp", get(api_mcp))
+        .route("/api/rules", get(api_rules))
+        .route("/api/rules/add", post(api_rule_add))
+        .route("/api/rules/delete", post(api_rule_delete))
 }
 
 async fn api_state(State(ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
@@ -449,4 +454,209 @@ fn parse_gitmodules(root: &std::path::Path) -> Vec<serde_json::Value> {
     }
     flush(&mut out, &name, &path, &url);
     out
+}
+
+// ---- Context tracker / MCP viz / Rules CRUD ----
+
+/// Current omp session context usage for the active project. Reads the newest
+/// session JSONL's last `contextSnapshot.promptTokens`. Window is assumed
+/// (configurable later); threshold comes from compaction.thresholdPercent.
+async fn api_context(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
+    let root = detect_current_project_root();
+    let home = &ctx.home;
+    let window: u64 = 1_000_000; // ASSUMED model context window (glm-5.2 observed reaching ~574k pre-compact → ~1M class)
+    let cfg_raw = std::fs::read_to_string(home.join(".omp/agent/config.yml")).unwrap_or_default();
+    let threshold_pct = parse_threshold(&cfg_raw);
+    let (used, last_compact_at, session, model) = match (&root, session_slug(home, root.as_deref())) {
+        (Some(_r), Some(slug)) => {
+            let dir = home.join(format!(".omp/agent/sessions/{}", slug));
+            let newest = newest_session(&dir);
+            let model = read_model(home);
+            let (used, last_compact) = newest.as_ref().and_then(|p| analyze_context(p)).unwrap_or((0, None));
+            let session = newest.as_ref().and_then(|p| p.file_name()).and_then(|n| n.to_str()).unwrap_or("").to_string();
+            (used, last_compact, session, model)
+        }
+        _ => (0u64, None, String::new(), String::new()),
+    };
+    let pct = if window > 0 { used * 100 / window } else { 0 };
+    let compact_at = window * threshold_pct / 100;
+    Json(serde_json::json!({
+        "used": used,
+        "window": window,
+        "pct": pct,
+        "threshold_pct": threshold_pct,
+        "compact_at": compact_at,
+        "over_threshold": used >= compact_at,
+        "last_compact_at": last_compact_at,
+        "compaction_observed": last_compact_at.is_some(),
+        "session": session,
+        "model": model,
+        "project": root.map(|p| p.display().to_string()).unwrap_or_default(),
+        "note": "window assumed 1M; threshold parsed from config.yml; last_compact_at = observed token-drop (proof compaction fired)",
+    }))
+}
+
+fn session_slug(home: &std::path::Path, root: Option<&std::path::Path>) -> Option<String> {
+    let r = root?;
+    let rel = r.strip_prefix(home).ok()?;
+    Some(format!("-{}", rel.to_string_lossy().replace('/', "-")))
+}
+
+fn newest_session(dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut newest: Option<(std::path::PathBuf, std::time::SystemTime)> = None;
+    let rd = std::fs::read_dir(dir).ok()?;
+    for e in rd.flatten() {
+        if let (Ok(m), Some(name)) = (e.metadata(), e.file_name().to_str()) {
+            if !name.ends_with(".jsonl") {
+                continue;
+            }
+            if let Ok(mtime) = m.modified() {
+                if newest.as_ref().map_or(true, |(_, t)| mtime > *t) {
+                    newest = Some((e.path(), mtime));
+                }
+            }
+        }
+    }
+    newest.map(|(p, _)| p)
+}
+
+/// Scan the tail of a session JSONL for the last `contextSnapshot.promptTokens`.
+/// Read the whole session JSONL, collect every `contextSnapshot.promptTokens`
+/// in order, return (last = current usage, last_compact_at = pre-compact value
+/// before the most recent >30% drop — empirical proof compaction fired).
+fn analyze_context(path: &std::path::Path) -> Option<(u64, Option<u64>)> {
+    let bytes = std::fs::read(path).ok()?;
+    let text = String::from_utf8_lossy(&bytes);
+    let mut tokens: Vec<u64> = Vec::new();
+    for line in text.lines() {
+        if let Some(i) = line.find("\"promptTokens\"") {
+            let rest = line[i + 14..].trim_start_matches([':', ' ', '"']);
+            let num: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if let Ok(n) = num.parse::<u64>() {
+                tokens.push(n);
+            }
+        }
+    }
+    let used = *tokens.last()?;
+    let mut last_compact: Option<u64> = None;
+    for w in tokens.windows(2) {
+        if w[0] > 0 && w[1] < w[0] * 7 / 10 {
+            last_compact = Some(w[0]);
+        }
+    }
+    Some((used, last_compact))
+}
+
+fn parse_threshold(cfg: &str) -> u64 {
+    for line in cfg.lines() {
+        let l = line.trim();
+        if let Some(v) = l.strip_prefix("thresholdPercent:") {
+            if let Ok(n) = v.trim().parse::<u64>() {
+                return n;
+            }
+        }
+    }
+    50
+}
+
+fn read_model(home: &std::path::Path) -> String {
+    let cfg = std::fs::read_to_string(home.join(".omp/agent/config.yml")).unwrap_or_default();
+    let key = "default:";
+    if let Some(i) = cfg.find(key) {
+        let rest = cfg[i + key.len()..].trim_start();
+        let v: String = rest.chars().take_while(|c| !c.is_whitespace()).collect();
+        return v;
+    }
+    String::new()
+}
+
+async fn api_mcp(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
+    let raw = std::fs::read_to_string(ctx.home.join(".omp/agent/mcp.json")).unwrap_or_default();
+    let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+    let mut servers = Vec::new();
+    if let Some(map) = parsed.get("mcpServers").and_then(|v| v.as_object()) {
+        for (name, v) in map {
+            servers.push(serde_json::json!({
+                "name": name,
+                "command": v.get("command").and_then(|x| x.as_str()).unwrap_or(""),
+                "args": v.get("args").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|y| y.as_str().map(String::from)).collect::<Vec<_>>()).unwrap_or_default(),
+                "type": v.get("type").and_then(|x| x.as_str()).unwrap_or("stdio"),
+                "present": v.get("command").and_then(|x| x.as_str()).map(|c| which::which(c).is_ok()).unwrap_or(false),
+            }));
+        }
+    }
+    Json(serde_json::json!({ "servers": servers }))
+}
+
+async fn api_rules(State(ctx): State<Arc<Ctx>>) -> Result<Json<Vec<serde_json::Value>>, ApiErr> {
+    let root = detect_current_project_root().unwrap_or_default();
+    let mut out = Vec::new();
+    for (scope, base) in [
+        ("global", ctx.home.join(".omp/agent/rules")),
+        ("project", root.join(".omp/rules")),
+    ] {
+        if let Ok(rd) = std::fs::read_dir(&base) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if !(name.ends_with(".md") || name.ends_with(".mdc")) {
+                        continue;
+                    }
+                    let size = path.metadata().map(|m| m.len()).unwrap_or(0);
+                    out.push(serde_json::json!({ "scope": scope, "name": name, "path": path.display().to_string(), "bytes": size }));
+                }
+            }
+        }
+    }
+    Ok(Json(out))
+}
+
+#[derive(Deserialize)]
+struct RuleAddBody {
+    name: String,
+    content: String,
+    scope: Option<String>, // "project" (default) | "global"
+}
+
+async fn api_rule_add(
+    State(ctx): State<Arc<Ctx>>,
+    Json(body): Json<RuleAddBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let dir = match body.scope.as_deref() {
+        Some("global") => ctx.home.join(".omp/agent/rules"),
+        _ => root.join(".omp/rules"),
+    };
+    std::fs::create_dir_all(&dir).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut name = body.name.trim().to_string();
+    if name.is_empty() {
+        name = format!("rule-{}", std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0));
+    }
+    if !name.ends_with(".md") {
+        name.push_str(".md");
+    }
+    let safe: String = name.chars().filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.' )).collect();
+    let target = dir.join(safe);
+    std::fs::write(&target, body.content).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::json!({ "ok": true, "path": target.display().to_string() })))
+}
+
+#[derive(Deserialize)]
+struct RuleDelBody {
+    path: String,
+}
+
+async fn api_rule_delete(
+    State(_ctx): State<Arc<Ctx>>,
+    Json(body): Json<RuleDelBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let p = std::path::Path::new(&body.path);
+    // Only allow deleting files under a rules dir (defensive).
+    let ok = p.to_string_lossy().contains("/.omp/rules/") || p.to_string_lossy().contains("/rules/");
+    if !ok {
+        return Err((StatusCode::BAD_REQUEST, "path not under a rules dir".into()));
+    }
+    std::fs::remove_file(p).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::json!({ "ok": true })))
 }

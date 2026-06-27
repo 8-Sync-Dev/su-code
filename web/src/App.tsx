@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type SkillEntry, type Engines } from "./api";
 
-type Page = "state" | "skills" | "memory" | "engines" | "bench" | "eval" | "workspaces" | "team" | "submodules";
+type Page = "state" | "skills" | "memory" | "engines" | "context" | "bench" | "eval" | "workspaces" | "team" | "submodules" | "mcp" | "rules";
 const NAV: { id: Page; label: string }[] = [
   { id: "state", label: "State" },
+  { id: "context", label: "Context" },
   { id: "skills", label: "Skills" },
   { id: "memory", label: "Memory" },
   { id: "engines", label: "Engines" },
@@ -13,6 +14,8 @@ const NAV: { id: Page; label: string }[] = [
   { id: "workspaces", label: "Workspaces" },
   { id: "team", label: "Team" },
   { id: "submodules", label: "Submodules" },
+  { id: "mcp", label: "MCP" },
+  { id: "rules", label: "Rules" },
 ];
 const MEMORY_FILES = ["STATE", "KNOWLEDGE", "PLAYBOOKS", "DECISIONS", "PROJECT", "NOTES"] as const;
 
@@ -42,6 +45,9 @@ export default function App() {
         {page === "workspaces" && <WorkspacesPage />}
         {page === "team" && <TeamPage />}
         {page === "submodules" && <SubmodulesPage />}
+        {page === "context" && <ContextPage />}
+        {page === "mcp" && <McpPage />}
+        {page === "rules" && <RulesPage />}
       </main>
     </div>
   );
@@ -380,6 +386,131 @@ function SubmodulesPage() {
               </div>
             ))
           : null}
+      </div>
+    </>
+  );
+}
+
+function ContextPage() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["context"],
+    queryFn: api.context,
+    refetchInterval: 4000,
+  });
+  if (isLoading) return <p className="muted">Loading…</p>;
+  if (error) return <p className="err">Error: {(error as Error).message}</p>;
+  if (!data) return <p className="muted">No data.</p>;
+  const pct = Math.min(data.pct, 100);
+  const near = data.pct >= data.threshold_pct - 10;
+  const over = data.over_threshold;
+  const barColor = over ? "var(--err)" : near ? "var(--warn)" : "var(--accent)";
+  return (
+    <>
+      <h2>Context</h2>
+      <p className="sub">Live omp session token usage. Auto-compacts at {data.threshold_pct}% (snapcompact).</p>
+      <div className="card">
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+          <strong className="mono">{(data.used / 1000).toFixed(0)}k / {(data.window / 1000).toFixed(0)}k tok</strong>
+          <span className="pct" style={{ color: barColor }}>{data.pct}%</span>
+        </div>
+        <div style={{ position: "relative", height: 22, background: "var(--panel-2)", borderRadius: 6, overflow: "hidden" }} role="progressbar" aria-valuenow={data.pct} aria-valuemin={0} aria-valuemax={100}>
+          <div style={{ width: `${pct}%`, height: "100%", background: barColor, transition: "width .4s ease-out" }} />
+          {/* 50% threshold marker */}
+          <div title={`compact at ${data.threshold_pct}%`} style={{ position: "absolute", left: `${data.threshold_pct}%`, top: 0, bottom: 0, width: 2, background: "var(--text)", opacity: 0.7 }} />
+        </div>
+        <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+          compact at {data.threshold_pct}% = {(data.compact_at / 1000).toFixed(0)}k tok · {over ? "OVER — will compact next turn" : `${data.threshold_pct - data.pct > 0 ? data.threshold_pct - data.pct : 0}% headroom`}
+        </p>
+        {data.compaction_observed && (
+          <p style={{ marginTop: 6 }}>
+            <span className="tag ok">✓ compaction observed</span>
+            <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>last fired at {((data.last_compact_at ?? 0) / 1000).toFixed(0)}k tok</span>
+          </p>
+        )}
+      </div>
+      <div className="card">
+        <div className="row" style={{ borderBottom: 0 }}>
+          <span>model</span><span className="mono">{data.model || "—"}</span>
+        </div>
+        <div className="row" style={{ borderBottom: 0 }}>
+          <span>project</span><span className="mono" style={{ fontSize: 11 }}>{data.project || "—"}</span>
+        </div>
+        <div className="row" style={{ borderBottom: 0 }}>
+          <span>session</span><span className="mono" style={{ fontSize: 11 }}>{data.session || "—"}</span>
+        </div>
+        <p className="muted" style={{ marginTop: 8, fontSize: 11 }}>{data.note}</p>
+      </div>
+    </>
+  );
+}
+
+function McpPage() {
+  const { data, isLoading, error } = useQuery({ queryKey: ["mcp"], queryFn: api.mcp });
+  if (isLoading) return <p className="muted">Loading…</p>;
+  if (error) return <p className="err">Error: {(error as Error).message}</p>;
+  if (!data || data.servers.length === 0) return <p className="muted">No MCP servers registered.</p>;
+  return (
+    <>
+      <h2>MCP servers</h2>
+      <p className="sub">From <code>~/.omp/agent/mcp.json</code>. omp loads these each session.</p>
+      <div className="card">
+        {data.servers.map((s) => (
+          <div className="row" key={s.name}>
+            <div>
+              <div className="mono">{s.name}</div>
+              <div className="muted mono" style={{ fontSize: 11 }}>{s.command} {s.args.join(" ")}</div>
+            </div>
+            <span className={`tag ${s.present ? "ok" : "warn"}`}>{s.present ? "present" : "missing"} · {s.type}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function RulesPage() {
+  const qc = useQueryClient();
+  const { data, isLoading, error } = useQuery({ queryKey: ["rules"], queryFn: api.rules });
+  const [name, setName] = useState("");
+  const [content, setContent] = useState("");
+  const [scope, setScope] = useState<"project" | "global">("project");
+  const add = useMutation({
+    mutationFn: () => api.ruleAdd(name, content, scope),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rules"] }); setName(""); setContent(""); },
+  });
+  const del = useMutation({ mutationFn: (p: string) => api.ruleDelete(p), onSuccess: () => qc.invalidateQueries({ queryKey: ["rules"] }) });
+  return (
+    <>
+      <h2>Rules</h2>
+      <p className="sub">omp rule files (<code>.omp/rules/*.md</code> project, <code>~/.omp/agent/rules/*.md</code> global).</p>
+      <div className="card">
+        <div className="row" style={{ borderBottom: 0 }}>
+          <input type="text" placeholder="rule-name" value={name} onChange={(e) => setName(e.target.value)} aria-label="rule name" />
+          <select value={scope} onChange={(e) => setScope(e.target.value as "project" | "global")}>
+            <option value="project">project</option>
+            <option value="global">global</option>
+          </select>
+        </div>
+        <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Rule content (markdown)…" style={{ minHeight: 140, marginTop: 8 }} aria-label="rule content" />
+        <div className="row" style={{ borderBottom: 0, marginTop: 6 }}>
+          <span className="muted" style={{ fontSize: 11 }}>Tip: paste from a link/file/folder source here.</span>
+          <button className="primary" disabled={!content || add.isPending} onClick={() => add.mutate()}>Add rule</button>
+        </div>
+        {add.isError ? <p className="err" style={{ marginTop: 8 }}>Add failed: {(add.error as Error).message}</p> : null}
+      </div>
+      <div className="card">
+        {isLoading ? <p className="muted">Loading…</p> : null}
+        {error ? <p className="err">Error: {(error as Error).message}</p> : null}
+        {data && data.length === 0 ? <p className="muted">No rules.</p> : null}
+        {data && data.length > 0 ? data.map((r) => (
+          <div className="row" key={r.path}>
+            <div>
+              <div className="mono">{r.name}</div>
+              <div className="muted mono" style={{ fontSize: 11 }}>{r.scope} · {r.bytes} B</div>
+            </div>
+            <button onClick={() => del.mutate(r.path)} disabled={del.isPending}>delete</button>
+          </div>
+        )) : null}
       </div>
     </>
   );

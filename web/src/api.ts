@@ -32,6 +32,22 @@ export type TeamInfo = {
   readiness: EvalReport | null;
 };
 export type Submodule = { name: string; path: string; url: string; initialized: boolean };
+export type ContextInfo = {
+  used: number;
+  window: number;
+  pct: number;
+  threshold_pct: number;
+  compact_at: number;
+  over_threshold: boolean;
+  last_compact_at: number | null;
+  compaction_observed: boolean;
+  session: string;
+  model: string;
+  project: string;
+  note: string;
+};
+export type McpServer = { name: string; command: string; args: string[]; type: string; present: boolean };
+export type Rule = { scope: string; name: string; path: string; bytes: number };
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, init);
@@ -67,4 +83,10 @@ export const api = {
   submodulePull: (path: string) => json<{ ok: boolean }>("/api/submodules/pull", POST_JSON({ path })),
   submoduleRemove: (path: string) =>
     json<{ ok: boolean }>("/api/submodules/remove", POST_JSON({ path })),
+  context: () => json<ContextInfo>("/api/context"),
+  mcp: () => json<{ servers: McpServer[] }>("/api/mcp"),
+  rules: () => json<Rule[]>("/api/rules"),
+  ruleAdd: (name: string, content: string, scope?: string) =>
+    json<{ ok: boolean; path: string }>("/api/rules/add", POST_JSON({ name, content, scope })),
+  ruleDelete: (path: string) => json<{ ok: boolean }>("/api/rules/delete", POST_JSON({ path })),
 };

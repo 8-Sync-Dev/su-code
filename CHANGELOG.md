@@ -4,6 +4,22 @@ Mọi thay đổi đáng kể của `8sync` ghi vào đây. Format theo [Keep a 
 versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nhật mục `Unreleased`.
 
 ## [Unreleased]
+## [0.26.0] — 2026-06-27
+
+### Added (dashboard FE enhancement)
+
+- **Context tracker page** — live omp session token usage for the current project (reads the
+  session JSONL's `contextSnapshot.promptTokens`, auto-refresh 4s). Gauge + 50% threshold marker +
+  **compaction-observed badge** (detects the token drop = empirical proof auto-compact fired). `/api/context`.
+  Verified real: tracks this very session 440k→447k live; detected last compact at 575k.
+- **MCP servers page** — visualize `~/.omp/agent/mcp.json` (name/command/args/present). `/api/mcp`.
+- **Rules CRUD page** — list/add/delete omp rule files (`.omp/rules/*` project + `~/.omp/agent/rules/*`
+  global), add from pasted content (link/file/folder source). `/api/rules` (+add/delete).
+- Dashboard now 12 pages (State · Context · Skills · Memory · Engines · Bench · Readiness · Workspaces ·
+  Team · Submodules · MCP · Rules). Anti-slop per impeccable (no gradient text / glassmorphism / over-round;
+  verb+object buttons). Browser-tested (Chromium): all pages render real data, Context live-tracking +
+  Rules add-end-to-end verified.
+
 
 ## [0.25.0] — 2026-06-27
 

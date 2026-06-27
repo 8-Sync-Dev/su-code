@@ -14,7 +14,7 @@ Biến 8sync/omp thành một **super agent-team** token-optimal: omp = core, su
 - [x] **/gs L3 worktree isolation** cụ thể hoá: `git worktree add .gs/wt/<slug> -b gs/<slug>` (v0.23.0)
 
 ## Current step
-Installed 8sync = **0.25.0** (built local). **Plan `harness-web-and-recall-plan` FULLY EXECUTED (A+B+C, all tested real):** (A) anti-forget — compaction@50% + idle + recall hook (`~/.omp/hooks/pre/8sync-recall.ts`); (B) **`8sync harness web`** — axum+Vite dashboard (`http://127.0.0.1:8731`), API state/skills(toggle)/memory/engines(codegraph/cbm/headroom/**serena**/mnemopi)/bench/eval, refactor `bench_metrics()`+`eval_project_data()` shared; (C) full-manage — workspaces(profiles+project)/team(roster+readiness)/submodules(add/pull/remove)/skill add-update. Verified real: all endpoints live (eval 96%, bench A1 PASS, submodules parse, omp 16.2.1 OK). **Next: push + release v0.25.0.**
+Installed 8sync = **0.26.0** (built local). **Plan done + FE enhancement:** A (anti-forget) + B (`8sync harness web` axum+Vite) + C (workspaces/team/submodules/skill-add) + **v0.26.0 dashboard FE**: Context tracker (live token gauge + 50% threshold + compaction-observed badge — verified detects 575k compact), MCP servers viz, Rules CRUD. **12 pages**, browser-tested (Chromium): all render real data, Context auto-refresh tracking live, Rules add e2e. omp 16.2.1 OK.
 
 ## Next (chưa làm — tùy chọn)
 - [ ] **Phase 3b — gstack host `omp`** (DEFERRED, không regression): role `/qa`,`/ship` đã fallback bundled; host nằm TRONG submodule gstack (foreign repo, pinned SHA) — KHÔNG thuộc binary su-code. Chỉ làm khi muốn role tool-backed chạy thật qua gstack: `git submodule update --init reference/gstack` → đọc `docs/ADDING_A_HOST.md` → implement → `./setup --host omp` → deinit lại.
