@@ -1,21 +1,16 @@
 name = "alexdev"
-description = "alexdev full bundle — all personal profiles (nvidia driver + hardware + IME + dev stack + warp)"
+description = "alexdev bundle — kitty terminal + fan/LED control (CoolerControl/OpenRGB/Lian Li) + Cloudflare WARP + Vietnamese Unikey"
 visibility = "personal"
 
 extends = [
-  "nvidia",
-  "vietnamese",
   "hardware-cooling",
   "hardware-lianli",
-  "displaylink",
-  "apps-personal",
   "warp",
-  "dev-stack",
-  "bluetooth",
+  "vietnamese",
 ]
 
 [packages]
-pacman = []
+pacman = ["kitty"]
 aur = []
 
 [services]
@@ -24,4 +19,4 @@ user_enable = []
 
 [post_install]
 commands = []
-hint = "Reboot sau khi NVIDIA driver được bật. Desktop environment (Hyprland/Caelestia) cài riêng — 8sync không còn quản lý."
+hint = "Re-login để fcitx5 (Unikey) + Cloudflare WARP có hiệu lực. Mở CoolerControl/OpenRGB để config fan/RGB. KHÔNG cài nvidia/dev-stack/bluetooth/displaylink/apps-personal."
