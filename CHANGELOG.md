@@ -5,6 +5,8 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-06-29
+
 ### Added — adaptive model routing
 
 - **Per-prompt model selection** (no more single fixed model). `assets/configs/models.toml`
