@@ -546,7 +546,7 @@ fn install_terminal(env: &env_detect::Env, dry_run: bool) -> Result<()> {
 /// Put a wallpaper at `target`. Bundled `assets/wallpapers/default.png` wins; else
 /// download `[ui].wallpaper_url` from global.toml with curl. True if present after.
 fn deploy_wallpaper(env: &env_detect::Env, target: &std::path::Path) -> bool {
-    if target.exists() {
+    if is_valid_image(target) {
         return true;
     }
     if let Some(p) = target.parent() {
@@ -560,19 +560,38 @@ fn deploy_wallpaper(env: &env_detect::Env, target: &std::path::Path) -> bool {
     }
     if let Some(url) = wallpaper_url(env) {
         let ok = Command::new("curl")
-            .args(["-fsSL", "-o"])
+            .args(["-fsSL", "--retry", "2", "-A", "Mozilla/5.0", "-o"])
             .arg(target)
             .arg(&url)
             .status()
             .map(|s| s.success())
             .unwrap_or(false);
-        if ok && target.exists() {
+        // exists() is not enough — a blocked/empty response leaves a 0-byte PNG
+        // that kitty can't render ("Could not render image to RGB: EOF"). Require
+        // valid image magic, else purge the leftover so a re-run can retry.
+        if ok && is_valid_image(target) {
             ui::ok(&format!("wallpaper ↓ {}", target.display()));
             return true;
         }
-        ui::skip("wallpaper", "no bundled image and download failed");
+        let _ = std::fs::remove_file(target);
+        ui::skip("wallpaper", "download failed or not a valid image");
     }
     false
+}
+
+/// A wallpaper file is usable only if it is non-empty and its magic bytes are a
+/// known raster format — guards the 0-byte / HTML-error downloads that make kitty
+/// fail with "Could not render image to RGB: EOF" and leave a blank background.
+fn is_valid_image(p: &std::path::Path) -> bool {
+    use std::io::Read;
+    let Ok(mut f) = std::fs::File::open(p) else { return false };
+    let mut head = [0u8; 4];
+    if f.read_exact(&mut head).is_err() {
+        return false; // < 4 bytes ⇒ empty or truncated
+    }
+    head == [0x89, 0x50, 0x4E, 0x47] // PNG
+        || head[..2] == [0xFF, 0xD8] // JPEG
+        || head == [0x52, 0x49, 0x46, 0x46] // WEBP "RIFF"
 }
 
 /// `[ui].wallpaper_url` from the deployed global.toml, else the embedded default.
