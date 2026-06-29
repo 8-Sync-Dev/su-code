@@ -23,20 +23,8 @@ pub(crate) fn harness_model(env: &env_detect::Env, args: &[String]) -> Result<()
     if args.len() >= 2 {
         let key = args[0].trim().to_string();
         let val = args[1..].join(" ").trim().to_string();
-        let raw = std::fs::read_to_string(&path).unwrap_or_default();
-        let mut doc: toml::Value =
-            toml::from_str(&raw).unwrap_or_else(|_| toml::Value::Table(Default::default()));
         let section = if ROLE_KEYS.contains(&key.as_str()) { "roles" } else { "tasks" };
-        let tbl = doc
-            .as_table_mut()
-            .ok_or_else(|| anyhow::anyhow!("models.toml is not a table"))?;
-        let sect = tbl
-            .entry(section.to_string())
-            .or_insert_with(|| toml::Value::Table(Default::default()));
-        sect.as_table_mut()
-            .ok_or_else(|| anyhow::anyhow!("[{}] is not a table", section))?
-            .insert(key.clone(), toml::Value::String(val.clone()));
-        std::fs::write(&path, toml::to_string(&doc)?)?;
+        set_model_toml(&path, section, &key, &val)?;
         ui::ok(&format!("set [{}].{} = \"{}\" → {}", section, key, val, path.display()));
         ui::info("re-run `8sync harness model` to view; takes effect on the next `8sync ai`/`8sync .`/`/auto`.");
         return Ok(());
@@ -66,5 +54,30 @@ pub(crate) fn harness_model(env: &env_detect::Env, args: &[String]) -> Result<()
     ui::info("set: 8sync harness model <default|plan|smol|slow | plan|review|debug|code|trivial> <model>");
     ui::info("e.g. 8sync harness model review opus · 8sync harness model default codex");
     ui::info("names resolve fuzzily in omp; unconfigured/unauthed → omp falls back to an authed model.");
+    Ok(())
+}
+
+/// Set `[section].key = value` in a `models.toml` document, creating the table
+/// and section as needed, then write it back. Shared by the CLI set mode and
+/// the `harness web` `POST /api/models` handler so both edit the toml identically.
+pub(crate) fn set_model_toml(
+    path: &std::path::Path,
+    section: &str,
+    key: &str,
+    value: &str,
+) -> Result<()> {
+    let raw = std::fs::read_to_string(path).unwrap_or_default();
+    let mut doc: toml::Value =
+        toml::from_str(&raw).unwrap_or_else(|_| toml::Value::Table(Default::default()));
+    let tbl = doc
+        .as_table_mut()
+        .ok_or_else(|| anyhow::anyhow!("models.toml is not a table"))?;
+    let sect = tbl
+        .entry(section.to_string())
+        .or_insert_with(|| toml::Value::Table(Default::default()));
+    sect.as_table_mut()
+        .ok_or_else(|| anyhow::anyhow!("[{}] is not a table", section))?
+        .insert(key.to_string(), toml::Value::String(value.to_string()));
+    std::fs::write(path, toml::to_string(&doc)?)?;
     Ok(())
 }

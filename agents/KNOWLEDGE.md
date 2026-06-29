@@ -192,3 +192,16 @@
   now deploys APPEND_SYSTEM+engine+workflow (was bare/init only). Grounded in `reference/gsd-pi` auto-mode +
   dynamic-model-routing (read real submodule). Verified: build clean, bare harness deploys `/auto` only,
   bench A1 PASS. DEFERRED: full capability-scoring per-task model router (gsd-pi-level, TS engine) — documented as target.
+- **validated: dashboard redesign + model-routing UI → v0.29.0.** `8sync harness web` rebuilt
+  (FE `web/src`, impeccable product-register; backend `web.rs`). New: **Models page** (`/api/models`
+  get+post → live-edit `models.toml` roles/tasks), **project switcher** (`/api/projects`, status dots),
+  **workflow templates** (`/api/workflows/templates`), **markdown renderer** (`web/src/markdown.tsx`,
+  XSS-safe — watch: shared module-level RegExp `.lastIndex` clobber froze the tab → per-call RegExp).
+  Fixes: **serena showed off** = false-negative (`which serena` fails; serena is uvx-launched) → detect
+  via `mcpServers.serena` in `~/.omp/agent/mcp.json` + `uvx`/`uv` on PATH; **context honesty** (`assumed:true`,
+  `windowTok`, `thresholdPct`, `willCompact` — 1M window is an estimate, not authoritative); **workflow
+  canvas** fixed (was tiny broken box → 560px react-flow viewport). Model philosophy locked in
+  `models.toml`+omp `config.yml`: **Opus = thinking** (plan/review/debug/vision), **GLM = mechanical**
+  (code/edit/default/trivial). Verified: integrated `cargo build` (build.rs embeds FE) clean, all
+  endpoints smoke-tested live, 14 pages browser-verified 0 console errors. Delegated FE↔backend to
+  parallel subagents on disjoint files (web/src vs web.rs) — lead owned integrated build + verify + ship.

@@ -28,7 +28,9 @@
 - **Workflow templates** hiện + load được; fix react-flow canvas (full height, không bể).
 - Redesign all screens: contrast ≥4.5:1, spacing rhythm, no glassmorphism-default, no over-round, empty states, responsive; browser-verify mọi trang (0 console error).
 
-## Phases / track
-- [ ] BE: serena detection · context real-window · /api/models GET+POST · /api/projects · /api/workflows/templates
-- [ ] FE: markdown render · Models page · project switcher (status dots) · workflow templates · full impeccable redesign
-- [ ] Integrate + build (build.rs FE) + browser-verify key pages + ship
+## Phases / track — DONE, shipped v0.29.0
+- [x] BE: serena detection · context honesty (`assumed/willCompact`) · /api/models GET+POST · /api/projects · /api/workflows/templates
+- [x] FE: markdown render (`markdown.tsx`) · Models page (inline edit) · project switcher (status dots, 24 projects) · workflow templates + fixed 560px canvas · full impeccable redesign (14 pages)
+- [x] Integrate + `cargo build` (build.rs embeds FE) + browser-verify (0 console errors) + ship v0.29.0
+- Bonus: model-routing philosophy locked — Opus=thinking (plan/review/debug/vision) · GLM=mechanical (code/edit/default/trivial); omp `config.yml` vision→opus.
+- DEFERRED: full capability-scoring per-task router (TS engine) — documented as future target.

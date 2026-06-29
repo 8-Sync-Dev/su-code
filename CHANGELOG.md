@@ -5,6 +5,33 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.29.0] — 2026-06-29
+
+### Added — `8sync harness web` dashboard: full redesign + Models/Projects
+- **Models page** (`/api/models` get+post) — view/edit the adaptive model routing live: `[roles]`
+  (default/plan/smol/slow) + `[tasks]` (plan/review/debug/code/trivial), inline selects write
+  `~/.config/8sync/models.toml` immediately. Surfaces the routing philosophy: **thinking → Opus**
+  (plan/review/debug/vision), **mechanical → GLM** (code/edit/default/trivial).
+- **Project switcher** (`/api/projects`) — sidebar-top dropdown lists every omp project with a
+  green (active) / gray (off) status dot; activate + refresh without `cd`.
+- **Workflow templates** (`/api/workflows/templates`) — 3 starter graphs (research→plan→build,
+  review, qa) loadable in the editor.
+- **Markdown rendering** — new XSS-safe renderer (`web/src/markdown.tsx`); State/Memory/Context
+  now render headings, lists, GFM checkboxes, code, emphasis (was raw text).
+
+### Fixed
+- **serena engine showed "off" wrongly** — detection now checks `mcpServers.serena` in
+  `~/.omp/agent/mcp.json` + `uvx`/`uv` on PATH (serena is uvx-launched, no PATH binary), not
+  `which serena`. Reports `{present,registered,runner}`.
+- **Context window honesty** — `/api/context` now exposes `assumed:true`, `windowTok`,
+  `thresholdPct`, `willCompact`; the FE labels the 1M window as an estimate (no false precision).
+- **Workflow canvas** — react-flow viewport fixed (was a tiny broken box) to a usable 560px panel
+  with fit/zoom.
+
+### Changed
+- Dashboard FE redesigned to a product-register design system (impeccable): solid surfaces,
+  violet brand preserved, legible chips, grouped nav, dark + light. 14 pages, zero console errors.
+
 ## [0.28.0] — 2026-06-29
 
 ### Changed — ONE command: `/auto` (retired `/gs`)

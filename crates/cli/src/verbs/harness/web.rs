@@ -74,7 +74,10 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/rules", get(api_rules))
         .route("/api/rules/add", post(api_rule_add))
         .route("/api/rules/delete", post(api_rule_delete))
+        .route("/api/models", get(api_models_get).post(api_models_set))
+        .route("/api/projects", get(api_projects))
         .route("/api/workflows", get(api_workflows))
+        .route("/api/workflows/templates", get(api_workflow_templates))
         .route("/api/workflows/:name", get(api_workflow_get).post(api_workflow_save).delete(api_workflow_delete))
         .route("/api/workflows/:name/export", post(api_workflow_export))
 }
@@ -196,11 +199,27 @@ async fn api_engines(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
     let ver = |b: &str| crate::env_detect::cmd_version(b, &["--version"]).unwrap_or_default();
     let eng = |b: &str| serde_json::json!({ "present": which::which(b).is_ok(), "version": ver(b).trim() });
     let cfg = std::fs::read_to_string(ctx.home.join(".omp/agent/config.yml")).unwrap_or_default();
+    // serena runs via `uvx` (no `serena` binary on PATH), so `which serena`
+    // always reports it off. Detect it instead by registration in mcp.json
+    // (`mcpServers.serena`) AND a uv/uvx runner being present. Version is
+    // best-effort (the uvx-launched server exposes none here) → left empty.
+    let mcp_raw = std::fs::read_to_string(ctx.home.join(".omp/agent/mcp.json")).unwrap_or_default();
+    let serena_registered = serde_json::from_str::<serde_json::Value>(&mcp_raw)
+        .ok()
+        .and_then(|v| v.get("mcpServers").and_then(|m| m.get("serena")).cloned())
+        .is_some();
+    let uv_present = which::which("uvx").is_ok() || which::which("uv").is_ok();
+    let serena = serde_json::json!({
+        "present": serena_registered && uv_present,
+        "version": "",
+        "registered": serena_registered,
+        "runner": uv_present,
+    });
     Json(serde_json::json!({
         "codegraph": eng("codegraph"),
         "cbm": eng("codebase-memory-mcp"),
         "headroom": eng("headroom"),
-        "serena": eng("serena"),
+        "serena": serena,
         "mnemopi_on": cfg.contains("backend: mnemopi"),
     }))
 }
@@ -483,19 +502,27 @@ async fn api_context(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
     };
     let pct = if window > 0 { used * 100 / window } else { 0 };
     let compact_at = window * threshold_pct / 100;
+    let will_compact = compact_at > 0 && used >= compact_at;
     Json(serde_json::json!({
-        "used": used,
-        "window": window,
+        // explicit FE contract (camelCase) — the window is ASSUMED, not authoritative
+        "usedTok": used,
+        "windowTok": window,
         "pct": pct,
-        "threshold_pct": threshold_pct,
-        "compact_at": compact_at,
-        "over_threshold": used >= compact_at,
-        "last_compact_at": last_compact_at,
-        "compaction_observed": last_compact_at.is_some(),
-        "session": session,
+        "thresholdPct": threshold_pct,
+        "willCompact": will_compact,
+        "assumed": true,
         "model": model,
         "project": root.map(|p| p.display().to_string()).unwrap_or_default(),
-        "note": "window assumed 1M; threshold parsed from config.yml; last_compact_at = observed token-drop (proof compaction fired)",
+        "session": session,
+        // retained legacy/diagnostic fields
+        "used": used,
+        "window": window,
+        "threshold_pct": threshold_pct,
+        "compact_at": compact_at,
+        "over_threshold": will_compact,
+        "last_compact_at": last_compact_at,
+        "compaction_observed": last_compact_at.is_some(),
+        "note": "window assumed 1M (not authoritative); threshold parsed from config.yml; last_compact_at = observed token-drop (proof compaction fired)",
     }))
 }
 
@@ -890,5 +917,274 @@ fn topo_order(nodes: &[serde_json::Value], edges: &[serde_json::Value]) -> Vec<u
         out
     } else {
         (0..nodes.len()).collect() // cycle → array order
+    }
+}
+
+// ---- Adaptive model config (models.toml) ----
+
+/// Resolve `~/.config/8sync/models.toml` the same way `ModelConfig::load()`
+/// does (XDG config dir), falling back to `<home>/.config` if XDG is absent.
+fn models_toml_path(home: &std::path::Path) -> std::path::PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| home.join(".config"))
+        .join("8sync/models.toml")
+}
+
+/// The `/api/models` JSON shape: config path + parsed roles/tasks + the fixed
+/// task-class list the FE renders as editable rows.
+fn models_config_json(path: &std::path::Path) -> serde_json::Value {
+    let cfg = crate::models::ModelConfig::load();
+    serde_json::json!({
+        "path": path.display().to_string(),
+        "roles": {
+            "default": cfg.roles.default,
+            "plan": cfg.roles.plan,
+            "smol": cfg.roles.smol,
+            "slow": cfg.roles.slow,
+        },
+        "tasks": cfg.tasks,
+        "classes": ["plan", "review", "debug", "code", "trivial"],
+    })
+}
+
+async fn api_models_get(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
+    Json(models_config_json(&models_toml_path(&ctx.home)))
+}
+
+#[derive(Deserialize)]
+struct ModelSetBody {
+    section: String,
+    key: String,
+    value: String,
+}
+
+async fn api_models_set(
+    State(ctx): State<Arc<Ctx>>,
+    Json(body): Json<ModelSetBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let section = body.section.trim();
+    if section != "roles" && section != "tasks" {
+        return Err((StatusCode::BAD_REQUEST, "section must be 'roles' or 'tasks'".into()));
+    }
+    let key = body.key.trim();
+    if key.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "key must not be empty".into()));
+    }
+    let path = models_toml_path(&ctx.home);
+    // Seed the user file from the embedded default on first touch (same as the
+    // CLI set mode), so a fresh machine writes a complete config.
+    if !path.exists() {
+        if let (Some(def), Some(parent)) = (assets::read("configs/models.toml"), path.parent()) {
+            std::fs::create_dir_all(parent).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            std::fs::write(&path, def).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        }
+    }
+    super::model::set_model_toml(&path, section, key, body.value.trim())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(models_config_json(&path)))
+}
+
+// ---- Projects (omp session directories) ----
+
+/// Invert `session_slug`'s encoding (`-<rel-with-/replaced-by-->`) back to an
+/// absolute project path under `home`. The encoding is lossy (a literal `-` in a
+/// dir name is indistinguishable from a `/` separator), so resolve greedily
+/// against the filesystem: at each level take the longest run of `-`-joined
+/// tokens that names an existing directory. Returns None if it can't be resolved
+/// to an existing path.
+fn slug_to_path(home: &std::path::Path, slug: &str) -> Option<std::path::PathBuf> {
+    let body = slug.strip_prefix('-')?;
+    let tokens: Vec<&str> = body.split('-').collect();
+    let mut cur = home.to_path_buf();
+    let mut i = 0;
+    while i < tokens.len() {
+        let mut advanced = false;
+        // Prefer the longest token run that forms an existing directory.
+        for j in (i + 1..=tokens.len()).rev() {
+            let candidate = tokens[i..j].join("-");
+            let p = cur.join(&candidate);
+            if p.is_dir() {
+                cur = p;
+                i = j;
+                advanced = true;
+                break;
+            }
+        }
+        if !advanced {
+            return None;
+        }
+    }
+    Some(cur)
+}
+
+/// Newest session file mtime (unix seconds) for a session directory, 0 if none.
+fn session_mtime_secs(dir: &std::path::Path) -> u64 {
+    newest_session(dir)
+        .and_then(|p| std::fs::metadata(&p).ok())
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+async fn api_projects(State(ctx): State<Arc<Ctx>>) -> Json<Vec<serde_json::Value>> {
+    let home = &ctx.home;
+    let sessions_dir = home.join(".omp/agent/sessions");
+    let mut rows: Vec<(std::path::PathBuf, u64)> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&sessions_dir) {
+        for e in rd.flatten() {
+            let dir = e.path();
+            if !dir.is_dir() {
+                continue;
+            }
+            let slug = match e.file_name().to_str() {
+                Some(s) => s.to_string(),
+                None => continue,
+            };
+            let proj = match slug_to_path(home, &slug) {
+                Some(p) => p,
+                None => continue,
+            };
+            rows.push((proj, session_mtime_secs(&dir)));
+        }
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let most_recent = rows.iter().map(|(_, m)| *m).max().unwrap_or(0);
+    let mut out: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|(path, mtime)| {
+            let within_30m = mtime > 0 && now.saturating_sub(mtime) <= 30 * 60;
+            let is_most_recent = mtime > 0 && mtime == most_recent;
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+            serde_json::json!({
+                "name": name,
+                "path": path.display().to_string(),
+                "active": within_30m || is_most_recent,
+                "lastModified": mtime,
+            })
+        })
+        .collect();
+    // Active first, then most-recently-modified first.
+    out.sort_by(|a, b| {
+        let (aa, bb) = (a["active"].as_bool().unwrap_or(false), b["active"].as_bool().unwrap_or(false));
+        bb.cmp(&aa).then_with(|| {
+            let (am, bm) = (a["lastModified"].as_u64().unwrap_or(0), b["lastModified"].as_u64().unwrap_or(0));
+            bm.cmp(&am)
+        })
+    });
+    Json(out)
+}
+
+// ---- Workflow templates (react-flow starter graphs) ----
+
+/// One react-flow node in the `{ name, nodes, edges }` graph shape that
+/// `api_workflow_get`/`api_workflow_save` use. `kind` ∈ skill|subagent|tool
+/// (consumed by `generate_workflow_extension`); `ref` is the skill/agent/tool id.
+fn wf_node(id: &str, label: &str, kind: &str, refv: &str, x: i64, y: i64) -> serde_json::Value {
+    serde_json::json!({
+        "id": id,
+        "type": "default",
+        "position": { "x": x, "y": y },
+        "data": { "label": label, "kind": kind, "ref": refv },
+    })
+}
+
+fn wf_edge(source: &str, target: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": format!("e-{}-{}", source, target),
+        "source": source,
+        "target": target,
+    })
+}
+
+async fn api_workflow_templates(State(_ctx): State<Arc<Ctx>>) -> Json<Vec<serde_json::Value>> {
+    let research_plan_build = serde_json::json!({
+        "name": "research → plan → build",
+        "nodes": [
+            wf_node("research", "Research the problem space", "subagent", "explore", 0, 0),
+            wf_node("plan", "Draft an implementation plan", "subagent", "plan", 240, 0),
+            wf_node("build", "Implement the plan", "subagent", "task", 480, 0),
+        ],
+        "edges": [wf_edge("research", "plan"), wf_edge("plan", "build")],
+    });
+    let review = serde_json::json!({
+        "name": "review",
+        "nodes": [
+            wf_node("review", "Review the diff for quality + security", "subagent", "reviewer", 0, 0),
+            wf_node("report", "Summarize findings + action items", "skill", "", 240, 0),
+        ],
+        "edges": [wf_edge("review", "report")],
+    });
+    let qa = serde_json::json!({
+        "name": "qa",
+        "nodes": [
+            wf_node("test", "Run the test suite", "tool", "bash", 0, 0),
+            wf_node("fix", "Fix any failing tests", "subagent", "task", 240, 0),
+            wf_node("verify", "Re-run tests to confirm green", "tool", "bash", 480, 0),
+        ],
+        "edges": [wf_edge("test", "fix"), wf_edge("fix", "verify")],
+    });
+    Json(vec![
+        serde_json::json!({ "name": "research → plan → build", "graph": research_plan_build }),
+        serde_json::json!({ "name": "review", "graph": review }),
+        serde_json::json!({ "name": "qa", "graph": qa }),
+    ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{session_slug, slug_to_path};
+    use std::path::PathBuf;
+
+    /// Unique scratch home under the OS temp dir; cleaned on drop.
+    struct TmpHome(PathBuf);
+    impl TmpHome {
+        fn new(tag: &str) -> Self {
+            let p = std::env::temp_dir().join(format!("8sync_web_test_{}_{}", std::process::id(), tag));
+            let _ = std::fs::remove_dir_all(&p);
+            std::fs::create_dir_all(&p).unwrap();
+            TmpHome(p)
+        }
+        fn mkdirs(&self, rel: &str) -> PathBuf {
+            let p = self.0.join(rel);
+            std::fs::create_dir_all(&p).unwrap();
+            p
+        }
+    }
+    impl Drop for TmpHome {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn slug_roundtrip_recovers_path_with_literal_dash() {
+        let home = TmpHome::new("dash");
+        // Project dir whose name contains a literal '-' (the lossy case).
+        let root = home.mkdirs("Projects/tools/su-code");
+        let slug = session_slug(&home.0, Some(root.as_path())).unwrap();
+        assert_eq!(slug, "-Projects-tools-su-code");
+        assert_eq!(slug_to_path(&home.0, &slug), Some(root));
+    }
+
+    #[test]
+    fn slug_roundtrip_simple_and_nested() {
+        let home = TmpHome::new("nested");
+        for rel in ["foo", "a/b/c"] {
+            let root = home.mkdirs(rel);
+            let slug = session_slug(&home.0, Some(root.as_path())).unwrap();
+            assert_eq!(slug_to_path(&home.0, &slug), Some(root), "rel={}", rel);
+        }
+    }
+
+    #[test]
+    fn slug_to_path_unresolvable_is_none() {
+        let home = TmpHome::new("missing");
+        assert_eq!(slug_to_path(&home.0, "-does-not-exist"), None);
+        // Missing leading '-' is not a valid slug.
+        assert_eq!(slug_to_path(&home.0, "Projects"), None);
     }
 }

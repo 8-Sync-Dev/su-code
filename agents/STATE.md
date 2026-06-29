@@ -12,9 +12,10 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - [x] **Loop correctness** — codegraph verbs đúng (query/callers/callees/impact) · force-load dedup theo frontmatter name · impeccable `.agents`→`agents` path fix (v0.22.0)
 - [x] **Loop quality probe** `8sync harness eval` (omp task-suite + verify.sh + baseline diff) — verified 3/3 (v0.23.0)
 - [x] **/gs L3 worktree isolation** cụ thể hoá: `git worktree add .gs/wt/<slug> -b gs/<slug>` (v0.23.0)
+- [x] **Dashboard redesign + Models/Projects** (v0.29.0): `8sync harness web` full impeccable redesign · Models page (view/edit routing live) · project switcher (status dots) · markdown render · serena-off fix · context honesty · workflow canvas — 14 pages, 0 console errors.
 
 ## Current step
-Shipping **0.28.0**: executed `outputs/one-auto-unification-plan.md` — **P1–P5 DONE** (gỡ `/gs`; `/auto` là lệnh DUY NHẤT, gsd-pi-grade: research-in-plan · fresh-context · verify-gate · Closeout/UAT/re-review · Tauri/browser; `8sync harness model` config 1-nguồn; `harness up` deploy đủ; clean-cutover `cleanup_legacy_gs`). **P6**: build clean + bench A1 PASS → commit/tag/release. DEFERRED: full capability-scoring per-task router (TS engine).
+Shipped **0.29.0** — dashboard redesign + model-routing UI. Model philosophy applied (asset+live+omp `vision`): **Opus = thinking** (plan/review/debug/vision) · **GLM = mechanical** (code/edit/default/trivial). Backend (`web.rs`): `/api/models` get+post, `/api/projects`, `/api/workflows/templates`, serena-detection fix, context `assumed/willCompact`. FE (`web/src`, impeccable): Models page, project switcher, markdown renderer, fixed workflow canvas, full redesign — verified live (build clean, 0 console errors). DEFERRED: full capability-scoring per-task router (TS engine).
 
 ## Next (chưa làm — tùy chọn)
 - [x] **DONE: `outputs/one-auto-unification-plan.md` P1–P6** — `/auto` là lệnh tự động DUY NHẤT (v0.28.0).

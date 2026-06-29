@@ -1,5 +1,5 @@
-// Inline SVG icon set for the sidebar nav + wordmark. Hand-tuned to one
-// coherent line family (24px grid, 1.6 stroke, round caps/joins) so no icon
+// Inline SVG icon set for the sidebar nav, wordmark, and a few UI affordances.
+// One coherent line family (24px grid, 1.6 stroke, round caps/joins) so no icon
 // dependency is needed. Sized via CSS (.ico { width/height: 1.1em }).
 import type { ReactNode } from "react";
 
@@ -32,6 +32,14 @@ const ICONS: Record<string, ReactNode> = {
   ),
   skills: svg(
     <path d="M12 3l1.9 5.6 5.6 1.9-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z" />,
+  ),
+  models: svg(
+    <>
+      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+      <path d="M12 12l8-4.5" />
+      <path d="M12 12v9" />
+      <path d="M12 12L4 7.5" />
+    </>,
   ),
   memory: svg(
     <>
@@ -112,6 +120,63 @@ const ICONS: Record<string, ReactNode> = {
 
 export function NavIcon({ name }: { name: string }) {
   return <>{ICONS[name] ?? null}</>;
+}
+
+// ── Small UI affordance glyphs (not keyed by page) ─────────────────────────
+export function Glyph({ name }: { name: "chevron" | "folder" | "refresh" | "check" | "alert" | "plus" | "trash" | "export" | "layout" }) {
+  switch (name) {
+    case "chevron":
+      return svg(<path d="M6 9l6 6 6-6" />);
+    case "folder":
+      return svg(
+        <>
+          <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2H19.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+        </>,
+      );
+    case "refresh":
+      return svg(
+        <>
+          <path d="M4.5 10a7.5 7.5 0 0 1 12.4-3.1L19 9" />
+          <path d="M19.5 14a7.5 7.5 0 0 1-12.4 3.1L5 15" />
+          <path d="M19 4.5V9h-4.5" />
+        </>,
+      );
+    case "check":
+      return svg(<path d="M5 12.5l4.2 4.2L19 7" />);
+    case "alert":
+      return svg(
+        <>
+          <path d="M12 3.5l9 16H3z" />
+          <path d="M12 10v4" />
+          <circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none" />
+        </>,
+      );
+    case "plus":
+      return svg(<path d="M12 5v14M5 12h14" />);
+    case "trash":
+      return svg(
+        <>
+          <path d="M4.5 7h15" />
+          <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" />
+          <path d="M6.5 7l.8 12A1.5 1.5 0 0 0 8.8 20.5h6.4a1.5 1.5 0 0 0 1.5-1.5L17.5 7" />
+        </>,
+      );
+    case "export":
+      return svg(
+        <>
+          <path d="M12 15V4" />
+          <path d="M8 7.5L12 4l4 3.5" />
+          <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+        </>,
+      );
+    case "layout":
+      return svg(
+        <>
+          <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+          <path d="M3.5 9.5h17M9 9.5V19.5" />
+        </>,
+      );
+  }
 }
 
 // Wordmark glyph: two sync arrows on an accent badge (badge styling lives in
