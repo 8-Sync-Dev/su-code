@@ -5,6 +5,18 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.32.1] — 2026-06-29
+
+### Fixed — `8sync harness` auto-installs the token-optimization MCPs (no startup error)
+
+- `headroom` (and `serena`) were **registered in `~/.omp/agent/mcp.json` even when their binary
+  wasn't installed** — so omp failed at startup with `Executable not found in $PATH: "headroom"`.
+  Now `8sync harness` **bootstraps `uv`** (Astral, user-level curl install — no sudo), installs
+  `headroom-ai[mcp]` through it, and **only registers an MCP whose executable actually exists** —
+  a still-missing tool has its stale entry **purged** so omp never errors at startup. `uv` also
+  ships the `uvx` serena needs, so both engines come up from one `8sync harness`, no manual steps.
+  (`crates/cli/src/verbs/skill/deploy.rs`)
+
 ## [0.32.0] — 2026-06-29
 
 ### Performance — binary back under control (offsets bundled rusqlite)

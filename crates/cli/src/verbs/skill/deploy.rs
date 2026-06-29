@@ -277,6 +277,47 @@ fn register_omp_mcp(home: &Path, name: &str, command: &str, args: &[&str]) -> Re
     Ok(())
 }
 
+/// Best-effort bootstrap of `uv` (Astral's Python tool manager) — the canonical
+/// installer for both `headroom-ai[mcp]` and serena (`uvx`). User-level curl
+/// install (no sudo); lands in `~/.local/bin` (already on PATH). Idempotent.
+/// Returns true if `uv` is available afterwards.
+fn ensure_uv() -> bool {
+    if which::which("uv").is_ok() {
+        return true;
+    }
+    ui::step("uv (missing — bootstrapping Astral uv: powers headroom + serena)");
+    let _ = Command::new("sh")
+        .arg("-c")
+        .arg("curl -fsSL https://astral.sh/uv/install.sh | sh")
+        .status();
+    which::which("uv").is_ok()
+}
+
+/// Remove a stale MCP server from omp's `mcp.json` (e.g. a tool whose binary
+/// failed to install) so omp never fails at startup spawning a missing
+/// executable. No-op when absent or the file is unreadable.
+fn deregister_omp_mcp(home: &Path, name: &str) -> Result<()> {
+    let mcp_path = home.join(".omp/agent/mcp.json");
+    let Ok(s) = std::fs::read_to_string(&mcp_path) else {
+        return Ok(());
+    };
+    let Ok(mut root) = serde_json::from_str::<serde_json::Value>(&s) else {
+        return Ok(());
+    };
+    let removed = root
+        .get_mut("mcpServers")
+        .and_then(|v| v.as_object_mut())
+        .is_some_and(|m| m.remove(name).is_some());
+    if removed {
+        std::fs::write(&mcp_path, serde_json::to_string_pretty(&root)?)?;
+        ui::warn(&format!(
+            "{} not installed — removed its stale MCP entry (omp won't error at startup)",
+            name
+        ));
+    }
+    Ok(())
+}
+
 /// Best-effort: build/refresh the codebase-memory-mcp knowledge graph for `root`.
 pub(crate) fn index_codebase_memory(root: &Path) {
     if which::which("codebase-memory-mcp").is_err() {
@@ -295,22 +336,30 @@ pub(crate) fn index_codebase_memory(root: &Path) {
 /// they reach the model (60–95% fewer tokens) — complements codegraph/cbm.
 pub(crate) fn ensure_headroom_mcp(env: &env_detect::Env) -> Result<()> {
     if which::which("headroom").is_err() {
-        ui::step("headroom (missing — installing headroom-ai[mcp])");
-        // Isolated installs first (Arch is PEP-668 externally-managed).
-        let cmd = "if command -v uv >/dev/null 2>&1; then uv tool install 'headroom-ai[mcp]'; \
-elif command -v pipx >/dev/null 2>&1; then pipx install 'headroom-ai[mcp]'; \
-else pip install --user 'headroom-ai[mcp]' || pip install --user --break-system-packages 'headroom-ai[mcp]'; fi";
-        let st = Command::new("sh").arg("-c").arg(cmd).status();
-        match st {
-            Ok(s) if s.success() => ui::ok("headroom installed"),
-            Ok(s) => ui::warn(&format!("headroom install exited {} — registering anyway (manual: pipx install 'headroom-ai[mcp]')", s)),
-            Err(e) => ui::warn(&format!("could not run installer: {} — continuing", e)),
+        ui::step("headroom (missing — installing headroom-ai[mcp] via uv)");
+        if ensure_uv() {
+            let _ = Command::new("uv")
+                .args(["tool", "install", "headroom-ai[mcp]"])
+                .status();
         }
-    } else {
-        let v = env_detect::cmd_version("headroom", &["--version"]).unwrap_or_default();
-        ui::skip("headroom", &format!("present ({})", v));
+        // Fallback for boxes with pipx/pip but no uv (e.g. curl bootstrap blocked).
+        if which::which("headroom").is_err() {
+            let cmd = "if command -v pipx >/dev/null 2>&1; then pipx install 'headroom-ai[mcp]'; \
+elif command -v pip >/dev/null 2>&1; then pip install --user 'headroom-ai[mcp]' \
+|| pip install --user --break-system-packages 'headroom-ai[mcp]'; fi";
+            let _ = Command::new("sh").arg("-c").arg(cmd).status();
+        }
     }
-    register_omp_mcp(&env.home, "headroom", "headroom", &["mcp", "serve"])
+    // Register ONLY when the binary exists — never leave a broken MCP entry that
+    // makes omp fail at startup. If still missing, purge any stale entry.
+    if which::which("headroom").is_ok() {
+        let v = env_detect::cmd_version("headroom", &["--version"]).unwrap_or_default();
+        ui::ok(&format!("headroom present ({})", v.trim()));
+        register_omp_mcp(&env.home, "headroom", "headroom", &["mcp", "serve"])
+    } else {
+        ui::warn("headroom unavailable — skipped MCP (install `uv`: https://astral.sh/uv, then re-run `8sync harness`)");
+        deregister_omp_mcp(&env.home, "headroom")
+    }
 }
 
 /// Enable omp's local long-term memory (Mnemopi) in the user's omp settings
@@ -397,29 +446,30 @@ pub(crate) fn ensure_append_system(home: &Path) -> Result<()> {
 
 /// Register serena (LSP-based semantic code toolkit) as an omp MCP server, giving
 /// the agent symbol-level find + precise edits — token-cheaper than blind file
-/// reads/rewrites. Launched via `uvx` (always-latest, no install) when `uv` is
-/// present; otherwise skipped with a hint (the launcher must be on PATH).
+/// reads/rewrites. Launched via `uvx` (always-latest, no install); bootstraps
+/// `uv` if absent. Skipped (and any stale entry purged) only if uv can't install.
 pub(crate) fn ensure_serena_mcp(env: &env_detect::Env) -> Result<()> {
     if which::which("uvx").is_err() && which::which("uv").is_err() {
-        ui::skip(
-            "serena MCP",
-            "needs `uv` (https://docs.astral.sh/uv) — install it then re-run `8sync harness`",
-        );
-        return Ok(());
+        ensure_uv();
     }
-    register_omp_mcp(
-        &env.home,
-        "serena",
-        "uvx",
-        &[
-            "--from",
-            "git+https://github.com/oraios/serena",
+    if which::which("uvx").is_ok() || which::which("uv").is_ok() {
+        register_omp_mcp(
+            &env.home,
             "serena",
-            "start-mcp-server",
-            "--context",
-            "claude-code",
-        ],
-    )
+            "uvx",
+            &[
+                "--from",
+                "git+https://github.com/oraios/serena",
+                "serena",
+                "start-mcp-server",
+                "--context",
+                "claude-code",
+            ],
+        )
+    } else {
+        ui::skip("serena MCP", "needs `uv` (https://astral.sh/uv) — install failed, skipped");
+        deregister_omp_mcp(&env.home, "serena")
+    }
 }
 /// Best-effort: ensure the `feynman` research CLI (companion-inc/feynman) is
 /// available so the 20 feynman research skills registered in agents/skills.toml
