@@ -5,6 +5,16 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.31.1] — 2026-06-29
+
+### Changed — `toolstats` now reports the *actionable* ratio
+- The headline is now **optimizer vs raw-search of code-lookup calls only** (optimizer = codegraph /
+  cbm / serena; raw-search = grep / search / find / glob) — instead of "% of all calls", which was
+  misleading (most calls are edit / bash / read-before-edit, not lookups). `read` is shown separately
+  (often legitimate, not shamed) and `headroom` is labelled background/auto-compress (not an
+  agent-called tool). Measured: su-code optimizer **34%** of lookups, agentic-cloudgo **25%** — vs the
+  old "2% of all calls" framing. The DB is rebuilt from current sessions each run (re-categorizes).
+
 ## [0.31.0] — 2026-06-29
 
 ### Added — `8sync harness toolstats` (SQLite tool-call tracker)

@@ -38,7 +38,7 @@ pub(crate) fn harness_toolstats(env: &env_detect::Env) -> Result<()> {
     }
     let (new_calls, n_sessions) = ingest(&conn, &sess_dir)?;
     ui::ok(&format!(
-        "ingested {} new call(s) from {} session(s) → {}",
+        "tracked {} call(s) from {} session(s) → {}",
         new_calls,
         n_sessions,
         db_path.display()
@@ -74,6 +74,7 @@ fn init_schema(conn: &Connection) -> Result<()> {
 fn ingest(conn: &Connection, sess_dir: &Path) -> Result<(usize, usize)> {
     let mut new_rows = 0usize;
     let mut n_sessions = 0usize;
+    conn.execute("DELETE FROM calls", [])?; // rebuild from current sessions (re-categorize)
     let rd = std::fs::read_dir(sess_dir)?;
     for ent in rd.flatten() {
         let path = ent.path();
@@ -165,7 +166,7 @@ fn categorize(name: &str, cmd: &str) -> (&'static str, String) {
         "search_graph", "semantic_query", "trace_path", "get_architecture", "query_graph",
         "get_code_snippet", "detect_changes", "manage_adr",
     ];
-    const FALLBACK: &[&str] = &["grep", "glob", "read", "search", "find"];
+    const SEARCH: &[&str] = &["grep", "glob", "search", "find"];
     let n = name.to_lowercase();
     if name == "bash" && cmd.contains("codegraph") {
         return ("optimizer", "codegraph".into());
@@ -177,10 +178,13 @@ fn categorize(name: &str, cmd: &str) -> (&'static str, String) {
         return ("optimizer", "cbm".into());
     }
     if n.contains("headroom") {
-        return ("optimizer", "headroom".into());
+        return ("compress", "headroom".into()); // auto-compression, not a lookup tool
     }
-    if FALLBACK.contains(&name) {
-        return ("fallback", name.to_string());
+    if name == "read" {
+        return ("read", "read".into()); // often legit read-before-edit
+    }
+    if SEARCH.contains(&name) {
+        return ("search", name.to_string()); // raw search the optimizer should replace
     }
     if name == "edit" || name == "write" {
         return ("edit", name.to_string());
@@ -194,48 +198,49 @@ fn report(conn: &Connection, root: &Path) -> Result<()> {
         ui::info("no tool calls tracked yet.");
         return Ok(());
     }
-    let cat_count = |cat: &str| -> (i64, i64) {
+    let cat = |c: &str| -> (i64, i64) {
         conn.query_row(
             "SELECT COUNT(*), COALESCE(SUM(1-ok),0) FROM calls WHERE category=?1",
-            [cat],
+            [c],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .unwrap_or((0, 0))
     };
-    let pct = |n: i64| if total > 0 { 100.0 * n as f64 / total as f64 } else { 0.0 };
+    let (opt, opt_fail) = cat("optimizer");
+    let (search, search_fail) = cat("search");
+    let (read, _) = cat("read");
+    let (compress, _) = cat("compress");
+    let (edit, _) = cat("edit");
+    let (other, _) = cat("other");
 
-    let (opt, opt_fail) = cat_count("optimizer");
-    let (fb, fb_fail) = cat_count("fallback");
-    let (edit, _) = cat_count("edit");
-    let (other, _) = cat_count("other");
+    // The actionable ratio: of code-LOOKUP calls (optimizer + raw search), how many
+    // used the token-optimized engines? read/edit/bash aren't lookups → excluded.
+    let lookup = opt + search;
+    let lookup_pct = if lookup > 0 { 100.0 * opt as f64 / lookup as f64 } else { 0.0 };
 
     ui::step(&format!("project: {}  ·  {} tracked tool calls", root.display(), total));
     println!();
-    println!("  OPTIMIZER  (codegraph·cbm·serena·headroom)  {:>6}   {:>5.1}%   {} fail", opt, pct(opt), opt_fail);
-    for (detail, n) in detail_counts(conn, "optimizer")? {
-        let flag = if n == 0 { "  ← never called" } else { "" };
-        println!("    {:<12} {:>6}{}", detail, n, flag);
-    }
-    // Always surface the four optimizers even when absent (n=0 rows won't exist).
-    for d in ["codegraph", "cbm", "serena", "headroom"] {
-        let seen: i64 = conn
+    println!("  CODE-LOOKUP calls (optimizer + raw-search) = {}", lookup);
+    println!("  ┌ OPTIMIZER  (codegraph·cbm·serena)   {:>6}   {:>5.1}% of lookups   {} fail", opt, lookup_pct, opt_fail);
+    for d in ["codegraph", "cbm", "serena"] {
+        let n: i64 = conn
             .query_row("SELECT COUNT(*) FROM calls WHERE detail=?1", [d], |r| r.get(0))
             .unwrap_or(0);
-        if seen == 0 {
-            println!("    {:<12} {:>6}  ← never called", d, 0);
-        }
+        let flag = if n == 0 { "  ← never called" } else { "" };
+        println!("  │    {:<10} {:>6}{}", d, n, flag);
+    }
+    println!("  └ RAW SEARCH (grep·search·find·glob)  {:>6}   {:>5.1}% of lookups   {} fail", search, 100.0 - lookup_pct, search_fail);
+    for (d, n) in detail_counts(conn, "search")? {
+        println!("       {:<10} {:>6}", d, n);
     }
     println!();
-    println!("  FALLBACK   (grep·read·search·find·glob)      {:>6}   {:>5.1}%   {} fail", fb, pct(fb), fb_fail);
-    for (detail, n) in detail_counts(conn, "fallback")? {
-        println!("    {:<12} {:>6}", detail, n);
-    }
-    println!();
-    println!("  edit/write {:>6}   {:>5.1}%", edit, pct(edit));
-    println!("  other      {:>6}   {:>5.1}%", other, pct(other));
+    println!("  read (read-before-edit, ranges)  {:>6}   (often legit — not shamed)", read);
+    println!("  edit / write                     {:>6}", edit);
+    println!("  headroom (auto-compress)         {:>6}   (background, not agent-called)", compress);
+    println!("  other (bash/todo/job/…)          {:>6}", other);
     println!();
 
-    // Failing tools (any category) — fix these (e.g. dead MCP server).
+    // Failing tools (any category) — fix these (e.g. a dead MCP server).
     let mut fails = conn.prepare(
         "SELECT detail, COUNT(*) FROM calls WHERE ok=0 GROUP BY detail ORDER BY 2 DESC LIMIT 8",
     )?;
@@ -248,18 +253,16 @@ fn report(conn: &Connection, root: &Path) -> Result<()> {
         ui::info(&format!("failing calls: {}", list.join(", ")));
     }
 
-    // Verdict.
-    if opt == 0 {
-        ui::warn("the token-optimization stack was NEVER used — the agent relies on raw read/grep/search.");
-        ui::info("fix: ensure codegraph/cbm/serena are installed+registered (`8sync doctor`), and that STEP 0 force-load is intact (AGENTS.md / ~/.omp/skills/00-force-load.md).");
-    } else if pct(opt) < pct(fb) {
-        ui::warn(&format!(
-            "optimizer {:.1}% << fallback {:.1}% — STEP 0 is under-used; the agent still defaults to raw search.",
-            pct(opt),
-            pct(fb)
-        ));
+    // Verdict on the code-lookup ratio (the actionable number).
+    if lookup == 0 {
+        ui::info("no code-lookup calls yet.");
+    } else if opt == 0 {
+        ui::warn("0% of code-lookups used the optimizer — every where-is/who-calls went through raw grep/search.");
+        ui::info("check `8sync doctor` (codegraph/cbm/serena reachable?). serena was fixed in 0.29.3 — re-measure after omp usage.");
+    } else if lookup_pct < 50.0 {
+        ui::warn(&format!("optimizer = {:.0}% of code-lookups — STEP-0 under-used; agent still defaults to raw search.", lookup_pct));
     } else {
-        ui::ok(&format!("optimizer {:.1}% vs fallback {:.1}% — STEP 0 is being used.", pct(opt), pct(fb)));
+        ui::ok(&format!("optimizer = {:.0}% of code-lookups — STEP-0 is working.", lookup_pct));
     }
     Ok(())
 }
