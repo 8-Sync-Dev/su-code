@@ -205,3 +205,11 @@
   (code/edit/default/trivial). Verified: integrated `cargo build` (build.rs embeds FE) clean, all
   endpoints smoke-tested live, 14 pages browser-verified 0 console errors. Delegated FE↔backend to
   parallel subagents on disjoint files (web/src vs web.rs) — lead owned integrated build + verify + ship.
+- **failure→fix: dashboard project switcher didn't switch data (v0.29.1).** `activate` only wrote
+  advisory `web-session.json`; all handlers read `detect_current_project_root()` (launch cwd) → pages
+  never changed (FE label changed locally, masking it). Fix: `apply_active_project` chdir's into the
+  activated project at startup + on activate, so every cwd-based handler resolves to it (dashboard is
+  single-user/local → process-global cwd is the simplest reliable switch). Also `/api/projects`: dedup
+  by resolved path, drop junk slugs (mtime 0 / non-dir), widen green-dot window to 2h, add `current`
+  flag. Lesson: a "switch" that only changes a label is a lie — verify the underlying data actually
+  changes (curl /api/state before+after), and browser-test interactive flows before claiming done.

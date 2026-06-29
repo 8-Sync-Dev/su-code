@@ -27,6 +27,7 @@ const MEMORY_ALLOWLIST: &[&str] = &["STATE", "KNOWLEDGE", "PLAYBOOKS", "DECISION
 
 pub(crate) fn harness_web(home: &std::path::Path, port: u16, no_open: bool) -> Result<()> {
     let ctx = Arc::new(Ctx { home: home.to_path_buf() });
+    apply_active_project(home); // honor last-activated project across restarts
     let app = api_routes()
         .merge(Router::new().fallback(static_handler))
         .with_state(ctx);
@@ -46,6 +47,21 @@ pub(crate) fn harness_web(home: &std::path::Path, port: u16, no_open: bool) -> R
         Ok::<(), anyhow::Error>(())
     })?;
     Ok(())
+}
+
+/// Honor the last-activated project (web-session.json) by chdir-ing into it, so
+/// every cwd-based handler (detect_current_project_root) resolves to it. The
+/// dashboard is single-user/local → a process-global cwd is the simplest reliable
+/// switch and it persists across server restarts.
+fn apply_active_project(home: &std::path::Path) {
+    let sess = std::fs::read_to_string(home.join(".config/8sync/web-session.json")).unwrap_or_default();
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&sess) {
+        if let Some(p) = v.get("project").and_then(|x| x.as_str()) {
+            if std::path::Path::new(p).is_dir() {
+                let _ = std::env::set_current_dir(p);
+            }
+        }
+    }
 }
 
 
@@ -311,6 +327,7 @@ async fn api_workspace_activate(
     }
     std::fs::write(&path, serde_json::to_string_pretty(&obj).unwrap_or_default())
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    apply_active_project(&ctx.home); // chdir now so every handler switches project
     Ok(Json(obj))
 }
 
@@ -1030,7 +1047,10 @@ fn session_mtime_secs(dir: &std::path::Path) -> u64 {
 async fn api_projects(State(ctx): State<Arc<Ctx>>) -> Json<Vec<serde_json::Value>> {
     let home = &ctx.home;
     let sessions_dir = home.join(".omp/agent/sessions");
-    let mut rows: Vec<(std::path::PathBuf, u64)> = Vec::new();
+    // Dedup by resolved project path (several slugs can map to one repo), keep the
+    // newest session mtime, and skip slugs that don't resolve to a real dir or have
+    // no session file (junk like a bare parent dir).
+    let mut by_path: std::collections::HashMap<std::path::PathBuf, u64> = std::collections::HashMap::new();
     if let Ok(rd) = std::fs::read_dir(&sessions_dir) {
         for e in rd.flatten() {
             let dir = e.path();
@@ -1045,35 +1065,50 @@ async fn api_projects(State(ctx): State<Arc<Ctx>>) -> Json<Vec<serde_json::Value
                 Some(p) => p,
                 None => continue,
             };
-            rows.push((proj, session_mtime_secs(&dir)));
+            if !proj.is_dir() {
+                continue;
+            }
+            let mtime = session_mtime_secs(&dir);
+            if mtime == 0 {
+                continue;
+            }
+            let slot = by_path.entry(proj).or_insert(0);
+            if mtime > *slot {
+                *slot = mtime;
+            }
         }
     }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    let most_recent = rows.iter().map(|(_, m)| *m).max().unwrap_or(0);
-    let mut out: Vec<serde_json::Value> = rows
+    let most_recent = by_path.values().copied().max().unwrap_or(0);
+    let current = detect_current_project_root();
+    let mut out: Vec<serde_json::Value> = by_path
         .into_iter()
         .map(|(path, mtime)| {
-            let within_30m = mtime > 0 && now.saturating_sub(mtime) <= 30 * 60;
-            let is_most_recent = mtime > 0 && mtime == most_recent;
+            let is_current = current.as_deref() == Some(path.as_path());
+            // green dot = the project you're viewing, used within 2h, or the single
+            // most-recent. (We can't poll omp for a live PID; this is the best signal.)
+            let recent = now.saturating_sub(mtime) <= 2 * 60 * 60;
+            let active = is_current || recent || mtime == most_recent;
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
             serde_json::json!({
                 "name": name,
                 "path": path.display().to_string(),
-                "active": within_30m || is_most_recent,
+                "current": is_current,
+                "active": active,
                 "lastModified": mtime,
             })
         })
         .collect();
-    // Active first, then most-recently-modified first.
+    // current first, then active, then most-recently-modified.
     out.sort_by(|a, b| {
-        let (aa, bb) = (a["active"].as_bool().unwrap_or(false), b["active"].as_bool().unwrap_or(false));
-        bb.cmp(&aa).then_with(|| {
-            let (am, bm) = (a["lastModified"].as_u64().unwrap_or(0), b["lastModified"].as_u64().unwrap_or(0));
-            bm.cmp(&am)
-        })
+        let ka = (a["current"].as_bool().unwrap_or(false), a["active"].as_bool().unwrap_or(false));
+        let kb = (b["current"].as_bool().unwrap_or(false), b["active"].as_bool().unwrap_or(false));
+        kb.0.cmp(&ka.0)
+            .then(kb.1.cmp(&ka.1))
+            .then_with(|| b["lastModified"].as_u64().unwrap_or(0).cmp(&a["lastModified"].as_u64().unwrap_or(0)))
     });
     Json(out)
 }

@@ -5,6 +5,18 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.29.1] — 2026-06-29
+
+### Fixed — dashboard project switcher
+- **Switching projects now actually switches the data.** `activate` only wrote an advisory
+  `web-session.json`; every handler still read `detect_current_project_root()` (the launch cwd),
+  so pages never changed. Now `apply_active_project` chdir's into the activated project (at startup
+  + on activate) so all cwd-based handlers (State/Context/Skills/Memory/Rules/Submodules/Workflow)
+  resolve to it. Verified in-browser: switch → State path + content + trigger label all update.
+- **`/api/projects` cleanup** — dedup by resolved path; drop junk slugs (no session file / non-dir);
+  widened the green-dot "active" window to 2h + added a `current` flag for the project being viewed
+  (a project open but idle >30 min now shows correctly).
+
 ## [0.29.0] — 2026-06-29
 
 ### Added — `8sync harness web` dashboard: full redesign + Models/Projects

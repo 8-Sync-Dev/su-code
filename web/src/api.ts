@@ -66,10 +66,12 @@ export type WfEdge = { id: string; source: string; target: string };
 export type Workflow = { name?: string; nodes: WfNode[]; edges: WfEdge[] };
 export type WorkflowExport = { ok: boolean; path: string; tool: string };
 
-// Project switcher. `active` = omp is currently working there.
+// Project switcher. `current` = the project the dashboard is viewing; `active` =
+// current OR used within 2h (green dot).
 export type ProjectEntry = {
   name: string;
   path: string;
+  current?: boolean;
   active: boolean;
   lastModified?: number | null;
 };

@@ -150,7 +150,7 @@ function ProjectSwitcher() {
   // the backend's first "active". Keeps the trigger label consistent with the
   // page content even when several projects report active.
   const currentPath = ws.data?.project;
-  const current = (currentPath ? list.find((p) => p.path === currentPath) : null) ?? list.find((p) => p.active) ?? null;
+  const current = list.find((p) => p.current) ?? (currentPath ? list.find((p) => p.path === currentPath) : null) ?? list.find((p) => p.active) ?? null;
   const currentName = current?.name ?? (currentPath ? currentPath.split("/").pop() : null) ?? "no project";
   const missing = projects.error instanceof EndpointMissingError;
 
