@@ -1,29 +1,31 @@
 # ~/.config/8sync/models.toml — adaptive model routing for omp.
 #
+# PHILOSOPHY (8 Sync Dev):
+#   Opus = việc cần TƯ DUY (plan · review · debug · ảnh/vision · suy luận sâu).
+#   GLM  = việc CƠ HỌC ít logic (code · edit · đọc file · xoá · default · trivial).
+#
 # 8sync classifies each `8sync ai "<prompt>"` into a task class and passes the
 # matching model to omp via `--model`. omp resolves the name against its own
-# catalog with fuzzy matching, so short names work: "codex", "glm", "sonnet",
-# "opus", "haiku", or a full "provider/model-id".
+# catalog with fuzzy matching, so short names work: "glm", "opus", "haiku",
+# "codex", or a full "provider/model-id". The [roles] models are passed as
+# --plan / --smol / --slow so omp's OWN routing uses your picks too.
 #
-# The [roles] models are passed as --plan / --smol / --slow so omp's OWN internal
-# routing (planning sub-steps, session titles, memory, deep reasoning) uses YOUR
-# picks too — not just the main turn.
+# Edit freely (or via `8sync harness model <key> <value>`). "" = let omp decide.
+# Override one call:  8sync ai --model opus "review this PR"
 #
-# Edit freely. Leave a value as "" to let omp keep its own default for that slot.
-# Override for one call:  8sync ai --model glm "explain this module"
+# Vision/ảnh: omp has no --vision CLI flag, so set it in omp's own config:
+#   ~/.omp/agent/config.yml →  modelRoles: { vision: opus }   (images → Opus)
 
 [roles]
-default = "codex"   # main coding model        → --model
-plan    = "glm"     # architectural planning    → --plan
-smol    = "haiku"   # cheap/fast: titles+memory → --smol
-slow    = "opus"    # deep reasoning / hard bugs → --slow
+default = "glm"     # main working model — code/edit/read/delete (mechanical) → GLM
+plan    = "opus"    # architectural planning → Opus (deep thinking)
+smol    = "glm"     # cheap/fast: titles + memory (mechanical) → GLM
+slow    = "opus"    # deep reasoning / hard bugs → Opus
 
 [tasks]
-# Prompt class → model (overrides roles.default for `8sync ai`).
-# Classes are detected heuristically from the prompt text:
-#   plan | review | debug | code | trivial
-plan    = "glm"
-review  = "opus"
-debug   = "opus"
-code    = "codex"
-trivial = "haiku"
+# Prompt class → model. Classes detected heuristically: plan | review | debug | code | trivial
+plan    = "opus"    # planning            → thinking → Opus
+review  = "opus"    # code review         → thinking → Opus
+debug   = "opus"    # debugging           → thinking → Opus
+code    = "glm"     # write/edit code     → mechanical → GLM
+trivial = "glm"     # tiny mechanical ops → GLM
