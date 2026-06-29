@@ -5,6 +5,22 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-06-29
+
+### Performance — binary back under control (offsets bundled rusqlite)
+
+- Enabled rust-embed's `compression` feature (transparent `include-flate` decompress on `.data` — both the
+  `assets/` skills tree and the embedded `web/dist` FE shrink) and set the release profile to `opt-level = "z"`.
+  Roughly halves the binary, offsetting the bundled `rusqlite` (toolstats) + impeccable + the Vite FE.
+  (`crates/cli/Cargo.toml`, `Cargo.toml`)
+
+### Fixed — wallpaper self-heal (no more kitty "render to RGB: EOF")
+
+- `setup::deploy_wallpaper` trusted `exists()`, so a transient/blocked download left a **0-byte
+  `wallpaper.png`** kitty can't render (blank background) — and the early `exists()` return meant it never
+  re-tried. Now validates the file (size>0 + PNG/JPEG/WEBP magic via `is_valid_image`), adds a `Mozilla/5.0`
+  UA + `--retry 2`, and **purges a corrupt file** so a re-run re-downloads. (`crates/cli/src/verbs/setup.rs`)
+
 ## [0.31.1] — 2026-06-29
 
 ### Changed — `toolstats` now reports the *actionable* ratio
