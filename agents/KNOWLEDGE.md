@@ -10,33 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1782720405.md)_
-  `harness up --pull` read `agents/skills.toml`. Fix: init.rs now runs
-  `update::update_skills(env, global_toml, None)` as step 5/9 before the mirror step.
-  Verified: temp project + feynman manifest → `8sync harness init` produces
-  `agents/skills/deep-research/SKILL.md` (all 20 feynman skills vendored).
-- **validated: Phase A loop-eng v2 (token/prefix discipline) shipped.** (1) `inject.rs`
-  +`always_on_core()` (codegraph/karpathy/ponytail/8sync-cli) → generated block renders CORE
-  (read-now, numbered) vs SPECIALIST (read-on-trigger). (2) `headroom_compress` mandatory
-  >~50 dòng ở STEP 0 + invariants + `00-force-load.md`. (3) `memory.rs` breadcrumb bỏ
-  `now_stamp()` epoch → byte-stable. Verified /tmp: AGENTS.md có CORE(4)/SPECIALIST(4) +
-  headroom bắt buộc; `harness init` ×2 → `git status` rỗng (prefix byte-identical = KV-cache win).
-  Grounding: Manus KV-cache + Anthropic progressive-disclosure (outputs/harness-loop-engineering-v2-plan.provenance.md).
-- **validated: `8sync harness bench` quantifies Phase A.** Deterministic (no model calls):
-  reuses `inject::build_force_load()` (refactored as shared single-source) to measure upfront
-  budget (force-load prefix + CORE bodies) vs deferred (SPECIALIST + on-demand), A2 saving, and
-  an A1 stable-prefix gate (rebuild byte-identical). Baseline on THIS repo: upfront ~5,542 tok vs
-  naive ~37,850 tok = **85% upfront cut**; deferred ~117k tok; SPECIALIST footprint 1971 KB
-  (impeccable) no longer loaded each session; A1 PASS. token est = chars/4 (relative, not billing).
-  Phase A applied to repo via `8sync harness up` (AGENTS.md → CORE/SPECIALIST, breadcrumb stable).
-- **validated: Phase B loop-eng v2 (live memory & recitation) shipped.** (B1) `memory.rs`
-  `STATE_TEMPLATE` → `agents/STATE.md` seeded as structured live plan (Goal/DoD/Checklist/Current/
-  Next/Open-q/Handoff) = recitation anchor (Manus todo.md). (B2/B3) `00-force-load.md` loop section
-  + `inject.rs` generated-block invariant gain recitation + compaction (near-limit handoff→reinit,
-  `headroom_compress` as summarizer) + budget-awareness. `harness bench` extended to count the
-  memory spine in upfront. Verified on this repo: upfront ~6,611 tok (prefix 1,871 + CORE 3,726 +
-  spine 1,014), A2 saved 83% (abs 32,308 tok), A1 PASS; `harness up` reseeded structured STATE.md +
-  injected Loop/STATE invariant. Grounding: Manus recitation + Anthropic compaction.
+_(consolidated 27 dòng cũ → agents/archive/KNOWLEDGE-1782725542.md)_
 - **validated: Phase C/D/E loop-eng v2 (full) shipped → v0.19.0.** (C) loop section + generated
   block: `task` implementer↔independent verifier (verify-gate before commit, objective/boundaries/
   output per subagent, share-trace for dependent, parallel only independent); FAIL → `failure:` in
