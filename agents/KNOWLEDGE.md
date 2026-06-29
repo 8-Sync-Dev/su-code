@@ -227,3 +227,13 @@ _(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1782720405.md)_
   docker → `dev-stack` only. `doctor` terminal checks made advisory (was `check_cmd`→warn on missing).
   Safe because `8sync .` now just execs omp (no kitty panes) and `find` falls back to `vi`. Lesson:
   keep the DEFAULT install lean — personalization is opt-in profiles, not Stage A creep.
+- **measured+built: `8sync harness toolstats` (v0.31.0) — the optimizer stack is barely used.** User
+  observed the agent always grep/read, never codegraph/cbm/serena. Confirmed from omp session JSONL:
+  across 68 sessions / 28,020 calls → optimizer **1.1%** (codegraph 302 via bash, cbm 5, serena 0,
+  headroom 0) vs fallback **35.2%** (read 8250, search 1147, find 380, grep 77, glob 12). Built a
+  SQLite tracker: parse `~/.omp/agent/sessions/<slug>/*.jsonl` (`type:message` → `message.content[]`
+  `type:toolCall` {id,name,arguments}; `message.role:toolResult` {toolCallId, isError}); categorize
+  optimizer/fallback/edit/other; store `.cache/8sync/toolstats.db` (gitignored), idempotent on
+  (session,seq); report ratio + fails. NOTE: codegraph is a `bash` call (inspect `arguments.command`
+  for "codegraph"); serena/cbm/headroom are MCP tools. rusqlite `bundled` (+~1.8MB binary, build ~2m
+  first time). The tracker gives VISIBILITY; raising the ratio is a separate force-load/prompt fix.

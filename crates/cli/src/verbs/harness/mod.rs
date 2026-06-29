@@ -21,6 +21,7 @@ mod memory;
 mod model;
 mod up;
 mod web;
+mod toolstats;
 
 #[derive(ClapArgs, Debug)]
 #[command(after_help = indoc::indoc! {"
@@ -46,7 +47,7 @@ mod web;
       external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)
 "})]
 pub struct Args {
-    /// init (default) | up | audit | bench | eval | model | web | compaction | help
+    /// init (default) | up | audit | bench | eval | toolstats | model | web | compaction | help
     pub sub: Option<String>,
     /// Optional value for value-taking sub-commands (e.g. `compaction <pct>`).
     pub value: Option<String>,
@@ -100,6 +101,7 @@ pub fn run(a: Args) -> Result<()> {
         Some("eval") if a.project => eval::harness_eval_project(&env),
         Some("eval") => eval::harness_eval(&env, a.baseline),
         Some("web") => web::harness_web(&env.home, a.port.unwrap_or(8731), a.no_open),
+        Some("toolstats") | Some("tools") => toolstats::harness_toolstats(&env),
         Some("compaction") => compaction::harness_compaction(&env.home, a.value.as_deref()),
         Some("model") => {
             let args: Vec<String> = [a.value.clone(), a.value2.clone()].into_iter().flatten().collect();
@@ -137,6 +139,7 @@ fn print_help() {
     println!("  8sync harness compaction [pct]  view/set omp auto-compaction threshold (anti-forget; default 50%)");
     println!("  8sync harness model [k v]       view/edit ~/.config/8sync/models.toml (model routing for /auto + 8sync ai)");
     println!("  8sync harness web [--port N]    local dashboard (axum+Vite): skills/memory/engines/team/submodules");
+    println!("  8sync harness toolstats         SQLite tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails");
     println!("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)");
 
     println!("\nSKILLS (deployed by init)");

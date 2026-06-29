@@ -28,3 +28,6 @@ urlencoding = "2.1"
 axum = { version = "0.7", default-features = false, features = ["http1", "json", "tokio"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "signal", "macros"] }
 tower-http = { version = "0.5", features = ["cors"] }
+# `8sync harness toolstats` — SQLite tracker of omp tool-call usage (optimizer vs
+# fallback ratio + failures). Bundled sqlite = self-contained, no system dep.
+rusqlite = { version = "0.32", features = ["bundled"] }

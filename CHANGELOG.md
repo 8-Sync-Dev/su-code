@@ -5,6 +5,18 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.31.0] — 2026-06-29
+
+### Added — `8sync harness toolstats` (SQLite tool-call tracker)
+- New verb that tracks how the agent **actually** uses tools, parsed from omp's own session
+  JSONL, into a per-project SQLite DB (`.cache/8sync/toolstats.db`, gitignored). Reports the
+  **optimizer** (codegraph / codebase-memory-mcp / serena / headroom) vs **fallback** (grep / read /
+  search / find / glob) call ratio + per-tool failures, so you can see whether the STEP-0
+  token-optimization stack is being used and catch failing calls (e.g. a dead MCP server).
+- Idempotent (keyed on session+seq → re-run only adds new calls); inspectable with any SQLite tool.
+- Motivation: across this machine's 68 omp sessions / 28k calls, the optimizer stack was **1.1%**
+  of calls (serena/headroom **0**) vs **35%** raw fallback — `toolstats` makes that visible per project.
+
 ## [0.30.0] — 2026-06-29
 
 ### Changed — default `8sync setup` is AI-core only

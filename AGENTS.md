@@ -259,6 +259,7 @@ su-code/
 | Verb | Mô tả |
 |---|---|
 | `8sync harness [init\|up\|help]` | **bare `8sync harness`** = ONE idempotent command: deploy/update skill + mirror (additive, KHÔNG đè skill đã sửa) + inject + seed memory + consolidate + codegraph index. **init**: full bootstrap (progress UI) + **managed `.gitignore`** (ignore `.codegraph/`/`.cache/`/`.env*`, keep `agents/`+`agents/skills/`) + **gitleaks pre-commit hook**; `--force` re-mirror đè hết. **up**: light refresh (`--pull` re-pull skill; `--commit` git-commit memory — gitleaks scan trước, abort nếu rò secret; `--loop`/`--timer` chạy nền; tự consolidate `## Learnings` >200 dòng → `agents/archive/`). **help**: cheatsheet |
+| `8sync harness toolstats` | SQLite tracker (`.cache/8sync/toolstats.db`, gitignored) đọc omp session JSONL → tỉ lệ **optimizer** (codegraph/cbm/serena/headroom) vs **fallback** (grep/read/search/find/glob) + fail per tool. Nắm bắt lịch sử call, phát hiện STEP-0 không được dùng. Idempotent (re-run chỉ thêm call mới) |
 | `8sync skill [add <spec>\|gen \|list\|update]` | Quản lý skill: `add` clone GitHub (collection-aware) / `builtin:<name>` / **`<url>@<ref>` để pin commit/tag** (ghi `rev` vào `skills.toml` = lockfile, reproducible); `update [name]` re-pull theo `src` (git dedup theo URL, honor `rev` pin); `gen` fuse N skill |
 | `8sync shot <url\|file>` | Render web/file → PNG (cho image-routing) |
 | `8sync diff-img [ref]` | Git diff → PNG |
