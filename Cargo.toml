@@ -10,7 +10,7 @@ authors = ["8sync-dev <8sync.dev.1111@gmail.com>"]
 repository = "https://github.com/8-Sync-Dev/su-code"
 
 [profile.release]
-opt-level = 3
+opt-level = "z"
 lto = "fat"
 codegen-units = 1
 strip = true
