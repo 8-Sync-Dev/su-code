@@ -10,22 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-
-- **skills.toml = update source-of-truth.** `skill::discover::read_registry` parses it
-  (`toml` crate → `BTreeMap<String, SkillEntry { src, when }>`); `skill::update::update_skills`
-  reinstalls per recorded `src`: git deduped by URL (clone once → reinstall all sub-skills),
-  `builtin:` → embedded assets (`assets::install_tree`), `path:` → symlink. Best-effort per source.
-- **`.gitignore` portability rule** (`harness::memory::seed_gitignore` via `upsert_block` sentinels):
-  COMMIT learned/decided (`agents/*.md`, `AGENTS.md`, `CHANGELOG.md`, `agents/skills/`); IGNORE
-  derived (`.codegraph/`, `.cache/8sync/`) + secrets (`.env*`, keep `.env.example`). Note: a
-  trailing-slash pattern (`.codegraph/`) only matches once the dir exists — verify `git check-ignore`
-  on a path INSIDE it, not the bare name.
-- **KNOWLEDGE.md managed block** (`<!-- 8sync:harness:* -->`) is overwritten every `harness up`;
-  durable learnings MUST live below it in the seeded `## Learnings` zone.
-- **validated: `harness init` was NOT a superset of bare `harness`.** `init` (init.rs)
-  only deployed bundled skills + 2 hardcoded external packs (ponytail, addyosmani) and
-  never called `update_skills` — so manifest skills (feynman: deep-research, …) never
-  reached `agents/skills/` via `init`. Only bare `8sync harness` (auto.rs:46) and
+_(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1782720405.md)_
   `harness up --pull` read `agents/skills.toml`. Fix: init.rs now runs
   `update::update_skills(env, global_toml, None)` as step 5/9 before the mirror step.
   Verified: temp project + feynman manifest → `8sync harness init` produces
@@ -226,3 +211,12 @@
   so `web/src` edits silently shipped stale (verify served bundle: curl `/assets/*.js` for your new
   strings). Fixed to rebuild when src newer than dist + `rerun-if-changed=web/src`. Lesson: after an
   FE edit, confirm the embedded bundle actually changed before claiming it shipped.
+- **failure→fix: serena MCP "Transport closed" (v0.29.3).** Root cause: serena renamed its executable
+  — `uvx … serena-mcp-server` no longer exists (now `serena start-mcp-server`); running it printed
+  "An executable named `serena-mcp-server` is not provided" and exited → omp reported transport
+  closed. Also `--context ide-assistant` is deprecated → `claude-code`. Fixed `deploy.rs::ensure_serena_mcp`
+  args. Deeper fix: `register_omp_mcp` SKIPPED any already-present server, so stale entries never
+  self-healed — now it UPDATES in place when command/args changed, and `harness up` now calls the MCP
+  ensures too (was init/bare-harness only). Lesson: pin/verify external tool entrypoints — a renamed
+  binary silently breaks an MCP; reproduce by running the exact `command + args` directly (stdin=EOF)
+  and read stderr. Diagnose external-tool failures by running them, not guessing.

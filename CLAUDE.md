@@ -55,7 +55,6 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `frontend-ui-engineering` — `agents/skills/frontend-ui-engineering/SKILL.md`
 - `full-flow` — `agents/skills/full-flow/SKILL.md`
 - `git-workflow-and-versioning` — `agents/skills/git-workflow-and-versioning/SKILL.md`
-- `gs` — `agents/skills/gs/SKILL.md`
 - `idea-refine` — `agents/skills/idea-refine/SKILL.md`
 - `incremental-implementation` — `agents/skills/incremental-implementation/SKILL.md`
 - `interview-me` — `agents/skills/interview-me/SKILL.md`

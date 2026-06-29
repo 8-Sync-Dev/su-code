@@ -262,16 +262,18 @@ fn register_omp_mcp(home: &Path, name: &str, command: &str, args: &[&str]) -> Re
         *servers = serde_json::json!({});
     }
     let smap = servers.as_object_mut().unwrap();
-    if smap.contains_key(name) {
+    let desired = serde_json::json!({ "type": "stdio", "command": command, "args": args });
+    if smap.get(name) == Some(&desired) {
         ui::skip(name, "already in omp mcp.json");
         return Ok(());
     }
-    smap.insert(
-        name.to_string(),
-        serde_json::json!({ "type": "stdio", "command": command, "args": args }),
-    );
+    // Self-heal: update in place when the command/args changed (e.g. serena's
+    // executable rename) instead of skipping a stale entry.
+    let updating = smap.contains_key(name);
+    smap.insert(name.to_string(), desired);
     std::fs::write(&mcp_path, serde_json::to_string_pretty(&root)?)?;
-    ui::ok(&format!("registered {} MCP → {}", name, mcp_path.display()));
+    let verb = if updating { "updated" } else { "registered" };
+    ui::ok(&format!("{} {} MCP → {}", verb, name, mcp_path.display()));
     Ok(())
 }
 
@@ -412,9 +414,10 @@ pub(crate) fn ensure_serena_mcp(env: &env_detect::Env) -> Result<()> {
         &[
             "--from",
             "git+https://github.com/oraios/serena",
-            "serena-mcp-server",
+            "serena",
+            "start-mcp-server",
             "--context",
-            "ide-assistant",
+            "claude-code",
         ],
     )
 }

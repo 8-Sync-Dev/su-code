@@ -5,6 +5,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.29.3] — 2026-06-29
+
+### Fixed — serena MCP "Transport closed"
+- **serena's executable was renamed.** The registered command `uvx … serena-mcp-server` no longer
+  exists (serena now ships `serena` with a `start-mcp-server` subcommand), so the MCP process exited
+  instantly → omp reported `serena: Transport closed`. Now registers
+  `uvx … serena start-mcp-server --context claude-code` (`ide-assistant` was also deprecated). Verified
+  it launches (22 tools exposed, no error).
+- **MCP registration now self-heals.** `register_omp_mcp` previously skipped any server already in
+  `mcp.json`, so a stale entry never got corrected. It now updates in place when the command/args
+  changed, and **`8sync harness up` also refreshes MCP servers** (was init/bare-harness only) — so
+  `8sync harness up` fixes the stale serena entry on existing machines.
+
 ## [0.29.2] — 2026-06-29
 
 ### Fixed — Context page is now correct for ALL models (not just GLM)
