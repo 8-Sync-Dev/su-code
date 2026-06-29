@@ -138,7 +138,7 @@ bash scripts/bootstrap.sh        # cài rustup (nếu thiếu) + build + install
 
 Sau đó:
 ```bash
-8sync setup                      # harness slim + hỏi y/N từng personal profile
+8sync setup                      # AI core thuần (omp + codegraph + MCP/skills + gh + PATH) + hỏi y/N từng profile (kitty/helix, dev-stack… đều opt-in)
 # hoặc:
 8sync setup --yall               # cài full harness + ALL profiles, không hỏi
 8sync setup --no-profile         # chỉ harness (không hỏi profile)
@@ -244,7 +244,7 @@ su-code/
 ### Lifecycle
 | Verb | Mô tả |
 |---|---|
-| `8sync setup` | Stage A (harness + PATH bootstrap zsh/bash/fish) + Stage B (curated y/N: dev-stack, nvidia, bluetooth, warp) |
+| `8sync setup` | Stage A = **AI core thuần** (omp · codegraph · MCP/skills · gh · PATH bootstrap) + Stage B (curated y/N: dev-stack, nvidia, bluetooth, warp, **terminal**). Không cài kitty/helix/wallpaper mặc định |
 | `8sync setup --community` | Auto-yes — Stage A + dev-stack + bluetooth (KHÔNG include warp) |
 | `8sync setup --no-profile` | Chỉ harness, không hỏi profile |
 | `8sync setup --profile <name>` | Apply 1 profile cụ thể non-interactive (cả community + personal) |

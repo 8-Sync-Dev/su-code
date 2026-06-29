@@ -30,15 +30,19 @@ pub fn run() -> Result<()> {
         ui::info(&format!("gh auth: {}", out));
     }
 
-    // Editor / terminal / container CLI (Stage A defaults)
-    check_cmd("hx", &["--version"]);
-    check_cmd("kitty", &["--version"]);
-    check_cmd("docker", &["--version"]);
-    let kitty_glass = env.xdg_config.join("kitty/8sync.conf");
-    if kitty_glass.exists() {
-        ui::ok(&format!("kitty glass theme: {}", kitty_glass.display()));
+    // Terminal/editor stack — opt-in profile `terminal`, NOT part of the AI core.
+    let term: Vec<&str> = ["kitty", "hx", "docker"]
+        .into_iter()
+        .filter(|c| which::which(c).is_ok())
+        .collect();
+    if term.is_empty() {
+        ui::info("terminal stack (kitty/helix/docker): not installed — opt-in via `8sync setup --profile terminal` / dev-stack");
     } else {
-        ui::info("kitty glass theme not deployed — run `8sync setup`");
+        ui::ok(&format!("terminal stack: {}", term.join(", ")));
+        let kitty_glass = env.xdg_config.join("kitty/8sync.conf");
+        if kitty_glass.exists() {
+            ui::ok(&format!("kitty glass theme: {}", kitty_glass.display()));
+        }
     }
 
     // AI engines — the token-optimization stack must be installed AND wired into

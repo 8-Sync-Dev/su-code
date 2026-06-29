@@ -13,6 +13,7 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
           8sync setup --community              unattended: dev-stack + bluetooth
           8sync setup --profile dev-stack      just dev-stack (Docker + Node/Bun + Encore)
           8sync setup --no-profile             harness only (skip profile stage)
+          8sync setup --profile terminal       kitty glass + helix + Nerd font (opt-in)
           8sync setup --dry-run                print the full plan, change nothing
 
         STAGE A — HARNESS (always run, idempotent)
@@ -29,6 +30,7 @@ use crate::{assets, env_detect, pkg, ui, verbs::profile};
           nvidia       Auto-detect GPU family → open-dkms / dkms (skipped if chwd active)
           warp         Cloudflare WARP VPN + DoH + MASQUE  (toggle via `8sync sec`)
           bluetooth    bluez + bluez-utils + service enable  (control via `8sync bt`)
+          terminal     kitty (glass) + helix + JetBrains Nerd font (3-pane vibe loop)
 
         PROFILE MANAGEMENT
           8sync setup profile list             every profile (community + personal tag)
@@ -125,8 +127,6 @@ pub fn run(a: Args) -> Result<()> {
         ui::info("would write: configs + skills");
         ui::info("would patch PATH in zsh/bash + ~/.config/fish/conf.d/8sync-path.fish");
         ui::info("would register codegraph as a global+local skill");
-        ui::info("would install: kitty + helix + docker + docker-compose + JetBrains Nerd font");
-        ui::info("would deploy kitty glass config + wallpaper + helix config (if absent)");
     } else {
         try_step("github-cli", yolo, &mut failures, || {
             pkg::pacman_install_safe(&["github-cli"], true)
@@ -138,8 +138,6 @@ pub fn run(a: Args) -> Result<()> {
         try_step("configs",    yolo, &mut failures, || install_configs(&env))?;
         try_step("skills",     yolo, &mut failures, || install_skills(&env))?;
         try_step("codegraph-skill", yolo, &mut failures, || register_codegraph_skill(&env))?;
-        try_step("terminal-stack", yolo, &mut failures, install_terminal_pkgs)?;
-        try_step("terminal-config", yolo, &mut failures, || install_terminal_config(&env))?;
     }
 
     // ── Stage B: Profiles (optional) ─────────────────────────────
@@ -153,6 +151,12 @@ pub fn run(a: Args) -> Result<()> {
 
     // explicit --profile <name>
     if let Some(name) = a.profile.as_ref() {
+        if name == "terminal" {
+            ui::step("Stage B — terminal (kitty glass + helix + Nerd font)");
+            try_step("terminal", yolo, &mut failures, || install_terminal(&env, a.dry_run))?;
+            finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
+            return Ok(());
+        }
         ui::step(&format!("Stage B — applying profile `{}`", name));
         try_step(&format!("profile:{}", name), yolo, &mut failures, || {
             let resolved = profile::resolve(name, &all)?;
@@ -194,6 +198,7 @@ pub fn run(a: Args) -> Result<()> {
                 })?;
             }
         }
+        try_step("terminal", yolo, &mut failures, || install_terminal(&env, a.dry_run))?;
         finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return Ok(());
     }
@@ -260,6 +265,11 @@ pub fn run(a: Args) -> Result<()> {
             } else if !a.dry_run {
                 let _ = profile::mark_applied(name);
             }
+        }
+    }
+    if ui::prompt_yes_no("Apply `terminal` — kitty glass + helix + Nerd font (3-pane vibe loop)", false) {
+        if let Err(e) = install_terminal(&env, a.dry_run) {
+            ui::err(&format!("terminal failed: {}", e));
         }
     }
 
@@ -485,29 +495,10 @@ fn install_configs(env: &env_detect::Env) -> Result<()> {
     Ok(())
 }
 
-/// Stage A terminal/editor/container stack (official Arch repos, transactional):
-/// kitty (terminal), helix (`hx`), docker + compose CLI, and a Nerd font for the
-/// glass theme. Docker is enabled + the user added to the `docker` group so the
-/// CLI works without sudo after a re-login (best-effort).
+/// Opt-in terminal/editor nicety (Stage B, NOT the AI core): kitty (terminal),
+/// helix (`hx`), and a Nerd font for the glass theme. Docker lives in `dev-stack`.
 fn install_terminal_pkgs() -> Result<()> {
-    pkg::pacman_install_safe(
-        &["kitty", "helix", "docker", "docker-compose", "ttf-jetbrains-mono-nerd"],
-        true,
-    )?;
-    let _ = Command::new("sudo")
-        .args(["systemctl", "enable", "--now", "docker.socket"])
-        .status();
-    if let Ok(user) = std::env::var("USER") {
-        let added = Command::new("sudo")
-            .args(["usermod", "-aG", "docker", &user])
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-        if added {
-            ui::info("added you to the `docker` group — re-login for it to take effect");
-        }
-    }
-    Ok(())
+    pkg::pacman_install_safe(&["kitty", "helix", "ttf-jetbrains-mono-nerd"], true)
 }
 
 /// Deploy the kitty glass theme (transparency + wallpaper + splits) without
@@ -538,6 +529,18 @@ fn install_terminal_config(env: &env_detect::Env) -> Result<()> {
         ui::skip("helix config", "exists or no asset — left as-is");
     }
     Ok(())
+}
+
+/// Opt-in terminal stack (packages + glass config). Used by the Stage B menu,
+/// `--profile terminal`, and `--full` — never in the default AI-core Stage A.
+fn install_terminal(env: &env_detect::Env, dry_run: bool) -> Result<()> {
+    if dry_run {
+        ui::info("would install: kitty + helix + JetBrains Nerd font");
+        ui::info("would deploy kitty glass config + wallpaper + helix config (if absent)");
+        return Ok(());
+    }
+    install_terminal_pkgs()?;
+    install_terminal_config(env)
 }
 
 /// Put a wallpaper at `target`. Bundled `assets/wallpapers/default.png` wins; else

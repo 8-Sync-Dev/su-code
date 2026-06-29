@@ -220,3 +220,10 @@ _(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1782720405.md)_
   ensures too (was init/bare-harness only). Lesson: pin/verify external tool entrypoints — a renamed
   binary silently breaks an MCP; reproduce by running the exact `command + args` directly (stdin=EOF)
   and read stderr. Diagnose external-tool failures by running them, not guessing.
+- **decided: default `8sync setup` = AI-core only (v0.30.0).** User wants a fresh install to pull
+  ONLY the AI coding stack; everything personal/desktop (vietnamese/unikey, warp, LED/RGB, displaylink,
+  kitty/helix/wallpaper) is opt-in. Stage A had crept to install kitty+helix+docker+Nerd-font+glass
+  config always. Moved that into an opt-in `terminal` step (`--profile terminal`, y/N menu, `--full`);
+  docker → `dev-stack` only. `doctor` terminal checks made advisory (was `check_cmd`→warn on missing).
+  Safe because `8sync .` now just execs omp (no kitty panes) and `find` falls back to `vi`. Lesson:
+  keep the DEFAULT install lean — personalization is opt-in profiles, not Stage A creep.

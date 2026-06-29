@@ -5,6 +5,20 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.30.0] — 2026-06-29
+
+### Changed — default `8sync setup` is AI-core only
+- **Stage A now installs only the AI coding harness**: omp, codegraph, MCP servers + skills,
+  github-cli, paru, PATH bootstrap, configs. The terminal/editor polish (kitty glass theme + helix
+  + JetBrains Nerd font + wallpaper) is **no longer installed by default** — a fresh `8sync setup`
+  is pure AI now.
+- **New opt-in `terminal` stack**: `8sync setup --profile terminal` (also offered in the y/N menu
+  and applied by `--full`). `docker` moved out of the terminal stack — it lives in `dev-stack`.
+- **`doctor`** reports the terminal stack (kitty/helix/docker) as advisory/opt-in — no longer warns
+  when it's absent.
+- Personal/hardware profiles (vietnamese/unikey, warp, hardware-*, displaylink, …) stay opt-in as
+  before. Nothing personal is installed unless you pick it.
+
 ## [0.29.3] — 2026-06-29
 
 ### Fixed — serena MCP "Transport closed"
