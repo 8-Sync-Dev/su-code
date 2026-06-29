@@ -68,11 +68,11 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `observability-and-instrumentation` — `agents/skills/observability-and-instrumentation/SKILL.md`
 - `paper-code-audit` — `agents/skills/paper-code-audit/SKILL.md`
 - `paper-writing` — `agents/skills/paper-writing/SKILL.md`
+- `peer-review` — `agents/skills/peer-review/SKILL.md`
 - `performance-optimization` — `agents/skills/performance-optimization/SKILL.md`
 - `planning-and-task-breakdown` — `agents/skills/planning-and-task-breakdown/SKILL.md`
 - `ponytail-audit` — `agents/skills/ponytail-audit/SKILL.md`
 - `ponytail-debt` — `agents/skills/ponytail-debt/SKILL.md`
-- `ponytail-gain` — `agents/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `agents/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `agents/skills/ponytail-review/SKILL.md`
 - `preview` — `agents/skills/preview/SKILL.md`

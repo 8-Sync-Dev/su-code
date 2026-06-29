@@ -14,10 +14,10 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - [x] **/gs L3 worktree isolation** cụ thể hoá: `git worktree add .gs/wt/<slug> -b gs/<slug>` (v0.23.0)
 
 ## Current step
-Released **0.27.0**. **Active track → unify về MỘT lệnh `/auto`** (bỏ `/gs`), nâng `/auto` đạt chuẩn gsd-pi (research-in-plan · fresh-context-per-task · verify gate · UAT/closeout · downgrade-only model routing · Tauri/browser verify). Kế hoạch chuẩn + checklist tiến độ: **`outputs/one-auto-unification-plan.md`** (6 phase, grounded từ submodule `reference/gsd-pi` + `reference/gstack` đã đọc thật). Đang ở **Phase 1** (chưa code).
+Shipping **0.28.0**: executed `outputs/one-auto-unification-plan.md` — **P1–P5 DONE** (gỡ `/gs`; `/auto` là lệnh DUY NHẤT, gsd-pi-grade: research-in-plan · fresh-context · verify-gate · Closeout/UAT/re-review · Tauri/browser; `8sync harness model` config 1-nguồn; `harness up` deploy đủ; clean-cutover `cleanup_legacy_gs`). **P6**: build clean + bench A1 PASS → commit/tag/release. DEFERRED: full capability-scoring per-task router (TS engine).
 
 ## Next (chưa làm — tùy chọn)
-- [ ] **★ ACTIVE: thực thi `outputs/one-auto-unification-plan.md`** — Phase 1 (hợp nhất `/gs`→`/auto`) → … → Phase 6 (ship). Tick checklist trong file đó.
+- [x] **DONE: `outputs/one-auto-unification-plan.md` P1–P6** — `/auto` là lệnh tự động DUY NHẤT (v0.28.0).
 - [ ] **Phase 3b — gstack host `omp`** (DEFERRED, không regression): role `/qa`,`/ship` đã fallback bundled; host nằm TRONG submodule gstack (foreign repo, pinned SHA) — KHÔNG thuộc binary su-code. Chỉ làm khi muốn role tool-backed chạy thật qua gstack: `git submodule update --init reference/gstack` → đọc `docs/ADDING_A_HOST.md` → implement → `./setup --host omp` → deinit lại.
 - [ ] (tùy) Chạy `8sync harness eval --baseline` định kỳ để theo dõi chất lượng loop qua thời gian (kết quả ở `.cache/8sync/eval/`, gitignored).
 - [x] **(P2 — DONE) Mnemopi memory** wired vào `8sync harness`+`init` (`deploy.rs::ensure_mnemopi_memory`, idempotent sentinel-block, không clobber) + `doctor` báo ON/OFF; bật máy này (`~/.omp/agent/config.yml`, API-only `llmMode:smol`+`noEmbeddings`). omp 16.1.20 load OK.

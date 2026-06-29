@@ -18,6 +18,7 @@ mod eval;
 mod external;
 mod init;
 mod memory;
+mod model;
 mod up;
 mod web;
 
@@ -45,10 +46,12 @@ mod web;
       external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)
 "})]
 pub struct Args {
-    /// init (default) | up | audit | bench | eval | help
+    /// init (default) | up | audit | bench | eval | model | web | compaction | help
     pub sub: Option<String>,
     /// Optional value for value-taking sub-commands (e.g. `compaction <pct>`).
     pub value: Option<String>,
+    /// Second positional value (e.g. `model <key> <value>`).
+    pub value2: Option<String>,
     /// `up --loop <dur>`: refresh every <dur> in the foreground (e.g. 10m, 1h, 30s)
     #[arg(long = "loop", value_name = "DUR")]
     pub loop_every: Option<String>,
@@ -98,6 +101,10 @@ pub fn run(a: Args) -> Result<()> {
         Some("eval") => eval::harness_eval(&env, a.baseline),
         Some("web") => web::harness_web(&env.home, a.port.unwrap_or(8731), a.no_open),
         Some("compaction") => compaction::harness_compaction(&env.home, a.value.as_deref()),
+        Some("model") => {
+            let args: Vec<String> = [a.value.clone(), a.value2.clone()].into_iter().flatten().collect();
+            model::harness_model(&env, &args)
+        }
         Some("help") => {
             print_help();
             Ok(())

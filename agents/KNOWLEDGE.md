@@ -181,3 +181,14 @@
 - **failure: image generation unavailable (no XAI/OpenAI/Gemini/OpenRouter key in env).** The default
   anime/dark wallpaper could NOT be auto-generated. The pipeline + `assets/wallpapers/` drop-in are ready;
   shipping the actual art needs an image-API key (then `generate_image`) or a user-provided `default.png`.
+- **validated: unified to ONE `/auto` → v0.28.0** (executed `outputs/one-auto-unification-plan.md` P1–P6).
+  Removed `/gs` entirely (asset cmd + skill + `ensure_gs_command` + 5 call sites + help/flow/force-load/
+  engine-comment refs); added `deploy::cleanup_legacy_gs` (removes stale `/gs` cmd+skill global+repo on
+  every harness run — clean cutover for old machines, verified gone here). `/auto` (auto.md) upgraded to
+  gsd-pi-grade: research-in-plan (codegraph/cbm/serena + feynman) · fresh-context per task · verify-gate ·
+  hard Closeout (full suite + browser QA/UAT + independent re-review vs DoD) · Tauri-v2 web-debug→browser
+  convention · model+context-budget. New **`8sync harness model`** (view/edit `models.toml` = single
+  source; `<key> <value>` sets roles/tasks; omp fuzzy-resolves + `retry.modelFallback` to authed). `harness up`
+  now deploys APPEND_SYSTEM+engine+workflow (was bare/init only). Grounded in `reference/gsd-pi` auto-mode +
+  dynamic-model-routing (read real submodule). Verified: build clean, bare harness deploys `/auto` only,
+  bench A1 PASS. DEFERRED: full capability-scoring per-task model router (gsd-pi-level, TS engine) — documented as target.

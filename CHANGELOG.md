@@ -5,6 +5,26 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-06-29
+
+### Changed — ONE command: `/auto` (retired `/gs`)
+- **Unified the autonomous entry to a single `/auto`** — removed `/gs` (command + skill +
+  `ensure_gs_command` + all wiring + help/force-load refs). `/auto` (8sync-engine) is the only
+  automation path; `deploy::cleanup_legacy_gs` removes the retired `/gs` from machines that had it.
+- **`/auto` upgraded to gsd-pi-grade** (grounded in `reference/gsd-pi`): research INTEGRATED into
+  planning (codegraph/cbm/serena scout + feynman/deep-research), fresh scoped context per task,
+  mechanical verify-gate, hard **Closeout** (full suite + QA/UAT in a browser + independent re-review
+  vs DoD + doc-hygiene), and a context-budget/handoff rule.
+- **Verify UI for real**: web → `browser` at the dev URL; **Tauri v2 / WRY-WebKit desktop → run with
+  its web-inspector/remote-debug port + point the same `browser` tool at it**.
+- **`harness up` now deploys the full harness** (APPEND_SYSTEM + `/auto` engine + workflow), matching
+  bare `8sync harness`.
+
+### Added
+- **`8sync harness model`** — view/edit `~/.config/8sync/models.toml` (single model-routing source):
+  bare shows roles+tasks; `8sync harness model <key> <value>` sets one (e.g. `review opus`). omp
+  resolves names fuzzily + falls back to an authenticated model.
+
 ## [0.27.0] — 2026-06-29
 
 ### Added — adaptive model routing

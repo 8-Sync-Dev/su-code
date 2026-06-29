@@ -1,6 +1,6 @@
 # Plan — Unify to ONE `/auto`, gsd-pi-grade autonomous team (token-lean)
 
-**Date:** 2026-06-29 · **Status tracker** (tick boxes as done; this file = source of truth, committed → survives machine switch). Mirror the current step into `agents/STATE.md`.
+**Date:** 2026-06-29 · **Status: P1–P6 DONE → shipped v0.28.0** (`/auto` là lệnh tự động duy nhất; `/gs` đã gỡ). File này = source of truth, committed → survives machine switch.
 
 ## North star
 **Một lệnh duy nhất trong omp: `/auto [prompt]`** = cả team kỹ thuật tự động: research → plan → slices → tasks → verify từng task → QA/UAT → re-review → handoff. omp = core, su-code = tools. Token-lean (codegraph/serena/cbm/headroom ưu tiên hơn tool omp). Model theo **một** yml + fallback model đã auth. Prompt thường vẫn bám rules/skills/mem + ponytail (qua `APPEND_SYSTEM.md`).

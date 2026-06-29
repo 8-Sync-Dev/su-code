@@ -43,9 +43,9 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
 
     let Some(root) = discover::detect_current_project_root() else {
         ui::ok("global skills ready — `cd` into a project and re-run `8sync harness`");
-        let _ = deploy::ensure_gs_command(&env.home, None);
         let _ = deploy::ensure_workflow_extension(&env.home, None);
         let _ = deploy::ensure_engine(&env.home, None);
+        let _ = deploy::cleanup_legacy_gs(&env.home, None);
         return Ok(());
     };
 
@@ -66,9 +66,9 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
     seed_gitleaks_hook(&root);
     inject_agents_md(&env.home, &root)?;
     inject_subfolder_indexes(&root)?;
-    let _ = deploy::ensure_gs_command(&env.home, Some(&root));
     let _ = deploy::ensure_workflow_extension(&env.home, Some(&root));
     let _ = deploy::ensure_engine(&env.home, Some(&root));
+    let _ = deploy::cleanup_legacy_gs(&env.home, Some(&root));
     let _ = consolidate_learnings(&root);
 
     // 4. Re-index so the agent learns the current tree.

@@ -14,7 +14,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
     // (asset prefix, target subdir name). always-on first (read order), then
     // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
-    let bundled: [(&str, &str); 16] = [
+    let bundled: [(&str, &str); 15] = [
         ("skills/codegraph",               "codegraph"),
         ("skills/karpathy",                "karpathy-guidelines"),
         ("skills/ponytail",                "ponytail"),
@@ -29,7 +29,6 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
         ("skills/full-flow",               "full-flow"),
         ("skills/encore-deploy",           "encore-deploy"),
         ("skills/last30days",              "last30days"),
-        ("skills/gs",                      "gs"),
         ("skills/token-bench",             "token-bench"),
     ];
     for (asset_prefix, name) in bundled {
@@ -43,35 +42,16 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     Ok(())
 }
 
-/// Deploy the `/gs` orchestrator slash command into omp's command dirs so it is
-/// available as `/gs` in every session. Always writes the global user command
-/// (`~/.omp/agent/commands/gs.md`); inside a project also writes the repo copy
-/// (`<root>/.omp/commands/gs.md`) so the whole team gets `/gs` on clone.
-pub(crate) fn ensure_gs_command(home: &Path, root: Option<&Path>) -> Result<()> {
-    let Some(body) = assets::read("commands/gs.md") else {
-        return Ok(());
-    };
-    let global = home.join(".omp/agent/commands/gs.md");
-    if let Some(p) = global.parent() {
-        std::fs::create_dir_all(p)?;
-    }
-    let changed = std::fs::read_to_string(&global).map(|s| s != body).unwrap_or(true);
-    std::fs::write(&global, &body)?;
-    if changed {
-        ui::ok(&format!("/gs command → {}", global.display()));
-    }
+/// Clean cutover for machines that installed an earlier 8sync: remove the retired
+/// `/gs` command + skill (global + project). Idempotent no-op when absent — `/auto`
+/// is the single automation entry now.
+pub(crate) fn cleanup_legacy_gs(home: &Path, root: Option<&Path>) {
+    let _ = std::fs::remove_file(home.join(".omp/agent/commands/gs.md"));
+    let _ = std::fs::remove_dir_all(home.join(".omp/skills/gs"));
     if let Some(r) = root {
-        let proj = r.join(".omp/commands/gs.md");
-        if let Some(p) = proj.parent() {
-            std::fs::create_dir_all(p)?;
-        }
-        let changed = std::fs::read_to_string(&proj).map(|s| s != body).unwrap_or(true);
-        std::fs::write(&proj, &body)?;
-        if changed {
-            ui::ok(&format!("/gs command → {}", proj.display()));
-        }
+        let _ = std::fs::remove_file(r.join(".omp/commands/gs.md"));
+        let _ = std::fs::remove_dir_all(r.join("agents/skills/gs"));
     }
-    Ok(())
 }
 
 /// Ensure a skill directory follows the Agent Skills 3-folder layout:

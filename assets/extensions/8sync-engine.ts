@@ -9,7 +9,7 @@
 //     blocks a task once max retries is hit — the agent can't skip the gate),
 //   - git worktree open / squash-merge / remove (code, not "please run git").
 // The `/auto` slash command orchestrates these tools into a run-to-done loop.
-// This supersedes /gs as the automation path; /gs stays a (skill-backed) command.
+// This is THE automation path: a single `/auto` command (no competing `/gs`).
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
