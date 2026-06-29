@@ -46,16 +46,8 @@ pub fn run(a: Args) -> Result<()> {
 
     if a.message.is_empty() {
         // open in editor
-        let editor = if which::which("hx").is_ok() {
-            "hx"
-        } else if which::which("helix").is_ok() {
-            "helix"
-        } else if let Ok(e) = std::env::var("EDITOR") {
-            return open_editor(&e, &notes);
-        } else {
-            "vi"
-        };
-        return open_editor(editor, &notes);
+        let editor = crate::verbs::find::pick_editor();
+        return open_editor(&editor, &notes);
     }
 
     let msg = a.message.join(" ");

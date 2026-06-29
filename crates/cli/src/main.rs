@@ -5,6 +5,7 @@ mod ui;
 mod env_detect;
 mod pkg;
 mod assets;
+mod models;
 mod verbs;
 
 use anyhow::Result;
@@ -99,7 +100,7 @@ enum Cmd {
     /// Workflow-ordered help (lifecycle commands in chronological order)
     Flow,
 
-    /// Search code (rg + fzf) or filenames (fd); pick → open in $EDITOR or helix
+    /// Search code (rg + fzf) or filenames (fd); pick → open in $EDITOR or hx
     Find(verbs::find::Args),
 
     /// Append a one-line note to agents/NOTES.md (AI will read it in the next session)

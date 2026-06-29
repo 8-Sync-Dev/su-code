@@ -160,3 +160,24 @@
   (4) submodule PIN SHA ≠ auto-pull; skill auto-latest qua manifest+`harness up --pull`; reference repo nên
   `read` on-demand (0 disk). (5) agent-reach (Panniantong 41k★) = capability layer đọc internet qua CLI+MCP+
   SKILL.md → thêm làm skill, không phải team engine. Full: `outputs/omp-customization-memory-platform-research.md`.
+
+- **validated: adaptive model + gsd-pi engine + context-always-read + glass terminal/web (this session).**
+  (1) `crate::models` + `assets/configs/models.toml` classify the prompt → omp `--model/--plan/--smol/--slow`
+  (omp owns catalog; 8sync only steers). Wired in `ai.rs` (+`--model` override) and `here.rs`. Unit tests 2/2.
+  (2) gsd-pi-style engine = `assets/extensions/8sync-engine.ts` (durable slice/task JSON state at
+  `.cache/8sync/engine/` + CODE-enforced verify-retry gate + git worktree tools) + `/auto` command.
+  100% on omp core (config dirs, no patch). Both engine + recall-hook TS transpile clean via bun.
+  `/gs` demoted to skill-only (was an old skill forced into a command — not gsd-pi's intent).
+  (3) `APPEND_SYSTEM.md` → `~/.omp/agent/` = always-in-system-prompt RULE#0 + skill manifest
+  (fixes ">50% of the time the agent ignores defined skills/rules"); recall hook rewritten to the
+  LIVE half only; serena MCP registered via `uvx` (skips with hint when `uv` absent);
+  `8sync harness compaction [pct]` view/set knob (config.yml `thresholdPercent`, default 50).
+  (4) Terminal: `setup` installs kitty + helix + docker + docker-compose + JetBrains Nerd font;
+  deploys glass `~/.config/kitty/8sync.conf` via an `include` line (never clobbers kitty.conf) +
+  wallpaper pipeline (`deploy_wallpaper`: bundled `assets/wallpapers/default.png` → `[ui].wallpaper_url`).
+  Helix `hx` fix: dropped the dead `"helix"` fallback (Arch ships `/usr/bin/hx`); `find`/`note` share `pick_editor()`.
+  (5) Web dashboard redesigned to glassmorphism (designer + impeccable); `build.rs` robust (bun→pnpm→npm +
+  styled fallback). Browser-verified: 13 pages render, 0 console errors. Binary 0.26.0 built + installed.
+- **failure: image generation unavailable (no XAI/OpenAI/Gemini/OpenRouter key in env).** The default
+  anime/dark wallpaper could NOT be auto-generated. The pipeline + `assets/wallpapers/` drop-in are ready;
+  shipping the actual art needs an image-API key (then `generate_image`) or a user-provided `default.png`.

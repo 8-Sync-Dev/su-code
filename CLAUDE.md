@@ -20,19 +20,19 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 
 Nhỏ + dùng cho MỌI task. **Thứ tự = ưu tiên (đọc top-down).** Mở `SKILL.md` ở path dưới rồi mới gọi tool đầu tiên:
 
-  1. `/home/alexdev/Projects/su-code/agents/skills/codegraph/SKILL.md`
-  2. `/home/alexdev/Projects/su-code/agents/skills/karpathy-guidelines/SKILL.md`
-  3. `/home/alexdev/Projects/su-code/agents/skills/ponytail/SKILL.md`
-  4. `/home/alexdev/Projects/su-code/agents/skills/8sync-cli/SKILL.md`
+  1. `/home/alexdev/Projects/tools/su-code/agents/skills/codegraph/SKILL.md`
+  2. `/home/alexdev/Projects/tools/su-code/agents/skills/karpathy-guidelines/SKILL.md`
+  3. `/home/alexdev/Projects/tools/su-code/agents/skills/ponytail/SKILL.md`
+  4. `/home/alexdev/Projects/tools/su-code/agents/skills/8sync-cli/SKILL.md`
 
 ### 🧩 SPECIALIST always-on — biết khả năng, đọc body KHI task khớp (progressive disclosure)
 
 KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF.
 
-- `assp-skill` — `/home/alexdev/Projects/su-code/agents/skills/assp-skill/SKILL.md`
-- `impeccable` — `/home/alexdev/Projects/su-code/agents/skills/impeccable/SKILL.md`
-- `design-taste-frontend` — `/home/alexdev/Projects/su-code/agents/skills/taste-skill/SKILL.md`
-- `image-routing` — `/home/alexdev/Projects/su-code/agents/skills/image-routing/SKILL.md`
+- `assp-skill` — `/home/alexdev/Projects/tools/su-code/agents/skills/assp-skill/SKILL.md`
+- `impeccable` — `/home/alexdev/Projects/tools/su-code/agents/skills/impeccable/SKILL.md`
+- `design-taste-frontend` — `/home/alexdev/Projects/tools/su-code/agents/skills/taste-skill/SKILL.md`
+- `image-routing` — `/home/alexdev/Projects/tools/su-code/agents/skills/image-routing/SKILL.md`
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
@@ -71,6 +71,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `planning-and-task-breakdown` — `agents/skills/planning-and-task-breakdown/SKILL.md`
 - `ponytail-audit` — `agents/skills/ponytail-audit/SKILL.md`
 - `ponytail-debt` — `agents/skills/ponytail-debt/SKILL.md`
+- `ponytail-gain` — `agents/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `agents/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `agents/skills/ponytail-review/SKILL.md`
 - `preview` — `agents/skills/preview/SKILL.md`

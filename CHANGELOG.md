@@ -4,6 +4,53 @@ Mọi thay đổi đáng kể của `8sync` ghi vào đây. Format theo [Keep a 
 versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nhật mục `Unreleased`.
 
 ## [Unreleased]
+
+### Added — adaptive model routing
+
+- **Per-prompt model selection** (no more single fixed model). `assets/configs/models.toml`
+  (deployed → `~/.config/8sync/models.toml`) maps `[roles]` default/plan/smol/slow + `[tasks]`
+  plan/review/debug/code/trivial → models (defaults: codex main · glm plan · opus review/debug ·
+  haiku smol). New `crate::models` classifies the prompt heuristically and passes omp
+  `--model/--plan/--smol/--slow` (omp resolves fuzzy: "glm","codex","opus"). Wired into
+  `8sync ai` (+`--model` override) and `8sync .` (resume flags). omp owns the catalog — 8sync only steers.
+
+### Added — gsd-pi-style automation engine (on omp core, no patch)
+
+- **`8sync-engine` omp extension** (`~/.omp/agent/extensions/` + project) — durable slice/task
+  state machine (`.cache/8sync/engine/state.json`) + model-callable tools `engine_plan/status/
+  next/verify/advance/worktree`. **Code-enforced** verify-with-retry gate (counts attempts,
+  BLOCKs at maxRetries — the agent can't skip it) and git worktree open/squash-merge/remove.
+- **`/auto` command** orchestrates the engine to run a goal to DONE (right-sized, token-lean).
+  Closes the gsd-pi gaps (verify/worktree as CODE, not prose). `/gs` stays a lighter skill.
+
+### Added — context engineering (always-read + serena + tunable compaction)
+
+- **`APPEND_SYSTEM.md`** deployed to `~/.omp/agent/` — RULE #0 (code-intel before grep/CRUD) +
+  always-on skill manifest (name·purpose·ref-path) injected into EVERY system prompt (never
+  compacts away) → fixes "skills/rules defined but ignored past 50%". Recall hook rewritten to
+  the LIVE half (skill index + STATE Current/Next).
+- **serena MCP** registered (`ensure_serena_mcp`, via `uvx`) — symbol-level code intel, prioritized
+  over native search/file-CRUD. Surfaced on the dashboard Engines page + force-load RULE #0.
+- **`8sync harness compaction [pct]`** — view/set `compaction.thresholdPercent` (auto-clean at 50%).
+
+### Added — terminal: kitty glass + helix + docker (Stage A defaults)
+
+- `8sync setup` now installs **kitty + helix + docker + docker-compose + JetBrains Nerd font** and
+  deploys a **glass kitty theme** (`~/.config/kitty/8sync.conf`, included from kitty.conf — no clobber):
+  transparency + blur + wallpaper + 3-pane split keymaps + violet accent. Wallpaper deployed to
+  `~/.config/8sync/wallpaper.png` from `assets/wallpapers/default.png` (bundled) or `[ui].wallpaper_url`.
+  Transparent helix config (`base16_transparent`) deployed if absent. `8sync doctor` checks hx/kitty/docker.
+
+### Changed / Fixed
+
+- **Web dashboard redesigned** to a dark glassmorphism / Hyprland aesthetic (translucent blurred panels,
+  layered gradient, icon sidebar, refined type scale, light-mode + a11y fallbacks). 13 pages, react-flow
+  workflow editor intact. Browser-verified: all pages render, zero console errors. (`web/src/{styles.css,App.tsx,icons.tsx}`)
+- **`build.rs`** now builds the FE with bun → pnpm → npm (first available); on no toolchain it embeds a
+  styled, instructive fallback page instead of a bare one-line stub.
+- **Helix command fixed to `hx`** — dropped the dead `"helix"` fallback (Arch ships `/usr/bin/hx`, no
+  `helix` binary); `note`/`find` now share one `pick_editor()` ($VISUAL→$EDITOR→hx→vi).
+
 ## [0.26.0] — 2026-06-27
 
 ### Added (dashboard FE enhancement)

@@ -17,7 +17,7 @@ use crate::ui;
           8sync find --no-open Result           print matches, do NOT open the editor
 
         EDITOR
-          Honors $EDITOR / $VISUAL first; falls back to hx, helix, then vi.
+          Honors $EDITOR / $VISUAL first; falls back to hx, then vi.
           To force helix:  EDITOR=hx 8sync find ...
 
         REQUIREMENTS
@@ -148,8 +148,8 @@ fn pipe_to_fzf_then_open(stdout: &str) -> Result<()> {
     Ok(())
 }
 
-/// Honor `$EDITOR` / `$VISUAL` first; fall back to helix/hx/vi.
-fn pick_editor() -> String {
+/// Honor `$VISUAL` / `$EDITOR` first; fall back to hx, then vi. Shared with `note`.
+pub(crate) fn pick_editor() -> String {
     if let Ok(e) = std::env::var("VISUAL") {
         if !e.is_empty() && which::which(&e).is_ok() { return e; }
     }
@@ -157,6 +157,5 @@ fn pick_editor() -> String {
         if !e.is_empty() && which::which(&e).is_ok() { return e; }
     }
     if which::which("hx").is_ok()    { return "hx".to_string(); }
-    if which::which("helix").is_ok() { return "helix".to_string(); }
     "vi".to_string()
 }

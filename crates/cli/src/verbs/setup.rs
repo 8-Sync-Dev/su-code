@@ -125,6 +125,8 @@ pub fn run(a: Args) -> Result<()> {
         ui::info("would write: configs + skills");
         ui::info("would patch PATH in zsh/bash + ~/.config/fish/conf.d/8sync-path.fish");
         ui::info("would register codegraph as a global+local skill");
+        ui::info("would install: kitty + helix + docker + docker-compose + JetBrains Nerd font");
+        ui::info("would deploy kitty glass config + wallpaper + helix config (if absent)");
     } else {
         try_step("github-cli", yolo, &mut failures, || {
             pkg::pacman_install_safe(&["github-cli"], true)
@@ -136,6 +138,8 @@ pub fn run(a: Args) -> Result<()> {
         try_step("configs",    yolo, &mut failures, || install_configs(&env))?;
         try_step("skills",     yolo, &mut failures, || install_skills(&env))?;
         try_step("codegraph-skill", yolo, &mut failures, || register_codegraph_skill(&env))?;
+        try_step("terminal-stack", yolo, &mut failures, install_terminal_pkgs)?;
+        try_step("terminal-config", yolo, &mut failures, || install_terminal_config(&env))?;
     }
 
     // ── Stage B: Profiles (optional) ─────────────────────────────
@@ -468,6 +472,7 @@ fn install_configs(env: &env_detect::Env) -> Result<()> {
     let pairs = [
         ("configs/global.toml", env.xdg_config.join("8sync/global.toml")),
         ("configs/skills.toml", env.xdg_config.join("8sync/skills.toml")),
+        ("configs/models.toml", env.xdg_config.join("8sync/models.toml")),
     ];
     for (asset, target) in &pairs {
         let changed = assets::install(asset, target, false)?;
@@ -477,6 +482,175 @@ fn install_configs(env: &env_detect::Env) -> Result<()> {
             ui::skip(&target.display().to_string(), "unchanged");
         }
     }
+    Ok(())
+}
+
+/// Stage A terminal/editor/container stack (official Arch repos, transactional):
+/// kitty (terminal), helix (`hx`), docker + compose CLI, and a Nerd font for the
+/// glass theme. Docker is enabled + the user added to the `docker` group so the
+/// CLI works without sudo after a re-login (best-effort).
+fn install_terminal_pkgs() -> Result<()> {
+    pkg::pacman_install_safe(
+        &["kitty", "helix", "docker", "docker-compose", "ttf-jetbrains-mono-nerd"],
+        true,
+    )?;
+    let _ = Command::new("sudo")
+        .args(["systemctl", "enable", "--now", "docker.socket"])
+        .status();
+    if let Ok(user) = std::env::var("USER") {
+        let added = Command::new("sudo")
+            .args(["usermod", "-aG", "docker", &user])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if added {
+            ui::info("added you to the `docker` group — re-login for it to take effect");
+        }
+    }
+    Ok(())
+}
+
+/// Deploy the kitty glass theme (transparency + wallpaper + splits) without
+/// clobbering the user's kitty.conf, plus a transparent helix config if absent.
+fn install_terminal_config(env: &env_detect::Env) -> Result<()> {
+    ui::step("Terminal (kitty glass + wallpaper + helix)");
+    let kitty_dir = env.xdg_config.join("kitty");
+    std::fs::create_dir_all(&kitty_dir)?;
+
+    // Wallpaper → ~/.config/8sync/wallpaper.png (bundled asset preferred, else URL).
+    let wp = env.xdg_config.join("8sync/wallpaper.png");
+    let wp_ready = deploy_wallpaper(env, &wp);
+
+    // Glass conf → ~/.config/kitty/8sync.conf (absolute wallpaper path baked in).
+    let conf_path = kitty_dir.join("8sync.conf");
+    std::fs::write(&conf_path, render_kitty_conf(wp_ready.then_some(wp.as_path())))?;
+    ui::ok(&format!("wrote {}", conf_path.display()));
+
+    // Make the user's kitty.conf include ours (managed line, idempotent, no clobber).
+    ensure_kitty_include(&kitty_dir)?;
+
+    // Helix: transparent config if the user has none yet (never overwrite).
+    let hx_cfg = env.xdg_config.join("helix/config.toml");
+    if !hx_cfg.exists() && assets::read("configs/helix/config.toml").is_some() {
+        assets::install("configs/helix/config.toml", &hx_cfg, false)?;
+        ui::ok(&format!("wrote {}", hx_cfg.display()));
+    } else {
+        ui::skip("helix config", "exists or no asset — left as-is");
+    }
+    Ok(())
+}
+
+/// Put a wallpaper at `target`. Bundled `assets/wallpapers/default.png` wins; else
+/// download `[ui].wallpaper_url` from global.toml with curl. True if present after.
+fn deploy_wallpaper(env: &env_detect::Env, target: &std::path::Path) -> bool {
+    if target.exists() {
+        return true;
+    }
+    if let Some(p) = target.parent() {
+        let _ = std::fs::create_dir_all(p);
+    }
+    if let Some(bytes) = assets::read_bytes("wallpapers/default.png") {
+        if std::fs::write(target, bytes).is_ok() {
+            ui::ok(&format!("wallpaper → {}", target.display()));
+            return true;
+        }
+    }
+    if let Some(url) = wallpaper_url(env) {
+        let ok = Command::new("curl")
+            .args(["-fsSL", "-o"])
+            .arg(target)
+            .arg(&url)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if ok && target.exists() {
+            ui::ok(&format!("wallpaper ↓ {}", target.display()));
+            return true;
+        }
+        ui::skip("wallpaper", "no bundled image and download failed");
+    }
+    false
+}
+
+/// `[ui].wallpaper_url` from the deployed global.toml, else the embedded default.
+fn wallpaper_url(env: &env_detect::Env) -> Option<String> {
+    let s = std::fs::read_to_string(env.xdg_config.join("8sync/global.toml"))
+        .ok()
+        .or_else(|| assets::read("configs/global.toml"))?;
+    let v: toml::Value = s.parse().ok()?;
+    v.get("ui")?.get("wallpaper_url")?.as_str().map(str::to_string)
+}
+
+/// The glass kitty theme body: transparency + blur (Hyprland/KDE/picom), optional
+/// wallpaper, violet accent, and 3-pane split keymaps.
+fn render_kitty_conf(wallpaper: Option<&std::path::Path>) -> String {
+    let bg_image = match wallpaper {
+        Some(p) => format!(
+            "background_image {}\nbackground_image_layout cscaled\nbackground_image_linear yes\nbackground_tint 0.92\nbackground_tint_gaps 0.0\n",
+            p.display()
+        ),
+        None => String::new(),
+    };
+    let header = indoc::indoc! {"
+        # 8sync — glass dark terminal (managed by `8sync setup`; included from kitty.conf)
+        # Transparency + blur (honored by Hyprland/KDE/picom compositors).
+        background_opacity 0.82
+        dynamic_background_opacity yes
+        background_blur 28
+        background #0b0d12
+    "};
+    let rest = indoc::indoc! {"
+        # Font (JetBrains Mono Nerd Font installed by setup)
+        font_family JetBrainsMono Nerd Font
+        bold_font auto
+        italic_font auto
+        font_size 12.0
+        # Window + layouts
+        enabled_layouts splits:split_axis=horizontal,stack,tall,grid
+        window_padding_width 8
+        hide_window_decorations yes
+        confirm_os_window_close 0
+        # Tabs
+        tab_bar_edge top
+        tab_bar_style powerline
+        tab_powerline_style slanted
+        # Colors (glass black + violet accent)
+        foreground #e6e9ef
+        selection_background #2a2f3a
+        selection_foreground #e6e9ef
+        cursor #7c5cff
+        cursor_text_color #0b0d12
+        url_color #8ab4ff
+        active_border_color #7c5cff
+        inactive_border_color #262b36
+        active_tab_background #14171f
+        active_tab_foreground #e6e9ef
+        inactive_tab_background #0b0d12
+        inactive_tab_foreground #9aa3b2
+        # 3-pane splits (gsd-style)
+        map ctrl+shift+enter launch --location=hsplit --cwd=current
+        map ctrl+shift+minus launch --location=vsplit --cwd=current
+        map ctrl+shift+] next_window
+        map ctrl+shift+[ previous_window
+    "};
+    format!("{header}{bg_image}{rest}")
+}
+
+/// Ensure `~/.config/kitty/kitty.conf` includes our managed 8sync.conf. Creates
+/// the file if missing; appends the include once (idempotent, never clobbers).
+fn ensure_kitty_include(kitty_dir: &std::path::Path) -> Result<()> {
+    let main = kitty_dir.join("kitty.conf");
+    let mut body = std::fs::read_to_string(&main).unwrap_or_default();
+    if body.contains("include 8sync.conf") {
+        ui::skip("kitty.conf", "already includes 8sync.conf");
+        return Ok(());
+    }
+    if !body.is_empty() && !body.ends_with('\n') {
+        body.push('\n');
+    }
+    body.push_str("\n# 8sync glass theme (managed by `8sync setup`)\ninclude 8sync.conf\n");
+    std::fs::write(&main, body)?;
+    ui::ok("kitty.conf now includes 8sync.conf");
     Ok(())
 }
 

@@ -28,6 +28,11 @@ pub fn read(path: &str) -> Option<String> {
     String::from_utf8(f.data.into_owned()).ok()
 }
 
+/// Raw embedded asset bytes — for binary assets (e.g. PNG wallpapers).
+pub fn read_bytes(path: &str) -> Option<Vec<u8>> {
+    Some(Assets::get(path)?.data.into_owned())
+}
+
 /// Write embedded asset to target path. If target exists and differs, back it up.
 pub fn install(path: &str, target: &std::path::Path, force: bool) -> anyhow::Result<bool> {
     use std::fs;

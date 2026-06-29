@@ -390,6 +390,54 @@ pub(crate) fn ensure_recall_hook(home: &Path) -> Result<()> {
     ui::ok(&format!("recall hook → {}", target.display()));
     Ok(())
 }
+
+/// Deploy the always-apply operating directives to `~/.omp/agent/APPEND_SYSTEM.md`.
+/// omp appends this verbatim to EVERY system prompt (never compacts away), so the
+/// code-intel-first rule + always-on skill manifest are read on every turn — the
+/// fix for "skills/rules are defined but the agent ignores them past ~50% context".
+/// Idempotent (byte-identical skip); appended, so omp's base prompt is preserved.
+pub(crate) fn ensure_append_system(home: &Path) -> Result<()> {
+    let Some(body) = assets::read("configs/omp/APPEND_SYSTEM.md") else {
+        return Ok(());
+    };
+    let target = home.join(".omp/agent/APPEND_SYSTEM.md");
+    if let Some(p) = target.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    if std::fs::read_to_string(&target).ok().as_deref() == Some(body.as_str()) {
+        ui::skip("APPEND_SYSTEM.md", "already deployed");
+        return Ok(());
+    }
+    std::fs::write(&target, &body)?;
+    ui::ok(&format!("always-on directives → {}", target.display()));
+    Ok(())
+}
+
+/// Register serena (LSP-based semantic code toolkit) as an omp MCP server, giving
+/// the agent symbol-level find + precise edits — token-cheaper than blind file
+/// reads/rewrites. Launched via `uvx` (always-latest, no install) when `uv` is
+/// present; otherwise skipped with a hint (the launcher must be on PATH).
+pub(crate) fn ensure_serena_mcp(env: &env_detect::Env) -> Result<()> {
+    if which::which("uvx").is_err() && which::which("uv").is_err() {
+        ui::skip(
+            "serena MCP",
+            "needs `uv` (https://docs.astral.sh/uv) — install it then re-run `8sync harness`",
+        );
+        return Ok(());
+    }
+    register_omp_mcp(
+        &env.home,
+        "serena",
+        "uvx",
+        &[
+            "--from",
+            "git+https://github.com/oraios/serena",
+            "serena-mcp-server",
+            "--context",
+            "ide-assistant",
+        ],
+    )
+}
 /// Best-effort: ensure the `feynman` research CLI (companion-inc/feynman) is
 /// available so the 20 feynman research skills registered in agents/skills.toml
 /// (deep-research, alpha-research, literature-review, …) are functional rather
@@ -449,4 +497,63 @@ pub(crate) fn ensure_workflow_extension(home: &Path, root: Option<&Path>) -> Res
         }
     }
     Ok(())
+}
+
+/// Deploy an omp artifact (command/extension) to the global config dir and, when
+/// inside a project, the project config dir too. Byte-identical writes are quiet.
+fn deploy_omp_pair(
+    home: &Path,
+    root: Option<&Path>,
+    asset: &str,
+    global_rel: &str,
+    proj_rel: &str,
+    label: &str,
+) -> Result<()> {
+    let Some(body) = assets::read(asset) else {
+        return Ok(());
+    };
+    let global = home.join(global_rel);
+    if let Some(p) = global.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    let changed = std::fs::read_to_string(&global).map(|s| s != body).unwrap_or(true);
+    std::fs::write(&global, &body)?;
+    if changed {
+        ui::ok(&format!("{} → {}", label, global.display()));
+    }
+    if let Some(r) = root {
+        let proj = r.join(proj_rel);
+        if let Some(p) = proj.parent() {
+            std::fs::create_dir_all(p)?;
+        }
+        let changed = std::fs::read_to_string(&proj).map(|s| s != body).unwrap_or(true);
+        std::fs::write(&proj, &body)?;
+        if changed {
+            ui::ok(&format!("{} → {}", label, proj.display()));
+        }
+    }
+    Ok(())
+}
+
+/// Deploy the gsd-pi-style automation engine — the `8sync-engine` omp extension
+/// (durable slice/task state machine + code-enforced verify-retry gate + git
+/// worktree tools) and its `/auto` orchestration command. 100% on omp core (config
+/// dirs only, never patches omp) so updates stay safe. Mirrors the workflow ext.
+pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
+    deploy_omp_pair(
+        home,
+        root,
+        "extensions/8sync-engine.ts",
+        ".omp/agent/extensions/8sync-engine.ts",
+        ".omp/extensions/8sync-engine.ts",
+        "8sync-engine extension",
+    )?;
+    deploy_omp_pair(
+        home,
+        root,
+        "commands/auto.md",
+        ".omp/agent/commands/auto.md",
+        ".omp/commands/auto.md",
+        "/auto command",
+    )
 }

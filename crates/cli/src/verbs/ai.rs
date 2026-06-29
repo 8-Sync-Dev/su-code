@@ -13,6 +13,7 @@ use crate::ui;
           8sync ai \"add a login form with email + password validation\"
           8sync ai \"refactor src/auth.rs into smaller files\"
           8sync ai \"why does the build fail on macOS?\"
+          8sync ai --model glm \"plan the refactor\"   override the auto-picked model for one prompt
 
         NOTES
           · omp auto-loads project context from AGENTS.md + agents/* (memory + skills).
@@ -21,7 +22,11 @@ use crate::ui;
     "}
 )]
 pub struct Args {
-    /// Prompt to send to omp. Empty (or `continue`/`resume`) = resume last session via `omp --continue`.
+    /// Override the auto-picked model for this prompt (fuzzy: \"glm\", \"codex\", \"opus\").
+    #[arg(long)]
+    pub model: Option<String>,
+
+    /// Prompt to send to omp. Empty (or `continue`/`resume`) = resume last session.
     pub rest: Vec<String>,
 }
 
@@ -34,16 +39,27 @@ pub fn run(a: Args) -> Result<()> {
         return Ok(());
     }
 
+    let cfg = crate::models::ModelConfig::load();
+    let mut cmd = Command::new("omp");
     let status = if trimmed.is_empty() || trimmed == "continue" || trimmed == "resume" {
         ui::info("omp — continue previous session");
-        Command::new("omp").arg("--continue").status()?
+        cmd.args(cfg.resume_flags()).arg("--continue").status()?
     } else {
-        ui::info(&format!("omp — prompt: {}", trimmed));
-        Command::new("omp").arg("-p").arg(trimmed).status()?
+        let flags = cfg.omp_flags(trimmed, a.model.as_deref());
+        match flag_value(&flags, "--model") {
+            Some(m) => ui::info(&format!("omp — [{}] {}", m, trimmed)),
+            None => ui::info(&format!("omp — prompt: {}", trimmed)),
+        }
+        cmd.args(&flags).arg("-p").arg(trimmed).status()?
     };
 
     if !status.success() {
         ui::warn("omp exited non-zero");
     }
     Ok(())
+}
+
+/// First value following `name` in a flat flag vec (`["--model","glm",...]`).
+fn flag_value<'a>(flags: &'a [String], name: &str) -> Option<&'a str> {
+    flags.windows(2).find(|w| w[0] == name).map(|w| w[1].as_str())
 }

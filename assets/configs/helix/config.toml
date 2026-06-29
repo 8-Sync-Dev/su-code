@@ -1,0 +1,35 @@
+# ~/.config/helix/config.toml — deployed by `8sync setup` only if you have none.
+# Edit freely; 8sync never overwrites an existing helix config.
+theme = "base16_transparent"
+
+[editor]
+line-number = "relative"
+cursorline = true
+color-modes = true
+true-color = true
+bufferline = "multiple"
+rulers = [100]
+
+[editor.cursor-shape]
+insert = "bar"
+normal = "block"
+select = "underline"
+
+[editor.statusline]
+left = ["mode", "spinner", "file-name", "read-only-indicator", "file-modification-indicator"]
+center = []
+right = ["diagnostics", "selections", "position", "file-encoding", "file-type"]
+
+[editor.lsp]
+display-messages = true
+display-inlay-hints = true
+
+[editor.indent-guides]
+render = true
+character = "▏"
+
+[keys.normal]
+# quick save / quit, space-leader file picker
+"C-s" = ":w"
+space.w = ":w"
+space.q = ":q"

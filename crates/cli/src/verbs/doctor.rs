@@ -30,6 +30,17 @@ pub fn run() -> Result<()> {
         ui::info(&format!("gh auth: {}", out));
     }
 
+    // Editor / terminal / container CLI (Stage A defaults)
+    check_cmd("hx", &["--version"]);
+    check_cmd("kitty", &["--version"]);
+    check_cmd("docker", &["--version"]);
+    let kitty_glass = env.xdg_config.join("kitty/8sync.conf");
+    if kitty_glass.exists() {
+        ui::ok(&format!("kitty glass theme: {}", kitty_glass.display()));
+    } else {
+        ui::info("kitty glass theme not deployed — run `8sync setup`");
+    }
+
     // AI engines — the token-optimization stack must be installed AND wired into
     // omp so the loop actually uses STEP 0 (else it silently falls back to grep).
     check_ai_engines(&env.home);

@@ -1,7 +1,7 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
 
 ## Goal
-Biến 8sync/omp thành một **super agent-team** token-optimal: omp = core, su-code = tools, học từ gstack + gsd-pi; điều khiển bằng **một lệnh `/gs`** chạy team tự động.
+Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation mạnh kiểu gsd-pi = **`/auto`** (`8sync-engine`, 100% trên omp core: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read** (APPEND_SYSTEM + serena); terminal + web **glass**. (`/gs` = skill-backed lead, không còn là engine.)
 
 ## Definition of Done
 - [x] Loop-engineering v2 (Phase A–E) shipped + đo bằng `8sync harness bench`
@@ -14,7 +14,7 @@ Biến 8sync/omp thành một **super agent-team** token-optimal: omp = core, su
 - [x] **/gs L3 worktree isolation** cụ thể hoá: `git worktree add .gs/wt/<slug> -b gs/<slug>` (v0.23.0)
 
 ## Current step
-Installed 8sync = **0.26.0** (built local). **Plan done + FE enhancement:** A (anti-forget) + B (`8sync harness web` axum+Vite) + C (workspaces/team/submodules/skill-add) + **v0.26.0 dashboard FE**: Context tracker (live token gauge + 50% threshold + compaction-observed badge — verified detects 575k compact), MCP servers viz, Rules CRUD. **12 pages**, browser-tested (Chromium): all render real data, Context auto-refresh tracking live, Rules add e2e. omp 16.2.1 OK.
+Installed 8sync **0.26.0** (built + cài → `~/.local/bin`). **Session này ship:** (1) **adaptive model routing** (`models.toml` + classifier → omp `--model/--plan/--smol`, codex/glm/claude); (2) **gsd-pi-style engine** `8sync-engine` ext + `/auto` (durable JSON state · verify-retry gate · git worktree) — 100% trên omp core, transpile OK; (3) context **always-read** `APPEND_SYSTEM.md` + **serena** MCP + `8sync harness compaction [pct]`; (4) terminal **kitty glass** + helix `hx` + **docker/nerd-font** trong setup + doctor checks; (5) **web dashboard glass** redesign (browser-verified 13 pages, 0 console error). Pending: ảnh anime wallpaper (thiếu image-API key — pipeline + drop-in sẵn).
 
 ## Next (chưa làm — tùy chọn)
 - [ ] **Phase 3b — gstack host `omp`** (DEFERRED, không regression): role `/qa`,`/ship` đã fallback bundled; host nằm TRONG submodule gstack (foreign repo, pinned SHA) — KHÔNG thuộc binary su-code. Chỉ làm khi muốn role tool-backed chạy thật qua gstack: `git submodule update --init reference/gstack` → đọc `docs/ADDING_A_HOST.md` → implement → `./setup --host omp` → deinit lại.

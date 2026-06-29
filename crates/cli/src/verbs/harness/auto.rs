@@ -32,6 +32,8 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
     deploy::ensure_headroom_mcp(env)?;
     let _ = deploy::ensure_omp_memory_config(&env.home);
     let _ = deploy::ensure_recall_hook(&env.home);
+    let _ = deploy::ensure_append_system(&env.home);
+    let _ = deploy::ensure_serena_mcp(env);
     deploy::ensure_feynman_cli();
     let _ = install_external_skill_packs(env); // best-effort; skips packs already present
     let global_dir = env.home.join(".omp/skills");
@@ -43,6 +45,7 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
         ui::ok("global skills ready — `cd` into a project and re-run `8sync harness`");
         let _ = deploy::ensure_gs_command(&env.home, None);
         let _ = deploy::ensure_workflow_extension(&env.home, None);
+        let _ = deploy::ensure_engine(&env.home, None);
         return Ok(());
     };
 
@@ -65,6 +68,7 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
     inject_subfolder_indexes(&root)?;
     let _ = deploy::ensure_gs_command(&env.home, Some(&root));
     let _ = deploy::ensure_workflow_extension(&env.home, Some(&root));
+    let _ = deploy::ensure_engine(&env.home, Some(&root));
     let _ = consolidate_learnings(&root);
 
     // 4. Re-index so the agent learns the current tree.

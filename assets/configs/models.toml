@@ -1,0 +1,29 @@
+# ~/.config/8sync/models.toml — adaptive model routing for omp.
+#
+# 8sync classifies each `8sync ai "<prompt>"` into a task class and passes the
+# matching model to omp via `--model`. omp resolves the name against its own
+# catalog with fuzzy matching, so short names work: "codex", "glm", "sonnet",
+# "opus", "haiku", or a full "provider/model-id".
+#
+# The [roles] models are passed as --plan / --smol / --slow so omp's OWN internal
+# routing (planning sub-steps, session titles, memory, deep reasoning) uses YOUR
+# picks too — not just the main turn.
+#
+# Edit freely. Leave a value as "" to let omp keep its own default for that slot.
+# Override for one call:  8sync ai --model glm "explain this module"
+
+[roles]
+default = "codex"   # main coding model        → --model
+plan    = "glm"     # architectural planning    → --plan
+smol    = "haiku"   # cheap/fast: titles+memory → --smol
+slow    = "opus"    # deep reasoning / hard bugs → --slow
+
+[tasks]
+# Prompt class → model (overrides roles.default for `8sync ai`).
+# Classes are detected heuristically from the prompt text:
+#   plan | review | debug | code | trivial
+plan    = "glm"
+review  = "opus"
+debug   = "opus"
+code    = "codex"
+trivial = "haiku"

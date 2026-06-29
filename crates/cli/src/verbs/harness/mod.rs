@@ -11,6 +11,7 @@ use clap::Args as ClapArgs;
 use crate::{env_detect, ui};
 
 mod auto;
+mod compaction;
 pub(crate) mod audit;
 mod bench;
 mod eval;
@@ -35,6 +36,7 @@ mod web;
       8sync harness bench            benchmark the loop-engineering context budget (upfront vs deferred tokens + KV-cache gate)
       8sync harness audit             scan docs for stale paths / oversized / junk + churn hotspots (doc-hygiene)
       8sync harness eval [--baseline] run the quality task-suite through omp (pass/fail + wall-time; --baseline saves the reference)
+      8sync harness compaction [pct]  view/set omp auto-compaction threshold (default 50% — anti-forget)
 
     WHAT init DEPLOYS
       always-on : codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing
@@ -45,6 +47,8 @@ mod web;
 pub struct Args {
     /// init (default) | up | audit | bench | eval | help
     pub sub: Option<String>,
+    /// Optional value for value-taking sub-commands (e.g. `compaction <pct>`).
+    pub value: Option<String>,
     /// `up --loop <dur>`: refresh every <dur> in the foreground (e.g. 10m, 1h, 30s)
     #[arg(long = "loop", value_name = "DUR")]
     pub loop_every: Option<String>,
@@ -93,6 +97,7 @@ pub fn run(a: Args) -> Result<()> {
         Some("eval") if a.project => eval::harness_eval_project(&env),
         Some("eval") => eval::harness_eval(&env, a.baseline),
         Some("web") => web::harness_web(&env.home, a.port.unwrap_or(8731), a.no_open),
+        Some("compaction") => compaction::harness_compaction(&env.home, a.value.as_deref()),
         Some("help") => {
             print_help();
             Ok(())
@@ -122,6 +127,7 @@ fn print_help() {
     println!("  8sync harness audit             scan docs for stale paths / oversized / junk + churn (doc-hygiene)");
     println!("  8sync harness bench             benchmark the loop context budget (upfront vs deferred tokens + KV-cache gate)");
     println!("  8sync harness eval [--baseline] run the quality task-suite through omp; --baseline saves the reference");
+    println!("  8sync harness compaction [pct]  view/set omp auto-compaction threshold (anti-forget; default 50%)");
     println!("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)");
 
     println!("\nSKILLS (deployed by init)");

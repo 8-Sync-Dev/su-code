@@ -21,19 +21,19 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 
 Nhỏ + dùng cho MỌI task. **Thứ tự = ưu tiên (đọc top-down).** Mở `SKILL.md` ở path dưới rồi mới gọi tool đầu tiên:
 
-  1. `/home/alexdev/Projects/su-code/agents/skills/codegraph/SKILL.md`
-  2. `/home/alexdev/Projects/su-code/agents/skills/karpathy-guidelines/SKILL.md`
-  3. `/home/alexdev/Projects/su-code/agents/skills/ponytail/SKILL.md`
-  4. `/home/alexdev/Projects/su-code/agents/skills/8sync-cli/SKILL.md`
+  1. `/home/alexdev/Projects/tools/su-code/agents/skills/codegraph/SKILL.md`
+  2. `/home/alexdev/Projects/tools/su-code/agents/skills/karpathy-guidelines/SKILL.md`
+  3. `/home/alexdev/Projects/tools/su-code/agents/skills/ponytail/SKILL.md`
+  4. `/home/alexdev/Projects/tools/su-code/agents/skills/8sync-cli/SKILL.md`
 
 ### 🧩 SPECIALIST always-on — biết khả năng, đọc body KHI task khớp (progressive disclosure)
 
 KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF.
 
-- `assp-skill` — `/home/alexdev/Projects/su-code/agents/skills/assp-skill/SKILL.md`
-- `impeccable` — `/home/alexdev/Projects/su-code/agents/skills/impeccable/SKILL.md`
-- `design-taste-frontend` — `/home/alexdev/Projects/su-code/agents/skills/taste-skill/SKILL.md`
-- `image-routing` — `/home/alexdev/Projects/su-code/agents/skills/image-routing/SKILL.md`
+- `assp-skill` — `/home/alexdev/Projects/tools/su-code/agents/skills/assp-skill/SKILL.md`
+- `impeccable` — `/home/alexdev/Projects/tools/su-code/agents/skills/impeccable/SKILL.md`
+- `design-taste-frontend` — `/home/alexdev/Projects/tools/su-code/agents/skills/taste-skill/SKILL.md`
+- `image-routing` — `/home/alexdev/Projects/tools/su-code/agents/skills/image-routing/SKILL.md`
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
@@ -72,6 +72,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `planning-and-task-breakdown` — `agents/skills/planning-and-task-breakdown/SKILL.md`
 - `ponytail-audit` — `agents/skills/ponytail-audit/SKILL.md`
 - `ponytail-debt` — `agents/skills/ponytail-debt/SKILL.md`
+- `ponytail-gain` — `agents/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `agents/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `agents/skills/ponytail-review/SKILL.md`
 - `preview` — `agents/skills/preview/SKILL.md`
@@ -344,11 +345,11 @@ Repo chưa theo spec (không có `SKILL.md`)? 8sync fallback: phát hiện `CLAU
 
 ## 8. Quy ước contribute
 
-- **Cite code**: `crates/cli/src/verbs/bg.rs:330-373` (range), `bg.rs:330` (single line).
-- **Không thêm dep nặng**: tránh `reqwest`, `tokio` cho phần nhỏ. Dùng shell-out (`curl`, `pkill`, `systemctl`) thay vì re-implement trong Rust.
+- **Cite code**: `crates/cli/src/verbs/setup.rs:130` (single line), `crates/cli/src/models.rs:90-110` (range).
+- **Không thêm dep nặng**: tránh `reqwest`; `tokio`/`axum` CHỈ cho `8sync harness web` (gated, xem `Cargo.toml` note). Phần khác dùng shell-out (`curl`, `systemctl`) thay vì re-implement.
 - **Idempotent install**: mọi thao tác cài đặt trong `setup.rs`/`pkg.rs` phải an toàn khi chạy lần 2.
-- **Smart-parse args**: 1 verb có thể nhận nhiều dạng input (vd `8sync bg 0.7` = opacity, `8sync bg /path` = file, `8sync bg cyberpunk` = search). Tránh tạo subcommand sâu.
-- **Verb count target**: giữ ≤ 22 verb flat (hiện 21, thêm `harness`).
+- **Smart-parse args**: 1 verb nhận nhiều dạng input (vd `8sync ai "..."` = prompt · `8sync ai --model glm "..."` = model override · `8sync find -f x` = filename mode · `8sync harness compaction 50` = set). Tránh subcommand sâu.
+- **Verb count target**: giữ ≤ 22 verb flat (hiện ~19; look&feel delegate cho HyDE, kitty glass deploy qua `setup`).
 - **Binary size target**: < 4 MB stripped (tăng từ 2 MB khi bundle `impeccable` — skill frontend nặng ~2 MB). Skill mới chỉ bundle nếu thật sự always-on; còn lại để `8sync skill add`.
 - **Help format**: mọi verb có `-h`/`--help` với `EXAMPLES` block (xem `setup.rs:7-15`).
 
@@ -362,8 +363,8 @@ cargo build --release
 ./target/release/8sync help
 ./target/release/8sync flow
 ./target/release/8sync doctor
-./target/release/8sync bg                           # status, không side effect
-./target/release/8sync look list
+./target/release/8sync harness compaction           # view omp auto-compaction threshold
+./target/release/8sync ai --model glm -h            # adaptive model flag present
 ./target/release/8sync . -h                         # sub-action help
 ./target/release/8sync find --no-open --type rs "fn run"
 ```
