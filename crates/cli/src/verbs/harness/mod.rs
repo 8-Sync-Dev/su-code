@@ -135,6 +135,8 @@ fn print_help() {
     println!("  8sync harness bench             benchmark the loop context budget (upfront vs deferred tokens + KV-cache gate)");
     println!("  8sync harness eval [--baseline] run the quality task-suite through omp; --baseline saves the reference");
     println!("  8sync harness compaction [pct]  view/set omp auto-compaction threshold (anti-forget; default 50%)");
+    println!("  8sync harness model [k v]       view/edit ~/.config/8sync/models.toml (model routing for /auto + 8sync ai)");
+    println!("  8sync harness web [--port N]    local dashboard (axum+Vite): skills/memory/engines/team/submodules");
     println!("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)");
 
     println!("\nSKILLS (deployed by init)");
