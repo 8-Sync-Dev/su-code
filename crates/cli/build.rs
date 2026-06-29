@@ -10,10 +10,12 @@ fn main() {
         .unwrap_or_default();
     println!("cargo:rustc-env=GIT_COMMIT_HASH={}", commit);
 
-    // Build the Vite FE if dist is missing so rust-embed (assets.rs) can embed it.
+    // Rebuild the Vite FE when dist is missing OR web/src changed, so edits can never
+    // silently ship a stale bundle (build.rs previously built only when dist was
+    // absent). rust-embed (assets.rs) then embeds the fresh web/dist.
     let web_dir = std::path::Path::new("../../web");
     let web_dist = web_dir.join("dist/index.html");
-    if !web_dist.exists() {
+    if !web_dist.exists() || web_src_newer(web_dir, &web_dist) {
         build_web_fe(web_dir);
     }
     // Guarantee dist exists so rust-embed compiles; embed a styled, instructive
@@ -26,6 +28,10 @@ fn main() {
         println!("cargo:warning=8sync: web FE not built (no bun/pnpm/npm found) — embedded fallback page; install bun then rebuild for the full dashboard");
     }
     println!("cargo:rerun-if-changed=../../web/dist/index.html");
+    println!("cargo:rerun-if-changed=../../web/src");
+    println!("cargo:rerun-if-changed=../../web/index.html");
+    println!("cargo:rerun-if-changed=../../web/package.json");
+    println!("cargo:rerun-if-changed=../../web/vite.config.ts");
     println!("cargo:rerun-if-changed=../../.git/HEAD");
     println!("cargo:rerun-if-changed=../../.git/refs/heads/main");
 }
@@ -78,6 +84,41 @@ fn which_bin(bin: &str) -> Option<std::path::PathBuf> {
         }
     }
     None
+}
+
+/// Newest mtime under a directory tree (recursive), UNIX_EPOCH if unreadable.
+fn newest_in_dir(dir: &std::path::Path) -> std::time::SystemTime {
+    let mut newest = std::time::SystemTime::UNIX_EPOCH;
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            let m = if p.is_dir() { newest_in_dir(&p) } else { file_mtime(&p) };
+            if m > newest {
+                newest = m;
+            }
+        }
+    }
+    newest
+}
+
+fn file_mtime(p: &std::path::Path) -> std::time::SystemTime {
+    std::fs::metadata(p)
+        .and_then(|m| m.modified())
+        .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+}
+
+/// True when any FE source (web/src tree or key config) is newer than the built
+/// dist — so a `cargo build` after editing web/src rebuilds the bundle.
+fn web_src_newer(web_dir: &std::path::Path, dist: &std::path::Path) -> bool {
+    let dist_m = file_mtime(dist);
+    let mut newest = newest_in_dir(&web_dir.join("src"));
+    for f in ["package.json", "vite.config.ts", "index.html", "tsconfig.json"] {
+        let m = file_mtime(&web_dir.join(f));
+        if m > newest {
+            newest = m;
+        }
+    }
+    newest > dist_m
 }
 
 const FALLBACK_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8">

@@ -54,6 +54,8 @@ export type CtxInfo = {
   session: string;
   lastCompactAt: number | null;
   compactionObserved: boolean;
+  stale?: boolean; // session idle/ended — snapshot, not a live run
+  sessionAgeSecs?: number;
   note?: string;
 };
 
@@ -152,6 +154,8 @@ export function normalizeContext(raw: Record<string, unknown>): CtxInfo {
           ? num(raw.last_compact_at)
           : null,
     compactionObserved: Boolean(raw.compaction_observed ?? raw.compactionObserved),
+    stale: raw.stale != null ? Boolean(raw.stale) : undefined,
+    sessionAgeSecs: raw.sessionAgeSecs != null ? num(raw.sessionAgeSecs) : undefined,
     note: str(raw.note) || undefined,
   };
 }

@@ -503,31 +503,51 @@ fn parse_gitmodules(root: &std::path::Path) -> Vec<serde_json::Value> {
 async fn api_context(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
     let root = detect_current_project_root();
     let home = &ctx.home;
-    let window: u64 = 1_000_000; // ASSUMED model context window (glm-5.2 observed reaching ~574k pre-compact → ~1M class)
+    let model = read_model(home);
+    let (window, assumed) = model_window(&model);
     let cfg_raw = std::fs::read_to_string(home.join(".omp/agent/config.yml")).unwrap_or_default();
     let threshold_pct = parse_threshold(&cfg_raw);
-    let (used, last_compact_at, session, model) = match (&root, session_slug(home, root.as_deref())) {
+    let (used, last_compact_at, session, session_age) = match (&root, session_slug(home, root.as_deref())) {
         (Some(_r), Some(slug)) => {
             let dir = home.join(format!(".omp/agent/sessions/{}", slug));
             let newest = newest_session(&dir);
-            let model = read_model(home);
             let (used, last_compact) = newest.as_ref().and_then(|p| analyze_context(p)).unwrap_or((0, None));
             let session = newest.as_ref().and_then(|p| p.file_name()).and_then(|n| n.to_str()).unwrap_or("").to_string();
-            (used, last_compact, session, model)
+            let age = newest
+                .as_ref()
+                .and_then(|p| std::fs::metadata(p).ok())
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.elapsed().ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            (used, last_compact, session, age)
         }
-        _ => (0u64, None, String::new(), String::new()),
+        _ => (0u64, None, String::new(), 0u64),
     };
     let pct = if window > 0 { used * 100 / window } else { 0 };
     let compact_at = window * threshold_pct / 100;
     let will_compact = compact_at > 0 && used >= compact_at;
+    // A session not written for >10 min is a stored snapshot, not a live run. omp
+    // compacts on the NEXT turn (or a safe mid-turn point), so a paused/ended session
+    // legitimately sits above threshold until resumed — it is not "stuck".
+    let stale = session_age > 600;
+    let note = if assumed {
+        "window is assumed (model not found in `omp models`); the % is approximate"
+    } else if stale {
+        "compaction is turn-triggered (omp compacts after a completed turn / safe mid-turn point when usage exceeds threshold, not as a hard cap). This session is idle/ended, so it sits above threshold until resumed — run /compact or continue to compact now. last_compact_at is observed history and may predate the current threshold."
+    } else {
+        "compaction is turn-triggered: omp compacts after a completed turn / safe mid-turn point once usage exceeds the threshold — not a hard cap. last_compact_at is observed history and may predate the current threshold."
+    };
     Json(serde_json::json!({
-        // explicit FE contract (camelCase) — the window is ASSUMED, not authoritative
+        // explicit FE contract (camelCase)
         "usedTok": used,
         "windowTok": window,
         "pct": pct,
         "thresholdPct": threshold_pct,
         "willCompact": will_compact,
-        "assumed": true,
+        "assumed": assumed,
+        "stale": stale,
+        "sessionAgeSecs": session_age,
         "model": model,
         "project": root.map(|p| p.display().to_string()).unwrap_or_default(),
         "session": session,
@@ -539,8 +559,65 @@ async fn api_context(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
         "over_threshold": will_compact,
         "last_compact_at": last_compact_at,
         "compaction_observed": last_compact_at.is_some(),
-        "note": "window assumed 1M (not authoritative); threshold parsed from config.yml; last_compact_at = observed token-drop (proof compaction fired)",
+        "note": note,
     }))
+}
+
+/// Per-model context window (tokens) parsed once from `omp models`, so the % is
+/// real instead of a hardcoded 1M. Falls back to (1M, assumed=true) when the model
+/// isn't in the catalog or `omp` is unavailable.
+static MODEL_WINDOWS: std::sync::LazyLock<std::collections::HashMap<String, u64>> =
+    std::sync::LazyLock::new(build_model_windows);
+
+fn model_window(model: &str) -> (u64, bool) {
+    // "zai/glm-5.2:high" → "glm-5.2"
+    let bare = model.rsplit('/').next().unwrap_or(model);
+    let bare = bare.split(':').next().unwrap_or(bare);
+    match MODEL_WINDOWS.get(bare) {
+        Some(&w) if w > 0 => (w, false),
+        _ => (1_000_000, true),
+    }
+}
+
+fn build_model_windows() -> std::collections::HashMap<String, u64> {
+    let mut map = std::collections::HashMap::new();
+    let Ok(out) = std::process::Command::new("omp").arg("models").output() else {
+        return map;
+    };
+    let text = String::from_utf8_lossy(&out.stdout);
+    for line in text.lines() {
+        // table rows: `│ <id> │ <context> │ <max-out> │ ...`
+        let cols: Vec<&str> = line.split('│').map(|s| s.trim()).collect();
+        if cols.len() < 3 {
+            continue;
+        }
+        let id = cols[1];
+        if id.is_empty() || id == "model" || id.contains(' ') {
+            continue;
+        }
+        if let Some(tok) = parse_token_count(cols[2]) {
+            map.insert(id.to_string(), tok);
+        }
+    }
+    map
+}
+
+/// "1M" → 1_000_000, "205K" → 205_000, "131072" → 131072, "1.5M" → 1_500_000.
+fn parse_token_count(s: &str) -> Option<u64> {
+    let s = s.trim();
+    let last = s.chars().last()?;
+    let (num, mult) = match last {
+        'K' | 'k' => (&s[..s.len() - 1], 1_000f64),
+        'M' | 'm' => (&s[..s.len() - 1], 1_000_000f64),
+        'G' | 'g' => (&s[..s.len() - 1], 1_000_000_000f64),
+        c if c.is_ascii_digit() => (s, 1f64),
+        _ => return None,
+    };
+    let f: f64 = num.trim().parse().ok()?;
+    if f <= 0.0 {
+        return None;
+    }
+    Some((f * mult) as u64)
 }
 
 fn session_slug(home: &std::path::Path, root: Option<&std::path::Path>) -> Option<String> {

@@ -311,12 +311,13 @@ function ContextPage() {
   const pct = Math.min(d.pct, 100);
   const near = d.pct >= d.thresholdPct - 10;
   const over = d.willCompact;
-  const barColor = over ? "var(--err)" : near ? "var(--warn)" : "var(--accent)";
+  const stale = Boolean(d.stale);
+  const barColor = over ? (stale ? "var(--warn)" : "var(--err)") : near ? "var(--warn)" : "var(--accent)";
   const headroom = Math.max(0, d.thresholdPct - d.pct);
   return (
     <Page
       title="Context"
-      sub="Live omp session token usage. The window is assumed, so the percentage is approximate."
+      sub="Live omp session token usage. The window is the active model's real context window (or an estimate if the model isn't in omp's catalog)."
     >
       <div className="card">
         <div className="gauge-head">
@@ -329,8 +330,13 @@ function ContextPage() {
         </div>
         <p className="gauge-note">
           {d.assumed && <span className="tag warn" style={{ marginRight: 8 }}>assumed window</span>}
+          {stale && <span className="tag info" style={{ marginRight: 8 }}>idle snapshot</span>}
           compact at <strong>{d.thresholdPct}%</strong> ({fmt((d.thresholdPct * d.windowTok) / 100)} tok) ·{" "}
-          {over ? <span className="err">over threshold — will compact</span> : <span>{headroom}% headroom</span>}
+          {over ? (
+            <span className={stale ? "warn" : "err"}>over threshold — compacts on next turn</span>
+          ) : (
+            <span>{headroom}% headroom</span>
+          )}
         </p>
         {d.compactionObserved && d.lastCompactAt != null && (
           <p className="gauge-observed">
@@ -338,11 +344,7 @@ function ContextPage() {
             <span className="muted">last fired near {fmt(d.lastCompactAt)} tok</span>
           </p>
         )}
-        {d.assumed && (
-          <p className="gauge-note faint">
-            The {fmt(d.windowTok)}-token window is an assumption, not a measured limit. Treat the percentage as a rough signal until a measured window is available.
-          </p>
-        )}
+        {d.note && <p className="gauge-note faint">{d.note}</p>}
       </div>
       <div className="card">
         <div className="card-title">Session</div>

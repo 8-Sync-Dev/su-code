@@ -5,6 +5,24 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.29.2] — 2026-06-29
+
+### Fixed — Context page is now correct for ALL models (not just GLM)
+- **Per-model context window.** `/api/context` hardcoded a 1,000,000-token window, so models with
+  a smaller real window (e.g. `claude-haiku-4-5` 200k, `glm-4.x` 131–205k) showed an artificially
+  low % and looked like they never hit the compaction threshold — while 1M models (glm-5.2,
+  claude-opus) looked fine. Now the window is parsed per active model from `omp models` (cached via
+  `LazyLock`), so the %, threshold marker, and "will compact" are accurate for every model. Falls
+  back to an explicit `assumed` estimate only when the model isn't in omp's catalog.
+- **Honest compaction copy.** omp's threshold compaction is **turn-triggered** (fires after a
+  completed turn / safe mid-turn point once usage exceeds `thresholdPercent` of the real window) —
+  not a hard cap, so a paused/ended session legitimately sits above the line until resumed. The page
+  now says "compacts on next turn", flags idle/ended sessions (`stale`), surfaces the explanation,
+  and only shows the "assumed window" badge when the window is truly unknown.
+- **`build.rs` shipped stale FE.** It rebuilt the Vite bundle only when `web/dist` was *missing* and
+  watched only `web/dist`, so edits to `web/src` were silently embedded stale. Now it rebuilds when
+  any FE source is newer than dist and emits `rerun-if-changed` for `web/src` + configs.
+
 ## [0.29.1] — 2026-06-29
 
 ### Fixed — dashboard project switcher

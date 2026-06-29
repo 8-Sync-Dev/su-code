@@ -213,3 +213,16 @@
   by resolved path, drop junk slugs (mtime 0 / non-dir), widen green-dot window to 2h, add `current`
   flag. Lesson: a "switch" that only changes a label is a lie — verify the underlying data actually
   changes (curl /api/state before+after), and browser-test interactive flows before claiming done.
+- **failure→fix: Context % wrong for non-1M models + stale-FE build (v0.29.2).** User: "GLM compacts,
+  other vendors don't." Root cause was the dashboard, not omp: `/api/context` hardcoded window=1M, so
+  smaller-window models (claude-haiku 200k, glm-4.x 131–205k) showed artificially low % and never
+  looked over-threshold, while 1M models (glm-5.2, claude-opus) looked right. omp compaction IS
+  model-agnostic — threshold = `thresholdPercent` (or default `window − max(15%,reserve)`) of the
+  model's REAL `contextWindow` (omp/compaction.md). Fix: parse per-model window from `omp models`
+  (cached `LazyLock`), fall back to assumed only when unknown. Also: omp threshold compaction is
+  TURN-TRIGGERED (after a completed turn / safe mid-turn), not a hard cap → a paused session sits
+  above threshold until resumed; copy now says "compacts on next turn" + flags `stale`.
+  **build.rs trap:** it rebuilt the FE only when `web/dist` was MISSING and watched only `web/dist`,
+  so `web/src` edits silently shipped stale (verify served bundle: curl `/assets/*.js` for your new
+  strings). Fixed to rebuild when src newer than dist + `rerun-if-changed=web/src`. Lesson: after an
+  FE edit, confirm the embedded bundle actually changed before claiming it shipped.
