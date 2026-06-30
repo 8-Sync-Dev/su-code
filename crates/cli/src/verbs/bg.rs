@@ -28,6 +28,7 @@ use crate::{env_detect::Env, ui};
           8sync bg list             list the collection (fzf picker in kitty; plain paths otherwise)
           8sync bg add <url>        download a wallpaper into the collection
           8sync bg add ~/pic.jpg -s add AND set in one go
+          8sync bg search 'dark anime'  search wallhaven.cc (no API key) → fzf + live preview → set
 
         WHERE WALLPAPERS LIVE
           active  → recorded in ~/.config/8sync/wallpaper (path), baked into 8sync.conf
@@ -74,8 +75,15 @@ pub fn run(a: Args) -> Result<()> {
             }
             Ok(())
         }
+        "search" => {
+            let query = a.action.get(1).map(|s| s.as_str()).unwrap_or("");
+            if query.is_empty() {
+                bail!("usage: 8sync bg search <query>  (wallhaven.cc — no API key, SFW)");
+            }
+            search(&env, query)
+        }
         other => {
-            ui::warn(&format!("unknown action `{other}` — try: show | get | set | list | add"));
+            ui::warn(&format!("unknown action `{other}` — try: show | get | set | list | add | search"));
             Ok(())
         }
     }
@@ -222,6 +230,136 @@ fn add(env: &Env, src: &str) -> Result<PathBuf> {
         bail!("downloaded file is not a valid image (purged): {}", dest.display());
     }
     Ok(dest)
+}
+
+/// `bg search <query>` — search wallhaven.cc (public API, no key, SFW) and pick a
+/// wallpaper via fzf with a live `kitten icat` preview + source link. Only
+/// thumbnails are fetched for browsing; the full image is downloaded for the one
+/// you pick. Non-interactive contexts get a printed list with source links.
+fn search(env: &Env, query: &str) -> Result<()> {
+    let q = urlencoding::encode(query);
+    let api = format!(
+        "https://wallhaven.cc/api/v1/search?q={q}&categories=100&purity=100&sorting=relevance&atleast=1920x1080&limit=24"
+    );
+    ui::info(&format!("searching wallhaven.cc for \"{query}\"…"));
+    let resp = Command::new("curl").args(["-fsSL", "--retry", "2", &api]).output()?;
+    if !resp.status.success() {
+        bail!("wallhaven search request failed (network?)");
+    }
+    let v: serde_json::Value =
+        serde_json::from_slice(&resp.stdout).context("bad JSON from wallhaven")?;
+    let data = v.get("data").and_then(|d| d.as_array()).context("no data field")?;
+    if data.is_empty() {
+        ui::warn(&format!("no results for \"{query}\""));
+        return Ok(());
+    }
+
+    let tmp = std::env::temp_dir().join(format!("8sync-bg-search-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp)?;
+    let _guard = TmpGuard(tmp.clone()); // cleans the staged thumbs on return
+
+    // Stage thumbnails; the id+resolution is baked into the filename so the fzf
+    // list is readable. Sidecar files carry the source link + full-res URL; the
+    // full image is only fetched for the one you pick.
+    let mut thumbs: Vec<PathBuf> = Vec::new();
+    for r in data.iter().take(16) {
+        let (thumb, full, page, id, dx, dy) = match (
+            r.get("thumbs").and_then(|t| t.get("small")).and_then(|s| s.as_str()),
+            r.get("path").and_then(|p| p.as_str()),
+            r.get("url").and_then(|u| u.as_str()),
+            r.get("id").and_then(|i| i.as_str()),
+            r.get("dimension_x").and_then(|x| x.as_i64()),
+            r.get("dimension_y").and_then(|y| y.as_i64()),
+        ) {
+            (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f)) => (a, b, c, d, e, f),
+            _ => continue,
+        };
+        let thumb_path = tmp.join(format!("{id}_{dx}x{dy}.jpg"));
+        let ok = Command::new("curl")
+            .args(["-fsSL", "--retry", "1", "-o"])
+            .arg(&thumb_path)
+            .arg(thumb)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if !ok || !is_image(&thumb_path) {
+            continue;
+        }
+        std::fs::write(format!("{}.url", thumb_path.display()), page)?;
+        std::fs::write(format!("{}.full", thumb_path.display()), full)?;
+        thumbs.push(thumb_path);
+    }
+    if thumbs.is_empty() {
+        bail!("downloaded no usable thumbnails (network/filter)");
+    }
+
+    if !crate::env_detect::has_tty() {
+        ui::step(&format!("{} results for \"{query}\" (wallhaven.cc)", thumbs.len()));
+        for t in &thumbs {
+            let page =
+                std::fs::read_to_string(format!("{}.url", t.display())).unwrap_or_default();
+            println!(
+                "  {}  {}",
+                t.file_name().unwrap_or_default().to_string_lossy(),
+                page
+            );
+        }
+        println!("\n  pick interactively in kitty: 8sync bg search <query>  (fzf + live preview)");
+        return Ok(());
+    }
+
+    let list = thumbs
+        .iter()
+        .map(|t| t.to_string_lossy().to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut child = Command::new("fzf")
+        .args([
+            "--preview",
+            "kitten icat {}; echo; echo -n 'source: '; cat {}.url 2>/dev/null",
+            "--preview-window",
+            "right:60%:wrap",
+            "--prompt",
+            "wallpaper> ",
+            "--header",
+            "Enter=set (downloads full res)  Esc=cancel",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .context("fzf not found — install it")?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(list.as_bytes());
+    }
+    let out = child.wait_with_output()?;
+    if !out.status.success() {
+        ui::info("no selection");
+        return Ok(());
+    }
+    let picked = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if picked.is_empty() {
+        return Ok(());
+    }
+    let full_url =
+        std::fs::read_to_string(format!("{picked}.full")).context("lost the full-res URL")?;
+    let page = std::fs::read_to_string(format!("{picked}.url")).unwrap_or_default();
+    ui::info(&format!("downloading full-res → {}", full_url.trim()));
+    let added = add(env, full_url.trim())?;
+    set(env, added.to_str().unwrap_or(""))?;
+    if !page.is_empty() {
+        println!("  ↳ source: {page}");
+    }
+    Ok(())
+}
+
+/// RAII temp-dir cleaner — removes the staged search thumbnails on scope exit.
+struct TmpGuard(PathBuf);
+impl Drop for TmpGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────

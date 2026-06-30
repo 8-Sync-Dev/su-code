@@ -73,6 +73,7 @@ pub fn run() -> Result<()> {
         ("8sync bg",               "show the current wallpaper (rendered inline in kitty)"),
         ("8sync bg set <file>",    "swap wallpaper live; no arg → fzf picker with live image preview"),
         ("8sync bg add <url>",     "download a wallpaper into the collection (-s to also set)"),
+        ("8sync bg search \"dark anime\"", "search wallhaven.cc (no key) → fzf live preview → set"),
     ]);
 
     println!("Every verb supports {} and {} for detailed help.", "-h".bold().green(), "--help".bold().green());

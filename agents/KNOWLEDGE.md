@@ -235,5 +235,9 @@ _(consolidated 27 dòng cũ → agents/archive/KNOWLEDGE-1782725542.md)_
   via /dev/tty — spawn with Stdio::piped stdin, take+drop stdin to close, wait_with_output). Image
   validity = magic bytes (PNG 89 50 4E 47 / JPEG FF D8 FF / RIFF…WEBP / GIF8) — guards 0-byte HTML
   downloads. Zero new Rust deps (kitten/fzf/curl shell-outs). `hydectl wallpaper` = desktop, `8sync
-  bg` = kitty background_image — distinct. **Online search not yet built — needs an image API key
-  (Unsplash/Pexels) — pending user decision.**
+  bg` = kitty background_image — distinct. **Online search shipped v0.36.0 via `8sync bg search
+  <q>`** — wallhaven.cc public API (NO key needed, SFW, ≥1920×1080); JSON `data[].path`=full,
+  `thumbs.small`=thumb, `url`=page link. Stage thumbs in temp, fzf `--preview 'kitten icat {};
+  cat {}.url'` (id+res baked into filename so no --delimiter needed), pick → read `{thumb}.full`
+  sidecar → `add`+`set`. Sidecar pattern (`<file>.url`/`.full`) maps a chosen path to its metadata
+  without a TSV/delimiter. RAII `TmpGuard` cleans staged thumbs. Non-TTY → print list with links.

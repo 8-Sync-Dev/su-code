@@ -73,6 +73,7 @@ pub fn print_cheatsheet() {
         ("8sync bg set <file>",    "swap wallpaper live (rewrites 8sync.conf + reloads kitty); no arg → fzf picker"),
         ("8sync bg list",          "browse the collection with a live image preview (fzf) → pick → set"),
         ("8sync bg add <url>",     "download a wallpaper into the collection (-s to also set)"),
+        ("8sync bg search <q>",   "search wallhaven.cc (no API key) → fzf + live preview → set"),
     ]);
     println!("  {}", "→ palettes = color fragments; wallpaper swaps the kitty background_image. Both reload via SIGUSR1 (instant)".dimmed());
 

@@ -5,6 +5,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.36.0] — 2026-06-30
+
+### Added — `8sync bg search`: find wallpapers online (no API key) + pick with live preview
+- New **`8sync bg search <query>`** sub-action. Searches **wallhaven.cc** via its public API
+  (**no API key needed**, SFW, ≥1920×1080) — wallpaper-focused (incl. anime/dark), a good fit for
+  the project's aesthetic without imposing an Unsplash/Pexels registration on the user.
+- **Interactive (kitty)**: stages thumbnails, then opens `fzf` with a **live `kitten icat` preview
+  pane** showing each candidate + its wallhaven **source link**. Enter downloads the full-res image,
+  adds it to the collection, and sets it live; Esc cancels. Only the full image you pick is fetched.
+- **Non-interactive**: prints the result list (id + resolution + source link) for scripting/agents.
+- RAII temp cleanup; reuses the existing `add`+`set` path. No new Rust deps.
+  (`crates/cli/src/verbs/bg.rs`)
+
 ## [0.35.0] — 2026-06-30
 
 ### Added — `8sync bg`: manage the kitty wallpaper at runtime (live swap + inline preview)
