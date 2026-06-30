@@ -75,6 +75,7 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/skills/add", post(api_skill_add))
         .route("/api/skills/update", post(api_skill_update))
         .route("/api/engines", get(api_engines))
+        .route("/api/engine", get(api_engine))
         .route("/api/bench", get(api_bench))
         .route("/api/eval", get(api_eval))
         .route("/api/memory/:file", get(api_memory_get).post(api_memory_set))
@@ -237,6 +238,59 @@ async fn api_engines(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
         "headroom": eng("headroom"),
         "serena": serena,
         "mnemopi_on": cfg.contains("backend: mnemopi"),
+    }))
+}
+
+/// Live `/auto` engine run — the REAL gsd-pi state machine the engine drives at
+/// `<root>/.cache/8sync/engine/state.json` (NOT demo data). Read-only mirror of
+/// the terminal board: goal · progress · slice/task tree · current task. Returns
+/// `{active:false}` when no run exists. The engine (driven by `/auto` in omp) is
+/// the source of truth; the dashboard displays it, never bypasses its verify gate.
+async fn api_engine(State(_ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
+    let root = match detect_current_project_root() {
+        Some(r) => r,
+        None => return Json(serde_json::json!({ "active": false })),
+    };
+    let raw = match std::fs::read_to_string(root.join(".cache/8sync/engine/state.json")) {
+        Ok(s) => s,
+        Err(_) => return Json(serde_json::json!({ "active": false })),
+    };
+    let state: serde_json::Value = match serde_json::from_str(&raw) {
+        Ok(v) => v,
+        Err(_) => return Json(serde_json::json!({ "active": false })),
+    };
+    // Mirror 8sync-engine.ts counts()/findNext() over slices[].tasks[].
+    let (mut total, mut done, mut blocked) = (0u64, 0u64, 0u64);
+    let mut current = serde_json::Value::Null;
+    if let Some(slices) = state.get("slices").and_then(|v| v.as_array()) {
+        for s in slices {
+            let Some(tasks) = s.get("tasks").and_then(|v| v.as_array()) else { continue };
+            for t in tasks {
+                total += 1;
+                match t.get("status").and_then(|v| v.as_str()) {
+                    Some("done") => done += 1,
+                    Some("blocked") => blocked += 1,
+                    Some("pending") | Some("in_progress") if current.is_null() => {
+                        current = serde_json::json!({
+                            "slice": s.get("title").cloned().unwrap_or(serde_json::Value::Null),
+                            "task": t.get("title").cloned().unwrap_or(serde_json::Value::Null),
+                            "status": t.get("status").cloned().unwrap_or(serde_json::Value::Null),
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    Json(serde_json::json!({
+        "active": true,
+        "goal": state.get("goal").cloned().unwrap_or(serde_json::Value::Null),
+        "updatedAt": state.get("updatedAt").cloned().unwrap_or(serde_json::Value::Null),
+        "total": total,
+        "done": done,
+        "blocked": blocked,
+        "current": current,
+        "slices": state.get("slices").cloned().unwrap_or(serde_json::json!([])),
     }))
 }
 

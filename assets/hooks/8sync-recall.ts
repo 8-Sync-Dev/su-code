@@ -43,7 +43,7 @@ export default function (pi: HookAPI): void {
   function bundle(): string {
     const lines: string[] = [
       "# 8sync recall — obey ~/.omp/agent/APPEND_SYSTEM.md",
-      "Code-intel first (codegraph · codebase-memory-mcp · serena · headroom) BEFORE grep/Read; open a skill's SKILL.md before acting.",
+      "Code-intel first (codegraph · codebase-memory-mcp · serena · headroom) BEFORE grep/Read; recall before / retain durable facts after; browser to verify web/UI; open a skill's SKILL.md before acting.",
     ];
     const skills = skillIndex();
     if (skills.length) {

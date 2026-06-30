@@ -568,6 +568,7 @@ function EnginesPage() {
   ];
   return (
     <Page title="Engines" sub="Token-opt + file-CRUD stack. Absent engines fall back to slow grep/read.">
+      <EngineRunBoard />
       {isLoading || !data ? <Loading rows={4} /> : error ? <ErrorState message={(error as Error).message} /> : (
         <div className="grid">
           {engines.map((e) => {
@@ -602,6 +603,50 @@ function EnginesPage() {
         </div>
       )}
     </Page>
+  );
+}
+
+// ── Live /auto engine run (real .cache/8sync/engine/state.json, not demo) ──
+function EngineRunBoard() {
+  const { data } = useQuery({ queryKey: ["engine-run"], queryFn: api.engine, refetchInterval: 4000 });
+  if (!data) return null;
+  if (!data.active) {
+    return (
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="tile-head"><strong>/auto engine</strong><span className="tag warn">idle</span></div>
+        <p className="tile-hint">No active run. Start one in omp with <code>/auto &lt;goal&gt;</code> — this board mirrors the real <code>.cache/8sync/engine/state.json</code>.</p>
+      </div>
+    );
+  }
+  const total = data.total ?? 0, done = data.done ?? 0, blocked = data.blocked ?? 0;
+  const pct = total > 0 ? Math.round((done * 100) / total) : 0;
+  const icon = (s: string) => (s === "done" ? "✓" : s === "in_progress" ? "▸" : s === "blocked" ? "✗" : "○");
+  const cls = (s: string) => (s === "done" ? "ok" : s === "blocked" ? "warn" : "");
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="tile-head">
+        <strong>/auto engine — live run</strong>
+        <span className="tag ok">{done}/{total} done{blocked ? ` · ${blocked} blocked` : ""}</span>
+      </div>
+      {data.goal && <p className="tile-hint" style={{ marginTop: 0 }}>{data.goal}</p>}
+      <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,.08)", overflow: "hidden", margin: "8px 0" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: "#7c5cff" }} />
+      </div>
+      {data.current && (
+        <p className="tile-sub">▸ current: <strong>{data.current.task}</strong> <span className="tag">{data.current.slice}</span></p>
+      )}
+      {(data.slices ?? []).map((s) => (
+        <div key={s.id ?? s.title} style={{ marginTop: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, margin: "6px 0 4px" }}>{s.title}</div>
+          {s.tasks.map((t) => (
+            <div key={t.id ?? t.title} style={{ display: "flex", gap: 8, alignItems: "center", padding: "2px 0", fontSize: 13 }}>
+              <span className={`tag ${cls(t.status)}`}>{icon(t.status)}</span>
+              <span>{t.title}{t.retries ? ` · ${t.retries} retries` : ""}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }
 

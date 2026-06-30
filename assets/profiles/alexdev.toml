@@ -1,5 +1,5 @@
 name = "alexdev"
-description = "alexdev bundle — kitty terminal + fan/LED control (CoolerControl/OpenRGB/Lian Li) + Cloudflare WARP + Vietnamese Unikey"
+description = "alexdev bundle — kitty terminal + fan/LED control (CoolerControl/OpenRGB/Lian Li) + Cloudflare WARP + Vietnamese Unikey + AFFiNE (OSS knowledge base)"
 visibility = "personal"
 
 extends = [
@@ -11,7 +11,10 @@ extends = [
 
 [packages]
 pacman = ["kitty"]
-aur = []
+# AFFiNE — official prebuilt of the open-source Community Edition (AGPL/custom:
+# free, self-hostable, no cloud lock-in). The from-source `affine` AUR pkg fails
+# to build upstream (electron-packager zip step), so use the official prebuilt.
+aur = ["affine-bin"]
 
 [services]
 system_enable = []

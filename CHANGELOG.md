@@ -5,6 +5,34 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-06-29
+
+### Added — dashboard surfaces the live `/auto` engine run (real, not demo)
+- New `/api/engine` reads the **real** gsd-pi state machine the engine drives at
+  `<root>/.cache/8sync/engine/state.json`; the Engines page renders a live board — goal · progress
+  bar · slice/task tree with ✓/▸/○/✗ status + retries · current task (4 s refresh, read-only mirror of
+  the terminal board). Closes the gap where the dashboard showed the workflow *editor* + engine
+  *binaries* but never the actual `/auto` run. `{active:false}` when none. Browser-verified, 0 console
+  errors. (`crates/cli/src/verbs/harness/web.rs`, `web/src/{api.ts,App.tsx}`)
+
+### Added — AFFiNE in the `alexdev` profile
+- `affine-bin` — official prebuilt of the open-source Community Edition (AGPL/custom: free, self-hostable,
+  no cloud lock-in). The from-source `affine` AUR pkg fails upstream (electron-packager zip step), so the
+  prebuilt is used. (`assets/profiles/alexdev.toml`)
+
+### Changed — always-on directives also prime recall/retain + browser
+- `APPEND_SYSTEM.md` (every system prompt, never compacted) + the recall hook now explicitly prime
+  **`recall`/`reflect` before · `retain` durable facts after** (Mnemopi) and **`browser` to verify any
+  web/UI change for real** — on top of RULE #0 (code-intel MCPs) + skill ref-paths. Stays terse by design
+  (the system prompt isn't headroom-compressed; headroom is for tool OUTPUTS).
+  (`assets/configs/omp/APPEND_SYSTEM.md`, `assets/hooks/8sync-recall.ts`)
+- **kitty tab bar moved to the bottom** (`tab_bar_edge bottom`) — easier tab switching. (`setup.rs` renderer)
+
+### Fixed — `8sync harness up` now redeploys the recall hook
+- `harness up` refreshed APPEND_SYSTEM/engine/workflow but not the recall hook (only init/bare-harness
+  did), so hook changes never reached existing machines via `up`. Now it does.
+  (`crates/cli/src/verbs/harness/up.rs`)
+
 ## [0.32.1] — 2026-06-29
 
 ### Fixed — `8sync harness` auto-installs the token-optimization MCPs (no startup error)

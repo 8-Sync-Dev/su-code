@@ -17,7 +17,8 @@ Reaching for grep/find/Read to EXPLORE first is a violation. Read a raw file onl
 - **8sync-cli** — `~/.omp/skills/8sync-cli/SKILL.md` — prefer `8sync` verbs over raw shell.
 Specialist (open the body only when the task matches): **impeccable** (UI/design — mandatory for any frontend), **assp** (copy/brand), **taste** (anti-slop), **image-routing** (image/PDF/diff).
 
-## Memory + compaction
-- `agents/STATE.md` is the live plan — read it first; rewrite it at every phase boundary.
-- Record learnings in `agents/KNOWLEDGE.md` (`validated:` / `failure:`); after any change update `CHANGELOG.md`.
-- Context auto-compacts at 50% (tune: `8sync harness compaction <pct>`); write a handoff into STATE before it fires.
+## Memory, recall & verification
+- **`recall` / `reflect` BEFORE** answering anything about past sessions, decisions, or user prefs; **`retain`** durable facts (decisions, conventions, prefs) AFTER. omp Mnemopi long-term memory — the recall hook also auto-injects the live skill index + STATE every turn.
+- **`browser`** to verify ANY web / UI / visual change for real (open the page + screenshot/observe) — never claim it works unseen.
+- `agents/STATE.md` is the live plan — read it first; rewrite at every phase boundary. Record learnings in `agents/KNOWLEDGE.md` (`validated:` / `failure:`); update `CHANGELOG.md` after any change.
+- Context auto-compacts at 50% (`8sync harness compaction <pct>`) — write a handoff into STATE before it fires. This block is never compressed, so it stays terse by design; `headroom_compress` is for large tool OUTPUTS.

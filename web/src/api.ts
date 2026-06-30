@@ -68,6 +68,20 @@ export type WfEdge = { id: string; source: string; target: string };
 export type Workflow = { name?: string; nodes: WfNode[]; edges: WfEdge[] };
 export type WorkflowExport = { ok: boolean; path: string; tool: string };
 
+// Live `/auto` engine run — the real gsd-pi state.json the engine drives.
+export type EngineTaskView = { id?: string; title: string; status: "pending" | "in_progress" | "done" | "blocked"; retries?: number };
+export type EngineSliceView = { id?: string; title: string; tasks: EngineTaskView[] };
+export type EngineRun = {
+  active: boolean;
+  goal?: string;
+  updatedAt?: string;
+  total?: number;
+  done?: number;
+  blocked?: number;
+  current?: { slice: string; task: string; status: string } | null;
+  slices?: EngineSliceView[];
+};
+
 // Project switcher. `current` = the project the dashboard is viewing; `active` =
 // current OR used within 2h (green dot).
 export type ProjectEntry = {
@@ -171,6 +185,7 @@ export const api = {
   saveMemory: (file: string, content: string) =>
     json<{ ok: boolean }>("/api/memory/" + file, POST_JSON({ content })),
   engines: () => json<Engines>("/api/engines"),
+  engine: () => json<EngineRun>("/api/engine"),
   bench: () => json<BenchReport>("/api/bench"),
   evalProject: () => json<EvalReport>("/api/eval"),
   workspaces: () => json<WorkspaceInfo>("/api/workspaces"),
