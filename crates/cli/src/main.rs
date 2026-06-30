@@ -83,6 +83,9 @@ enum Cmd {
     /// Switch kitty color palette (live): 8sync theme [list | set <name> | show]
     Theme(verbs::theme::Args),
 
+    /// Manage kitty wallpaper: 8sync bg [show | get | set | list | add] (live swap, inline preview)
+    Bg(verbs::bg::Args),
+
     /// Stand up / refresh the agent harness (init = deploy skills+codegraph+AGENTS.md+memory; up = refresh)
     Harness(verbs::harness::Args),
 
@@ -128,6 +131,7 @@ fn main() -> Result<()> {
         Some(Cmd::Doctor)     => verbs::doctor::run(),
         Some(Cmd::Here(a))    => verbs::here::run(a),
         Some(Cmd::Ai(a))      => verbs::ai::run(a),
+        Some(Cmd::Bg(a)) => verbs::bg::run(a),
         Some(Cmd::Ship(a))    => verbs::ship::run(a),
         Some(Cmd::Run(a))     => verbs::run::run(a),
         Some(Cmd::Theme(a)) => verbs::theme::run(a),

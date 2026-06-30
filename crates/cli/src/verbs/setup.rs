@@ -512,9 +512,19 @@ fn install_terminal_config(env: &env_detect::Env) -> Result<()> {
     let wp = env.xdg_config.join("8sync/wallpaper.png");
     let wp_ready = deploy_wallpaper(env, &wp);
 
-    // Glass conf → ~/.config/kitty/8sync.conf (absolute wallpaper path baked in).
+    // Glass conf → ~/.config/kitty/8sync.conf. Honor a `8sync bg set` choice
+    // (recorded in ~/.config/8sync/wallpaper) when it still exists; else bake the
+    // deployed wallpaper.png so a fresh setup is never a silent no-op.
     let conf_path = kitty_dir.join("8sync.conf");
-    std::fs::write(&conf_path, render_kitty_conf(wp_ready.then_some(wp.as_path())))?;
+    let bg_choice = std::fs::read_to_string(env.xdg_config.join("8sync/wallpaper"))
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && std::path::Path::new(s).exists());
+    let wp_for_conf: Option<&std::path::Path> = bg_choice
+        .as_deref()
+        .map(std::path::Path::new)
+ .or_else(|| wp_ready.then_some(wp.as_path()));
+    std::fs::write(&conf_path, render_kitty_conf(wp_for_conf))?;
     ui::ok(&format!("wrote {}", conf_path.display()));
 
     // Palette → ~/.config/kitty/8sync-theme.conf (swappable via `8sync theme set`).

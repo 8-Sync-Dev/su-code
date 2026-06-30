@@ -223,3 +223,17 @@ _(consolidated 27 dòng cũ → agents/archive/KNOWLEDGE-1782725542.md)_
   --profile terminal` regenerates both files (clean cutover from old inline-palette format);
   `8sync theme set <name>` swaps palette only. `hydectl theme` owns Hyprland; `8sync theme` owns
   kitty — distinct surfaces. Contrast verified in eval (WCAG formula), not eyeballed.
+- **validated: `8sync bg` verb (live wallpaper swap + inline preview) shipped → v0.35.0.** Inline
+  image render in terminal = **`kitten icat <file>`** (kitty graphics protocol; omp uses the same).
+  Requires a real kitty TTY — from a detached shell it errors `open /dev/tty: no such device` (can't
+  visually verify from agent context; verify path/record/reload mechanics instead). Live wallpaper
+  swap = rewrite the `background_image <path>` LINE in `~/.config/kitty/8sync.conf` (in-place) +
+  `pkill -SIGUSR1 -x kitty` — changing the PATH string forces a definite image reload (same-path-
+  content-swap is unreliable). Persist choice in `~/.config/8sync/wallpaper` (path text); taught
+  `install_terminal_config` to honor it so re-setup doesn't clobber. fzf image picker =
+  `fzf --preview "kitten icat '{}'"` with paths piped to stdin (fzf reads list via pipe, interacts
+  via /dev/tty — spawn with Stdio::piped stdin, take+drop stdin to close, wait_with_output). Image
+  validity = magic bytes (PNG 89 50 4E 47 / JPEG FF D8 FF / RIFF…WEBP / GIF8) — guards 0-byte HTML
+  downloads. Zero new Rust deps (kitten/fzf/curl shell-outs). `hydectl wallpaper` = desktop, `8sync
+  bg` = kitty background_image — distinct. **Online search not yet built — needs an image API key
+  (Unsplash/Pexels) — pending user decision.**

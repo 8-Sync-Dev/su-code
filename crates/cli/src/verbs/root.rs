@@ -64,13 +64,17 @@ pub fn print_cheatsheet() {
     ]);
     println!("  {}", "→ governor is reported, NOT changed (amd-pstate powersave = efficient dynamic mode)".dimmed());
 
-    println!("\n{}", "TERMINAL (kitty palette)".bold().yellow());
+    println!("\n{}", "TERMINAL (kitty palette + wallpaper)".bold().yellow());
     rows(&[
         ("8sync theme",            "list color palettes (★ = active, curated for wallpaper-overlay readability)"),
         ("8sync theme set <name>", "switch palette + reload kitty live (tokyo-night · catppuccin-mocha · gruvbox-dark · nord · rose-pine · dracula)"),
         ("8sync theme show <name>", "preview a palette without applying"),
+        ("8sync bg",               "show the current wallpaper (rendered inline in kitty via kitten icat)"),
+        ("8sync bg set <file>",    "swap wallpaper live (rewrites 8sync.conf + reloads kitty); no arg → fzf picker"),
+        ("8sync bg list",          "browse the collection with a live image preview (fzf) → pick → set"),
+        ("8sync bg add <url>",     "download a wallpaper into the collection (-s to also set)"),
     ]);
-    println!("  {}", "→ palettes are pure color fragments; structure (transparency/blur/splits/font) untouched".dimmed());
+    println!("  {}", "→ palettes = color fragments; wallpaper swaps the kitty background_image. Both reload via SIGUSR1 (instant)".dimmed());
 
     println!("\n{}", "PROFILES (opt-in personal customization, idempotent)".bold().yellow());
     rows(&[

@@ -13,6 +13,7 @@ pub mod ship;
 pub mod run;
 pub mod skill;
 pub mod theme;
+pub mod bg;
 pub mod harness;
 pub mod shot;
 pub mod diff_img;

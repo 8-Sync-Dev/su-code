@@ -5,6 +5,23 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.35.0] — 2026-06-30
+
+### Added — `8sync bg`: manage the kitty wallpaper at runtime (live swap + inline preview)
+- New **`8sync bg`** verb: `show | get | set [file] | list | add <url|file>`. Brings back the
+  wallpaper control that was removed in the slim-down — now without HyDE overlap (kitty's
+  in-terminal `background_image` ≠ HyDE's desktop wallpaper).
+- **Inline preview**: `bg show` renders the current wallpaper in the terminal via `kitten icat`
+  (kitty graphics protocol — same mechanism omp uses); `bg list`/`bg set` (no arg) open an
+  interactive **fzf picker with a live `kitten icat` preview pane** → scroll, see each image,
+  Enter to set.
+- **Live swap**: `bg set <file>` rewrites the `background_image` line in `8sync.conf` +
+  SIGUSR1-reloads kitty (instant, no restart). The choice is recorded in
+  `~/.config/8sync/wallpaper` and **`8sync setup` honors it** (re-setup no longer resets your
+  wallpaper). Collection lives in `~/.config/8sync/wallpapers/` (`bg add <url>` populates it).
+- Zero new Rust deps (shell-outs to `kitten`/`fzf`/`curl`) — binary stays lean.
+  (`crates/cli/src/verbs/bg.rs`)
+
 ## [0.34.0] — 2026-06-30
 
 ### Added — `8sync theme`: switch kitty palettes live (readable on any wallpaper)

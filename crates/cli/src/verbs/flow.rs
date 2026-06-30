@@ -67,9 +67,12 @@ pub fn run() -> Result<()> {
         ("8sync setup profile apply warp", "(re-)apply a profile idempotently"),
     ]);
 
-    section("7. TERMINAL THEME (kitty palette)", &[
+    section("7. TERMINAL (kitty palette + wallpaper)", &[
         ("8sync theme",            "list color palettes (★ = active)"),
         ("8sync theme set dracula", "switch palette + reload kitty live (tokyo-night · catppuccin-mocha · gruvbox-dark · nord · rose-pine · dracula)"),
+        ("8sync bg",               "show the current wallpaper (rendered inline in kitty)"),
+        ("8sync bg set <file>",    "swap wallpaper live; no arg → fzf picker with live image preview"),
+        ("8sync bg add <url>",     "download a wallpaper into the collection (-s to also set)"),
     ]);
 
     println!("Every verb supports {} and {} for detailed help.", "-h".bold().green(), "--help".bold().green());
