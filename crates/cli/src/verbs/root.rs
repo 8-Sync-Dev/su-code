@@ -64,6 +64,14 @@ pub fn print_cheatsheet() {
     ]);
     println!("  {}", "→ governor is reported, NOT changed (amd-pstate powersave = efficient dynamic mode)".dimmed());
 
+    println!("\n{}", "TERMINAL (kitty palette)".bold().yellow());
+    rows(&[
+        ("8sync theme",            "list color palettes (★ = active, curated for wallpaper-overlay readability)"),
+        ("8sync theme set <name>", "switch palette + reload kitty live (tokyo-night · catppuccin-mocha · gruvbox-dark · nord · rose-pine · dracula)"),
+        ("8sync theme show <name>", "preview a palette without applying"),
+    ]);
+    println!("  {}", "→ palettes are pure color fragments; structure (transparency/blur/splits/font) untouched".dimmed());
+
     println!("\n{}", "PROFILES (opt-in personal customization, idempotent)".bold().yellow());
     rows(&[
         ("8sync setup --yall",           "install harness + `alexdev` bundle, no prompts"),

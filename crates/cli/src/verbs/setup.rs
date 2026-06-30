@@ -517,6 +517,12 @@ fn install_terminal_config(env: &env_detect::Env) -> Result<()> {
     std::fs::write(&conf_path, render_kitty_conf(wp_ready.then_some(wp.as_path())))?;
     ui::ok(&format!("wrote {}", conf_path.display()));
 
+    // Palette → ~/.config/kitty/8sync-theme.conf (swappable via `8sync theme set`).
+    match crate::verbs::theme::deploy(env) {
+        Ok(name) => ui::ok(&format!("kitty palette → {name} (8sync-theme.conf)")),
+        Err(e) => ui::warn(&format!("theme deploy skipped: {e}")),
+    }
+
     // Make the user's kitty.conf include ours (managed line, idempotent, no clobber).
     ensure_kitty_include(&kitty_dir)?;
 
@@ -603,23 +609,28 @@ fn wallpaper_url(env: &env_detect::Env) -> Option<String> {
     v.get("ui")?.get("wallpaper_url")?.as_str().map(str::to_string)
 }
 
-/// The glass kitty theme body: transparency + blur (Hyprland/KDE/picom), optional
-/// wallpaper, violet accent, and 3-pane split keymaps.
+/// The glass kitty STRUCTURE: transparency + blur + font + layouts + splits.
+/// The color palette is swappable and lives in `8sync-theme.conf` (deployed by
+/// `verbs::theme::deploy` / `8sync theme set`), included first so its
+/// `background` is the tint target. `wallpaper`, if present, is baked in.
 fn render_kitty_conf(wallpaper: Option<&std::path::Path>) -> String {
     let bg_image = match wallpaper {
         Some(p) => format!(
-            "background_image {}\nbackground_image_layout cscaled\nbackground_image_linear yes\nbackground_tint 0.92\nbackground_tint_gaps 0.0\n",
+            "background_image {}\nbackground_image_layout cscaled\nbackground_image_linear yes\nbackground_tint 0.86\nbackground_tint_gaps 0.0\n",
             p.display()
         ),
         None => String::new(),
     };
     let header = indoc::indoc! {"
         # 8sync — glass dark terminal (managed by `8sync setup`; included from kitty.conf)
-        # Transparency + blur (honored by Hyprland/KDE/picom compositors).
-        background_opacity 0.82
+        # Palette: `8sync theme set <name>` (default tokyo-night). Included first so its
+        # `background` is the tint target. Structure (opacity/blur/font/splits) below.
+        include 8sync-theme.conf
+        background_opacity 0.90
         dynamic_background_opacity yes
         background_blur 28
-        background #0b0d12
+        # Remote control so `8sync theme` / `8sync .` can live-drive kitty.
+        allow_remote_control yes
     "};
     let rest = indoc::indoc! {"
         # Font (JetBrains Mono Nerd Font installed by setup)
@@ -632,23 +643,10 @@ fn render_kitty_conf(wallpaper: Option<&std::path::Path>) -> String {
         window_padding_width 8
         hide_window_decorations yes
         confirm_os_window_close 0
-        # Tabs
+        # Tabs (structure only — colors come from the palette)
         tab_bar_edge bottom
         tab_bar_style powerline
         tab_powerline_style slanted
-        # Colors (glass black + violet accent)
-        foreground #e6e9ef
-        selection_background #2a2f3a
-        selection_foreground #e6e9ef
-        cursor #7c5cff
-        cursor_text_color #0b0d12
-        url_color #8ab4ff
-        active_border_color #7c5cff
-        inactive_border_color #262b36
-        active_tab_background #14171f
-        active_tab_foreground #e6e9ef
-        inactive_tab_background #0b0d12
-        inactive_tab_foreground #9aa3b2
         # 3-pane splits (gsd-style)
         map ctrl+shift+enter launch --location=hsplit --cwd=current
         map ctrl+shift+minus launch --location=vsplit --cwd=current

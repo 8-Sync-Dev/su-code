@@ -211,3 +211,15 @@ _(consolidated 27 dòng cũ → agents/archive/KNOWLEDGE-1782725542.md)_
   (session,seq); report ratio + fails. NOTE: codegraph is a `bash` call (inspect `arguments.command`
   for "codegraph"); serena/cbm/headroom are MCP tools. rusqlite `bundled` (+~1.8MB binary, build ~2m
   first time). The tracker gives VISIBILITY; raising the ratio is a separate force-load/prompt fix.
+- **validated: `8sync theme` verb + kitty readability fix shipped → v0.34.0.** Kitty transparency
+  model (non-obvious, was a prior `fix(bg)` commit): `background_tint 0..1` blends the `background`
+  color OVER the image (0=image fully visible→text washes out on bright wp; 1=solid bg, image gone).
+  Readable-on-wallpaper sweet spot = **tint ≥ 0.85** + `background_opacity ~0.90` (higher opacity =
+  less desktop double-bleed). Foreground + bright-black (color8) MUST pass WCAG-AA (≥4.5:1) vs bg —
+  Tokyo Night `color8 #414868` fails at 2.9; brighten to `#7a85c4` (5.1). Architecture: **structure
+  (8sync.conf: opacity/blur/font/splits) split from palette (8sync-theme.conf: bg+fg+16 ANSI+tabs)**;
+  `include 8sync-theme.conf` at TOP so its `background` is the tint target. Live reload =
+  `pkill -SIGUSR1 -x kitty` (re-reads kitty.conf+includes, instant, no socket). `8sync setup
+  --profile terminal` regenerates both files (clean cutover from old inline-palette format);
+  `8sync theme set <name>` swaps palette only. `hydectl theme` owns Hyprland; `8sync theme` owns
+  kitty — distinct surfaces. Contrast verified in eval (WCAG formula), not eyeballed.

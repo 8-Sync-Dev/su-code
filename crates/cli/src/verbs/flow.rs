@@ -67,6 +67,11 @@ pub fn run() -> Result<()> {
         ("8sync setup profile apply warp", "(re-)apply a profile idempotently"),
     ]);
 
+    section("7. TERMINAL THEME (kitty palette)", &[
+        ("8sync theme",            "list color palettes (★ = active)"),
+        ("8sync theme set dracula", "switch palette + reload kitty live (tokyo-night · catppuccin-mocha · gruvbox-dark · nord · rose-pine · dracula)"),
+    ]);
+
     println!("Every verb supports {} and {} for detailed help.", "-h".bold().green(), "--help".bold().green());
     println!("Show this page anytime: {} or {}.", "8sync flow".bold().cyan(), "8sync".bold().cyan());
     Ok(())

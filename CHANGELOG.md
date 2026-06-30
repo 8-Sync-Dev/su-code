@@ -5,6 +5,27 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-06-30
+
+### Added — `8sync theme`: switch kitty palettes live (readable on any wallpaper)
+- New **`8sync theme`** verb: `list | set <name> | show [name]`. Six curated dark palettes
+  (**tokyo-night** default · catppuccin-mocha · gruvbox-dark · nord · rose-pine · dracula), each
+  a pure color fragment tuned for **wallpaper-overlay readability** (foreground + bright-black
+  verified at WCAG-AA contrast ≥ 4.5:1 against the theme bg). Switching writes
+  `~/.config/kitty/8sync-theme.conf` and **SIGUSR1-reloads kitty** — instant, no restart, no
+  remote-control socket. `hydectl theme` still owns Hyprland/UI; this owns kitty (distinct surfaces).
+  (`crates/cli/src/verbs/theme.rs`)
+
+### Fixed — kitty config: readable text + restored `allow_remote_control` + structure/palette split
+- **Readability root-cause**: deployed `8sync.conf` had `background_tint 0.55` (image 45% visible →
+  bright wallpaper washed out the foreground). Raised to **0.86** (image subtle, text crisp).
+- The glass **structure** (`background_opacity`/`blur`/font/splits/tabs) is now separated from the
+  **palette** (`8sync-theme.conf`, swappable); `render_kitty_conf` no longer emits colors inline.
+- **Restored `allow_remote_control yes`** in the managed config — it had been dropped in the
+  slim-down, breaking `kitty @` live control. (`crates/cli/src/verbs/setup.rs`)
+- `8sync setup --profile terminal` now deploys both files (structure + active palette); the active
+  theme is recorded in `~/.config/8sync/kitty-theme` and survives re-runs.
+
 ## [0.33.0] — 2026-06-29
 
 ### Added — dashboard surfaces the live `/auto` engine run (real, not demo)

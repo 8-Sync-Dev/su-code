@@ -80,6 +80,9 @@ enum Cmd {
     /// Manage skill library (list/add/sync)
     Skill(verbs::skill::Args),
 
+    /// Switch kitty color palette (live): 8sync theme [list | set <name> | show]
+    Theme(verbs::theme::Args),
+
     /// Stand up / refresh the agent harness (init = deploy skills+codegraph+AGENTS.md+memory; up = refresh)
     Harness(verbs::harness::Args),
 
@@ -127,6 +130,7 @@ fn main() -> Result<()> {
         Some(Cmd::Ai(a))      => verbs::ai::run(a),
         Some(Cmd::Ship(a))    => verbs::ship::run(a),
         Some(Cmd::Run(a))     => verbs::run::run(a),
+        Some(Cmd::Theme(a)) => verbs::theme::run(a),
         Some(Cmd::Sec(a))     => verbs::sec::run(a),
         Some(Cmd::Bt(a))      => verbs::bt::run(a),
         Some(Cmd::Clean(a))   => verbs::clean::run(a),
