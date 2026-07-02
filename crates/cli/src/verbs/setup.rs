@@ -524,7 +524,7 @@ fn install_terminal_config(env: &env_detect::Env) -> Result<()> {
         .as_deref()
         .map(std::path::Path::new)
  .or_else(|| wp_ready.then_some(wp.as_path()));
-    std::fs::write(&conf_path, render_kitty_conf(wp_for_conf))?;
+    std::fs::write(&conf_path, render_kitty_conf(wp_for_conf, env_detect::is_tiling_wm()))?;
     ui::ok(&format!("wrote {}", conf_path.display()));
 
     // Palette → ~/.config/kitty/8sync-theme.conf (swappable via `8sync theme set`).
@@ -623,7 +623,7 @@ fn wallpaper_url(env: &env_detect::Env) -> Option<String> {
 /// The color palette is swappable and lives in `8sync-theme.conf` (deployed by
 /// `verbs::theme::deploy` / `8sync theme set`), included first so its
 /// `background` is the tint target. `wallpaper`, if present, is baked in.
-fn render_kitty_conf(wallpaper: Option<&std::path::Path>) -> String {
+fn render_kitty_conf(wallpaper: Option<&std::path::Path>, tiling_wm: bool) -> String {
     let bg_image = match wallpaper {
         Some(p) => format!(
             "background_image {}\nbackground_image_layout cscaled\nbackground_image_linear yes\nbackground_tint 0.86\nbackground_tint_gaps 0.0\n",
@@ -642,7 +642,13 @@ fn render_kitty_conf(wallpaper: Option<&std::path::Path>) -> String {
         # Remote control so `8sync theme` / `8sync .` can live-drive kitty.
         allow_remote_control yes
     "};
-    let rest = indoc::indoc! {"
+    // Only hide kitty's own title bar/traffic-lights on a tiling compositor
+    // (Hyprland/sway/…) that draws no chrome of its own. On a stacking desktop
+    // (KDE/kwin, GNOME/mutter, …) the compositor ALSO won't decorate an
+    // undecorated client window — hiding kitty's decorations there leaves the
+    // window with no title bar, no min/max/close, and no resize border.
+    let decorations = if tiling_wm { "hide_window_decorations yes\n        " } else { "" };
+    let rest = indoc::formatdoc! {"
         # Font (JetBrains Mono Nerd Font installed by setup)
         font_family JetBrainsMono Nerd Font
         bold_font auto
@@ -651,15 +657,15 @@ fn render_kitty_conf(wallpaper: Option<&std::path::Path>) -> String {
         # Window + layouts
         enabled_layouts splits:split_axis=horizontal,stack,tall,grid
         window_padding_width 8
-        hide_window_decorations yes
-        confirm_os_window_close 0
+        {decorations}confirm_os_window_close 0
         # Tabs (structure only — colors come from the palette)
         tab_bar_edge bottom
         tab_bar_style powerline
         tab_powerline_style slanted
-        # 3-pane splits (gsd-style)
+        # 3-pane splits (gsd-style) — kept off ctrl+shift+equal/minus/backspace
+        # so kitty's built-in zoom (change_font_size) stays intact
         map ctrl+shift+enter launch --location=hsplit --cwd=current
-        map ctrl+shift+minus launch --location=vsplit --cwd=current
+        map ctrl+shift+backslash launch --location=vsplit --cwd=current
         map ctrl+shift+] next_window
         map ctrl+shift+[ previous_window
     "};

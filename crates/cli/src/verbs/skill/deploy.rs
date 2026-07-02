@@ -14,7 +14,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
     // (asset prefix, target subdir name). always-on first (read order), then
     // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
-    let bundled: [(&str, &str); 15] = [
+    let bundled: [(&str, &str); 16] = [
         ("skills/codegraph",               "codegraph"),
         ("skills/karpathy",                "karpathy-guidelines"),
         ("skills/ponytail",                "ponytail"),
@@ -23,6 +23,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
         ("skills/taste-skill",             "taste-skill"),
         ("skills/8sync-cli",               "8sync-cli"),
         ("skills/image-routing",           "image-routing"),
+        ("skills/zai-vision",              "zai-vision"),
         ("skills/code-review-and-quality", "code-review-and-quality"),
         ("skills/senior-security",         "senior-security"),
         ("skills/senior-frontend",         "senior-frontend"),
@@ -233,12 +234,12 @@ pub(crate) fn ensure_codebase_memory_mcp(env: &env_detect::Env) -> Result<()> {
             .args(["config", "set", "auto_index", "true"])
             .status();
     }
-    register_omp_mcp(&env.home, "codebase-memory-mcp", "codebase-memory-mcp", &[])
+    register_omp_mcp(&env.home, "codebase-memory-mcp", "codebase-memory-mcp", &[], &[])
 }
 
 /// Idempotently add an MCP server `name` (stdio `command` + `args`) to omp's user
 /// MCP config (`~/.omp/agent/mcp.json`), preserving any servers already there.
-fn register_omp_mcp(home: &Path, name: &str, command: &str, args: &[&str]) -> Result<()> {
+fn register_omp_mcp(home: &Path, name: &str, command: &str, args: &[&str], env: &[(&str, &str)]) -> Result<()> {
     let mcp_path = home.join(".omp/agent/mcp.json");
     if let Some(p) = mcp_path.parent() {
         std::fs::create_dir_all(p)?;
@@ -262,7 +263,19 @@ fn register_omp_mcp(home: &Path, name: &str, command: &str, args: &[&str]) -> Re
         *servers = serde_json::json!({});
     }
     let smap = servers.as_object_mut().unwrap();
-    let desired = serde_json::json!({ "type": "stdio", "command": command, "args": args });
+    let mut desired = serde_json::json!({ "type": "stdio", "command": command, "args": args });
+    // Only emit an `env` key when there are vars — keeps the stored entry for the
+    // env-less servers byte-identical (so the equality self-heal check holds).
+    if !env.is_empty() {
+        let env_obj: serde_json::Map<String, serde_json::Value> = env
+            .iter()
+            .map(|(k, v)| (k.to_string(), serde_json::Value::String(v.to_string())))
+            .collect();
+        desired
+            .as_object_mut()
+            .expect("stdio mcp server is an object")
+            .insert("env".into(), serde_json::Value::Object(env_obj));
+    }
     if smap.get(name) == Some(&desired) {
         ui::skip(name, "already in omp mcp.json");
         return Ok(());
@@ -355,7 +368,7 @@ elif command -v pip >/dev/null 2>&1; then pip install --user 'headroom-ai[mcp]' 
     if which::which("headroom").is_ok() {
         let v = env_detect::cmd_version("headroom", &["--version"]).unwrap_or_default();
         ui::ok(&format!("headroom present ({})", v.trim()));
-        register_omp_mcp(&env.home, "headroom", "headroom", &["mcp", "serve"])
+        register_omp_mcp(&env.home, "headroom", "headroom", &["mcp", "serve"], &[])
     } else {
         ui::warn("headroom unavailable — skipped MCP (install `uv`: https://astral.sh/uv, then re-run `8sync harness`)");
         deregister_omp_mcp(&env.home, "headroom")
@@ -465,11 +478,308 @@ pub(crate) fn ensure_serena_mcp(env: &env_detect::Env) -> Result<()> {
                 "--context",
                 "claude-code",
             ],
+            &[],
         )
     } else {
         ui::skip("serena MCP", "needs `uv` (https://astral.sh/uv) — install failed, skipped");
         deregister_omp_mcp(&env.home, "serena")
     }
+}
+
+/// Resolve the Z.AI API key for the vision MCP. Prefer an explicit env var
+/// (`Z_AI_API_KEY` / `ZAI_API_KEY` / `ZHIPUAI_API_KEY`); otherwise pull it from
+/// omp's auth-broker via `omp token zai` — the SAME key that auths `zai/glm-5.2`.
+/// Returns None only when neither source yields a plausible key; the caller then
+/// still registers the server (tools discovered) but without auth.
+fn resolve_zai_api_key() -> Option<String> {
+    for var in ["Z_AI_API_KEY", "ZAI_API_KEY", "ZHIPUAI_API_KEY"] {
+        if let Ok(v) = std::env::var(var) {
+            if v.len() >= 12 {
+                return Some(v);
+            }
+        }
+    }
+    // omp auth-broker holds the provider key (provider id `zai`, matching the
+    // `zai/glm-5.2` model role). `omp token zai` prints just the key on stdout.
+    if let Ok(out) = Command::new("omp").args(["token", "zai"]).output() {
+        if out.status.success() {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if s.len() >= 12 && !s.contains(' ') && !s.contains('\n') {
+                return Some(s);
+            }
+        }
+    }
+    None
+}
+
+/// Ensure the **Z.AI vision MCP** (`@z_ai/mcp-server`) is installed + registered.
+/// GLM-5.2 is text-only; this MCP exposes GLM-5V-Turbo as model-callable tools
+/// (`ui_to_artifact`, `extract_text_from_screenshot`, `diagnose_error_screenshot`,
+/// `understand_technical_diagram`, `analyze_data_visualization`, `ui_diff_check`,
+/// `analyze_image`, `analyze_video`) authed by the SAME Z.AI key. Closing the loop:
+/// `8sync shot <url>` (browser capture) → zai-vision tool → text → GLM-5.2 acts.
+/// Defaults `Z_AI_VISION_MODEL` to `glm-4.6v-flash` — the ONLY vision model this
+/// setup verified working end-to-end through the real MCP tool call on a stock
+/// Z.AI account with no vision resource package (it's the free-tier vision model
+/// per Z.AI's pricing page; paid ones like glm-4.6v/glm-5v-turbo 400 with
+/// "1113 insufficient balance" until a vision package is purchased). Installs via
+/// `bun add -g` (fast stdio binary on PATH); falls back to `bunx`. Never bails.
+pub(crate) fn ensure_zai_vision_mcp(env: &env_detect::Env) -> Result<()> {
+    // 1. Install the package so `zai-mcp-server` is on PATH (preferred over a
+    //    per-connect `bunx` cold-start). bun is omnipresent in the omp stack.
+    if which::which("zai-mcp-server").is_err() && which::which("bun").is_ok() {
+        ui::step("z.ai vision MCP (missing — installing @z_ai/mcp-server via bun)");
+        let _ = Command::new("bun").args(["add", "-g", "@z_ai/mcp-server"]).status();
+    }
+    let (command, args): (String, Vec<String>) = if which::which("zai-mcp-server").is_ok() {
+        ("zai-mcp-server".to_string(), Vec::new())
+    } else if which::which("bunx").is_ok() {
+        ("bunx".to_string(), vec!["@z_ai/mcp-server".to_string()])
+    } else {
+        ui::warn("z.ai vision MCP: needs `bun` (https://bun.sh) — skipped; GLM-5.2 stays text-only");
+        return deregister_omp_mcp(&env.home, "zai-vision");
+    };
+    // 2. Auth: same Z.AI key that auths `zai/glm-5.2`. Declared at fn scope so the
+    //    borrow in env_vars outlives the register_omp_mcp call.
+    let key = resolve_zai_api_key();
+    let key_str = key.clone().unwrap_or_default();
+    let mut env_vars: Vec<(&str, &str)> = vec![("Z_AI_MODE", "ZAI"), ("Z_AI_VISION_MODEL", "glm-4.6v-flash")];
+    if key.is_some() {
+        env_vars.push(("Z_AI_API_KEY", key_str.as_str()));
+    } else {
+        ui::warn("z.ai vision MCP: no Z_AI_API_KEY (env nor `omp token zai`) — registered WITHOUT auth; set it in ~/.omp/agent/mcp.json");
+    }
+    // 3. Register. omp's stringMap takes no ${VAR} expansion, so the key is
+    //    inlined into mcp.json (user-private, never committed; gitignored).
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    register_omp_mcp(&env.home, "zai-vision", &command, &args_ref, &env_vars)?;
+    ui::ok("z.ai vision MCP (GLM-5V) bridges GLM-5.2's text-only gap — ui_to_artifact · extract_text_from_screenshot · diagnose_error_screenshot · ui_diff_check · analyze_image");
+    Ok(())
+}
+
+/// Exact tool catalogs for the MCP servers `8sync harness` auto-registers.
+/// Static (spawning each server just to list tools would slow every `harness`
+/// run) but kept in sync with the pinned tool sets this harness installs —
+/// this is what `ensure_omp_capabilities_snapshot` embeds verbatim so the
+/// agent gets EXACT tool names instead of guessing/hallucinating them (the
+/// codegraph-verb hallucination bug in KNOWLEDGE.md is exactly what this
+/// prevents). Unknown/user-added servers get no catalog — the snapshot says so.
+fn known_mcp_tool_catalog(server: &str) -> &'static [(&'static str, &'static str)] {
+    match server {
+        "codebase-memory-mcp" => &[
+            ("search_graph", "BM25 / name-pattern / semantic search over functions, classes, routes"),
+            ("query_graph", "raw Cypher against the knowledge graph (complex joins, aggregations)"),
+            ("trace_path", "callers/callees, data-flow with args, or cross-service (HTTP/async) trace"),
+            ("get_architecture", "packages/services/deps + Leiden community clusters overview"),
+            ("get_code_snippet", "read a symbol's source by qualified_name (from search_graph first)"),
+            ("get_graph_schema", "node labels + edge types available to query"),
+            ("search_code", "grep enriched with graph context, deduped into containing functions"),
+            ("detect_changes", "diff-based impact analysis vs a base ref/branch"),
+            ("index_repository", "(re)index a repo; `cross-repo-intelligence` mode links routes across repos"),
+            ("index_status", "indexing progress/state for a project"),
+            ("list_projects", "every project currently indexed"),
+            ("delete_project", "drop a project's index"),
+            ("manage_adr", "get/update/list-sections of the Architecture Decision Record"),
+            ("ingest_traces", "feed runtime traces into the graph to enrich edges"),
+        ],
+        "headroom" => &[
+            ("headroom_compress", "compress >~50-line output BEFORE it enters context (60-95% fewer tokens)"),
+            ("headroom_retrieve", "fetch the original uncompressed content back by its hash"),
+            ("headroom_stats", "this session's compression stats (tokens/cost saved)"),
+        ],
+        "serena" => &[
+            ("find_symbol", "locate classes/functions/methods by name path (supports include_body)"),
+            ("find_referencing_symbols", "who calls/uses a symbol — run before editing an exported symbol"),
+            ("find_declaration", "declaration of a symbol via a regex-captured call-site context"),
+            ("find_implementations", "implementations of an interface/abstract symbol"),
+            ("get_symbols_overview", "structural summary of a file (first call when opening it)"),
+            ("replace_symbol_body", "precise symbol-level rewrite (MUST have read include_body=True first)"),
+            ("insert_after_symbol", "insert code right after a def/class/method"),
+            ("insert_before_symbol", "insert code right before a def/class (e.g. a new import)"),
+            ("rename_symbol", "project-wide rename via LSP — use instead of text search/replace"),
+            ("rename_file", "move/rename a file AND rewrite every import/reference"),
+            ("safe_delete_symbol", "delete only if no references remain, else lists them"),
+            ("replace_content", "regex/literal replace within one file (large wildcard ranges OK)"),
+            ("replace_in_files", "bulk regex/literal replace across many files (dry_run previews first)"),
+            ("get_diagnostics_for_file", "LSP errors/warnings grouped by symbol"),
+            ("get_current_config", "active project/tools/contexts/modes"),
+            ("activate_project", "switch the active project by name or path"),
+            ("list_memories", "serena's own project memory notes (topic-filterable)"),
+            ("read_memory", "read one serena memory by name"),
+            ("write_memory", "write/update a serena memory"),
+            ("edit_memory", "regex-edit a serena memory"),
+            ("rename_memory", "rename/move a serena memory"),
+            ("delete_memory", "delete a serena memory (only when explicitly asked)"),
+            ("onboarding", "first-run project onboarding instructions"),
+        ],
+        "zai-vision" => &[
+            ("ui_to_artifact", "UI screenshot -> frontend code / AI prompt / design spec / description"),
+            ("extract_text_from_screenshot", "OCR: code, terminal output, logs, docs (language hint optional)"),
+            ("diagnose_error_screenshot", "root-cause an error/stack-trace screenshot -> fix"),
+            ("understand_technical_diagram", "architecture/flowchart/UML/ER/sequence diagrams -> text"),
+            ("analyze_data_visualization", "charts/graphs -> trends, anomalies, business read"),
+            ("ui_diff_check", "visual regression: compare expected vs actual UI screenshots"),
+            ("analyze_image", "general-purpose FALLBACK when no specialized tool above fits"),
+            ("analyze_video", "video content understanding (uses `video_source` not `image_source`)"),
+        ],
+        _ => &[],
+    }
+}
+
+/// Capture a manifest of omp's LIVE capability surface (version + key flags +
+/// registered MCP servers + installed skills) to `~/.omp/capabilities.md` so the
+/// agent (and `doctor`) know what omp actually offers this session — refreshed
+/// every `8sync harness` run. This is the "read omp's README on every update"
+/// step: omp is a binary, so we discover its surface from `omp --help` + the
+/// config dirs. Surfaces the high-value flags the harness wants maximised:
+/// `--advisor`, `--thinking`, `inspect_image`, the `--smol`/`--slow`/`--plan`
+/// model roles, and retain/recall (Mnemopi).
+pub(crate) fn ensure_omp_capabilities_snapshot(home: &Path) -> Result<()> {
+    let omp_ver = env_detect::cmd_version("omp", &["--version"]).unwrap_or_default();
+    let help = Command::new("omp")
+        .arg("--help")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+    let has = |flag: &str| help.contains(flag);
+    let flags: [(&str, bool); 5] = [
+        ("--advisor (passive turn reviewer)", has("--advisor")),
+        ("--thinking (reasoning effort)", has("--thinking")),
+        ("inspect_image (built-in vision tool)", help.contains("inspect_image")),
+        ("--smol / --slow / --plan (adaptive models)", has("--smol")),
+        ("--skills (force-load discovery)", has("--skills")),
+    ];
+    // Parse the "Available Tools" block straight out of `omp --help` — this is
+    // omp's OWN base tool set (read/bash/edit/write/grep/glob/lsp/browser/…),
+    // distinct from the MCP servers below. Parsed (not hardcoded) so it tracks
+    // whatever this installed omp version actually ships.
+    let builtin_tools: Vec<(String, String)> = {
+        let mut out = Vec::new();
+        let mut in_section = false;
+        for line in help.lines() {
+            if line.trim_start().starts_with("Available Tools") {
+                in_section = true;
+                continue;
+            }
+            if !in_section {
+                continue;
+            }
+            if line.trim().is_empty() || !line.starts_with("  ") {
+                break;
+            }
+            if let Some((name, desc)) = line.trim().split_once('-') {
+                out.push((name.trim().to_string(), desc.trim().to_string()));
+            }
+        }
+        out
+    };
+    let mem_on = std::fs::read_to_string(home.join(".omp/agent/config.yml"))
+        .unwrap_or_default()
+        .contains("backend: mnemopi");
+    // Mnemopi's memory tools are added to the agent's tool set dynamically when
+    // `memory.backend: mnemopi` is configured — they don't show up in the
+    // static `omp --help` (which reflects the tool-less default), so they're
+    // pinned here instead, gated on `mem_on`.
+    let memory_tools: &[(&str, &str)] = &[
+        ("recall", "search long-term memory for specific facts/entries (ranked, raw)"),
+        ("reflect", "synthesize an answer across many memories (open-ended questions)"),
+        ("retain", "store durable facts (decisions, prefs, project context) for future sessions"),
+        ("memory_edit", "update/forget/invalidate a specific stored memory by id (from recall)"),
+    ];
+    let mcp_names: Vec<String> = std::fs::read_to_string(home.join(".omp/agent/mcp.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| {
+            v.get("mcpServers")
+                .and_then(|m| m.as_object().map(|o| o.keys().cloned().collect::<Vec<_>>()))
+        })
+        .unwrap_or_default();
+    let mut mcp_names_sorted = mcp_names.clone();
+    mcp_names_sorted.sort();
+    let skill_count = std::fs::read_dir(home.join(".omp/skills"))
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                .count()
+        })
+        .unwrap_or(0);
+    let mut out = String::new();
+    out.push_str("# omp capabilities snapshot\n\n");
+    out.push_str(&format!(
+        "Captured by `8sync harness`. omp version: **{}**\n\n",
+        omp_ver.trim()
+    ));
+    out.push_str(
+        "Refreshed every `8sync harness` run (omp self-updates via `omp update`). \
+         This file is the GROUND TRUTH for exact tool names/params — call these, \
+         never guess or invent a tool name.\n\n",
+    );
+    out.push_str("## Maximise these features\n\n");
+    for (label, on) in flags.iter() {
+        out.push_str(&format!(
+            "- [{}] {} — {}\n",
+            if *on { 'x' } else { ' ' },
+            label,
+            if *on { "available" } else { "not detected" }
+        ));
+    }
+    out.push_str(&format!(
+        "- [{}] retain/recall/reflect (Mnemopi long-term memory) — {}\n",
+        if mem_on { 'x' } else { ' ' },
+        if mem_on { "ON" } else { "OFF" }
+    ));
+    out.push_str("\n## omp built-in tools (from `omp --help`)\n\n");
+    if builtin_tools.is_empty() {
+        out.push_str("_(could not parse — run `omp --help` manually)_\n");
+    } else {
+        for (name, desc) in &builtin_tools {
+            out.push_str(&format!("- `{}` — {}\n", name, desc));
+        }
+    }
+    if mem_on {
+        out.push_str("\n## Memory tools (Mnemopi — ON)\n\n");
+        out.push_str("`recall`/`reflect` BEFORE answering about past sessions/decisions/prefs; `retain` durable facts AFTER. Never re-derive what's already retained.\n\n");
+        for (name, desc) in memory_tools {
+            out.push_str(&format!("- `{}` — {}\n", name, desc));
+        }
+    }
+    out.push_str("\n## Registered MCP servers — EXACT tool catalog\n\n");
+    out.push_str(&format!(
+        "`{}` server(s) in `~/.omp/agent/mcp.json`. Use these BEFORE raw grep/read (STEP 0). Tool names are prefixed by the client (e.g. `mcp__<server>_<tool>`); the base name below is what matters.\n\n",
+        mcp_names_sorted.len()
+    ));
+    for name in &mcp_names_sorted {
+        let tools = known_mcp_tool_catalog(name);
+        out.push_str(&format!("### {}\n\n", name));
+        if tools.is_empty() {
+            out.push_str("_(not a pinned harness server — no static catalog; check its own docs/`--help`)_\n\n");
+        } else {
+            for (tool, desc) in tools {
+                out.push_str(&format!("- `{}` — {}\n", tool, desc));
+            }
+            out.push('\n');
+        }
+    }
+    out.push_str(&format!(
+        "## Installed skills\n\n`{}` skill dir(s) in `~/.omp/skills/`.\n",
+        skill_count
+    ));
+    let mcp_servers = mcp_names_sorted.len();
+    let target = home.join(".omp/capabilities.md");
+    let changed = std::fs::read_to_string(&target).ok().as_deref() != Some(out.as_str());
+    std::fs::write(&target, out)?;
+    if changed {
+        ui::ok(&format!(
+            "omp capabilities snapshot → {} ({} · {} MCP · {} skills)",
+            target.display(),
+            omp_ver.trim(),
+            mcp_servers,
+            skill_count
+        ));
+    } else {
+        ui::skip("omp capabilities snapshot", "unchanged");
+    }
+    Ok(())
 }
 /// Best-effort: ensure the `feynman` research CLI (companion-inc/feynman) is
 /// available so the 20 feynman research skills registered in agents/skills.toml

@@ -10,7 +10,37 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1782879675.md)_
+_(consolidated → agents/archive/KNOWLEDGE-1782879675.md · agents/archive/KNOWLEDGE-1782951662.md)_
+- **failure→fixed: `8sync skill update`'s git-collection loop treated "no
+  filter" as "install every sub-skill found in the repo", not "only refresh
+  what's already registered".** Registering ONE skill from a 20-skill
+  collection (`agents/skills.toml`'s `alpha-research` → feynman) silently
+  installed all 19 others too, and re-added them on every bulk
+  `8sync harness` run even after being deliberately removed from the
+  manifest (`contributing` kept reappearing). Root cause: `want(name)` is
+  `filter.is_none_or(|f| f == name)` — vacuously true whenever `filter` is
+  `None`, so `url_matches || want(sname)` was always true in the bulk path.
+  Fixed in `update.rs`'s git-source loop: a sub-skill installs only when the
+  URL/repo-segment was explicitly targeted, its own name was explicitly
+  filtered, OR (bulk run, filter=None) it already has a registry key.
+  Lesson: any "install-all-from-collection" loop MUST distinguish "user
+  explicitly asked for this whole collection" from "no filter given" —
+  they are NOT the same thing, and conflating them lets any single
+  registered skill from a collection silently expand into arbitrary,
+  unrequested skills on every idempotent re-run.
+- **validated: 18 of feynman's 20 skills were installed as text with zero
+  chance of running** — 14 pointed to feynman's OWN slash-commands
+  (`prompts/*.md`, only registered inside feynman's own pi-coding-agent
+  runtime via `extensions/research-tools.ts`), which don't exist in omp.
+  Ported all 14 (+ 4 more with just cosmetic "Feynman" naming) to
+  self-contained `assets/skills/<name>/SKILL.md` using omp's real tool
+  names (`task` for feynman's `subagent`, `web_search`/`read` for
+  `fetch_content`, `ask` for `ask_user_question`). Lesson: NEVER trust a
+  skill's line count or presence in a registry as a proxy for it actually
+  working in the host runtime — a skill that only makes sense inside its
+  origin tool's own slash-command system is dead weight anywhere else.
+  Always open the actual prompt/extension source before assuming a ported
+  skill "just works".
 - **validated: Phase C/D/E loop-eng v2 (full) shipped → v0.19.0.** (C) loop section + generated
   block: `task` implementer↔independent verifier (verify-gate before commit, objective/boundaries/
   output per subagent, share-trace for dependent, parallel only independent); FAIL → `failure:` in

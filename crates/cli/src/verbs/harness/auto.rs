@@ -34,6 +34,8 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
     let _ = deploy::ensure_recall_hook(&env.home);
     let _ = deploy::ensure_append_system(&env.home);
     let _ = deploy::ensure_serena_mcp(env);
+    let _ = deploy::ensure_zai_vision_mcp(env);
+    let _ = deploy::ensure_omp_capabilities_snapshot(&env.home);
     deploy::ensure_feynman_cli();
     let _ = install_external_skill_packs(env); // best-effort; skips packs already present
     let global_dir = env.home.join(".omp/skills");

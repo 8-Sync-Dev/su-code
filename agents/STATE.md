@@ -15,7 +15,42 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - [x] **Dashboard redesign + Models/Projects** (v0.29.0): `8sync harness web` full impeccable redesign · Models page (view/edit routing live) · project switcher (status dots) · markdown render · serena-off fix · context honesty · workflow canvas — 14 pages, 0 console errors.
 
 ## Current step
-Shipped **0.29.0** — dashboard redesign + model-routing UI. Model philosophy applied (asset+live+omp `vision`): **Opus = thinking** (plan/review/debug/vision) · **GLM = mechanical** (code/edit/default/trivial). Backend (`web.rs`): `/api/models` get+post, `/api/projects`, `/api/workflows/templates`, serena-detection fix, context `assumed/willCompact`. FE (`web/src`, impeccable): Models page, project switcher, markdown renderer, fixed workflow canvas, full redesign — verified live (build clean, 0 console errors). DEFERRED: full capability-scoring per-task router (TS engine).
+Shipped 2 fixes (Unreleased): **(1) zai-vision MCP + skill** — `8sync harness`
+auto-installs `@z_ai/mcp-server`, registers `zai-vision` MCP with
+`Z_AI_VISION_MODEL=glm-4.6v-flash` (only free/working vision model on a stock
+key — verified end-to-end via real stdio JSON-RPC tool calls), key from
+`omp token zai`. New skill `assets/skills/zai-vision/SKILL.md` (auto-deployed)
+documents the full combination matrix + real verified examples.
+`~/.omp/capabilities.md` snapshot added, surfaced by `doctor`.
+**(3) exact MCP tool catalogs** — `capabilities.md` now embeds the FULL exact
+tool list (name + 1-line use) for every registered MCP server
+(codebase-memory-mcp/headroom/serena/zai-vision), omp's own built-in tools
+(parsed live from `omp --help`), and Mnemopi memory tools — no more guessing
+tool names (the failure mode that caused the earlier codegraph-verb bug).
+`APPEND_SYSTEM.md` RULE #0 + the recall hook both point at it as ground truth.
+**(2) kitty window decorations** — `render_kitty_conf` hardcoded
+`hide_window_decorations yes`, breaking title bar/min-max-close/resize on
+stacking WMs (reproduced live on this machine's KDE/kwin/Wayland). New
+`env_detect::is_tiling_wm()` gates it to Hyprland/HyDE/sway/etc only.
+Re-ran `8sync setup --profile terminal` — `~/.config/kitty/8sync.conf` fixed;
+user must close/reopen the kitty window (decorations negotiate at
+window-creation, not live-reloadable). See KNOWLEDGE.md top 2 entries +
+CHANGELOG Unreleased for full detail.
+**(4) kitty zoom binding** — `ctrl+shift+minus` (kitty's default zoom-out)
+was silently overridden by the 3-pane vsplit map; moved vsplit to
+`ctrl+shift+backslash`. Live config regenerated on this machine.
+**(5) 18 feynman research skills ported to omp-native** — 20 skills in
+`agents/skills.toml` pointed at `companion-inc/feynman`; audited via a
+temp submodule (removed after) and found 14 were dead stubs pointing at
+feynman's own slash-commands (`/deepresearch`, `/lit`, …, not usable in
+omp) + 4 more with only cosmetic feynman naming. Ported all 18 into
+`assets/skills/<name>/SKILL.md` (builtin, omp-native tools: `task` /
+`web_search` / `read` / `ask`). `alpha-research` kept pointed at feynman
+(real CLI dependency, `ensure_feynman_cli()`). Also fixed a real bug in
+`update_skills`: registering one skill from a collection repo silently
+reinstalled EVERY sub-skill on every bulk run, un-droppable via the
+manifest — fixed the filter logic. `peer-review` renamed `research-review`
+(feynman's actual current name; the old entry never resolved).
 
 ## Next (chưa làm — tùy chọn)
 - [x] **DONE: `outputs/one-auto-unification-plan.md` P1–P6** — `/auto` là lệnh tự động DUY NHẤT (v0.28.0).

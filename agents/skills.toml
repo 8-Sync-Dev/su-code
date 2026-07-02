@@ -9,27 +9,23 @@ src = "https://github.com/companion-inc/feynman"
 when = "on-demand"
 
 [autoresearch]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:autoresearch"
 when = "on-demand"
 
 [codegraph]
 src = "builtin:codegraph"
 when = "always"
 
-[contributing]
-src = "https://github.com/companion-inc/feynman"
-when = "on-demand"
-
 [deep-research]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:deep-research"
 when = "on-demand"
 
 [docker]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:docker"
 when = "on-demand"
 
 [eli5]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:eli5"
 when = "on-demand"
 
 [image-routing]
@@ -41,7 +37,7 @@ src = "builtin:impeccable"
 when = "on-demand"
 
 [jobs]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:jobs"
 when = "on-demand"
 
 [karpathy]
@@ -49,47 +45,47 @@ src = "builtin:karpathy"
 when = "always"
 
 [literature-review]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:literature-review"
 when = "on-demand"
 
 [ml-training-recipe]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:ml-training-recipe"
 when = "on-demand"
 
 [modal-compute]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:modal-compute"
 when = "on-demand"
 
 [paper-code-audit]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:paper-code-audit"
 when = "on-demand"
 
 [paper-writing]
-src = "https://github.com/companion-inc/feynman"
-when = "on-demand"
-
-[peer-review]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:paper-writing"
 when = "on-demand"
 
 [preview]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:preview"
 when = "on-demand"
 
 [replication]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:replication"
+when = "on-demand"
+
+[research-review]
+src = "builtin:research-review"
 when = "on-demand"
 
 [runpod-compute]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:runpod-compute"
 when = "on-demand"
 
 [session-log]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:session-log"
 when = "on-demand"
 
 [session-search]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:session-search"
 when = "on-demand"
 
 [social-growth]
@@ -97,9 +93,9 @@ src = "builtin:social-growth"
 when = "on-demand"
 
 [source-comparison]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:source-comparison"
 when = "on-demand"
 
 [watch]
-src = "https://github.com/companion-inc/feynman"
+src = "builtin:watch"
 when = "on-demand"

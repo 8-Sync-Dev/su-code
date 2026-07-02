@@ -48,6 +48,24 @@ pub fn is_hyde() -> bool {
         || home.join(".config/hyde").exists() && which::which("hydectl").is_ok()
 }
 
+/// True on a tiling Wayland compositor (Hyprland, sway, river, wayfire) that
+/// manages its own borders/gaps and expects clients to hide their own chrome.
+/// False on a stacking desktop (KDE/kwin, GNOME/mutter, Xfce) where the
+/// compositor does NOT draw decorations for kitty either — hiding kitty's own
+/// title bar there leaves the window with no title bar, no min/max/close
+/// buttons, and no drag-to-resize border at all.
+pub fn is_tiling_wm() -> bool {
+    if is_hyde() {
+        return true;
+    }
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default().to_lowercase();
+    let session = std::env::var("DESKTOP_SESSION").unwrap_or_default().to_lowercase();
+    let hay = format!("{desktop} {session}");
+    ["hyprland", "sway", "river", "wayfire", "qtile", "i3", "bspwm", "awesome"]
+        .iter()
+        .any(|wm| hay.contains(wm))
+}
+
 /// True when stdin/stdout is a real TTY (so we can prompt y/N).
 pub fn has_tty() -> bool {
     // Use the simple `isatty(0)` trick via /proc.

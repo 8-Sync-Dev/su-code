@@ -25,6 +25,7 @@ description: Use this skill on EVERY read request to decide between text and ima
 2. For visual content (UI, charts, screenshots, large PDFs), **prefer image**. A single 1500-token image vs 5,000+ tokens of describing layout = 3-10× savings.
 3. For long code files (> 800 LoC), request an **AST outline** first, then read narrow slices. Don't dump whole file.
 4. Always cite `filepath:start-end` after reading.
+5. **The default model (GLM-5.2) is text-only** — it cannot actually see the PNGs this table routes to. After `8sync shot`/`pdf-img`/`diff-img` produces an image, route it through the **`zai-vision` MCP** (see `~/.omp/skills/zai-vision/SKILL.md` for the full tool catalog + combination matrix + real verified examples) to get TEXT back, THEN feed that text to the model. omp's built-in `inspect_image` is the generic fallback.
 
 ## Example
 

@@ -56,7 +56,15 @@ pub(crate) fn update_skills(
     }
     for url in &git_urls {
         let url_seg = url.trim_end_matches(".git").rsplit('/').next().unwrap_or(url);
-        let url_matches = filter.is_none_or(|f| f == *url || f == url_seg);
+        // Explicit ask for this exact collection (by URL or repo segment) →
+        // install every sub-skill it contains. Otherwise (bulk `8sync
+        // harness` run with filter=None, or a filter naming a DIFFERENT
+        // skill/repo) a sub-skill is only (re)installed when it already has
+        // its own registry key — a collection repo must not silently grow
+        // the registry just because ONE of its skills is registered (e.g.
+        // registering only `alpha-research` out of a 20-skill repo must not
+        // also install the other 19 unrequested ones).
+        let explicit_collection_filter = filter.is_some_and(|f| f == *url || f == url_seg);
         let tmp = env.home.join(".cache/8sync/skill-clone").join(sanitize(url));
         let _ = std::fs::remove_dir_all(&tmp);
         if let Some(p) = tmp.parent() {
@@ -74,7 +82,9 @@ pub(crate) fn update_skills(
         let found = collect_repo_skills(&tmp, url_seg);
         let mut any_here = false;
         for (sname, sdir) in &found {
-            if sname.is_empty() || !(url_matches || want(sname)) {
+            let named_filter_hit = filter.is_some_and(|f| f == sname.as_str());
+            let keep = explicit_collection_filter || named_filter_hit || (filter.is_none() && reg.contains_key(sname.as_str()));
+            if sname.is_empty() || !keep {
                 continue;
             }
             matched = true;

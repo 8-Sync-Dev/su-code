@@ -45,6 +45,129 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 - Fixes recurring `400 thinking.enabled.budget_tokens: Field required` on claude-sonnet-5:
   omp's default `thinking:{type:adaptive}` is rejected by the gateway; the bundled template
   forces `enabled + budget_tokens`. (`crates/cli/src/verbs/harness/gateway.rs`, `assets/configs/omp/gateway-models.yml`)
+### Added — 18 feynman research skills ported to omp-native (were unusable stubs)
+- Audited `agents/skills.toml`'s 20 `companion-inc/feynman`-sourced skills
+  (submodule-inspected at `reference/feynman`, then removed). Found 12 were
+  12-line stubs pointing at feynman's OWN slash-commands (`/deepresearch`,
+  `/lit`, `/recipe`, `/audit`, `/draft`, `/review`, `/compare`, `/watch`,
+  `/replicate`, `/jobs`, `/log`, `/autoresearch`) — those commands only exist
+  in feynman's own pi-coding-agent runtime (`prompts/*.md` +
+  `extensions/research-tools.ts`), NOT in omp. Deployed as-is they were
+  completely inert. 2 more (`session-search`, `preview`) had the same
+  problem behind a documented fallback. Ported all 14 (deep-research,
+  literature-review, autoresearch, ml-training-recipe, paper-code-audit,
+  paper-writing, research-review, source-comparison, watch, replication,
+  jobs, session-log, session-search, preview) into self-contained
+  `assets/skills/<name>/SKILL.md` using omp's real tools (`task` in place of
+  feynman's `subagent`, `web_search`/`read` in place of `fetch_content`,
+  `ask` in place of `ask_user_question`, `job`/`retain` where feynman had no
+  equivalent). Also re-bundled 4 genuinely-portable CLI skills (`eli5`,
+  `docker`, `modal-compute`, `runpod-compute` — only cosmetic "Feynman"
+  naming, no runtime dependency) as `builtin:` too. `alpha-research` is kept
+  pointed at the real `companion-inc/feynman` source since it's a legitimate
+  CLI wrapper (`feynman alpha ...`, needs `@companion-ai/feynman` installed
+  via the existing `ensure_feynman_cli()`). Dropped `contributing`
+  (feynman-repo-only, no value for su-code users).
+- **Bug fixed in the process**: `agents/skills.toml` had `[peer-review]`
+  pointing at feynman, but feynman renamed that skill upstream to
+  `research-review` — the entry never resolved to anything on disk. Fixed
+  to `[research-review]`.
+- **Bug fixed in `update_skills` (`crates/cli/src/verbs/skill/update.rs`)**:
+  registering ANY single skill from a git collection repo (e.g. just
+  `alpha-research` from feynman's 20-skill repo) silently reinstalled
+  EVERY sub-skill in that repo on every `8sync harness`/`skill update` run,
+  regardless of registry membership — `contributing` kept reappearing after
+  being deliberately dropped from the manifest, because the git-source loop
+  treated `filter.is_none()` as "install everything found". Fixed: a
+  sub-skill is only (re)installed when the URL/repo was explicitly targeted,
+  the skill name was explicitly filtered, or (bulk run) it already has its
+  own registry key — a collection repo no longer silently grows the
+  registry.
+- 18 new on-demand skills registered in `assets/skills/00-force-load.md`'s
+  lookup table (55 on-demand total, up from 37).
+
+### Fixed — kitty terminal zoom (`ctrl+shift+minus`) silently stolen by vsplit binding
+- `8sync setup --profile terminal` mapped `ctrl+shift+minus` to
+  `launch --location=vsplit` for the gsd-style 3-pane layout. That's kitty's
+  DEFAULT font-zoom-out binding (`change_font_size all -2.0`) — user maps
+  override defaults, so zoom-out silently stopped working with no error.
+  Moved vsplit to `ctrl+shift+backslash` (unclaimed by any kitty default);
+  `ctrl+shift+minus`/`+equal`/`+backspace` now behave stock. Re-ran
+  `8sync setup --profile terminal` to regenerate the live
+  `~/.config/kitty/8sync.conf` on this machine — user must reload/reopen
+  kitty (font-zoom maps apply live via `kitty @ load-config` if remote
+  control is on, no window-recreate needed unlike the earlier decoration fix).
+  (`crates/cli/src/verbs/setup.rs:665-668`)
+
+### Added — `~/.omp/capabilities.md` now embeds EXACT MCP/builtin/memory tool catalogs
+- Previously the snapshot only said "`4` server(s) registered" — no tool names.
+  Agents had to guess, which is exactly how the earlier "codegraph verb"
+  hallucination bug happened (see KNOWLEDGE.md). Now `8sync harness` writes
+  the FULL exact tool catalog for every registered MCP server:
+  `codebase-memory-mcp` (14), `headroom` (3), `serena` (23), `zai-vision` (8)
+  — plus omp's own built-in tools (parsed live from `omp --help`'s "Available
+  Tools" block) and the Mnemopi memory tools (`recall`/`reflect`/`retain`/
+  `memory_edit`, listed only when the backend is ON).
+  (`crates/cli/src/verbs/skill/deploy.rs::known_mcp_tool_catalog` +
+  `ensure_omp_capabilities_snapshot` rewrite.)
+- `APPEND_SYSTEM.md` RULE #0 now names the 4 connected servers explicitly and
+  points at `~/.omp/capabilities.md` as the ground truth for exact
+  names/params — "never guess/invent an MCP tool name". The `8sync-recall.ts`
+  hook (injected every `before_agent_start` + compaction) carries the same
+  pointer so it survives past 50% context.
+
+### Fixed — kitty lost its title bar/min-max-close/resize border on KDE (stacking WM)
+- `8sync setup --profile terminal` unconditionally wrote
+  `hide_window_decorations yes` into `~/.config/kitty/8sync.conf`. That's
+  correct on a tiling Wayland compositor (Hyprland/HyDE — the project's
+  primary target) which draws no chrome and expects clients to hide their own,
+  but on a **stacking** desktop (KDE/kwin, GNOME/mutter, …) the compositor
+  ALSO does not add server-side decorations for an undecorated client — the
+  window ends up with no title bar, no traffic-light buttons, and no
+  drag-to-resize border at all.
+- New `env_detect::is_tiling_wm()` checks `is_hyde()` first, then
+  `XDG_CURRENT_DESKTOP`/`DESKTOP_SESSION` against known tiling WMs
+  (hyprland/sway/river/wayfire/qtile/i3/bspwm/awesome).
+  `render_kitty_conf` now only emits `hide_window_decorations yes` when
+  `is_tiling_wm()` is true; stacking desktops (verified live on KDE/Plasma/
+  kwin/Wayland) keep normal window chrome. (`crates/cli/src/verbs/setup.rs`,
+  `crates/cli/src/env_detect.rs`)
+- Re-running `8sync setup --profile terminal` (idempotent) regenerates
+  `~/.config/kitty/8sync.conf` with the fix; requires closing/reopening the
+  kitty window (decorations are negotiated at window-creation time, not
+  live-reloadable).
+
+### Added — Z.AI vision MCP (`zai-vision`) bridges GLM-5.2's text-only gap + dedicated skill
+- GLM-5.2 (omp's default model) is text-only. `8sync harness` now auto-installs
+  `@z_ai/mcp-server` (npm, via `bun add -g`) and registers it as the `zai-vision`
+  omp MCP server, exposing 8 GLM-5V tools (`ui_to_artifact`,
+  `extract_text_from_screenshot`, `diagnose_error_screenshot`,
+  `understand_technical_diagram`, `analyze_data_visualization`, `ui_diff_check`,
+  `analyze_image`, `analyze_video`). Auth reuses the SAME Z.AI key already
+  configured for `zai/glm-5.2` (pulled via `omp token zai`, no separate signup).
+  (`crates/cli/src/verbs/skill/deploy.rs::ensure_zai_vision_mcp` +
+  `resolve_zai_api_key`; wired into `harness auto`/`harness init`; reported by
+  `doctor`.)
+- **`register_omp_mcp` now supports per-server `env`** (only emitted when
+  non-empty, so existing env-less entries stay self-heal-stable).
+- **Verified end-to-end** (not illustrative): real browser screenshots run
+  through the actual `zai-mcp-server` stdio process via JSON-RPC `tools/call`.
+  Found and fixed a real gap — `8sync harness` now defaults
+  `Z_AI_VISION_MODEL=glm-4.6v-flash`, the ONLY vision model that works on a
+  stock Z.AI key with no vision resource package (paid models 400 with `1113
+  insufficient balance`; verified against Z.AI's live pricing table).
+- **New skill `zai-vision`** (`assets/skills/zai-vision/SKILL.md`, auto-deployed
+  by `install_bundled_global`) documents the full combination matrix: browser
+  screenshots, `8sync shot/pdf-img/diff-img`, codegraph/cbm diagrams, serena,
+  headroom compression, `inspect_image` fallback, retain/recall, and advisor —
+  plus the real verified tool-call output and a troubleshooting table for Z.AI
+  error codes (1113/1211/1301/1305).
+- **`~/.omp/capabilities.md`** — new live snapshot of omp's surface (advisor,
+  thinking, inspect_image, adaptive model roles, retain/recall, registered MCP
+  count, skill count), refreshed every `8sync harness` run, surfaced by
+  `doctor` (`ensure_omp_capabilities_snapshot`).
+- `APPEND_SYSTEM.md` and `image-routing` SKILL now point to `zai-vision` as the
+  mandatory bridge step after routing to "image".
 
 ## [0.36.0] — 2026-06-30
 
