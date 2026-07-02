@@ -10,7 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 27 dòng cũ → agents/archive/KNOWLEDGE-1782725542.md)_
+_(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1782879675.md)_
 - **validated: Phase C/D/E loop-eng v2 (full) shipped → v0.19.0.** (C) loop section + generated
   block: `task` implementer↔independent verifier (verify-gate before commit, objective/boundaries/
   output per subagent, share-trace for dependent, parallel only independent); FAIL → `failure:` in

@@ -5,6 +5,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — `8sync harness gateway` — deploy/verify the omp model-gateway
+- New subaction: `8sync harness gateway [apply|key <KEY>|verify|status]` — deploys
+  `~/.omp/agent/models.yml` from a bundled template so the 9router gateway config
+  (provider URL, models, API key, `thinking.mode = anthropic-budget-effort`) is
+  reproducible by one command instead of hand-editing.
+- `apply` is idempotent (backs up a differing file to `models.yml.bak`, preserves the
+  existing key on refresh; key from `$NINE_ROUTER_KEY` or `gateway key <KEY>`).
+- `verify` pings `cc/claude-sonnet-5` through the gateway — the exact path that 400'd
+  before the thinking fix; HTTP 200 = healthy. `status` masks the key + flags a missing fix.
+- Fixes recurring `400 thinking.enabled.budget_tokens: Field required` on claude-sonnet-5:
+  omp's default `thinking:{type:adaptive}` is rejected by the gateway; the bundled template
+  forces `enabled + budget_tokens`. (`crates/cli/src/verbs/harness/gateway.rs`, `assets/configs/omp/gateway-models.yml`)
+
 ## [0.36.0] — 2026-06-30
 
 ### Added — `8sync bg search`: find wallpapers online (no API key) + pick with live preview
@@ -55,7 +68,6 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   slim-down, breaking `kitty @` live control. (`crates/cli/src/verbs/setup.rs`)
 - `8sync setup --profile terminal` now deploys both files (structure + active palette); the active
   theme is recorded in `~/.config/8sync/kitty-theme` and survives re-runs.
-
 ## [0.33.0] — 2026-06-29
 
 ### Added — dashboard surfaces the live `/auto` engine run (real, not demo)

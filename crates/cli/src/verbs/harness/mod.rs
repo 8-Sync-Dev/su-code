@@ -19,6 +19,7 @@ mod external;
 mod init;
 mod memory;
 mod model;
+mod gateway;
 mod up;
 mod web;
 mod toolstats;
@@ -39,6 +40,7 @@ mod toolstats;
       8sync harness audit             scan docs for stale paths / oversized / junk + churn hotspots (doc-hygiene)
       8sync harness eval [--baseline] run the quality task-suite through omp (pass/fail + wall-time; --baseline saves the reference)
       8sync harness compaction [pct]  view/set omp auto-compaction threshold (default 50% — anti-forget)
+      8sync harness gateway [apply|key <KEY>|verify|status]  deploy/verify the omp model-gateway (9router + thinking fix)
 
     WHAT init DEPLOYS
       always-on : codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing
@@ -47,7 +49,7 @@ mod toolstats;
       external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)
 "})]
 pub struct Args {
-    /// init (default) | up | audit | bench | eval | toolstats | model | web | compaction | help
+    /// init (default) | up | audit | bench | eval | toolstats | model | gateway | web | compaction | help
     pub sub: Option<String>,
     /// Optional value for value-taking sub-commands (e.g. `compaction <pct>`).
     pub value: Option<String>,
@@ -107,13 +109,17 @@ pub fn run(a: Args) -> Result<()> {
             let args: Vec<String> = [a.value.clone(), a.value2.clone()].into_iter().flatten().collect();
             model::harness_model(&env, &args)
         }
+        Some("gateway") => {
+            let args: Vec<String> = [a.value.clone(), a.value2.clone()].into_iter().flatten().collect();
+            gateway::harness_gateway(&env, &args)
+        }
         Some("help") => {
             print_help();
             Ok(())
         }
         Some(other) => {
             ui::warn(&format!("unknown subcommand: {}", other));
-            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | audit | eval | bench | help");
+            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | gateway | audit | eval | bench | help");
             Ok(())
         }
     }
@@ -138,6 +144,7 @@ fn print_help() {
     println!("  8sync harness eval [--baseline] run the quality task-suite through omp; --baseline saves the reference");
     println!("  8sync harness compaction [pct]  view/set omp auto-compaction threshold (anti-forget; default 50%)");
     println!("  8sync harness model [k v]       view/edit ~/.config/8sync/models.toml (model routing for /auto + 8sync ai)");
+    println!("  8sync harness gateway [apply|key|verify]  deploy/verify omp model-gateway (9router + sonnet-5 thinking fix)");
     println!("  8sync harness web [--port N]    local dashboard (axum+Vite): skills/memory/engines/team/submodules");
     println!("  8sync harness toolstats         SQLite tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails");
     println!("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)");
@@ -159,5 +166,6 @@ fn print_help() {
     println!("  1) git clone <repo> && cd <repo>     # agents/*.md + agents/skills/ arrive with the clone");
     println!("  2) 8sync up                          # install/refresh the 8sync binary + omp");
     println!("  3) 8sync harness init                # rebuild .codegraph + global skills, re-inject rules");
+    println!("  3b) 8sync harness gateway apply     # deploy omp gateway config (set $NINE_ROUTER_KEY first)");
     println!("  4) prior memory (KNOWLEDGE/DECISIONS/STATE) is already present — the agent resumes context.");
 }
