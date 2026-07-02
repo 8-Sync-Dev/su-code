@@ -241,3 +241,27 @@ _(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1782879675.md)_
   cat {}.url'` (id+res baked into filename so no --delimiter needed), pick → read `{thumb}.full`
   sidecar → `add`+`set`. Sidecar pattern (`<file>.url`/`.full`) maps a chosen path to its metadata
   without a TSV/delimiter. RAII `TmpGuard` cleans staged thumbs. Non-TTY → print list with links.
+- **validated: dashboard `Codegraph` page (visualize codebase-memory-mcp graph) shipped.**
+  Browser-audited `8sync harness web` end-to-end (real project, all 14 pages) per user request —
+  confirmed 0 route existed for codegraph/memory graph viz despite `@xyflow/react`+`elkjs` already
+  bundled (only powered the manual Workflow builder). Fix: shell `codebase-memory-mcp cli <tool>
+  <json-args>` (NOT the MCP protocol — a plain subprocess call) from 3 new axum routes
+  (`/api/codegraph/{overview,search,trace}`); stdout is pure JSON, all progress/log lines go to
+  stderr (verified separately) so no scraping needed. Project slug = path with leading `/` stripped
+  + remaining `/`→`-` (matches `list_projects` output exactly, e.g.
+  `/home/alexdev/Projects/tools/su-code` → `home-alexdev-Projects-tools-su-code`) — **passing the
+  raw absolute path as `project` triggers `store.auto_clean` and DELETES a phantom index entry**,
+  always slug it first. FE: elk `layered`/`RIGHT` layout for the package boundary graph (nodes =
+  packages sized by node_count, edges = `boundaries[].call_count`), Leiden `clusters[]` rendered as
+  plain cards (cohesion/top_nodes/packages — no fake inter-cluster edges fabricated, the API doesn't
+  give them), trace subgraph uses depth=1 only so every rendered edge is a real direct caller/callee
+  (no fabricated multi-hop edges from a flat hop-list). failure(caught in review, fixed same session):
+  initial `SWAP` on the route-registration line accidentally deleted the pre-existing
+  `/api/workflows/:name` CRUD route (get/post/delete) — `cargo build` warnings
+  (`api_workflow_get`/`save`/`delete` never used) caught it immediately; always re-check route list
+  after a route-block edit, not just "does it compile". Also fixed pre-existing bug found during the
+  audit: `.tile-head strong` with `overflow-wrap:anywhere` + no `flex-basis` rendered
+  `codebase-memory-mcp` one-character-per-line next to a wide version tag (`flex:1 1 auto;
+  min-width:0` + `overflow-wrap:break-word` fixes it) — different tools' `--version` output format
+  differs (`0.9.2` vs `codebase-memory-mcp 0.8.1` vs `headroom, version 0.27.0`), extract just the
+  semver token instead of trusting raw output verbatim.

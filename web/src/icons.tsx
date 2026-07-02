@@ -48,6 +48,15 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M5 9.1c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8" />
     </>,
   ),
+  codegraph: svg(
+    <>
+      <circle cx="12" cy="5" r="2.2" />
+      <circle cx="5" cy="19" r="2.2" />
+      <circle cx="19" cy="19" r="2.2" />
+      <circle cx="19" cy="10" r="2.2" />
+      <path d="M10.6 6.6L6.4 17M13.4 6.6l3.6 8.7M7.2 19h9.6" />
+    </>,
+  ),
   engines: svg(
     <>
       <rect x="6" y="6" width="12" height="12" rx="2" />

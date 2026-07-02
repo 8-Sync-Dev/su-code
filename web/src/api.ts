@@ -68,6 +68,31 @@ export type WfEdge = { id: string; source: string; target: string };
 export type Workflow = { name?: string; nodes: WfNode[]; edges: WfEdge[] };
 export type WorkflowExport = { ok: boolean; path: string; tool: string };
 
+// Codegraph — codebase-memory-mcp knowledge graph, bridged read-only for viz.
+export type CgPackage = { name: string; node_count: number; fan_in: number; fan_out: number };
+export type CgBoundary = { from: string; to: string; call_count: number };
+export type CgCluster = {
+  id: number; label: string; members: number; cohesion: number;
+  top_nodes: string[]; packages: string[]; edge_types: string[];
+};
+export type CgHotspot = { name: string; qualified_name: string; fan_in: number };
+export type CgOverview = {
+  total_nodes: number; total_edges: number;
+  node_labels: { label: string; count: number }[];
+  languages: { language: string; file_count: number }[];
+  packages: CgPackage[];
+  boundaries: CgBoundary[];
+  clusters: CgCluster[];
+  hotspots: CgHotspot[];
+};
+export type CgSearchResult = {
+  name: string; qualified_name: string; label: string;
+  file_path: string; start_line: number; end_line: number; rank: number;
+};
+export type CgSearchResponse = { total: number; has_more: boolean; results: CgSearchResult[] };
+export type CgTraceNode = { name: string; qualified_name: string; hop: number };
+export type CgTrace = { function: string; direction: string; callers: CgTraceNode[]; callees: CgTraceNode[] };
+
 // Live `/auto` engine run — the real gsd-pi state.json the engine drives.
 export type EngineTaskView = { id?: string; title: string; status: "pending" | "in_progress" | "done" | "blocked"; retries?: number };
 export type EngineSliceView = { id?: string; title: string; tasks: EngineTaskView[] };
@@ -225,4 +250,11 @@ export const api = {
     json<{ name: string; graph: Workflow }[]>("/api/workflows/templates").then((ts) =>
       ts.map((t) => ({ ...t.graph, name: t.name })),
     ),
+
+  // ── Codegraph (codebase-memory-mcp bridge) ──
+  codegraphOverview: () => json<CgOverview>("/api/codegraph/overview"),
+  codegraphSearch: (q: string, limit = 20) =>
+    json<CgSearchResponse>(`/api/codegraph/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  codegraphTrace: (symbol: string, depth = 2) =>
+    json<CgTrace>(`/api/codegraph/trace?symbol=${encodeURIComponent(symbol)}&depth=${depth}`),
 };

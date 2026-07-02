@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, StatusCode, Uri},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -97,6 +97,9 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/workflows/templates", get(api_workflow_templates))
         .route("/api/workflows/:name", get(api_workflow_get).post(api_workflow_save).delete(api_workflow_delete))
         .route("/api/workflows/:name/export", post(api_workflow_export))
+        .route("/api/codegraph/overview", get(api_codegraph_overview))
+        .route("/api/codegraph/search", get(api_codegraph_search))
+        .route("/api/codegraph/trace", get(api_codegraph_trace))
 }
 
 async fn api_state(State(ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
@@ -212,9 +215,21 @@ async fn api_memory_set(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
+/// `--version` output is inconsistent across tools (`0.9.2` vs
+/// `codebase-memory-mcp 0.8.1` vs `headroom, version 0.27.0`). Extract just the
+/// semver-looking token so the UI always shows a short, consistent "on X.Y.Z"
+/// instead of duplicating the already-visible tool name into the tag pill.
+fn clean_version(raw: &str) -> String {
+    raw.split_whitespace()
+        .map(|t| t.trim_matches(','))
+        .find(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit()))
+        .unwrap_or(raw)
+        .to_string()
+}
+
 async fn api_engines(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
     let ver = |b: &str| crate::env_detect::cmd_version(b, &["--version"]).unwrap_or_default();
-    let eng = |b: &str| serde_json::json!({ "present": which::which(b).is_ok(), "version": ver(b).trim() });
+    let eng = |b: &str| serde_json::json!({ "present": which::which(b).is_ok(), "version": clean_version(ver(b).trim()) });
     let cfg = std::fs::read_to_string(ctx.home.join(".omp/agent/config.yml")).unwrap_or_default();
     // serena runs via `uvx` (no `serena` binary on PATH), so `which serena`
     // always reports it off. Detect it instead by registration in mcp.json
@@ -1298,6 +1313,108 @@ async fn api_workflow_templates(State(_ctx): State<Arc<Ctx>>) -> Json<Vec<serde_
         serde_json::json!({ "name": "review", "graph": review }),
         serde_json::json!({ "name": "qa", "graph": qa }),
     ])
+}
+
+// ---- Codegraph / codebase-memory-mcp — architecture graph, search, trace ----
+// Bridges the codebase-memory-mcp knowledge graph (built by `harness up`'s
+// `index_codebase_memory`) into the dashboard so the 4-6k node / 10k+ edge
+// call graph the agent already queries via MCP is visible to a human too.
+// Shelled out (`cli <tool> <json>`) instead of embedding an MCP client — the
+// same binary + slug scheme `harness up` already indexes against.
+
+/// codebase-memory-mcp's project slug: strip the leading `/`, replace the rest
+/// with `-` (e.g. `/home/alexdev/Projects/tools/su-code` →
+/// `home-alexdev-Projects-tools-su-code`). Matches `list_projects` output.
+fn cbm_project_slug(root: &std::path::Path) -> String {
+    root.display().to_string().trim_start_matches('/').replace('/', "-")
+}
+
+/// Run `codebase-memory-mcp cli <tool> <json-args>` and parse stdout as JSON.
+/// Progress/log lines go to stderr (verified: only the JSON result hits
+/// stdout), so no scraping is needed. Missing binary / tool error / bad JSON
+/// all surface as a single `String` the caller turns into a 502/404.
+fn cbm_cli(tool: &str, args: &serde_json::Value) -> Result<serde_json::Value, String> {
+    if which::which("codebase-memory-mcp").is_err() {
+        return Err("codebase-memory-mcp not installed — run `8sync harness up`".into());
+    }
+    let out = std::process::Command::new("codebase-memory-mcp")
+        .args(["cli", tool])
+        .arg(args.to_string())
+        .output()
+        .map_err(|e| format!("spawn codebase-memory-mcp: {e}"))?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        return Err(format!("{tool} failed: {}", err.trim()));
+    }
+    serde_json::from_slice(&out.stdout).map_err(|e| format!("bad JSON from {tool}: {e}"))
+}
+
+fn cbm_not_indexed(root: &std::path::Path, slug: &str) -> ApiErr {
+    (
+        StatusCode::NOT_FOUND,
+        format!(
+            "'{}' not indexed yet (slug {slug}) — run `8sync harness up` to build the graph",
+            root.display()
+        ),
+    )
+}
+
+/// Architecture overview: node/edge totals, language mix, package boundaries
+/// (fan-in/out call counts between top-level dirs), and Leiden clusters (the
+/// de-facto modules — often cutting across folders). Powers the package graph
+/// + cluster cards on the Codegraph page.
+async fn api_codegraph_overview(State(_ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let slug = cbm_project_slug(&root);
+    let v = cbm_cli("get_architecture", &serde_json::json!({ "project": slug }))
+        .map_err(|_| cbm_not_indexed(&root, &slug))?;
+    Ok(Json(v))
+}
+
+#[derive(Deserialize)]
+struct SearchQuery {
+    q: String,
+    #[serde(default)]
+    limit: Option<u32>,
+}
+
+/// BM25 symbol search (`search_graph`) — functions/classes/routes ranked by
+/// name/text match. Backs the search box on the Codegraph page.
+async fn api_codegraph_search(
+    State(_ctx): State<Arc<Ctx>>,
+    Query(q): Query<SearchQuery>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let slug = cbm_project_slug(&root);
+    let v = cbm_cli(
+        "search_graph",
+        &serde_json::json!({ "project": slug, "query": q.q, "limit": q.limit.unwrap_or(20) }),
+    )
+    .map_err(|_| cbm_not_indexed(&root, &slug))?;
+    Ok(Json(v))
+}
+
+#[derive(Deserialize)]
+struct TraceQuery {
+    symbol: String,
+    #[serde(default)]
+    depth: Option<u32>,
+}
+
+/// Caller/callee trace (`trace_path`, `mode:"calls"`) for one symbol — the
+/// subgraph rendered when a search result is selected.
+async fn api_codegraph_trace(
+    State(_ctx): State<Arc<Ctx>>,
+    Query(q): Query<TraceQuery>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let slug = cbm_project_slug(&root);
+    let v = cbm_cli(
+        "trace_path",
+        &serde_json::json!({ "project": slug, "function_name": q.symbol, "depth": q.depth.unwrap_or(2), "direction": "both" }),
+    )
+    .map_err(|_| cbm_not_indexed(&root, &slug))?;
+    Ok(Json(v))
 }
 
 #[cfg(test)]

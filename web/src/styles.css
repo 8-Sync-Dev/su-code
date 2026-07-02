@@ -412,6 +412,10 @@ code, .sub code, .page-head .sub code {
 .row-total strong { font-size: var(--fs-md); }
 .row-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 .row-skills { font-size: var(--fs-xs); text-align: right; max-width: 48%; overflow-wrap: anywhere; color: var(--muted); }
+.list-count { padding: 0 0 8px; font-size: var(--fs-xs); }
+.skills-toolbar { display: flex; gap: 8px; }
+.skills-toolbar input { width: 220px; }
+.skills-toolbar select { width: auto; }
 
 .kv { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--border-soft); }
 .kv:last-child { border-bottom: 0; }
@@ -420,8 +424,8 @@ code, .sub code, .page-head .sub code {
 
 /* ── Tiles (engines) ──────────────────────────────────────────────────────── */
 .tile { display: flex; flex-direction: column; gap: 8px; }
-.tile-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.tile-head strong { font-size: var(--fs-base); overflow-wrap: anywhere; }
+.tile-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.tile-head strong { font-size: var(--fs-base); flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; }
 .tile-hint { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
 .tile-sub { display: flex; flex-wrap: wrap; gap: 6px; }
 

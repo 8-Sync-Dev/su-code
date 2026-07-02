@@ -5,6 +5,34 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — dashboard `Codegraph` page: visualize the codebase-memory-mcp knowledge graph
+- The web dashboard (`8sync harness web`) had zero visibility into the codegraph/
+  codebase-memory-mcp engines it lists on the Engines page — `search_graph`/
+  `trace_path`/`get_architecture` were agent-only. New **Codegraph** nav item
+  (Runtime group) renders the real graph: package call graph (elk auto-layout,
+  box size ≈ node count, edges = call counts between packages), **Leiden
+  cluster cards** (de-facto modules, cohesion %, top symbols — the actual
+  architectural seams, not just folders), a BM25 **symbol search**, and a
+  **caller/callee trace subgraph** for the selected symbol or a fan-in hotspot.
+- Backend: 3 new routes (`/api/codegraph/{overview,search,trace}`) shell out to
+  `codebase-memory-mcp cli <tool> <json>` (same binary+slug `harness up`
+  already indexes against) — no MCP client embedded, stdout-only JSON parsing
+  verified log-noise-free. Honest 404 ("not indexed yet — run `harness up`")
+  when the project has no graph.
+  (`crates/cli/src/verbs/harness/web.rs`, `web/src/App.tsx`, `web/src/api.ts`)
+
+### Fixed — dashboard UI/UX audit (browser-verified against a real project)
+- **Engines page**: the `codebase-memory-mcp 0.8.1` tile title rendered
+  **one character per line** — `overflow-wrap: anywhere` collapsed the flex
+  item's intrinsic width to zero next to a wide version tag. Fixed `.tile-head`
+  to give the title `flex: 1 1 auto; min-width: 0` and wrap on word
+  boundaries instead of mid-word.
+- **Version tags** were inconsistent/redundant across tools (`on
+  codebase-memory-mcp 0.8.1`, `on headroom, version 0.27.0` — duplicating the
+  already-visible tool name). `api_engines` now extracts just the semver token.
+- **Skills page** (67 skills, no way to find one): added a filter input +
+  tier dropdown (`all/always/on-demand/off`) with a live "N of M" count.
+
 ### Added — `8sync harness gateway` — deploy/verify the omp model-gateway
 - New subaction: `8sync harness gateway [apply|key <KEY>|verify|status]` — deploys
   `~/.omp/agent/models.yml` from a bundled template so the 9router gateway config

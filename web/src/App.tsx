@@ -11,6 +11,7 @@ import {
   type WfKind,
   type WfNode,
   type WfEdge,
+  type CgSearchResult,
 } from "./api";
 import { Markdown } from "./markdown";
 import { NavIcon, LogoMark, Glyph } from "./icons";
@@ -24,13 +25,13 @@ import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
 
 type Page =
   | "state" | "context" | "models" | "skills" | "memory" | "rules"
-  | "engines" | "mcp" | "submodules"
+  | "engines" | "codegraph" | "mcp" | "submodules"
   | "bench" | "eval" | "team" | "workspaces" | "workflow";
 
 const NAV_GROUPS: { label: string; items: { id: Page; label: string }[] }[] = [
   { label: "Session", items: [{ id: "state", label: "State" }, { id: "context", label: "Context" }] },
   { label: "Configure", items: [{ id: "models", label: "Models" }, { id: "skills", label: "Skills" }, { id: "memory", label: "Memory" }, { id: "rules", label: "Rules" }] },
-  { label: "Runtime", items: [{ id: "engines", label: "Engines" }, { id: "mcp", label: "MCP" }, { id: "submodules", label: "Submodules" }] },
+  { label: "Runtime", items: [{ id: "engines", label: "Engines" }, { id: "codegraph", label: "Codegraph" }, { id: "mcp", label: "MCP" }, { id: "submodules", label: "Submodules" }] },
   { label: "Quality", items: [{ id: "bench", label: "Bench" }, { id: "eval", label: "Readiness" }, { id: "team", label: "Team" }] },
   { label: "Projects", items: [{ id: "workspaces", label: "Workspaces" }] },
   { label: "Build", items: [{ id: "workflow", label: "Workflow" }] },
@@ -93,6 +94,7 @@ export default function App() {
           {page === "memory" && <MemoryPage />}
           {page === "rules" && <RulesPage />}
           {page === "engines" && <EnginesPage />}
+          {page === "codegraph" && <CodegraphPage />}
           {page === "mcp" && <McpPage />}
           {page === "submodules" && <SubmodulesPage />}
           {page === "bench" && <BenchPage />}
@@ -478,13 +480,45 @@ function SkillsPage() {
   });
   const cycle = (t: SkillEntry["tier"]): SkillEntry["tier"] =>
     t === "always" ? "on-demand" : t === "on-demand" ? "off" : "always";
+  const [q, setQ] = useState("");
+  const [tier, setTier] = useState<"all" | SkillEntry["tier"]>("all");
+  const filtered = (data ?? []).filter((s) => {
+    if (tier !== "all" && s.tier !== tier) return false;
+    if (!q.trim()) return true;
+    const needle = q.toLowerCase();
+    return s.name.toLowerCase().includes(needle) || (s.source ?? "").toLowerCase().includes(needle);
+  });
   return (
-    <Page title="Skills" sub="Click a tier chip to cycle always → on-demand → off.">
+    <Page
+      title="Skills"
+      sub="Click a tier chip to cycle always → on-demand → off."
+      action={
+        data && data.length > 0 ? (
+          <div className="skills-toolbar">
+            <input
+              className="mono"
+              placeholder={`Filter ${data.length} skills…`}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <select value={tier} onChange={(e) => setTier(e.target.value as typeof tier)}>
+              <option value="all">all tiers</option>
+              <option value="always">always</option>
+              <option value="on-demand">on-demand</option>
+              <option value="off">off</option>
+            </select>
+          </div>
+        ) : undefined
+      }
+    >
       {isLoading ? <Loading rows={6} /> : error ? <ErrorState message={(error as Error).message} /> : !data ? <Loading /> : data.length === 0 ? (
         <EmptyState title="No skills registered" hint="Add a skill spec to make it loadable from the harness." />
+      ) : filtered.length === 0 ? (
+        <EmptyState title="No skills match" hint={`Nothing matches "${q}" in ${tier === "all" ? "any tier" : tier}.`} />
       ) : (
         <div className="card list">
-          {data.map((s) => (
+          <p className="muted list-count">{filtered.length} of {data.length} skills</p>
+          {filtered.map((s) => (
             <div className="row" key={s.name}>
               <div className="row-main">
                 <div className="row-title mono">{s.name}</div>
@@ -647,6 +681,220 @@ function EngineRunBoard() {
         </div>
       ))}
     </div>
+  );
+}
+
+// ── Codegraph (codebase-memory-mcp bridge) — architecture graph + trace ────
+// The knowledge graph the agent already queries via MCP (search_graph,
+// trace_path, get_architecture), made visible: package call graph (elk
+// layout), Leiden clusters (de-facto modules), a BM25 symbol search, and a
+// caller/callee subgraph for the selected result. Read-only — this never
+// writes to the graph, it only shells `codebase-memory-mcp cli` for JSON.
+function cgNode(id: string, label: ReactNode, x: number, y: number, opts?: { w?: number; accent?: string }): Node {
+  return {
+    id,
+    position: { x, y },
+    data: { label },
+    style: {
+      width: opts?.w ?? 160,
+      background: "var(--surface-2)",
+      border: `1.5px solid ${opts?.accent ?? "var(--border)"}`,
+      borderRadius: 10,
+      color: "var(--text)",
+      fontSize: 12,
+      padding: 8,
+    },
+  };
+}
+
+function CodegraphPage() {
+  const { data, isLoading, error } = useQuery({ queryKey: ["codegraph-overview"], queryFn: api.codegraphOverview });
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<CgSearchResult | null>(null);
+  const search = useQuery({
+    queryKey: ["codegraph-search", q],
+    queryFn: () => api.codegraphSearch(q, 8),
+    enabled: q.trim().length >= 2,
+  });
+  const trace = useQuery({
+    queryKey: ["codegraph-trace", selected?.name],
+    queryFn: () => api.codegraphTrace(selected!.name, 1),
+    enabled: !!selected,
+  });
+
+  const [pkgNodes, setPkgNodes, onPkgNodesChange] = useNodesState<Node>([]);
+  const [pkgEdges, setPkgEdges] = useEdgesState<Edge>([]);
+  useEffect(() => {
+    if (!data) return;
+    (async () => {
+      const pkgs = data.packages.filter((p) => p.node_count > 0).slice(0, 24);
+      const maxN = Math.max(...pkgs.map((p) => p.node_count), 1);
+      const graph: ElkNode = {
+        id: "root",
+        layoutOptions: { "elk.algorithm": "layered", "elk.direction": "RIGHT", "elk.spacing.nodeNode": "28" },
+        children: pkgs.map((p) => ({ id: p.name, width: 150, height: 50 })),
+        edges: data.boundaries
+          .filter((b) => pkgs.some((p) => p.name === b.from) && pkgs.some((p) => p.name === b.to))
+          .map((b, i) => ({ id: `pe${i}`, sources: [b.from], targets: [b.to] })),
+      };
+      const laid = await elk.layout(graph);
+      const pos = new Map((laid.children ?? []).map((c) => [c.id, { x: c.x ?? 0, y: c.y ?? 0 }]));
+      setPkgNodes(
+        pkgs.map((p) => {
+          const weight = p.node_count / maxN;
+          return cgNode(
+            p.name,
+            <div>
+              <div style={{ fontWeight: 700 }}>{p.name}</div>
+              <div style={{ color: "var(--muted)", fontSize: 11 }}>{p.node_count} nodes</div>
+            </div>,
+            pos.get(p.name)?.x ?? 0,
+            pos.get(p.name)?.y ?? 0,
+            { accent: `color-mix(in srgb, var(--accent) ${20 + weight * 60}%, var(--border))` },
+          );
+        }),
+      );
+      setPkgEdges(
+        data.boundaries
+          .filter((b) => pkgs.some((p) => p.name === b.from) && pkgs.some((p) => p.name === b.to))
+          .map((b, i) => ({
+            id: `pe${i}`,
+            source: b.from,
+            target: b.to,
+            label: String(b.call_count),
+            animated: false,
+            style: { stroke: "var(--border)" },
+          })),
+      );
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  // Trace subgraph: target centered, callers above, callees below (depth=1 →
+  // every returned node has a real direct edge to the target — no fabricated hops).
+  const [traceNodes, setTraceNodes, onTraceNodesChange] = useNodesState<Node>([]);
+  const [traceEdges, setTraceEdges] = useEdgesState<Edge>([]);
+  useEffect(() => {
+    if (!trace.data) {
+      setTraceNodes([]);
+      setTraceEdges([]);
+      return;
+    }
+    const t = trace.data;
+    const center = cgNode(t.function, <strong>{t.function}</strong>, 260, 160, { w: 180, accent: "var(--accent-bright)" });
+    const callers = t.callers.slice(0, 10).map((c, i) => cgNode(`in-${i}`, c.name, i * 190, 0, { w: 170 }));
+    const callees = t.callees.slice(0, 10).map((c, i) => cgNode(`out-${i}`, c.name, i * 190, 320, { w: 170 }));
+    setTraceNodes([...callers, center, ...callees]);
+    setTraceEdges([
+      ...t.callers.slice(0, 10).map((_, i) => ({ id: `ci${i}`, source: `in-${i}`, target: t.function, style: { stroke: "var(--border)" } })),
+      ...t.callees.slice(0, 10).map((_, i) => ({ id: `co${i}`, source: t.function, target: `out-${i}`, style: { stroke: "var(--border)" } })),
+    ]);
+  }, [trace.data, setTraceNodes, setTraceEdges]);
+
+  if (isLoading) return <Page title="Codegraph" sub="codebase-memory-mcp knowledge graph."><Loading rows={4} /></Page>;
+  if (isMissing(error)) return <Page title="Codegraph"><EndpointMissing endpoint="/api/codegraph/overview" /></Page>;
+  if (error) return (
+    <Page title="Codegraph" sub="codebase-memory-mcp knowledge graph.">
+      <EmptyState
+        title="Project not indexed"
+        hint={<span className="mono">{(error as Error).message}</span>}
+        icon={<Glyph name="alert" />}
+      />
+    </Page>
+  );
+  if (!data) return null;
+
+  return (
+    <Page
+      title="Codegraph"
+      sub={`${fmt(data.total_nodes)} nodes · ${fmt(data.total_edges)} edges · ${data.languages.length} languages — live from codebase-memory-mcp.`}
+    >
+      <div className="card" style={{ padding: 0, height: 340, overflow: "hidden" }}>
+        <ReactFlow
+          nodes={pkgNodes}
+          edges={pkgEdges}
+          onNodesChange={onPkgNodesChange}
+          fitView
+          minZoom={0.3}
+          nodesConnectable={false}
+          nodesDraggable={true}
+        >
+          <Background />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+      </div>
+      <p className="muted list-count">Package call graph — box size/tint ≈ node count, edge label = call count between packages.</p>
+
+      <div className="card">
+        <div className="card-title">Clusters ({data.clusters.length}) — de-facto modules from Leiden community detection</div>
+        <div className="grid">
+          {data.clusters.slice(0, 12).map((c) => (
+            <div className="card tile" key={c.id} style={{ margin: 0 }}>
+              <div className="tile-head">
+                <strong>{c.label} #{c.id}</strong>
+                <span className="tag accent">{c.members} nodes</span>
+              </div>
+              <p className="tile-hint">cohesion {(c.cohesion * 100).toFixed(0)}% · {c.packages.join(", ")}</p>
+              <p className="row-meta mono">{c.top_nodes.slice(0, 5).join(", ")}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="wf-layout">
+        <div className="card" style={{ padding: 0, height: 360, overflow: "hidden" }}>
+          {selected ? (
+            <ReactFlow
+              nodes={traceNodes}
+              edges={traceEdges}
+              onNodesChange={onTraceNodesChange}
+              fitView
+              minZoom={0.3}
+              nodesConnectable={false}
+            >
+              <Background />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+          ) : (
+            <EmptyState title="Pick a search result" hint="Search a symbol, then click a result to trace its callers/callees." />
+          )}
+        </div>
+        <div className="wf-side card">
+          <h3>Search</h3>
+          <input
+            className="mono"
+            placeholder="symbol, e.g. api_engines"
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setSelected(null); }}
+          />
+          {q.trim().length >= 2 && (
+            search.isLoading ? <p className="wf-empty">Searching…</p> : (search.data?.results.length ?? 0) === 0 ? (
+              <p className="wf-empty">No matches.</p>
+            ) : (
+              <ul className="wf-list">
+                {search.data!.results.map((r) => (
+                  <li key={r.qualified_name}>
+                    <button className="link" onClick={() => setSelected(r)}>
+                      {r.name} <span className="muted">— {r.file_path}:{r.start_line}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
+          <h3>Hotspots (highest fan-in)</h3>
+          <ul className="wf-list">
+            {data.hotspots.slice(0, 8).map((h) => (
+              <li key={h.qualified_name}>
+                <button className="link" onClick={() => setSelected({ name: h.name, qualified_name: h.qualified_name, label: "Function", file_path: "", start_line: 0, end_line: 0, rank: 0 })}>
+                  {h.name} <span className="muted">— {h.fan_in} callers</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </Page>
   );
 }
 
