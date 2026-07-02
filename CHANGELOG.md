@@ -3,7 +3,7 @@
 Mọi thay đổi đáng kể của `8sync` ghi vào đây. Format theo [Keep a Changelog](https://keepachangelog.com),
 versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nhật mục `Unreleased`.
 
-## [Unreleased]
+## [0.39.0] — 2026-07-02
 
 ### Added — dashboard `Codegraph` page: visualize the codebase-memory-mcp knowledge graph
 - The web dashboard (`8sync harness web`) had zero visibility into the codegraph/
