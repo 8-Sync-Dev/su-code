@@ -92,7 +92,18 @@ pub fn run() -> Result<()> {
     // Security (warp + ufw) — compact one-liners
     sec::status_quiet();
 
-    // Profiles applied
+    // Profiles applied — self-heal stale entries (profile deleted from repo/override
+    // since it was applied; state.applied is append-only otherwise, see profile.rs).
+    if let Ok(all) = profile::load_all() {
+        if let Ok(stale) = profile::prune_stale(&all) {
+            for name in &stale {
+                ui::warn(&format!(
+                    "profile \"{}\" was applied but no longer exists — cleared from state",
+                    name
+                ));
+            }
+        }
+    }
     let st = profile::load_state();
     if st.applied.is_empty() {
         ui::info("profiles: none applied (run `8sync setup`)");

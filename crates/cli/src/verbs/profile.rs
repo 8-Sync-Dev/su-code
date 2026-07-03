@@ -316,6 +316,21 @@ pub fn mark_applied(name: &str) -> Result<()> {
     save_state(&s)
 }
 
+/// Drop `applied` entries that no longer resolve against `load_all()` — e.g. a profile
+/// deleted from the repo/override dir after it was applied (state is append-only and
+/// outlives the profile definition otherwise). Rewrites state only if something changed.
+/// Returns the names that were pruned.
+pub fn prune_stale(all: &HashMap<String, Profile>) -> Result<Vec<String>> {
+    let mut s = load_state();
+    let (kept, stale): (Vec<String>, Vec<String>) =
+        s.applied.drain(..).partition(|n| all.contains_key(n));
+    if !stale.is_empty() {
+        s.applied = kept;
+        save_state(&s)?;
+    }
+    Ok(stale)
+}
+
 fn current_ts() -> String {
     // Simple ISO-ish timestamp without chrono dep
     use std::time::{SystemTime, UNIX_EPOCH};
