@@ -22,19 +22,23 @@
 ## TL;DR
 
 ```bash
-# Cài lần đầu — one-liner, tải binary prebuilt (KHÔNG cần git/rust/cargo)
+# 1. Cài — one-liner, binary prebuilt (KHÔNG cần git/rust/cargo)
 curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
-8sync setup --dry-run            # xem plan trước
-8sync setup                      # cài harness + curated y/N (community profiles)
-# hoặc:
-8sync setup --community          # unattended: dev-stack + bluetooth
-8sync doctor                     # verify
+8sync setup                       # cài AI core (omp + codegraph + MCP/skills + gh) — y/N từng profile
+8sync doctor                      # verify (tự dọn state cũ nếu có)
 
-# Dùng hằng ngày
+# 2. Vào project → dựng harness (1 lệnh, idempotent)
 cd <project>
-8sync .                          # mở session (kitty 3-pane + omp trong abduco)
-8sync ai "explain this codebase" # one-shot prompt; bỏ trống để resume session
-8sync ship "feat: ..."           # add + commit + push + gh pr create
+8sync harness                     # skills + codegraph index + AGENTS.md + memory, chạy lại lúc nào cũng được
+8sync .                           # mở session (kitty 3-pane + omp)
+
+# 3. Dashboard — theo dõi + CRUD toàn bộ agent-team qua trình duyệt
+8sync harness web                 # http://127.0.0.1:8731 — models, skills, memory, rules,
+                                  # engines, Codegraph graph, bench, team… sửa trực tiếp, ghi ngay
+
+# Hằng ngày
+8sync ai "explain this codebase"  # one-shot prompt; bỏ trống để resume session
+8sync ship "feat: ..."            # add + commit + push + gh pr create
 ```
 
 ---
@@ -73,7 +77,7 @@ Stage A (harness, luôn idempotent):
 - `pacman -S --needed helix lazygit abduco github-cli`
 - omp CLI qua `curl -fsSL https://omp.sh/install | sh` (skip nếu đã có)
 - ghi config: `~/.config/helix/`, `~/.config/kitty/8sync.session`, `~/.config/8sync/{global,skills}.toml`
-- ghi skill (15 bundled): `~/.omp/skills/{codegraph,karpathy-guidelines,ponytail,assp-skill,impeccable,taste-skill,8sync-cli,image-routing,code-review-and-quality,senior-security,senior-frontend,full-flow,encore-deploy,last30days}/SKILL.md` + `00-force-load.md` (+ `social-growth` opt-in)
+- ghi skill (35 bundled) vào `~/.omp/skills/<name>/SKILL.md` + `00-force-load.md`. Always-on: codegraph, karpathy-guidelines, ponytail, assp-skill, impeccable, taste-skill, 8sync-cli, image-routing. On-demand: code-review-and-quality, senior-security, senior-frontend, full-flow, last30days + 18 research skill (`social-growth` opt-in)
 
 Stage B (community profile, opt-in y/N từng cái):
 
@@ -129,19 +133,33 @@ System packages (`pacman -Syu`) **không** tự chạy — bạn tự quyết kh
 
 `8sync . ls` / `to <n>` / `new <n> [cmd]` / `rm <n>` / `wipe` / `kick`
 
-### Harness + Skill system
+### Harness (agent-team bootstrap + dashboard)
 
 | Lệnh | Mô tả |
 |---|---|
-| `8sync harness init` | **Một lệnh dựng harness:** deploy 15 bundled skill + codegraph binary + external packs (ponytail/addyosmani, best-effort) → `~/.omp/skills/`, mirror vào `agents/skills/`, `codegraph init`, seed `agents/*` + `CHANGELOG.md`, inject force-load vào `AGENTS.md`/`CLAUDE.md` + index mỗi sub-folder. Có progress UI |
-| `8sync harness up` | Refresh theo state hiện tại: re-inject + refresh `KNOWLEDGE.md` + re-index codegraph. `--loop 10m` (foreground) · `--timer 30m\|off` (systemd user timer, khuyến nghị cho nền) |
+| `8sync harness` | **Một lệnh (idempotent):** deploy/update bundled skill + codegraph binary + external packs (ponytail/addyosmani, best-effort) → `~/.omp/skills/`, mirror `agents/skills/`, `codegraph init`, seed `agents/*` + `CHANGELOG.md`, inject force-load vào `AGENTS.md`/`CLAUDE.md`. Chạy lại lúc nào cũng an toàn |
+| `8sync harness init` | Full bootstrap lần đầu (progress UI) + managed `.gitignore` + gitleaks pre-commit hook. `--force` re-mirror đè hết |
+| `8sync harness up` | Refresh state: re-inject + refresh `KNOWLEDGE.md` + re-index codegraph. `--pull` re-pull skill · `--commit` git-commit memory (gitleaks scan trước) · `--loop 10m` (foreground) · `--timer 30m\|off` (systemd user timer, cho nền) |
+| **`8sync harness web`** | **Dashboard local** (axum + Vite, `http://127.0.0.1:8731`) — xem & **CRUD** toàn bộ agent-team qua trình duyệt (xem mục Dashboard) |
+| `8sync harness gateway [apply\|key <K>\|verify\|status]` | Deploy/verify omp model-gateway (`~/.omp/agent/models.yml`): 9router + `thinking.mode` fix cho claude-sonnet-5. `verify` ping HTTP 200 = healthy |
+| `8sync harness bench` | Đo context budget của loop (upfront vs deferred tokens + KV-cache gate) |
+| `8sync harness audit` | Scan docs: stale path / oversized / junk + churn (doc-hygiene) |
+| `8sync harness eval [--baseline]` | Chạy quality task-suite qua omp; `--baseline` lưu tham chiếu |
+| `8sync harness toolstats` | SQLite tracker: tỉ lệ optimizer (codegraph/cbm/serena) vs fallback (grep/read) + fail/tool |
+| `8sync harness compaction [pct]` | Xem/set ngưỡng omp auto-compaction (anti-forget; default 50%) |
+| `8sync harness model [k v]` | Xem/edit `~/.config/8sync/models.toml` (routing cho `/auto` + `8sync ai`) |
+
+### Skill system
+
+| Lệnh | Mô tả |
+|---|---|
 | `8sync skill` | List skill global (`~/.omp/skills/`) + local (`agents/skills/`) |
-| `8sync skill add <github-url>` | Clone vào **cả** global + project; **collection-aware** (repo `skills/<name>/` → cài mọi sub-skill, vd `addyosmani/agent-skills`). Rewrite block `<!-- 8sync:skills:* -->` |
-| `8sync skill add gh:owner/repo` · `path:/abs` · `builtin:<name>` | Short form · symlink local · bật opt-in bundled skill (vd `builtin:social-growth`) |
+| `8sync skill add <github-url>` | Clone vào **cả** global + project; **collection-aware** (repo `skills/<name>/` → cài mọi sub-skill, vd `addyosmani/agent-skills`). Rewrite block `<!-- 8sync:skills:* -->` trong `AGENTS.md` |
+| `8sync skill add gh:owner/repo` · `<url>@<ref>` · `builtin:<name>` | Short form · pin commit/tag (ghi `rev` vào `skills.toml` = lockfile) · bật opt-in bundled skill (vd `builtin:social-growth`) |
+| `8sync skill update [name]` | Re-pull theo `src` (git dedup theo URL, honor `rev` pin) |
 | `8sync skill gen <id> <id>` | Fuse N local skill thành 1 SKILL.md tổng hợp |
 
-Always-on (đọc theo thứ tự): codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing. `encore-deploy` chỉ hiện khi project dùng Encore; `social-growth` (social/branding/leads) **opt-in**, không auto-bật.
-Idempotent: chạy lại `add` cùng URL → re-clone/refresh. Mỗi skill dir theo Agent Skills 3-folder layout (`SKILL.md` + `scripts/` + `references/`); `harness init` tự tạo subdir thiếu.
+**35 skill bundled** trong binary. Always-on (đọc theo thứ tự): codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing. On-demand: code-review-and-quality · senior-security · senior-frontend · full-flow · last30days + 18 research skill (deep-research, literature-review, autoresearch, paper-writing…). `encore-deploy` tech-gated; `social-growth` opt-in. Idempotent: chạy lại `add` cùng URL → `git pull --ff-only`.
 
 
 ### Lifecycle
@@ -166,7 +184,42 @@ Idempotent: chạy lại `add` cùng URL → re-clone/refresh. Mỗi skill dir t
 
 `8sync sec [on\|off\|toggle\|status]` — bật/tắt cùng lúc Cloudflare WARP VPN + ufw firewall. Sub: `sec warp …`, `sec ufw …`.
 
+### Máy (desktop / dọn dẹp)
+
+| Lệnh | Mô tả |
+|---|---|
+| `8sync bt [on\|off\|fix\|restart]` | Bluetooth (bluez): status / bật-tắt / troubleshoot adapter chết / restart |
+| `8sync clean [--deep\|--ram\|--gpu\|--timer 1h]` | Reclaim disk (paccache/journal/thumbnails) + report CPU/GPU/RAM. `--deep` gỡ orphan; **không** đụng model/cache tải gói |
+| `8sync theme [list\|set <name>\|show]` | Đổi palette màu kitty live (chỉ màu, giữ nguyên structure) |
+| `8sync bg [set\|list\|add <url>\|search <q>]` | Wallpaper kitty live swap + inline preview; `bg search` = wallhaven.cc (no API key) |
+
 Mọi verb hỗ trợ `-h` / `--help` với block `EXAMPLES` chi tiết.
+
+---
+
+## Dashboard — `8sync harness web`
+
+Một trang web local (axum backend + Vite/React FE, nhúng sẵn trong binary) để **xem và điều khiển toàn bộ agent-team** thay vì sửa file config bằng tay:
+
+```bash
+8sync harness web                 # http://127.0.0.1:8731 (tự mở trình duyệt)
+8sync harness web --port 9000     # đổi port
+8sync harness web --no-open       # không auto-mở (chạy nền / headless)
+```
+
+Sidebar gom theo nhóm — mỗi trang đọc **dữ liệu thật** (không mock), phần lớn cho **CRUD ghi thẳng** vào config/memory:
+
+| Nhóm | Trang | Làm được gì |
+|---|---|---|
+| Session | **State · Context** | Live plan (`agents/STATE.md`), session token/compaction thật |
+| Configure | **Models · Skills · Memory · Rules** | Đổi model per-role/task (ghi `models.toml` ngay) · filter + cycle tier 35 skill · edit 6 memory file (STATE/KNOWLEDGE…) · thêm/xoá rule |
+| Runtime | **Engines · Codegraph · MCP · Submodules** | Trạng thái engine (codegraph/cbm/headroom/serena/mnemopi) · **graph codebase**: package call graph (elk) + 12 Leiden cluster + symbol search + trace caller/callee · MCP servers · git submodule |
+| Quality | **Bench · Readiness · Team** | Chạy `harness bench` live · readiness gate · team roster |
+| Projects/Build | **Workspaces · Workflow** | Project switcher · trình dựng pipeline skill/subagent/tool (export ra omp extension) |
+
+![Codegraph page — package call graph + Leiden clusters](docs/assets/dashboard-codegraph.png)
+
+![Models page — đổi routing per-role, ghi config ngay](docs/assets/dashboard-models.png)
 
 ---
 
@@ -205,7 +258,7 @@ Sửa `docs/index.html` → push `main` → Pages tự rebuild trong ~1 phút.
 
 ## Stack & contribute
 
-Rust workspace 1 binary (`8sync` ≈ 3.8 MB stripped — gồm 15 bundled skill, nặng nhất `impeccable`). Toolchain pin tại `rust-toolchain.toml`.
+Rust workspace 1 binary (`8sync` ≈ 5.0 MB stripped — bundle web dashboard FE + 35 skill, nặng nhất `impeccable`). Toolchain pin tại `rust-toolchain.toml`. Web dashboard build từ `web/` (Vite/React) qua `build.rs`, nhúng bằng rust-embed.
 
 Bố cục source:
 
@@ -221,7 +274,7 @@ crates/cli/src/
 assets/                           embed vào binary qua rust-embed
 ├── configs/                      kitty.session, helix-config, fish-config, 8sync/*.toml
 ├── presets/                      kitty preset themes
-├── skills/                       15 bundled (codegraph, karpathy, ponytail, assp, impeccable, taste, 8sync-cli, image-routing, code-review, senior-security/frontend, full-flow, encore-deploy, last30days, social-growth)
+├── skills/                       35 bundled (codegraph, karpathy, ponytail, assp, impeccable, taste, 8sync-cli, image-routing, code-review, senior-security/frontend, full-flow, encore-deploy, last30days, 18 research skill, …)
 └── wallpapers/
 ```
 
@@ -236,6 +289,7 @@ cargo build --release
 ./target/release/8sync flow
 ./target/release/8sync doctor
 ./target/release/8sync skill
+./target/release/8sync harness web --no-open   # dashboard → http://127.0.0.1:8731
 ```
 
 Xem [`AGENTS.md`](AGENTS.md) cho hướng dẫn chi tiết dành cho AI agent / contributor.

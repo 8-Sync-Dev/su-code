@@ -5,6 +5,8 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.40.0] — 2026-07-03
+
 ### Changed — advisor default-ON (per-turn rule/tool-use reviewer)
 - omp's `--advisor` (passive per-turn reviewer that checks each turn against the
   always-on rules — code-intel first, correct MCP tool names, open SKILL.md — and
@@ -18,6 +20,23 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   `~/.config/8sync/models.toml`. New `advisor` key in `ModelConfig` (default true).
 - Docs: `models.toml`, `APPEND_SYSTEM.md`, and `8sync ai --help` document the
   toggle + tradeoff.
+
+### Fixed — `8sync doctor` self-heals stale profile state
+- `profile::mark_applied()` was append-only — a profile deleted from the repo
+  (e.g. `caelestia.toml`, removed in `e761c31`) stayed in `~/.config/8sync/profile.toml`'s
+  `applied` list forever, and `doctor` printed it back as a false positive. New
+  `profile::prune_stale()` diffs `applied` against `load_all()`, drops entries that no
+  longer resolve, rewrites state only if changed. Wired into `doctor` (warns once, then
+  clean). Verified against a real stale state.
+
+### Docs — README + GitHub Pages refreshed to current surface
+- README + `docs/index.html`: TL;DR now leads with the one-liner install →
+  `8sync harness` → `8sync harness web`; new **Dashboard** section (with screenshots)
+  documents the CRUD control surface (models/skills/memory/rules/engines/Codegraph);
+  full harness subcommand table (web/gateway/bench/audit/eval/toolstats); added the
+  machine verbs (`bt`/`clean`/`theme`/`bg`) that were missing. Fixed stale numbers
+  (binary ≈ 5.0 MB, **35** bundled skill). Landing page gains a Dashboard nav link +
+  feature card + two live screenshots (`docs/assets/`).
 
 ## [0.39.0] — 2026-07-02
 

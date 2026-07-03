@@ -114,6 +114,7 @@
       </div>
       <nav class="nav">
         <a href="#install">Install</a>
+        <a href="#dashboard">Dashboard</a>
         <a href="#commands">Commands</a>
         <a href="#skills">Skills</a>
         <a href="#update">Update</a>
@@ -143,16 +144,16 @@
         <p>Không có “AI terminal” riêng. CLI workflow hiện tại của bạn giữ nguyên — 8sync chỉ wrap quanh.</p>
       </article>
       <article class="card">
+        <h3><span class="dot"></span>Dashboard CRUD</h3>
+        <p><code>8sync harness web</code> mở trang local xem &amp; sửa toàn bộ agent-team: models, skills, memory, rules, engines, <b>graph codebase</b> — ghi thẳng vào config.</p>
+      </article>
+      <article class="card">
         <h3><span class="dot"></span>Context-aware</h3>
-        <p>Đi tới project nào, AI bám theo ngữ cảnh đó. Memory shared qua <code>AGENTS.md</code> + <code>agents/*</code>.</p>
+        <p>Đi tới project nào, AI bám ngữ cảnh đó. Memory shared qua <code>AGENTS.md</code> + <code>agents/*</code>. <code>8sync harness</code> dựng tất cả bằng 1 lệnh.</p>
       </article>
       <article class="card">
         <h3><span class="dot"></span>Skill injection</h3>
-        <p><code>8sync skill add &lt;github-url&gt;</code> clone vào cả global <code>~/.omp/skills/</code> và project <code>agents/skills/</code>.</p>
-      </article>
-      <article class="card">
-        <h3><span class="dot"></span>Small &amp; native</h3>
-        <p>1 binary Rust ≈ 3.8 MB stripped (gồm 15 bundled skill). Phù hợp CachyOS/Arch + Kitty + Helix + <a href="https://omp.sh">omp</a>.</p>
+        <p><b>35 skill</b> bundled sẵn. <code>8sync skill add &lt;github-url&gt;</code> clone vào cả global <code>~/.omp/skills/</code> lẫn project <code>agents/skills/</code>.</p>
       </article>
     </section>
 
@@ -162,21 +163,59 @@
       <p class="lede">CachyOS / Arch Linux, terminal Kitty (bật <code>allow_remote_control yes</code> để có layout 3-pane).</p>
       <div class="codeblock">
         <span class="lbl">bash</span>
-<pre><code>git clone https://github.com/8-Sync-Dev/su-code.git
-cd su-code
-bash scripts/bootstrap.sh        # rustup + cargo build + install vào ~/.local/bin
-
-8sync setup --dry-run            # xem plan trước
-8sync setup                      # cài harness + chọn profile y/N
+<pre><code># 1. Cài — one-liner, binary prebuilt (KHÔNG cần git/rust/cargo)
+curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
+8sync setup                      # AI core: omp + codegraph + MCP/skills + gh (y/N từng profile)
 8sync doctor                     # verify
 
+# 2. Vào project → dựng harness bằng 1 lệnh (idempotent)
 cd ~/code/my-app
-8sync .                          # mở session (kitty 3-pane + omp trong abduco)</code></pre>
+8sync harness                    # skills + codegraph + AGENTS.md + memory
+8sync .                          # mở session (kitty 3-pane + omp)
+
+# 3. Dashboard — xem + CRUD toàn bộ agent-team qua trình duyệt
+8sync harness web                # → http://127.0.0.1:8731</code></pre>
       </div>
       <p class="lede" style="margin-top:14px;">
-        Đảm bảo <code>~/.local/bin</code> trong <code>$PATH</code>. Cờ thường dùng:
-        <code>--dry-run</code>, <code>--no-profile</code>, <code>--yall</code>, <code>--profile &lt;name&gt;</code>.
+        Build từ source: <code>git clone … &amp;&amp; bash scripts/bootstrap.sh</code>.
+        Cờ setup thường dùng: <code>--dry-run</code>, <code>--no-profile</code>, <code>--community</code>, <code>--profile &lt;name&gt;</code>.
       </p>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section id="dashboard">
+      <h2>Dashboard — <code>8sync harness web</code></h2>
+      <p class="lede">Một trang web local (axum + Vite/React, nhúng sẵn trong binary) để <b>xem và điều khiển toàn bộ agent-team</b> qua trình duyệt thay vì sửa file config bằng tay. Mỗi trang đọc dữ liệu thật, phần lớn cho <b>CRUD ghi thẳng</b> vào config/memory.</p>
+      <figure style="margin:20px 0 0;">
+        <img src="assets/dashboard-codegraph.png" alt="Codegraph page — package call graph + Leiden clusters" style="width:100%; border-radius:12px; border:1px solid var(--line); display:block;" />
+        <figcaption style="color:var(--dim); font-size:13px; margin-top:8px; text-align:center;">Codegraph — package call graph (elk) + 12 Leiden cluster + symbol search + trace caller/callee, live từ codebase-memory-mcp.</figcaption>
+      </figure>
+      <figure style="margin:24px 0 0;">
+        <img src="assets/dashboard-models.png" alt="Models page — đổi routing per-role, ghi config ngay" style="width:100%; border-radius:12px; border:1px solid var(--line); display:block;" />
+        <figcaption style="color:var(--dim); font-size:13px; margin-top:8px; text-align:center;">Models — đổi model per-role/task, thay đổi ghi thẳng vào <code>models.toml</code>.</figcaption>
+      </figure>
+      <div class="two" style="margin-top:24px;">
+        <table>
+          <tbody>
+            <tr><td><b>Session</b></td><td>State (live plan) · Context (token/compaction thật)</td></tr>
+            <tr><td><b>Configure</b></td><td>Models · Skills (filter + cycle tier) · Memory (edit 6 file) · Rules (thêm/xoá)</td></tr>
+            <tr><td><b>Runtime</b></td><td>Engines · <b>Codegraph</b> graph · MCP · Submodules</td></tr>
+          </tbody>
+        </table>
+        <table>
+          <tbody>
+            <tr><td><b>Quality</b></td><td>Bench (chạy live) · Readiness · Team</td></tr>
+            <tr><td><b>Projects</b></td><td>Workspaces (project switcher)</td></tr>
+            <tr><td><b>Build</b></td><td>Workflow (dựng pipeline → export omp extension)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="codeblock" style="margin-top:18px;">
+        <span class="lbl">bash</span>
+<pre><code>8sync harness web                # http://127.0.0.1:8731 (tự mở trình duyệt)
+8sync harness web --port 9000    # đổi port
+8sync harness web --no-open      # chạy nền / headless</code></pre>
+      </div>
     </section>
 
     <!-- COMMANDS -->
@@ -205,11 +244,12 @@ cd ~/code/my-app
               <tr><td><code>8sync setup</code></td><td>Cài harness + chọn profile</td></tr>
               <tr><td><code>8sync up</code></td><td>Self-update binary + <code>omp update</code></td></tr>
               <tr><td><code>8sync doctor</code></td><td>Health check toàn diện</td></tr>
-              <tr><td><code>8sync harness init</code></td><td>Dựng harness: skills + codegraph + AGENTS.md + memory + CHANGELOG</td></tr>
-              <tr><td><code>8sync harness up</code></td><td>Refresh state hiện tại (<code>--loop</code> / <code>--timer</code>)</td></tr>
+              <tr><td><code>8sync harness</code></td><td>Dựng/refresh harness bằng 1 lệnh (idempotent)</td></tr>
+              <tr><td><code>8sync harness web</code></td><td><b>Dashboard local</b> — CRUD agent-team</td></tr>
+              <tr><td><code>8sync harness gateway</code></td><td>Deploy/verify omp model-gateway</td></tr>
               <tr><td><code>8sync skill</code></td><td>List + add skill (xem dưới)</td></tr>
-              <tr><td><code>8sync shot &lt;url|file&gt;</code></td><td>Render web/file → PNG</td></tr>
-              <tr><td><code>8sync diff-img | pdf-img</code></td><td>Diff / PDF → PNG</td></tr>
+              <tr><td><code>8sync theme | bg</code></td><td>Kitty palette / wallpaper live swap</td></tr>
+              <tr><td><code>8sync bt | clean</code></td><td>Bluetooth / dọn disk + report</td></tr>
               <tr><td><code>8sync sec on|off</code></td><td>WARP VPN + ufw cùng lúc</td></tr>
             </tbody>
           </table>
@@ -220,7 +260,7 @@ cd ~/code/my-app
     <!-- SKILLS -->
     <section id="skills">
       <h2>Skill injection</h2>
-      <p class="lede">Skill = module hướng dẫn cho AI. 8sync bundle sẵn <b>15 skill</b> (codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing · …); <code>8sync skill add</code> collection-aware kéo thêm cả bộ từ GitHub.</p>
+      <p class="lede">Skill = module hướng dẫn cho AI. 8sync bundle sẵn <b>35 skill</b> (codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing + 18 research skill · …); <code>8sync skill add</code> collection-aware kéo thêm cả bộ từ GitHub.</p>
       <div class="codeblock">
         <span class="lbl">bash</span>
 <pre><code># Clone từ URL: cài vào CẢ ~/.omp/skills/ (omp đọc global) lẫn agents/skills/ (project)
