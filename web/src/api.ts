@@ -61,6 +61,27 @@ export type CtxInfo = {
 
 export type McpServer = { name: string; command: string; args: string[]; type: string; present: boolean };
 export type Rule = { scope: string; name: string; path: string; bytes: number };
+export type MarketInstall = {
+  type: "stdio" | "http" | "sse" | "skill" | "link";
+  command?: string;
+  args?: string[];
+  url?: string;
+  spec?: string;
+  env?: { name: string; required: boolean; description: string }[];
+};
+export type MarketItem = {
+  id: string;
+  name: string;
+  description: string;
+  kind: "mcp" | "skill";
+  source: string;
+  stars: number;
+  updated: string;
+  url: string;
+  new: boolean;
+  install: MarketInstall;
+};
+export type MarketResponse = { kind: string; count: number; items: MarketItem[] };
 export type WfKind = "step" | "subagent" | "tool";
 export type WfData = { label: string; kind: WfKind; ref: string };
 export type WfNode = { id: string; type?: string; position: { x: number; y: number }; data: WfData };
@@ -257,4 +278,15 @@ export const api = {
     json<CgSearchResponse>(`/api/codegraph/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   codegraphTrace: (symbol: string, depth = 2) =>
     json<CgTrace>(`/api/codegraph/trace?symbol=${encodeURIComponent(symbol)}&depth=${depth}`),
+
+  // ── Marketplace (discover + install skills / MCP from external registries) ──
+  marketplace: (kind: "mcp" | "skill", search = "", sort: "top" | "new" = "top") =>
+    json<MarketResponse>(
+      `/api/marketplace?kind=${kind}&sort=${sort}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+    ),
+  mcpAdd: (body: { name: string; command?: string; args?: string[]; type?: string; url?: string; spec?: string }) =>
+    json<{ ok: boolean; name: string; note: string }>("/api/mcp/add", POST_JSON(body)),
+  mcpRemove: (name: string) => json<{ ok: boolean; removed: boolean }>("/api/mcp/remove", POST_JSON({ name })),
+  ruleImport: (source: string, scope?: string) =>
+    json<{ ok: boolean; imported: number; files: string[] }>("/api/rules/import", POST_JSON({ source, scope })),
 };

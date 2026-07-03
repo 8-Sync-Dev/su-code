@@ -34,3 +34,7 @@ tower-http = { version = "0.5", features = ["cors"] }
 # `8sync harness toolstats` — SQLite tracker of omp tool-call usage (optimizer vs
 # fallback ratio + failures). Bundled sqlite = self-contained, no system dep.
 rusqlite = { version = "0.32", features = ["bundled"] }
+# `8sync harness web` marketplace — Rust-first HTML scraping (pure Rust,
+# html5ever + CSS selectors) for aggregator sites without a JSON API (mcp.so).
+# HTTP still shells out to `curl` (no reqwest); scraper only parses the DOM.
+scraper = "0.20"

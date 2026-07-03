@@ -311,3 +311,17 @@ _(consolidated → agents/archive/KNOWLEDGE-1782879675.md · agents/archive/KNOW
   min-width:0` + `overflow-wrap:break-word` fixes it) — different tools' `--version` output format
   differs (`0.9.2` vs `codebase-memory-mcp 0.8.1` vs `headroom, version 0.27.0`), extract just the
   semver token instead of trusting raw output verbatim.
+- **validated: dashboard `Marketplace` (discover + install skills/MCP) shipped → v0.41.0.**
+  Browser-verified end-to-end: MCP catalog merges 4 sources (official
+  `registry.modelcontextprotocol.io` REST, Smithery `registry.smithery.ai`, Glama
+  `glama.ai` JSON, mcp.so **scraped with pure-Rust `scraper` crate** — HTML DOM
+  `a[href^="/server/"]`, fetched via `curl` so no reqwest), 135+ deduped; install
+  writes real `mcp.json` stdio/remote entries (verified United States Weather →
+  `npx -y @smithery/cli run …`, then Remove cleaned it). Skills = GitHub star-ranked
+  search → `skill add`. **Rust-first scraping rule:** prefer JSON APIs (official/
+  smithery/glama all have them → robust); only mcp.so needed DOM scraping. pulsemcp
+  API was dead (410) — dropped. Also wired import buttons that were plumbing-only:
+  Skills Import (github/gh:/path:/builtin:), MCP install-from-link + Remove, Rules
+  import-from-folder/github (prefers a `rules/` subdir, RAII temp clone). failure:
+  `tab.click('text/MCP')`/`text/Skills` matches BOTH the nav link AND marketplace
+  seg tab — target `.seg button` via `tab.evaluate` or the nav via `observe` role.

@@ -57,6 +57,14 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M10.6 6.6L6.4 17M13.4 6.6l3.6 8.7M7.2 19h9.6" />
     </>,
   ),
+  marketplace: svg(
+    <>
+      <path d="M4 9h16l-1 2.5a2 2 0 0 1-1.9 1.4H6.9A2 2 0 0 1 5 11.5z" />
+      <path d="M4 9l1.5-4h13L20 9" />
+      <path d="M6 13v7h12v-7" />
+      <path d="M10 20v-4h4v4" />
+    </>,
+  ),
   engines: svg(
     <>
       <rect x="6" y="6" width="12" height="12" rx="2" />

@@ -100,6 +100,10 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/codegraph/overview", get(api_codegraph_overview))
         .route("/api/codegraph/search", get(api_codegraph_search))
         .route("/api/codegraph/trace", get(api_codegraph_trace))
+        .route("/api/marketplace", get(api_marketplace))
+        .route("/api/mcp/add", post(api_mcp_add))
+        .route("/api/mcp/remove", post(api_mcp_remove))
+        .route("/api/rules/import", post(api_rule_import))
 }
 
 async fn api_state(State(ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
@@ -1415,6 +1419,215 @@ async fn api_codegraph_trace(
     )
     .map_err(|_| cbm_not_indexed(&root, &slug))?;
     Ok(Json(v))
+}
+
+// ---- Marketplace: discover + install skills / MCP servers ----
+// Catalog fetched from external registries (official MCP registry, Smithery,
+// Glama, mcp.so, GitHub) by the `marketplace` module; install writes the
+// project/global config (mcp.json, `skill add`).
+
+#[derive(Deserialize)]
+struct MarketQuery {
+    #[serde(default)]
+    kind: Option<String>, // "mcp" (default) | "skill"
+    #[serde(default)]
+    search: Option<String>,
+    #[serde(default)]
+    sort: Option<String>, // "top" (default) | "new"
+}
+
+async fn api_marketplace(
+    State(ctx): State<Arc<Ctx>>,
+    Query(q): Query<MarketQuery>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    // Cache under the current project when available, else the home cache.
+    let root = detect_current_project_root().unwrap_or_else(|| ctx.home.clone());
+    let kind = q.kind.as_deref().unwrap_or("mcp");
+    let search = q.search.as_deref().unwrap_or("").trim();
+    let sort = q.sort.as_deref().unwrap_or("top");
+    let rows = super::marketplace::catalog(&root, kind, search, sort);
+    Ok(Json(serde_json::json!({ "kind": kind, "count": rows.len(), "items": rows })))
+}
+
+#[derive(Deserialize)]
+struct McpAddBody {
+    name: String,
+    #[serde(default)]
+    command: Option<String>,
+    #[serde(default)]
+    args: Option<Vec<String>>,
+    #[serde(rename = "type", default)]
+    typ: Option<String>,
+    #[serde(default)]
+    url: Option<String>,
+    /// Raw spec typed by the user: `npx -y pkg`, a remote URL, or `uvx pkg`.
+    #[serde(default)]
+    spec: Option<String>,
+}
+
+/// Merge one server into `~/.omp/agent/mcp.json` (creating the file/map if
+/// absent). Accepts a structured entry (command/args or url) or a raw `spec`
+/// string the user pasted from a README.
+async fn api_mcp_add(
+    State(ctx): State<Arc<Ctx>>,
+    Json(body): Json<McpAddBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let name = body.name.trim();
+    if name.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "server name required".into()));
+    }
+    // Build the server object.
+    let server: serde_json::Value = if let Some(spec) = body.spec.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if spec.starts_with("http://") || spec.starts_with("https://") {
+            serde_json::json!({ "type": "http", "url": spec })
+        } else {
+            // Command line: first token = command, rest = args.
+            let mut it = spec.split_whitespace();
+            let cmd = it.next().unwrap_or("").to_string();
+            let args: Vec<String> = it.map(String::from).collect();
+            serde_json::json!({ "type": "stdio", "command": cmd, "args": args })
+        }
+    } else if let Some(url) = body.url.as_deref().filter(|s| !s.is_empty()) {
+        let t = body.typ.as_deref().unwrap_or("http");
+        serde_json::json!({ "type": t, "url": url })
+    } else if let Some(cmd) = body.command.as_deref().filter(|s| !s.is_empty()) {
+        serde_json::json!({ "type": "stdio", "command": cmd, "args": body.args.clone().unwrap_or_default() })
+    } else {
+        return Err((StatusCode::BAD_REQUEST, "need spec, url, or command".into()));
+    };
+    // Warn (don't fail) if the runtime binary is missing — npx/uvx fetch lazily.
+    let mut note = String::new();
+    if let Some(cmd) = server.get("command").and_then(|v| v.as_str()) {
+        if which::which(cmd).is_err() {
+            note = format!("runtime '{cmd}' not on PATH — install it to run this server");
+        }
+    }
+    let path = ctx.home.join(".omp/agent/mcp.json");
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+    let raw = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut root: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+    if !root.is_object() {
+        root = serde_json::json!({});
+    }
+    let obj = root.as_object_mut().unwrap();
+    let servers = obj.entry("mcpServers").or_insert(serde_json::json!({}));
+    if !servers.is_object() {
+        *servers = serde_json::json!({});
+    }
+    servers.as_object_mut().unwrap().insert(name.to_string(), server);
+    let pretty = serde_json::to_string_pretty(&root).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    std::fs::write(&path, pretty).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::json!({ "ok": true, "name": name, "note": note })))
+}
+
+#[derive(Deserialize)]
+struct McpRemoveBody {
+    name: String,
+}
+
+async fn api_mcp_remove(
+    State(ctx): State<Arc<Ctx>>,
+    Json(body): Json<McpRemoveBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let path = ctx.home.join(".omp/agent/mcp.json");
+    let raw = std::fs::read_to_string(&path).map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+    let mut root: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+    let removed = root
+        .get_mut("mcpServers")
+        .and_then(|m| m.as_object_mut())
+        .map(|m| m.remove(&body.name).is_some())
+        .unwrap_or(false);
+    if removed {
+        let pretty = serde_json::to_string_pretty(&root).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        std::fs::write(&path, pretty).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    }
+    Ok(Json(serde_json::json!({ "ok": true, "removed": removed })))
+}
+
+#[derive(Deserialize)]
+struct RuleImportBody {
+    /// Local dir path OR a git/https repo URL.
+    source: String,
+    scope: Option<String>, // "project" (default) | "global"
+}
+
+/// Import rule files (`.md`/`.mdc`) from a local folder or a GitHub repo into
+/// the project (or global) rules dir. Repos are shallow-cloned to a temp dir,
+/// scanned recursively, then cleaned up.
+async fn api_rule_import(
+    State(ctx): State<Arc<Ctx>>,
+    Json(body): Json<RuleImportBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
+    let dest = match body.scope.as_deref() {
+        Some("global") => ctx.home.join(".omp/agent/rules"),
+        _ => root.join(".omp/rules"),
+    };
+    std::fs::create_dir_all(&dest).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let src = body.source.trim();
+    if src.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "source required".into()));
+    }
+    // Resolve the scan root: a local dir, or a shallow clone of a repo URL.
+    let is_repo = src.starts_with("http://") || src.starts_with("https://") || src.starts_with("git@") || src.ends_with(".git");
+    let tmp_holder;
+    let scan_root: std::path::PathBuf = if is_repo {
+        let tmp = std::env::temp_dir().join(format!("8sync-ruleimport-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let st = std::process::Command::new("git")
+            .args(["clone", "--depth", "1", src])
+            .arg(&tmp)
+            .output()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("git clone: {e}")))?;
+        if !st.status.success() {
+            return Err((StatusCode::BAD_GATEWAY, format!("clone failed: {}", String::from_utf8_lossy(&st.stderr).trim())));
+        }
+        tmp_holder = TmpDir(tmp.clone());
+        tmp_holder.0.clone()
+    } else {
+        let p = std::path::PathBuf::from(src);
+        if !p.is_dir() {
+            return Err((StatusCode::BAD_REQUEST, format!("not a directory: {src}")));
+        }
+        p
+    };
+    // Prefer a conventional rules dir if the source has one — avoids slurping a
+    // whole repo's README/CHANGELOG when only rule files were meant.
+    let scan_root = ["rules", ".cursor/rules", ".omp/rules", ".claude/rules", ".windsurf/rules"]
+        .iter()
+        .map(|sub| scan_root.join(sub))
+        .find(|p| p.is_dir())
+        .unwrap_or(scan_root);
+    // Copy every .md/.mdc (recursively), skipping VCS + node_modules noise.
+    let mut imported = Vec::new();
+    let mut stack = vec![scan_root.clone()];
+    while let Some(dir) = stack.pop() {
+        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        for e in rd.flatten() {
+            let p = e.path();
+            let base = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if p.is_dir() {
+                if matches!(base, ".git" | "node_modules" | "target" | ".cache") { continue; }
+                stack.push(p);
+            } else if base.ends_with(".md") || base.ends_with(".mdc") {
+                let safe: String = base.chars().filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.')).collect();
+                if std::fs::copy(&p, dest.join(&safe)).is_ok() {
+                    imported.push(safe);
+                }
+            }
+        }
+    }
+    Ok(Json(serde_json::json!({ "ok": true, "imported": imported.len(), "files": imported })))
+}
+
+/// RAII temp dir — removed on drop so a clone never leaks.
+struct TmpDir(std::path::PathBuf);
+impl Drop for TmpDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 #[cfg(test)]

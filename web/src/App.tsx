@@ -12,6 +12,7 @@ import {
   type WfNode,
   type WfEdge,
   type CgSearchResult,
+  type MarketItem,
 } from "./api";
 import { Markdown } from "./markdown";
 import { NavIcon, LogoMark, Glyph } from "./icons";
@@ -26,12 +27,13 @@ import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
 type Page =
   | "state" | "context" | "models" | "skills" | "memory" | "rules"
   | "engines" | "codegraph" | "mcp" | "submodules"
-  | "bench" | "eval" | "team" | "workspaces" | "workflow";
+  | "bench" | "eval" | "team" | "workspaces" | "workflow" | "marketplace";
 
 const NAV_GROUPS: { label: string; items: { id: Page; label: string }[] }[] = [
   { label: "Session", items: [{ id: "state", label: "State" }, { id: "context", label: "Context" }] },
   { label: "Configure", items: [{ id: "models", label: "Models" }, { id: "skills", label: "Skills" }, { id: "memory", label: "Memory" }, { id: "rules", label: "Rules" }] },
   { label: "Runtime", items: [{ id: "engines", label: "Engines" }, { id: "codegraph", label: "Codegraph" }, { id: "mcp", label: "MCP" }, { id: "submodules", label: "Submodules" }] },
+  { label: "Discover", items: [{ id: "marketplace", label: "Marketplace" }] },
   { label: "Quality", items: [{ id: "bench", label: "Bench" }, { id: "eval", label: "Readiness" }, { id: "team", label: "Team" }] },
   { label: "Projects", items: [{ id: "workspaces", label: "Workspaces" }] },
   { label: "Build", items: [{ id: "workflow", label: "Workflow" }] },
@@ -102,6 +104,7 @@ export default function App() {
           {page === "team" && <TeamPage />}
           {page === "workspaces" && <WorkspacesPage />}
           {page === "workflow" && <WorkflowPage />}
+          {page === "marketplace" && <MarketplacePage />}
         </div>
       </main>
     </div>
@@ -480,6 +483,15 @@ function SkillsPage() {
   });
   const cycle = (t: SkillEntry["tier"]): SkillEntry["tier"] =>
     t === "always" ? "on-demand" : t === "on-demand" ? "off" : "always";
+  const [spec, setSpec] = useState("");
+  const add = useMutation({
+    mutationFn: (s: string) => api.skillAdd(s),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["skills"] }); setSpec(""); },
+  });
+  const update = useMutation({
+    mutationFn: () => api.skillUpdate(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["skills"] }),
+  });
   const [q, setQ] = useState("");
   const [tier, setTier] = useState<"all" | SkillEntry["tier"]>("all");
   const filtered = (data ?? []).filter((s) => {
@@ -511,6 +523,26 @@ function SkillsPage() {
         ) : undefined
       }
     >
+      <div className="card">
+        <div className="toolbar">
+          <input
+            className="grow"
+            placeholder="Import skill — github URL, gh:owner/repo, path:/abs/dir, or builtin:name"
+            value={spec}
+            onChange={(e) => setSpec(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && spec) add.mutate(spec); }}
+            aria-label="skill spec"
+          />
+          <button className="primary" disabled={!spec || add.isPending} onClick={() => add.mutate(spec)}>
+            {add.isPending ? "Adding…" : "Import"}
+          </button>
+          <button disabled={update.isPending} onClick={() => update.mutate()} title="git pull --ff-only every registered skill">
+            {update.isPending ? "Updating…" : "Update all"}
+          </button>
+        </div>
+        {add.isError ? <p className="hint hint-err">Import failed: {(add.error as Error).message}</p> : null}
+        {add.isSuccess ? <p className="hint hint-ok">Imported. Toggle its tier below.</p> : null}
+      </div>
       {isLoading ? <Loading rows={6} /> : error ? <ErrorState message={(error as Error).message} /> : !data ? <Loading /> : data.length === 0 ? (
         <EmptyState title="No skills registered" hint="Add a skill spec to make it loadable from the harness." />
       ) : filtered.length === 0 ? (
@@ -1080,11 +1112,40 @@ function SubmodulesPage() {
 
 // ── MCP ────────────────────────────────────────────────────────────────────
 function McpPage() {
+  const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["mcp"], queryFn: api.mcp });
+  const [name, setName] = useState("");
+  const [spec, setSpec] = useState("");
+  const add = useMutation({
+    mutationFn: () => api.mcpAdd({ name, spec }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["mcp"] }); setName(""); setSpec(""); },
+  });
+  const remove = useMutation({ mutationFn: (n: string) => api.mcpRemove(n), onSuccess: () => qc.invalidateQueries({ queryKey: ["mcp"] }) });
   return (
-    <Page title="MCP servers" sub={<>From <code>~/.omp/agent/mcp.json</code>. omp loads these each session.</>}>
+    <Page
+      title="MCP servers"
+      sub={<>From <code>~/.omp/agent/mcp.json</code>. omp loads these each session. Browse more in <b>Marketplace</b>.</>}
+    >
+      <div className="card">
+        <div className="toolbar">
+          <input type="text" placeholder="name" value={name} onChange={(e) => setName(e.target.value)} aria-label="server name" style={{ maxWidth: 160 }} />
+          <input
+            className="grow"
+            placeholder="Install — `npx -y pkg`, `uvx pkg`, or an https remote URL"
+            value={spec}
+            onChange={(e) => setSpec(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && name && spec) add.mutate(); }}
+            aria-label="mcp spec"
+          />
+          <button className="primary" disabled={!name || !spec || add.isPending} onClick={() => add.mutate()}>
+            {add.isPending ? "Installing…" : "Install"}
+          </button>
+        </div>
+        {add.isError ? <p className="hint hint-err">Install failed: {(add.error as Error).message}</p> : null}
+        {add.isSuccess ? <p className="hint hint-ok">Installed{add.data?.note ? ` — ${add.data.note}` : ". omp loads it next session."}</p> : null}
+      </div>
       {isLoading ? <Loading rows={3} /> : error ? <ErrorState message={(error as Error).message} /> : !data || data.servers.length === 0 ? (
-        <EmptyState title="No MCP servers registered" hint="Add a server to ~/.omp/agent/mcp.json to surface it here." />
+        <EmptyState title="No MCP servers registered" hint="Install one above, or browse the Marketplace." />
       ) : (
         <div className="card list">
           {data.servers.map((s) => (
@@ -1094,6 +1155,7 @@ function McpPage() {
                 <div className="row-meta mono">{s.command} {s.args.join(" ")}</div>
               </div>
               <span className={`tag ${s.present ? "ok" : "warn"}`}>{s.present ? "present" : "missing"} · {s.type}</span>
+              <button className="danger" onClick={() => remove.mutate(s.name)} disabled={remove.isPending}>Remove</button>
             </div>
           ))}
         </div>
@@ -1114,6 +1176,11 @@ function RulesPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["rules"] }); setName(""); setContent(""); },
   });
   const del = useMutation({ mutationFn: (p: string) => api.ruleDelete(p), onSuccess: () => qc.invalidateQueries({ queryKey: ["rules"] }) });
+  const [importSrc, setImportSrc] = useState("");
+  const imp = useMutation({
+    mutationFn: () => api.ruleImport(importSrc, scope),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rules"] }); setImportSrc(""); },
+  });
   return (
     <Page title="Rules" sub={<>omp rule files (<code>.omp/rules/*.md</code> project, <code>~/.omp/agent/rules/*.md</code> global).</>}>
       <div className="card">
@@ -1129,10 +1196,27 @@ function RulesPage() {
         </div>
         <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Rule content (markdown)…" className="textarea-sm" aria-label="rule content" spellCheck={false} />
         <div className="toolbar toolbar-split">
-          <span className="muted hint-inline">Paste from a link, file, or folder source.</span>
+          <span className="muted hint-inline">Type a rule inline, or import from a folder/GitHub below.</span>
           <button className="primary" disabled={!content || add.isPending} onClick={() => add.mutate()}>Add rule</button>
         </div>
         {add.isError ? <p className="hint hint-err">Add failed: {(add.error as Error).message}</p> : null}
+      </div>
+      <div className="card">
+        <div className="toolbar">
+          <input
+            className="grow"
+            placeholder="Import rules from a folder path or GitHub repo (.md/.mdc; prefers a rules/ subdir)"
+            value={importSrc}
+            onChange={(e) => setImportSrc(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && importSrc) imp.mutate(); }}
+            aria-label="rule import source"
+          />
+          <button className="primary" disabled={!importSrc || imp.isPending} onClick={() => imp.mutate()}>
+            {imp.isPending ? "Importing…" : "Import"}
+          </button>
+        </div>
+        {imp.isError ? <p className="hint hint-err">Import failed: {(imp.error as Error).message}</p> : null}
+        {imp.isSuccess ? <p className="hint hint-ok">Imported {imp.data?.imported ?? 0} rule file(s) into {scope}.</p> : null}
       </div>
       {isLoading ? <Loading rows={3} /> : error ? <ErrorState message={(error as Error).message} /> : data && data.length === 0 ? (
         <EmptyState title="No rules yet" hint="Add a project or global rule with the form above." />
@@ -1185,6 +1269,104 @@ function WfNodeView({ data }: NodeProps<Node<WfData>>) {
 // react-flow's NodeTypes is invariant over the Node generic; cast through unknown.
 const wfNodeTypes = { wf: WfNodeView } as unknown as NodeTypes;
 const elk = new ELK();
+
+// ── Marketplace (discover + install skills / MCP from external registries) ───
+function MarketplacePage() {
+  const qc = useQueryClient();
+  const [kind, setKind] = useState<"mcp" | "skill">("mcp");
+  const [sort, setSort] = useState<"top" | "new">("top");
+  const [draft, setDraft] = useState("");
+  const [search, setSearch] = useState("");
+  const { data, isLoading, error, isFetching } = useQuery({
+    queryKey: ["marketplace", kind, search, sort],
+    queryFn: () => api.marketplace(kind, search, sort),
+  });
+  const install = useMutation({
+    mutationFn: async (it: MarketItem): Promise<{ ok: boolean }> => {
+      if (it.kind === "skill") return api.skillAdd(it.install.spec ?? it.url);
+      const i = it.install;
+      if (i.type === "stdio") return api.mcpAdd({ name: it.name, command: i.command, args: i.args, type: "stdio" });
+      return api.mcpAdd({ name: it.name, url: i.url, type: i.type });
+    },
+    onSuccess: (_r, it) => qc.invalidateQueries({ queryKey: [it.kind === "skill" ? "skills" : "mcp"] }),
+  });
+  const [justInstalled, setJustInstalled] = useState<string>("");
+  const doInstall = (it: MarketItem) => {
+    if (it.install.type === "link") { window.open(it.url, "_blank", "noopener"); return; }
+    install.mutate(it, { onSuccess: () => setJustInstalled(it.id) });
+  };
+  const items = data?.items ?? [];
+  return (
+    <Page
+      title="Marketplace"
+      sub={<>Discover &amp; install <b>MCP servers</b> and <b>skills</b> from public registries — one click into this project.</>}
+      action={
+        <div className="mk-toolbar">
+          <div className="seg">
+            <button className={kind === "mcp" ? "seg-on" : ""} onClick={() => setKind("mcp")}>MCP</button>
+            <button className={kind === "skill" ? "seg-on" : ""} onClick={() => setKind("skill")}>Skills</button>
+          </div>
+          <div className="seg">
+            <button className={sort === "top" ? "seg-on" : ""} onClick={() => setSort("top")}>Top</button>
+            <button className={sort === "new" ? "seg-on" : ""} onClick={() => setSort("new")}>New</button>
+          </div>
+        </div>
+      }
+    >
+      <div className="card">
+        <div className="toolbar">
+          <input
+            className="grow"
+            placeholder={kind === "mcp" ? "Search MCP servers (official · smithery · glama · mcp.so)…" : "Search skills on GitHub…"}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") setSearch(draft.trim()); }}
+            aria-label="marketplace search"
+          />
+          <button className="primary" onClick={() => setSearch(draft.trim())}>Search</button>
+          {search ? <button onClick={() => { setDraft(""); setSearch(""); }}>Clear</button> : null}
+        </div>
+        <p className="muted list-count">
+          {isLoading || isFetching ? "Loading…" : `${items.length} ${kind === "mcp" ? "servers" : "skills"}${search ? ` for “${search}”` : ""}`}
+        </p>
+      </div>
+      {error ? <ErrorState message={(error as Error).message} /> : isLoading ? <Loading rows={6} /> : items.length === 0 ? (
+        <EmptyState title="Nothing found" hint="Try a different search, or switch MCP/Skills." />
+      ) : (
+        <div className="mk-grid">
+          {items.map((it) => {
+            const done = justInstalled === it.id;
+            const isLink = it.install.type === "link";
+            const label = it.kind === "skill" ? "Download" : isLink ? "Open ↗" : "Install";
+            return (
+              <div className="mk-card" key={`${it.source}:${it.id}`}>
+                <div className="mk-head">
+                  <a className="mk-name" href={it.url} target="_blank" rel="noopener">{it.name}</a>
+                  <div className="mk-badges">
+                    <span className="tag src">{it.source}</span>
+                    {it.new ? <span className="tag ok">new</span> : null}
+                    {it.stars > 0 ? <span className="tag muted">★ {it.stars.toLocaleString()}</span> : null}
+                  </div>
+                </div>
+                <p className="mk-desc">{it.description || "—"}</p>
+                <div className="mk-foot">
+                  <span className="tag muted mono">{it.install.type}</span>
+                  <button
+                    className={done ? "" : "primary"}
+                    disabled={install.isPending && install.variables?.id === it.id}
+                    onClick={() => doInstall(it)}
+                  >
+                    {done ? "✓ Added" : install.isPending && install.variables?.id === it.id ? "…" : label}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Page>
+  );
+}
 
 function WorkflowPage() {
   const qc = useQueryClient();

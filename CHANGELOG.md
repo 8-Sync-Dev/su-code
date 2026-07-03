@@ -5,6 +5,37 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.41.0] — 2026-07-03
+
+### Added — dashboard `Marketplace`: discover + install skills & MCP servers
+- New **Marketplace** nav page (Discover group) in `8sync harness web`: browse,
+  search, sort (Top by stars/uses · New by recency), and one-click install
+  skills and MCP servers from public registries into the current project.
+- **MCP sources (4):** the official registry (`registry.modelcontextprotocol.io`,
+  REST API), Smithery (`registry.smithery.ai`), Glama (`glama.ai` JSON API), and
+  **mcp.so scraped with the pure-Rust `scraper` crate** (HTML DOM via
+  `a[href^="/server/"]`, fetched through `curl` — no reqwest, Rust-first). 135+
+  merged/deduped entries; install writes a real `~/.omp/agent/mcp.json` stdio
+  (`npx`/`uvx`) or remote (`http`/`sse`) entry.
+- **Skills source:** GitHub repo search ranked by stars; install shells the
+  existing collection-aware `8sync skill add <url>`.
+- Catalog cached under `.cache/8sync/marketplace/*.json` (1h TTL — the MCP
+  registry maintainers ask aggregators to poll infrequently + persist).
+  (`crates/cli/src/verbs/harness/marketplace.rs`, `web.rs`, `web/src/*`)
+
+### Added — import buttons across the dashboard (were plumbing-only)
+- **Skills page**: `skillAdd`/`skillUpdate` were wired in the API client but had
+  no UI — added an **Import** toolbar (github URL · `gh:owner/repo` ·
+  `path:/abs/dir` folder · `builtin:name`) + **Update all**.
+- **MCP page**: **Install-from-link** (`npx -y pkg`, `uvx pkg`, or an https
+  remote URL → merged into `mcp.json`) + a per-server **Remove**.
+- **Rules page**: **Import from a folder or GitHub repo** (`.md`/`.mdc`,
+  recursively; prefers a `rules/`/`.cursor/rules`/… subdir), shallow-cloned to a
+  RAII temp dir. Complements the existing inline text-add.
+- New routes: `/api/marketplace`, `/api/mcp/{add,remove}`, `/api/rules/import`.
+- New dep: `scraper 0.20` (pure-Rust html5ever + CSS selectors) for the mcp.so
+  aggregator — HTTP still shells out to `curl`.
+
 ## [0.40.0] — 2026-07-03
 
 ### Changed — advisor default-ON (per-turn rule/tool-use reviewer)

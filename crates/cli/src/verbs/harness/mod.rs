@@ -22,6 +22,7 @@ mod model;
 mod gateway;
 mod up;
 mod web;
+mod marketplace;
 mod toolstats;
 
 #[derive(ClapArgs, Debug)]
