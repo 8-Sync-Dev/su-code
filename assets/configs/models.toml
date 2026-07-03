@@ -16,6 +16,13 @@
 # Vision/ảnh: omp has no --vision CLI flag, so set it in omp's own config:
 #   ~/.omp/agent/config.yml →  modelRoles: { vision: opus }   (images → Opus)
 
+# advisor = passive per-turn reviewer that checks each turn against the rules
+# (code-intel first, correct tool names, open SKILL.md) and injects corrective
+# notes. ON by default via `8sync ai` / `8sync .` (skipped for trivial prompts
+# to stay token-optimal). Costs a small per-turn review; set false to disable
+# globally, or `8sync ai --no-advisor` for one run.
+advisor = true
+
 [roles]
 default = "glm"     # main working model — code/edit/read/delete (mechanical) → GLM
 plan    = "opus"    # architectural planning → Opus (deep thinking)

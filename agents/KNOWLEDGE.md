@@ -11,6 +11,22 @@
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
 _(consolidated → agents/archive/KNOWLEDGE-1782879675.md · agents/archive/KNOWLEDGE-1782951662.md)_
+- **validated: anti-forget is a 4-layer stack that *declares + reminds* but
+  never *checks* — the missing 5th layer is a live per-turn reviewer.** Layers:
+  (1) `APPEND_SYSTEM.md` always-on rules (never compacts), (2) `8sync-recall.ts`
+  hook injecting skill-index + STATE at `agent-start`/`compacting`, (3) Mnemopi
+  `retain`/`recall` + `<memories>` per-turn inject ("remind"), (4)
+  `capabilities.md` exact tool catalog. None verify the turn just taken. omp's
+  `--advisor` (valueless boolean flag, confirmed in omp 16.2.x `--help`) is that
+  reviewer → now default-ON in `models.rs` `omp_flags()`/`resume_flags()`,
+  gated off for `TaskClass::Trivial`, opt-out `8sync ai --no-advisor` /
+  `advisor=false`. "remind" the user asked for = layer 3 (already wired), NOT a
+  distinct omp tool (`todo` is the closest built-in).
+- **validated: rust-embed uses `compression` feature here** → embedded assets
+  (`models.toml`, `APPEND_SYSTEM.md`) are compressed blobs, so `strings binary`
+  will NOT find their text. Verify asset edits via the edit-tool output / source,
+  and verify *flag/struct* strings (`--advisor`, `no_advisor`) which live in the
+  code section and DO show up.
 - **failure→fixed: `8sync skill update`'s git-collection loop treated "no
   filter" as "install every sub-skill found in the repo", not "only refresh
   what's already registered".** Registering ONE skill from a 20-skill

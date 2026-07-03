@@ -19,12 +19,17 @@ use crate::ui;
           · omp auto-loads project context from AGENTS.md + agents/* (memory + skills).
           · run inside the project root after `8sync .` for best results.
           · pass the prompt as ONE quoted argument so the shell doesn't split it.
+          · advisor (per-turn rule/tool reviewer) is ON by default; add --no-advisor to disable, or set advisor=false in ~/.config/8sync/models.toml.
     "}
 )]
 pub struct Args {
     /// Override the auto-picked model for this prompt (fuzzy: \"glm\", \"codex\", \"opus\").
     #[arg(long)]
     pub model: Option<String>,
+
+    /// Disable omp's per-turn advisor reviewer for this run (default on for non-trivial prompts).
+    #[arg(long = "no-advisor")]
+    pub no_advisor: bool,
 
     /// Prompt to send to omp. Empty (or `continue`/`resume`) = resume last session.
     pub rest: Vec<String>,
@@ -39,7 +44,10 @@ pub fn run(a: Args) -> Result<()> {
         return Ok(());
     }
 
-    let cfg = crate::models::ModelConfig::load();
+    let mut cfg = crate::models::ModelConfig::load();
+    if a.no_advisor {
+        cfg.advisor = false;
+    }
     let mut cmd = Command::new("omp");
     let status = if trimmed.is_empty() || trimmed == "continue" || trimmed == "resume" {
         ui::info("omp — continue previous session");

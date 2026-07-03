@@ -3,6 +3,22 @@
 Mọi thay đổi đáng kể của `8sync` ghi vào đây. Format theo [Keep a Changelog](https://keepachangelog.com),
 versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nhật mục `Unreleased`.
 
+## [Unreleased]
+
+### Changed — advisor default-ON (per-turn rule/tool-use reviewer)
+- omp's `--advisor` (passive per-turn reviewer that checks each turn against the
+  always-on rules — code-intel first, correct MCP tool names, open SKILL.md — and
+  injects corrective notes) is now passed **by default** by `8sync ai` and the
+  `8sync .` / resume session. Closes the last anti-forget gap: layers 1-4
+  (APPEND_SYSTEM rules, recall-hook live context, Mnemopi memory, capabilities
+  catalog) *declare + remind* but nothing *checked* whether the last turn actually
+  obeyed — advisor is that live reviewer.
+- Token-optimal gating: skipped for `trivial`-class prompts. Opt out per run with
+  `8sync ai --no-advisor`, or globally via `advisor = false` in
+  `~/.config/8sync/models.toml`. New `advisor` key in `ModelConfig` (default true).
+- Docs: `models.toml`, `APPEND_SYSTEM.md`, and `8sync ai --help` document the
+  toggle + tradeoff.
+
 ## [0.39.0] — 2026-07-02
 
 ### Added — dashboard `Codegraph` page: visualize the codebase-memory-mcp knowledge graph

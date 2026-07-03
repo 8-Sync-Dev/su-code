@@ -15,6 +15,18 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - [x] **Dashboard redesign + Models/Projects** (v0.29.0): `8sync harness web` full impeccable redesign · Models page (view/edit routing live) · project switcher (status dots) · markdown render · serena-off fix · context honesty · workflow canvas — 14 pages, 0 console errors.
 
 ## Current step
+Enhancement (Unreleased): **advisor default-ON** — closes the last anti-forget
+gap. The stack had 4 layers (APPEND_SYSTEM rules · recall-hook live STATE/skill
+inject · Mnemopi retain/recall = "remind" · capabilities.md tool catalog) that
+*declare + remind* but never *check* the turn just taken. omp's `--advisor`
+(passive per-turn reviewer) is now passed by default from `models.rs`
+`omp_flags()`/`resume_flags()`; gated off for `trivial` prompts (token-optimal);
+opt-out `8sync ai --no-advisor` or `advisor=false` in models.toml. New `advisor`
+field in `ModelConfig` (default true). Docs: models.toml + APPEND_SYSTEM +
+`ai --help`. Built + installed to PATH; verified `--advisor`/`no_advisor` in
+binary + `ai --help`. CHANGELOG/KNOWLEDGE updated.
+
+## Previous (Unreleased, shipped earlier this session)
 Shipped 2 fixes (Unreleased): **(1) zai-vision MCP + skill** — `8sync harness`
 auto-installs `@z_ai/mcp-server`, registers `zai-vision` MCP with
 `Z_AI_VISION_MODEL=glm-4.6v-flash` (only free/working vision model on a stock

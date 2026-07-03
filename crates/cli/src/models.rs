@@ -9,12 +9,31 @@
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct ModelConfig {
     #[serde(default)]
     pub roles: Roles,
     #[serde(default)]
     pub tasks: BTreeMap<String, String>,
+    /// Enable omp's `--advisor` passive per-turn reviewer. Default ON (skipped
+    /// for trivial prompts to stay token-optimal). Opt out: `advisor = false`
+    /// in models.toml, or `8sync ai --no-advisor` for one run.
+    #[serde(default = "advisor_default")]
+    pub advisor: bool,
+}
+
+impl Default for ModelConfig {
+    fn default() -> Self {
+        Self {
+            roles: Roles::default(),
+            tasks: BTreeMap::new(),
+            advisor: true,
+        }
+    }
+}
+
+fn advisor_default() -> bool {
+    true
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -81,13 +100,19 @@ impl ModelConfig {
     /// `override_model` (from `8sync ai --model X`) wins for the main model.
     /// Empty values are skipped so omp keeps its own defaults.
     pub fn omp_flags(&self, prompt: &str, override_model: Option<&str>) -> Vec<String> {
+        let class = classify(prompt);
         let main = match override_model {
             Some(m) if !m.trim().is_empty() => m.trim().to_string(),
-            _ => self.model_for(classify(prompt)).to_string(),
+            _ => self.model_for(class).to_string(),
         };
         let mut out = Vec::new();
         push_flag(&mut out, "--model", &main);
         self.push_role_flags(&mut out);
+        // Advisor: passive per-turn rule/tool reviewer. On for substantive work,
+        // skipped for trivial prompts to stay token-optimal.
+        if self.advisor && class != TaskClass::Trivial {
+            out.push("--advisor".to_string());
+        }
         out
     }
 
@@ -97,6 +122,10 @@ impl ModelConfig {
         let mut out = Vec::new();
         push_flag(&mut out, "--model", &self.roles.default);
         self.push_role_flags(&mut out);
+        // Interactive dev session (`8sync .` / resume): advisor on.
+        if self.advisor {
+            out.push("--advisor".to_string());
+        }
         out
     }
 
