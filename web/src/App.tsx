@@ -51,8 +51,21 @@ const TASK_HINTS: Record<string, string> = {
   plan: "thinking", review: "thinking", debug: "thinking", code: "mechanical", trivial: "mechanical",
 };
 
+// Deep-linkable routing: `?page=codegraph` (or `/codegraph`) selects the initial
+// page so `8sync shot http://127.0.0.1:8731/?page=codegraph` captures that view
+// (nav is in-memory, so without this a headless load always renders State).
+const ALL_PAGES: Page[] = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+function pageFromUrl(): Page {
+  const q = new URLSearchParams(window.location.search).get("page");
+  const cand = q ?? window.location.pathname.replace(/^\/+/, "");
+  return (ALL_PAGES as string[]).includes(cand) ? (cand as Page) : "state";
+}
 export default function App() {
-  const [page, setPage] = useState<Page>("state");
+  const [page, setPageState] = useState<Page>(pageFromUrl);
+  const setPage = useCallback((p: Page) => {
+    setPageState(p);
+    window.history.replaceState(null, "", p === "state" ? "." : `?page=${p}`);
+  }, []);
   return (
     <div className="app">
       <nav className="sidebar" aria-label="Sections">

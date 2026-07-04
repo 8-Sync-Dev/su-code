@@ -15,16 +15,20 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - [x] **Dashboard redesign + Models/Projects** (v0.29.0): `8sync harness web` full impeccable redesign · Models page (view/edit routing live) · project switcher (status dots) · markdown render · serena-off fix · context honesty · workflow canvas — 14 pages, 0 console errors.
 
 ## Current step
-Enhancement (Unreleased): **advisor default-ON** — closes the last anti-forget
-gap. The stack had 4 layers (APPEND_SYSTEM rules · recall-hook live STATE/skill
-inject · Mnemopi retain/recall = "remind" · capabilities.md tool catalog) that
-*declare + remind* but never *check* the turn just taken. omp's `--advisor`
-(passive per-turn reviewer) is now passed by default from `models.rs`
-`omp_flags()`/`resume_flags()`; gated off for `trivial` prompts (token-optimal);
-opt-out `8sync ai --no-advisor` or `advisor=false` in models.toml. New `advisor`
-field in `ModelConfig` (default true). Docs: models.toml + APPEND_SYSTEM +
-`ai --help`. Built + installed to PATH; verified `--advisor`/`no_advisor` in
-binary + `ai --help`. CHANGELOG/KNOWLEDGE updated.
+Enhancement (Unreleased): **modality routing** — read STRUCTURE as image, PRECISE
+as text. Researched the "read-image-saves-90%" claim → grounded: 90% (DeepSeek-OCR
+arXiv 2510.18234) needs a DEDICATED optical encoder, NOT a PNG-to-Opus/GLM; Claude
+bills per 28×28 patch (Opus 4.7+ pay-per-pixel). MEASURED here: STATE.md as image
+= 0.87× (LOSES); 12k-edge codegraph as image ≈ 25× (WINS). Built: **`8sync shot`
+real** (was stub) via bundled Chromium; **Modality routing** directive forced in
+APPEND_SYSTEM + image-routing skill (honest econ rewrite) + capabilities.md +
+`--advisor`. OCR-Memory pattern (arXiv 2604.26622) documented: image to LOCATE,
+text to READ. Built + `8sync harness` redeployed + verified deployed content +
+token math. CHANGELOG/KNOWLEDGE updated.
+**Deferred (flagged):** dashboard nav is in-memory (button) not URL-routed, so
+`8sync shot .../codegraph` renders State, not the graph. Flagship "shot the memory
+graph" needs a frontend deep-link (`?page=` → initial route) + bun/vite rebuild +
+re-embed. Not yet started — awaiting user go-ahead.
 
 ## Previous (Unreleased, shipped earlier this session)
 Shipped 2 fixes (Unreleased): **(1) zai-vision MCP + skill** — `8sync harness`

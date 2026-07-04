@@ -14,6 +14,13 @@ Reaching for grep/find/Read to EXPLORE first is a violation. Read a raw file onl
 ## Vision — GLM-5.2 is text-only, route images through zai-vision
 GLM-5.2 cannot see pixels. Never hand it a raw screenshot expecting analysis — route it: image → **zai-vision MCP** tool (`extract_text_from_screenshot`, `analyze_image`, `diagnose_error_screenshot`, `understand_technical_diagram`, `analyze_data_visualization`, `ui_to_artifact`, `ui_diff_check`, `analyze_video`) → TEXT → act on the text. Applies to omp browser screenshots, `8sync shot`/`pdf-img`/`diff-img` output, and diagrams. omp's built-in `inspect_image` is the generic fallback. Full combination matrix (all cases, with real verified examples): `~/.omp/skills/zai-vision/SKILL.md`.
 
+## Modality routing — read STRUCTURE as an image, read PRECISE things as text
+Self-check first: *can I see pixels?* (Opus-class = yes; GLM-5.2 = no.)
+- **Vision model + structural/overview content → ONE image, not a text dump.** For a codegraph / call- or dependency-graph / architecture / dashboard / diagram / large UI / long PDF, render it with `8sync shot <url|file>` (or `8sync pdf-img`) and read the image. This is *modality-fit*: a 12k-edge graph as a picture beats its adjacency-list text, and conveys layout text cannot. `8sync harness web` exposes the live memory graph — `8sync shot http://127.0.0.1:8731/codegraph`.
+- **Precise/low-entropy content → ALWAYS text.** Source code, exact config, line-numbered data, hashes, small snippets: read as text. It is cheaper AND exact. Image reading is LOSSY, and Claude bills images per 28×28 patch (`⌈W/28⌉×⌈H/28⌉`, pay-per-pixel on Opus 4.7+) — dense-text-as-image is only ~1.3-2× and risks illegibility, NOT the 10× that needs a dedicated OCR encoder. Never image-ify code.
+- **Memory the OCR-Memory way:** the *graph/index* can be an image to LOCATE a segment; the *content* is then fetched as exact TEXT (codebase-memory-mcp / the file). Image to find, text to read.
+- GLM-5.2 is text-only: it reads text, and routes any real incoming image through zai-vision (above). Enforced per-turn by `--advisor`. Full decision table: `~/.omp/skills/image-routing/SKILL.md`.
+
 ## Always-on skills — open the SKILL.md before acting (these EXIST; never reinvent them)
 - **codegraph** — `~/.omp/skills/codegraph/SKILL.md` — semantic code intel (the loop's senses).
 - **karpathy-guidelines** — `~/.omp/skills/karpathy-guidelines/SKILL.md` — read-before-write, test-before-refactor, small steps.

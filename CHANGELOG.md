@@ -3,7 +3,29 @@
 Mọi thay đổi đáng kể của `8sync` ghi vào đây. Format theo [Keep a Changelog](https://keepachangelog.com),
 versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nhật mục `Unreleased`.
 
-## [Unreleased]
+## [0.42.0] — 2026-07-04
+
+### Added — modality routing: read STRUCTURE as an image, PRECISE things as text
+- **`8sync shot` is now real** (was a no-op stub) — renders any URL / local HTML to
+  PNG via system or omp's bundled Chromium (`~/.omp/puppeteer/chrome/…`), prints a
+  vision-token estimate (`ceil(w/28)*ceil(h/28)`, 28×28 patch — no stale cap). Also
+  fixes the `image-routing` skill which already pointed at it.
+- New **Modality routing** directive forced across the harness: `APPEND_SYSTEM.md`
+  (always-on), the `image-routing` skill (rewritten with honest economics), and the
+  `capabilities.md` snapshot, enforced per-turn by `--advisor`. Rule: vision models
+  render a codegraph / diagram / dashboard / big PDF to ONE image (modality-fit); code /
+  exact config / line-numbered data stay TEXT (cheaper AND lossless).
+- Grounded, not hyped: the 10×/90% token cut (DeepSeek-OCR, arXiv 2510.18234) needs a
+  DEDICATED optical encoder — NOT a screenshot to Opus/GLM. Claude bills images per
+  28×28 patch (pay-per-pixel on Opus 4.7+). Measured on this repo: STATE.md as image =
+  0.87× (LOSES vs text); the 12k-edge codegraph as image ≈ 25× (structure win). The
+  gate captures exactly that. OCR-Memory pattern (arXiv 2604.26622) documented: image to
+  LOCATE, exact text to READ.
+- **Dashboard deep-link** — `web/src/App.tsx` now reads `?page=<id>` (or `/<id>`) for
+  the initial page (`pageFromUrl()` + `history.replaceState` on nav). Nav was in-memory
+  only, so `8sync shot .../codegraph` used to render State; now
+  `8sync shot http://127.0.0.1:8731/?page=codegraph` captures the real graph. `build.rs`
+  already rebuilds the Vite bundle on `web/src` change, so a plain `cargo build` re-embeds.
 
 ## [0.41.0] — 2026-07-03
 

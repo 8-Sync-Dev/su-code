@@ -728,6 +728,16 @@ pub(crate) fn ensure_omp_capabilities_snapshot(home: &Path) -> Result<()> {
         if mem_on { 'x' } else { ' ' },
         if mem_on { "ON" } else { "OFF" }
     ));
+    out.push_str(
+        "\n## Modality routing (token discipline)\n\n\
+         Read STRUCTURE as an image, PRECISE things as text. Vision models (Opus-class): \
+         render a codegraph / diagram / dashboard / big PDF with `8sync shot`/`pdf-img` and \
+         read the image (modality-fit — structure beats its adjacency-list text). NEVER \
+         image-ify source code / exact config / line-numbered data — text is cheaper AND \
+         lossless (Claude bills images per 28x28 patch, pay-per-pixel; the 10x/90% figure \
+         needs a dedicated OCR encoder, not a screenshot). GLM-5.2 is text-only → images \
+         via zai-vision. Full table: `~/.omp/skills/image-routing/SKILL.md`.\n",
+    );
     out.push_str("\n## omp built-in tools (from `omp --help`)\n\n");
     if builtin_tools.is_empty() {
         out.push_str("_(could not parse — run `omp --help` manually)_\n");
