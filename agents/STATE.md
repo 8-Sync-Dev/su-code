@@ -15,20 +15,20 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - [x] **Dashboard redesign + Models/Projects** (v0.29.0): `8sync harness web` full impeccable redesign · Models page (view/edit routing live) · project switcher (status dots) · markdown render · serena-off fix · context honesty · workflow canvas — 14 pages, 0 console errors.
 
 ## Current step
-Enhancement (Unreleased): **modality routing** — read STRUCTURE as image, PRECISE
-as text. Researched the "read-image-saves-90%" claim → grounded: 90% (DeepSeek-OCR
-arXiv 2510.18234) needs a DEDICATED optical encoder, NOT a PNG-to-Opus/GLM; Claude
-bills per 28×28 patch (Opus 4.7+ pay-per-pixel). MEASURED here: STATE.md as image
-= 0.87× (LOSES); 12k-edge codegraph as image ≈ 25× (WINS). Built: **`8sync shot`
-real** (was stub) via bundled Chromium; **Modality routing** directive forced in
-APPEND_SYSTEM + image-routing skill (honest econ rewrite) + capabilities.md +
-`--advisor`. OCR-Memory pattern (arXiv 2604.26622) documented: image to LOCATE,
-text to READ. Built + `8sync harness` redeployed + verified deployed content +
-token math. CHANGELOG/KNOWLEDGE updated.
-**Deferred (flagged):** dashboard nav is in-memory (button) not URL-routed, so
-`8sync shot .../codegraph` renders State, not the graph. Flagship "shot the memory
-graph" needs a frontend deep-link (`?page=` → initial route) + bun/vite rebuild +
-re-embed. Not yet started — awaiting user go-ahead.
+Shipped **v0.42.0** (released, binary on GitHub): **modality routing** — read
+STRUCTURE as image, PRECISE as text. Grounded the "read-image-saves-90%" claim:
+90% (DeepSeek-OCR arXiv 2510.18234) needs a DEDICATED optical encoder, NOT a
+PNG-to-Opus/GLM; Claude bills per 28×28 patch (Opus 4.7+ pay-per-pixel). MEASURED:
+STATE.md as image = 0.87× (LOSES); 12k-edge codegraph as image ≈ 25× (WINS).
+Built: **`8sync shot` real** (was stub) via bundled Chromium + honest patch-based
+token estimate; **Modality routing** directive forced in APPEND_SYSTEM +
+image-routing skill + capabilities.md + `--advisor`; OCR-Memory pattern (arXiv
+2604.26622) documented (image to LOCATE, text to READ). **Dashboard deep-link
+DONE:** `web/src/App.tsx` reads `?page=<id>` → `8sync shot .../?page=codegraph`
+captures the real graph (verified visually post-merge; Marketplace feature coexists).
+Rebased onto origin/main (remote had shipped 0.40.0 advisor + 0.41.0 Marketplace),
+re-versioned 0.42.0, resolved conflicts, built + pushed + `gh release`. Delivery:
+`8sync up && 8sync harness` on any machine now auto-injects latest.
 
 ## Previous (Unreleased, shipped earlier this session)
 Shipped 2 fixes (Unreleased): **(1) zai-vision MCP + skill** — `8sync harness`
