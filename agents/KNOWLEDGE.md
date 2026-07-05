@@ -211,3 +211,16 @@ _(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1783222758.md)_
   deserved an empty-state gate; breakdown meters; advisory card). STATE trim −71% (8.4→2.4 KB)
   dropped upfront ~13.6k→~12.2k tok. Pattern: a metric page must surface the *lever*, not just
   totals; and cheap deterministic queries should `enabled: true`, not hide behind a button.
+- **validated: v0.43.0 shipped — canvas capture + auto-locate E2E + English docs.** (1) `/codegraph?shot=1`
+  renders ONLY the React-Flow graph full-viewport (`position:fixed inset:0 z-index:var(--z-overlay)` —
+  nav sits at `--z-sticky:20`, overlay must beat it). Full non-vision chain proven on this box:
+  `8sync shot '?shot=1'` (~2k vision tok) → `8sync locate <img> "the box labeled skills"` →
+  box [1176,624,1502,735] click≈(1339,679) — EXACTLY on the node (annotated PNG cross-checked by
+  vision). CPU build (GCC 16, -march=native): 44s wall / 20min CPU on 9950X3D; GGUF q8_0 = 6.3GB.
+  (2) **Editing `assets/*` requires `cargo build` BEFORE `8sync harness` deploys them** — harness
+  deploys from the EMBEDDED (rust-embed) copy; "already deployed" = content-equal to the embed,
+  not the repo file. Stale binary → silent no-op deploy (hit this live).
+  (3) `harness web` restores the last web-session project — **activate the target project via
+  `/api/workspaces/activate` BEFORE screenshots** or you leak another repo (hit: content-post-agency).
+  (4) `agents/skills/` is fully gitignored (machine-local mirror); `git check-ignore` echoes the
+  path — don't misread it as `ls-files` output. Source of truth = `assets/skills/` (committed).
