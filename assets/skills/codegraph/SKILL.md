@@ -39,6 +39,7 @@ codegraph sync                 # incremental update after you (or the user) edit
 - `codegraph unlock` — remove a stale lock if indexing is blocked.
 - `codegraph init -i` — init + initial index in one shot (8sync already does the init half).
 - `codegraph serve` — MCP server mode for agents that speak MCP (rarely needed from inside 8sync).
+- **Graph as ONE image** (vision models / layout questions): `8sync shot 'http://127.0.0.1:8731/codegraph?shot=1' -o /tmp/cg.png` — canvas-only React-Flow package graph (`8sync harness web` must be running). Details stay text: `/api/codegraph/overview|search|trace`. Non-vision models read positions from the shot via `8sync locate` (automatic).
 
 ## 4. Citation convention
 

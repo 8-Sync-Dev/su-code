@@ -4,17 +4,16 @@
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
 ## Current step
-**/auto (Unreleased): bench-driven optimization — DONE, 4/4 tasks (`engine_status`).**
-Review verdict: dashboard 15 pages × 0 console errors; project switcher propagates end-to-end
-(state/bench/codegraph follow the designated project); A1 PASS; audit hits = historical false-positives.
-Gap found & fixed: bench measured but didn't DRIVE optimization.
-- `BenchMetrics` + `/api/bench` now expose `core_tok`/`spine_tok`/`naive_tok` + `spine_advice`
-  (warn when spine >50% of upfront) — `bench.rs::spine_advice`.
-- CLI `harness bench` prints the advisory (`!` line).
-- Web Bench page: auto-loads on mount (was empty until manual click), upfront breakdown meters
-  (prefix/CORE/spine share), advisory card, `.meter-val-wide` CSS. Browser-verified, 0 errors.
-- Spine trim applied: STATE narrative archived → `agents/archive/STATE-1783219303.md`.
-- Warning sweep: dead `assets.rs::web_asset_iter` removed · `LocalModel` pub(crate) · `_ctx`.
+**v0.43.0 ship (this session).** Bench-driven optimization (breakdown + `spine_advice` >50% upfront,
+CLI `!` line + `/api/bench` + Bench page auto-load/meters/advisory — browser-verified 0 errors;
+spine trim → advisory tự tắt sau consolidation, upfront 13.6k→12.0k tok). Plus:
+- **`/codegraph?shot=1`** — canvas-only React-Flow graph capture cho `8sync shot` (~2k vision tok);
+  auto-rule trong APPEND_SYSTEM + codegraph/image-routing/locate-anything skills: model không vision
+  đọc vị trí/phân bổ ảnh → **tự động `8sync locate`** (LocateAnything-3B, CPU/GPU).
+- **README + GitHub Pages 100% English-first** + 5 screenshot demo (docs/assets/dashboard-*.png,
+  leak-checked — không lộ repo khác; web-session từng restore content-post-agency → phải activate
+  su-code TRƯỚC khi capture).
+- Release: tag v0.43.0 + gh release kèm binary `8sync-v0.43.0-linux-x86_64`.
 
 ## Next (chưa làm — tùy chọn)
 - [ ] Phase 3b — gstack host `omp` (DEFERRED; xem archive + `reference/gstack` docs/ADDING_A_HOST.md).

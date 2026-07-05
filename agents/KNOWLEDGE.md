@@ -10,7 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 22 dòng cũ → agents/archive/KNOWLEDGE-1783219423.md)_
+_(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1783222758.md)_
   mọc lại. Re-ran `8sync harness`: on-demand 55→35, feynman trong AGENTS.md = 0, force-load 1998→1717 tok,
   `harness bench` A1 PASS, `harness eval` 3/3 (vs baseline +0, không regression). Giữ addyosmani coding-eng
   + impeccable/taste/assp design payload.

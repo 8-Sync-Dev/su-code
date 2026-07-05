@@ -5,6 +5,24 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.43.0] — 2026-07-05
+
+### Added — codegraph canvas capture (`?shot=1`) + automatic locate for non-vision models
+- **`/codegraph?shot=1`** on the dashboard renders ONLY the React-Flow package call graph,
+  full-viewport (no sidebar/cards) — made for `8sync shot 'http://127.0.0.1:8731/codegraph?shot=1'`:
+  one big, legible graph image (~2k vision tokens) instead of a full-page capture. Everything
+  else on that page stays text via `/api/codegraph/overview|search|trace` — image for the
+  layout, API text for the details.
+- **Auto-rule baked into the always-read layer** (`APPEND_SYSTEM.md` + codegraph/image-routing/
+  locate-anything skills): a non-vision model (GLM-5.2) that needs positions/layout/distribution
+  from an image uses **`8sync locate`** (LocateAnything-3B, on-device ggml, CPU or CUDA)
+  automatically — zai-vision answers *what it says*, locate answers *where it is*.
+
+### Changed — README + GitHub Pages are English-first (100%)
+- `README.md` fully rewritten in English with the dashboard demo: hero (State page) + Bench /
+  Codegraph / Models / Marketplace screenshots (`docs/assets/dashboard-*.png`, freshly captured,
+  leak-checked). `docs/index.html` (Pages) translated to English with a Dashboard gallery.
+
 ### Changed — bench now DRIVES optimization (breakdown + spine advisory, CLI/API/web)
 - `BenchMetrics` (`/api/bench`) exposes the upfront breakdown — `core_tok`, `spine_tok`,
   `naive_tok` — plus `spine_advice`: a warning set when the memory spine (`agents/*.md`)

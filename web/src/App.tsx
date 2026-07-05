@@ -849,6 +849,28 @@ function CodegraphPage() {
   );
   if (!data) return null;
 
+  // ?shot=1 — capture mode for `8sync shot`: ONLY the package call graph,
+  // full viewport (big + legible for vision/locate models). Everything else
+  // on this page is exact text via /api/codegraph/* — the canvas is the one
+  // thing that needs pixels.
+  if (new URLSearchParams(window.location.search).has("shot")) {
+    return (
+      <div style={{ position: "fixed", inset: 0, zIndex: "var(--z-overlay)" as never, background: "var(--bg)" }}>
+        <ReactFlow
+          nodes={pkgNodes}
+          edges={pkgEdges}
+          onNodesChange={onPkgNodesChange}
+          fitView
+          minZoom={0.2}
+          nodesConnectable={false}
+          nodesDraggable={false}
+        >
+          <Background />
+        </ReactFlow>
+      </div>
+    );
+  }
+
   return (
     <Page
       title="Codegraph"

@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>8sync — terminal-first AI coding harness</title>
-  <meta name="description" content="8sync: terminal-first AI coding harness cho CachyOS/Arch + Kitty + Helix + omp. Giữ workflow terminal bình thường, AI quan sát context và thực thi khi bạn yêu cầu." />
+  <meta name="description" content="8sync: terminal-first AI coding harness for CachyOS/Arch + Kitty + Helix + omp. Keep your normal terminal workflow; AI observes project context and executes when you ask." />
   <meta property="og:title" content="8sync — terminal-first AI coding harness" />
   <meta property="og:description" content="Keep your normal terminal workflow; AI agents observe project context, load agents/* memory, execute tasks on demand." />
   <meta property="og:type" content="website" />
@@ -125,10 +125,9 @@
     <!-- HERO -->
     <header class="hero">
       <span class="eyebrow">⚡ <b>terminal-first</b> · AI coding harness</span>
-      <h1>Dùng terminal như thường,<br/><span class="grad">AI đứng sau quan sát.</span></h1>
+      <h1>Use the terminal as usual,<br/><span class="grad">AI observes from behind.</span></h1>
       <p class="sub">
-        <strong>VI:</strong> Bạn vẫn <code>cd</code>, code, build, test bằng CLI. AI agent (omp) bám theo project context, đọc memory <code>agents/*</code>, và thực thi khi bạn yêu cầu.<br/>
-        <strong>EN:</strong> Keep your normal CLI workflow; AI agents observe project context, load <code>agents/*</code> memory, and execute tasks on demand.
+        You still <code>cd</code>, code, build, and test from the CLI. AI agents (omp) follow project context, load <code>agents/*</code> memory, and execute tasks on demand.
       </p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/8-Sync-Dev/su-code">View on GitHub →</a>
@@ -141,98 +140,112 @@
     <section class="grid" style="margin-top:40px;">
       <article class="card">
         <h3><span class="dot"></span>Terminal-first</h3>
-        <p>Không có “AI terminal” riêng. CLI workflow hiện tại của bạn giữ nguyên — 8sync chỉ wrap quanh.</p>
+        <p>No separate “AI terminal”. Your existing CLI workflow stays untouched — 8sync just wraps around it.</p>
       </article>
       <article class="card">
         <h3><span class="dot"></span>Dashboard CRUD</h3>
-        <p><code>8sync harness web</code> mở trang local xem &amp; sửa toàn bộ agent-team: models, skills, memory, rules, engines, <b>graph codebase</b> — ghi thẳng vào config.</p>
+        <p><code>8sync harness web</code> opens a local page to view &amp; edit the whole agent-team: models, skills, memory, rules, engines, <b>codebase graph</b> — written straight to config.</p>
       </article>
       <article class="card">
         <h3><span class="dot"></span>Context-aware</h3>
-        <p>Đi tới project nào, AI bám ngữ cảnh đó. Memory shared qua <code>AGENTS.md</code> + <code>agents/*</code>. <code>8sync harness</code> dựng tất cả bằng 1 lệnh.</p>
+        <p>Whichever project you enter, the AI picks up its context. Memory is shared via <code>AGENTS.md</code> + <code>agents/*</code>. <code>8sync harness</code> builds it all with one command.</p>
       </article>
       <article class="card">
         <h3><span class="dot"></span>Skill injection</h3>
-        <p><b>35 skill</b> bundled sẵn. <code>8sync skill add &lt;github-url&gt;</code> clone vào cả global <code>~/.omp/skills/</code> lẫn project <code>agents/skills/</code>.</p>
+        <p><b>35 skills</b> bundled. <code>8sync skill add &lt;github-url&gt;</code> clones into both the global <code>~/.omp/skills/</code> and the project's <code>agents/skills/</code>.</p>
       </article>
     </section>
 
     <!-- INSTALL -->
     <section id="install">
       <h2>Quick start</h2>
-      <p class="lede">CachyOS / Arch Linux, terminal Kitty (bật <code>allow_remote_control yes</code> để có layout 3-pane).</p>
+      <p class="lede">CachyOS / Arch Linux, Kitty terminal (enable <code>allow_remote_control yes</code> for the 3-pane layout).</p>
       <div class="codeblock">
         <span class="lbl">bash</span>
-<pre><code># 1. Cài — one-liner, binary prebuilt (KHÔNG cần git/rust/cargo)
+<pre><code># 1. Install — one-liner, prebuilt binary (NO git/rust/cargo needed)
 curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
-8sync setup                      # AI core: omp + codegraph + MCP/skills + gh (y/N từng profile)
+8sync setup                      # AI core: omp + codegraph + MCP/skills + gh (y/N per profile)
 8sync doctor                     # verify
 
-# 2. Vào project → dựng harness bằng 1 lệnh (idempotent)
+# 2. Enter a project → build the harness with one command (idempotent)
 cd ~/code/my-app
 8sync harness                    # skills + codegraph + AGENTS.md + memory
-8sync .                          # mở session (kitty 3-pane + omp)
+8sync .                          # open a session (kitty 3-pane + omp)
 
-# 3. Dashboard — xem + CRUD toàn bộ agent-team qua trình duyệt
+# 3. Dashboard — view + CRUD the whole agent-team from the browser
 8sync harness web                # → http://127.0.0.1:8731</code></pre>
       </div>
       <p class="lede" style="margin-top:14px;">
-        Build từ source: <code>git clone … &amp;&amp; bash scripts/bootstrap.sh</code>.
-        Cờ setup thường dùng: <code>--dry-run</code>, <code>--no-profile</code>, <code>--community</code>, <code>--profile &lt;name&gt;</code>.
+        Build from source: <code>git clone … &amp;&amp; bash scripts/bootstrap.sh</code>.
+        Common setup flags: <code>--dry-run</code>, <code>--no-profile</code>, <code>--community</code>, <code>--profile &lt;name&gt;</code>.
       </p>
     </section>
 
     <!-- DASHBOARD -->
     <section id="dashboard">
       <h2>Dashboard — <code>8sync harness web</code></h2>
-      <p class="lede">Một trang web local (axum + Vite/React, nhúng sẵn trong binary) để <b>xem và điều khiển toàn bộ agent-team</b> qua trình duyệt thay vì sửa file config bằng tay. Mỗi trang đọc dữ liệu thật, phần lớn cho <b>CRUD ghi thẳng</b> vào config/memory.</p>
+      <p class="lede">A local web app (axum + Vite/React, embedded in the binary) to <b>view and control the whole agent-team</b> from the browser instead of hand-editing config files. Every page reads real data; most support <b>CRUD written straight</b> to config/memory. Click any screenshot for the full-size PNG.</p>
       <figure style="margin:20px 0 0;">
-        <img src="assets/dashboard-codegraph.png" alt="Codegraph page — package call graph + Leiden clusters" style="width:100%; border-radius:12px; border:1px solid var(--line); display:block;" />
-        <figcaption style="color:var(--dim); font-size:13px; margin-top:8px; text-align:center;">Codegraph — package call graph (elk) + 12 Leiden cluster + symbol search + trace caller/callee, live từ codebase-memory-mcp.</figcaption>
+        <a href="assets/dashboard-state.png"><img src="assets/dashboard-state.png" alt="State page — live plan of the current session" style="width:100%; border-radius:12px; border:1px solid var(--line); display:block;" /></a>
+        <figcaption style="color:var(--dim); font-size:13px; margin-top:8px; text-align:center;">State — the live plan of the current session.</figcaption>
       </figure>
-      <figure style="margin:24px 0 0;">
-        <img src="assets/dashboard-models.png" alt="Models page — đổi routing per-role, ghi config ngay" style="width:100%; border-radius:12px; border:1px solid var(--line); display:block;" />
-        <figcaption style="color:var(--dim); font-size:13px; margin-top:8px; text-align:center;">Models — đổi model per-role/task, thay đổi ghi thẳng vào <code>models.toml</code>.</figcaption>
-      </figure>
+      <div class="grid" style="margin-top:18px; grid-template-columns:repeat(auto-fit,minmax(320px,1fr));">
+        <article class="card" style="padding:10px;">
+          <a href="assets/dashboard-bench.png"><img src="assets/dashboard-bench.png" alt="Bench page — token-budget bench with upfront breakdown and spine advisory" style="width:100%; border-radius:8px; border:1px solid var(--line); display:block;" /></a>
+          <p style="margin:10px 4px 2px;">Bench — token-budget bench with upfront breakdown (prefix / CORE / memory-spine) + spine advisory.</p>
+        </article>
+        <article class="card" style="padding:10px;">
+          <a href="assets/dashboard-codegraph.png"><img src="assets/dashboard-codegraph.png" alt="Codegraph page — package call graph + Leiden clusters" style="width:100%; border-radius:8px; border:1px solid var(--line); display:block;" /></a>
+          <p style="margin:10px 4px 2px;">Codegraph — package call graph + Leiden clusters, symbol search, caller/callee tracing — live from codebase-memory-mcp.</p>
+        </article>
+        <article class="card" style="padding:10px;">
+          <a href="assets/dashboard-models.png"><img src="assets/dashboard-models.png" alt="Models page — adaptive model routing per role/task" style="width:100%; border-radius:8px; border:1px solid var(--line); display:block;" /></a>
+          <p style="margin:10px 4px 2px;">Models — adaptive model routing per role/task, written straight to <code>models.toml</code>.</p>
+        </article>
+        <article class="card" style="padding:10px;">
+          <a href="assets/dashboard-marketplace.png"><img src="assets/dashboard-marketplace.png" alt="Marketplace page — MCP + skills marketplace" style="width:100%; border-radius:8px; border:1px solid var(--line); display:block;" /></a>
+          <p style="margin:10px 4px 2px;">Marketplace — browse + one-click install MCP servers &amp; skills (official registry, Smithery, Glama, mcp.so).</p>
+        </article>
+      </div>
       <div class="two" style="margin-top:24px;">
         <table>
           <tbody>
-            <tr><td><b>Session</b></td><td>State (live plan) · Context (token/compaction thật)</td></tr>
-            <tr><td><b>Configure</b></td><td>Models · Skills (filter + cycle tier) · Memory (edit 6 file) · Rules (thêm/xoá)</td></tr>
+            <tr><td><b>Session</b></td><td>State (live plan) · Context (real token/compaction)</td></tr>
+            <tr><td><b>Configure</b></td><td>Models · Skills (filter + cycle tier) · Memory (edit 6 files) · Rules (add/remove)</td></tr>
             <tr><td><b>Runtime</b></td><td>Engines · <b>Codegraph</b> graph · MCP · Submodules</td></tr>
           </tbody>
         </table>
         <table>
           <tbody>
-            <tr><td><b>Quality</b></td><td>Bench (chạy live) · Readiness · Team</td></tr>
+            <tr><td><b>Quality</b></td><td>Bench (live runs) · Readiness · Team</td></tr>
             <tr><td><b>Projects</b></td><td>Workspaces (project switcher)</td></tr>
-            <tr><td><b>Build</b></td><td>Workflow (dựng pipeline → export omp extension)</td></tr>
+            <tr><td><b>Build</b></td><td>Workflow (build a pipeline → export as omp extension)</td></tr>
           </tbody>
         </table>
       </div>
       <div class="codeblock" style="margin-top:18px;">
         <span class="lbl">bash</span>
-<pre><code>8sync harness web                # http://127.0.0.1:8731 (tự mở trình duyệt)
-8sync harness web --port 9000    # đổi port
-8sync harness web --no-open      # chạy nền / headless</code></pre>
+<pre><code>8sync harness web                # http://127.0.0.1:8731 (auto-opens the browser)
+8sync harness web --port 9000    # change the port
+8sync harness web --no-open      # background / headless</code></pre>
       </div>
     </section>
 
     <!-- COMMANDS -->
     <section id="commands">
-      <h2>Lệnh chính</h2>
-      <p class="lede">Mọi verb có <code>-h</code> / <code>--help</code> với block EXAMPLES. Chạy <code>8sync</code> hoặc <code>8sync help</code> để xem cheatsheet.</p>
+      <h2>Core commands</h2>
+      <p class="lede">Every verb has <code>-h</code> / <code>--help</code> with an EXAMPLES block. Run <code>8sync</code> or <code>8sync help</code> for the cheatsheet.</p>
 
       <div class="two">
         <div>
           <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Vibe loop (daily)</h3>
           <table>
             <tbody>
-              <tr><td><code>8sync .</code></td><td>Mở/attach session (kitty 3-pane + <code>omp --continue</code> trong abduco)</td></tr>
-              <tr><td><code>8sync ai [prompt]</code></td><td>Trống → resume; có prompt → one-shot <code>omp -p</code></td></tr>
-              <tr><td><code>8sync find &lt;kw&gt;</code></td><td>rg/fd + fzf, mở editor tại <code>file:line</code></td></tr>
-              <tr><td><code>8sync note "msg"</code></td><td>Append <code>agents/NOTES.md</code></td></tr>
-              <tr><td><code>8sync run dev|build|test|fmt|lint</code></td><td>Project runner theo recipe</td></tr>
+              <tr><td><code>8sync .</code></td><td>Open/attach a session (kitty 3-pane + <code>omp --continue</code> inside abduco)</td></tr>
+              <tr><td><code>8sync ai [prompt]</code></td><td>Empty → resume; with a prompt → one-shot <code>omp -p</code></td></tr>
+              <tr><td><code>8sync find &lt;kw&gt;</code></td><td>rg/fd + fzf, opens the editor at <code>file:line</code></td></tr>
+              <tr><td><code>8sync note "msg"</code></td><td>Appends to <code>agents/NOTES.md</code></td></tr>
+              <tr><td><code>8sync run dev|build|test|fmt|lint</code></td><td>Recipe-based project runner</td></tr>
               <tr><td><code>8sync ship "msg"</code></td><td><code>git add -A &amp;&amp; commit &amp;&amp; push &amp;&amp; gh pr create</code></td></tr>
             </tbody>
           </table>
@@ -241,16 +254,18 @@ cd ~/code/my-app
           <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Lifecycle &amp; tools</h3>
           <table>
             <tbody>
-              <tr><td><code>8sync setup</code></td><td>Cài harness + chọn profile</td></tr>
+              <tr><td><code>8sync setup</code></td><td>Install the harness + pick profiles</td></tr>
               <tr><td><code>8sync up</code></td><td>Self-update binary + <code>omp update</code></td></tr>
-              <tr><td><code>8sync doctor</code></td><td>Health check toàn diện</td></tr>
-              <tr><td><code>8sync harness</code></td><td>Dựng/refresh harness bằng 1 lệnh (idempotent)</td></tr>
-              <tr><td><code>8sync harness web</code></td><td><b>Dashboard local</b> — CRUD agent-team</td></tr>
+              <tr><td><code>8sync doctor</code></td><td>Comprehensive health check</td></tr>
+              <tr><td><code>8sync harness</code></td><td>Build/refresh the harness with one command (idempotent)</td></tr>
+              <tr><td><code>8sync harness web</code></td><td><b>Local dashboard</b> — agent-team CRUD</td></tr>
               <tr><td><code>8sync harness gateway</code></td><td>Deploy/verify omp model-gateway</td></tr>
-              <tr><td><code>8sync skill</code></td><td>List + add skill (xem dưới)</td></tr>
+              <tr><td><code>8sync harness add-local-model</code></td><td>Serve a local GGUF model (mistral.rs) as an omp provider</td></tr>
+              <tr><td><code>8sync locate</code></td><td>Visual grounding — bounding boxes + click points from an image</td></tr>
+              <tr><td><code>8sync skill</code></td><td>List + add skills (see below)</td></tr>
               <tr><td><code>8sync theme | bg</code></td><td>Kitty palette / wallpaper live swap</td></tr>
-              <tr><td><code>8sync bt | clean</code></td><td>Bluetooth / dọn disk + report</td></tr>
-              <tr><td><code>8sync sec on|off</code></td><td>WARP VPN + ufw cùng lúc</td></tr>
+              <tr><td><code>8sync bt | clean</code></td><td>Bluetooth / disk cleanup + report</td></tr>
+              <tr><td><code>8sync sec on|off</code></td><td>WARP VPN + ufw in one go</td></tr>
             </tbody>
           </table>
         </div>
@@ -260,22 +275,22 @@ cd ~/code/my-app
     <!-- SKILLS -->
     <section id="skills">
       <h2>Skill injection</h2>
-      <p class="lede">Skill = module hướng dẫn cho AI. 8sync bundle sẵn <b>35 skill</b> (codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing + 18 research skill · …); <code>8sync skill add</code> collection-aware kéo thêm cả bộ từ GitHub.</p>
+      <p class="lede">A skill is an instruction module for the AI. 8sync bundles <b>35 skills</b> (codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing + 18 research skills · …); <code>8sync skill add</code> is collection-aware and pulls whole sets from GitHub.</p>
       <div class="codeblock">
         <span class="lbl">bash</span>
-<pre><code># Clone từ URL: cài vào CẢ ~/.omp/skills/ (omp đọc global) lẫn agents/skills/ (project)
-# Đồng thời rewrite block &lt;!-- 8sync:skills:* --&gt; trong AGENTS.md
+<pre><code># Clone from a URL: installs into BOTH ~/.omp/skills/ (global, read by omp) and agents/skills/ (project)
+# Also rewrites the &lt;!-- 8sync:skills:* --&gt; block in AGENTS.md
 8sync skill add https://github.com/colbymchenry/codegraph
 
-# Các dạng spec khác
+# Other spec forms
 8sync skill add gh:owner/repo
 8sync skill add path:/abs/local/dir
 8sync skill add builtin:karpathy
 
-# Idempotent: chạy lại = git pull --ff-only
+# Idempotent: re-running = git pull --ff-only
 8sync skill add https://github.com/colbymchenry/codegraph   # → "updated"
 
-# Dựng / refresh toàn bộ harness (thay `skill sync` cũ)
+# Build / refresh the whole harness (replaces the old `skill sync`)
 8sync harness init
 8sync harness up --timer 30m</code></pre>
       </div>
@@ -284,17 +299,17 @@ cd ~/code/my-app
     <!-- UPDATE -->
     <section id="update">
       <h2>Update</h2>
-      <p class="lede">Hai cách:</p>
+      <p class="lede">Two ways:</p>
       <div class="two">
         <div>
-          <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Auto (khuyên dùng)</h3>
+          <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Auto (recommended)</h3>
           <div class="codeblock">
 <pre><code>8sync up</code></pre>
           </div>
-          <p class="lede" style="margin-top:10px;">Self-update binary (GitHub release) + <code>omp update</code>. Không đụng <code>pacman -Syu</code>.</p>
+          <p class="lede" style="margin-top:10px;">Self-updates the binary (GitHub release) + <code>omp update</code>. Never touches <code>pacman -Syu</code>.</p>
         </div>
         <div>
-          <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Manual (build từ source)</h3>
+          <h3 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px;">Manual (build from source)</h3>
           <div class="codeblock">
 <pre><code>cd su-code &amp;&amp; git pull
 cargo build --release
@@ -308,15 +323,15 @@ install -m755 target/release/8sync \
     <!-- DOCS / SITE -->
     <section id="docs">
       <h2>Documentation site</h2>
-      <p class="lede">Trang này là <code>docs/index.html</code>, deploy tự động qua GitHub Pages mỗi khi push <code>main</code>.</p>
+      <p class="lede">This page is <code>docs/index.html</code>, auto-deployed via GitHub Pages on every push to <code>main</code>.</p>
       <table>
         <tbody>
           <tr><td>Source</td><td><a href="https://github.com/8-Sync-Dev/su-code/blob/main/docs/index.html">docs/index.html</a></td></tr>
           <tr><td>Workflow</td><td><a href="https://github.com/8-Sync-Dev/su-code/blob/main/.github/workflows/pages.yml">.github/workflows/pages.yml</a></td></tr>
-          <tr><td>Trigger</td><td>push <code>main</code> hoặc <code>workflow_dispatch</code></td></tr>
+          <tr><td>Trigger</td><td>push <code>main</code> or <code>workflow_dispatch</code></td></tr>
           <tr><td>URL</td><td><a href="https://8-sync-dev.github.io/su-code/">8-sync-dev.github.io/su-code</a></td></tr>
-          <tr><td>README chi tiết</td><td><a href="https://github.com/8-Sync-Dev/su-code#readme">github.com/8-Sync-Dev/su-code#readme</a></td></tr>
-          <tr><td>AGENTS.md (cho AI)</td><td><a href="https://github.com/8-Sync-Dev/su-code/blob/main/AGENTS.md">AGENTS.md</a></td></tr>
+          <tr><td>Full README</td><td><a href="https://github.com/8-Sync-Dev/su-code#readme">github.com/8-Sync-Dev/su-code#readme</a></td></tr>
+          <tr><td>AGENTS.md (for AI)</td><td><a href="https://github.com/8-Sync-Dev/su-code/blob/main/AGENTS.md">AGENTS.md</a></td></tr>
         </tbody>
       </table>
     </section>

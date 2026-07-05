@@ -62,6 +62,8 @@ Review a UI: `8sync shot http://localhost:3000/login` → one PNG instead of `Lo
 styles (~8k tok). GLM: pass the PNG to zai-vision → text.
 
 Grok the architecture (vision model): boot `8sync harness web`, then
-`8sync shot http://127.0.0.1:8731/codegraph -o /tmp/cg.png --width 1400 --height 2200` → read the
-graph image instead of dumping the 12k-edge call graph as text. Then for a precise change, read the
-exact file slice as text.
+`8sync shot 'http://127.0.0.1:8731/codegraph?shot=1' -o /tmp/cg.png` — **`?shot=1` = canvas-only**
+(the React-Flow package graph full-viewport, big + legible, ~2k vision tokens). Never full-page-capture
+that page: clusters/hotspots/search are exact text via `/api/codegraph/overview|search|trace`. Then for
+a precise change, read the exact file slice as text. Non-vision model: read node positions from the
+shot with `8sync locate /tmp/cg.png "<node label>"` (automatic — see locate-anything skill).
