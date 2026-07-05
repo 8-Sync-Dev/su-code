@@ -100,6 +100,9 @@ enum Cmd {
     #[command(name = "pdf-img")]
     PdfImg(verbs::pdf_img::Args),
 
+    /// Visual grounding: image + prompt → labeled boxes (LocateAnything-3B). `--setup` first.
+    Locate(verbs::locate::Args),
+
     /// Show overview cheatsheet (alias of `8sync` with no args)
     Help,
 
@@ -143,6 +146,7 @@ fn main() -> Result<()> {
         Some(Cmd::Shot(a))    => verbs::shot::run(a),
         Some(Cmd::DiffImg(a)) => verbs::diff_img::run(a),
         Some(Cmd::PdfImg(a))  => verbs::pdf_img::run(a),
+        Some(Cmd::Locate(a))  => verbs::locate::run(a),
         Some(Cmd::Help)       => { verbs::root::print_cheatsheet(); Ok(()) }
         Some(Cmd::Flow)       => verbs::flow::run(),
         Some(Cmd::Find(a))    => verbs::find::run(a),

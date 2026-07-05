@@ -14,7 +14,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
     // (asset prefix, target subdir name). always-on first (read order), then
     // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
-    let bundled: [(&str, &str); 16] = [
+    let bundled: [(&str, &str); 17] = [
         ("skills/codegraph",               "codegraph"),
         ("skills/karpathy",                "karpathy-guidelines"),
         ("skills/ponytail",                "ponytail"),
@@ -24,6 +24,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
         ("skills/8sync-cli",               "8sync-cli"),
         ("skills/image-routing",           "image-routing"),
         ("skills/zai-vision",              "zai-vision"),
+        ("skills/locate-anything",         "locate-anything"),
         ("skills/code-review-and-quality", "code-review-and-quality"),
         ("skills/senior-security",         "senior-security"),
         ("skills/senior-frontend",         "senior-frontend"),

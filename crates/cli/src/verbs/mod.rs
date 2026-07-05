@@ -21,3 +21,4 @@ pub mod pdf_img;
 pub mod flow;
 pub mod find;
 pub mod note;
+pub mod locate;

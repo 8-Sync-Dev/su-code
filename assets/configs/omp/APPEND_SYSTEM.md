@@ -13,6 +13,7 @@ Reaching for grep/find/Read to EXPLORE first is a violation. Read a raw file onl
 
 ## Vision — GLM-5.2 is text-only, route images through zai-vision
 GLM-5.2 cannot see pixels. Never hand it a raw screenshot expecting analysis — route it: image → **zai-vision MCP** tool (`extract_text_from_screenshot`, `analyze_image`, `diagnose_error_screenshot`, `understand_technical_diagram`, `analyze_data_visualization`, `ui_to_artifact`, `ui_diff_check`, `analyze_video`) → TEXT → act on the text. Applies to omp browser screenshots, `8sync shot`/`pdf-img`/`diff-img` output, and diagrams. omp's built-in `inspect_image` is the generic fallback. Full combination matrix (all cases, with real verified examples): `~/.omp/skills/zai-vision/SKILL.md`.
+**Precise pixel COORDINATES (not just a description)** — need to click a UI element, or box where text/an object sits? Use **`8sync locate <image> "<target>"`** (NVIDIA LocateAnything-3B via ggml, on-device) → labeled boxes + click-center coords. This is grounding, not captioning: pair it with the `browser` tool to click exactly, or with `8sync shot` output. Setup once: `8sync locate --setup`. Skill: `~/.omp/skills/locate-anything/SKILL.md`.
 
 ## Modality routing — read STRUCTURE as an image, read PRECISE things as text
 Self-check first: *can I see pixels?* (Opus-class = yes; GLM-5.2 = no.)

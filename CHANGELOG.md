@@ -23,6 +23,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 - `doctor` reports the registered local-model count; `~/.omp/capabilities.md` lists them
   so the agent knows they exist.
 
+### Added — `8sync locate`: visual grounding (NVIDIA LocateAnything-3B)
+- New verb `8sync locate <image> "<prompt>"` returns labeled **bounding boxes +
+  click-center coordinates** from an image — GUI element grounding (click points),
+  OCR/text localization, open-set detection. Grounding, not captioning: complements
+  zai-vision (describe) and the `browser` tool (act). Pipeline: `8sync shot` → `locate`
+  → click. `--annotated out.png`, `--mode hybrid|slow|fast`.
+- Runs **NVIDIA LocateAnything-3B** through `mudler/locate-anything.cpp` (MIT C++/ggml
+  port, prebuilt GGUFs, no Python). `--setup` clones + cmake-builds the CLI (CUDA if
+  the toolkit is present, else CPU) and downloads the q8_0 GGUF (~6.3 GB) to
+  `~/.cache/8sync/locate-anything/`. Model license: NVIDIA research / non-commercial.
+- New always-deployed on-demand skill `locate-anything` (SKILL.md) + an APPEND_SYSTEM
+  pointer so the agent reaches for it when it needs exact coordinates.
+
 ## [0.42.0] — 2026-07-04
 
 ### Added — modality routing: read STRUCTURE as an image, PRECISE things as text
