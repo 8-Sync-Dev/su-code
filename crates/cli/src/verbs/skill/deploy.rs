@@ -770,6 +770,22 @@ pub(crate) fn ensure_omp_capabilities_snapshot(home: &Path) -> Result<()> {
             out.push('\n');
         }
     }
+    // Local GGUF models (mistral.rs → omp providers), if any are registered.
+    let reg_raw =
+        std::fs::read_to_string(home.join(".config/8sync/local-models.tsv")).unwrap_or_default();
+    let locals: Vec<&str> = reg_raw.lines().filter(|l| !l.trim().is_empty()).collect();
+    if !locals.is_empty() {
+        out.push_str("\n## Local GGUF models (mistral.rs → omp)\n\n");
+        out.push_str("On-device GGUF models served by mistral.rs (Rust, memory-safe) and registered as omp providers. Use like any model: `8sync ai --model local/<name>`. Manage: `8sync harness add-local-model list|rm`.\n\n");
+        for l in &locals {
+            let mut it = l.splitn(3, '\t');
+            let name = it.next().unwrap_or("").trim();
+            let port = it.next().unwrap_or("").trim();
+            if !name.is_empty() {
+                out.push_str(&format!("- `local/{}` — mistral.rs on port {}\n", name, port));
+            }
+        }
+    }
     out.push_str(&format!(
         "## Installed skills\n\n`{}` skill dir(s) in `~/.omp/skills/`.\n",
         skill_count

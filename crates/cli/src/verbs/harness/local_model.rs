@@ -371,6 +371,26 @@ pub(crate) fn strip_block(s: &str) -> String {
     out
 }
 
+/// Extract the managed sentinel block (BEGIN..=END inclusive) if present, so a
+/// caller (e.g. `gateway apply`) can re-attach it after rewriting models.yml.
+pub(crate) fn extract_block(s: &str) -> Option<String> {
+    let mut out = String::new();
+    let mut in_block = false;
+    for line in s.lines() {
+        if line.trim_end() == BLOCK_BEGIN {
+            in_block = true;
+        }
+        if in_block {
+            out.push_str(line);
+            out.push('\n');
+        }
+        if line.trim_end() == BLOCK_END {
+            return Some(out);
+        }
+    }
+    None
+}
+
 /// Render the managed block for the current registry (empty string if no models).
 fn render_block(reg: &[LocalModel]) -> String {
     if reg.is_empty() {

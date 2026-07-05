@@ -11,6 +11,16 @@
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
 _(consolidated 101 dòng cũ → agents/archive/KNOWLEDGE-1783170628.md)_
+- **validated: local GGUF for omp = a Rust runtime (mistral.rs), NOT embed + NOT C++
+  llama.cpp.** User directive: "tận dụng rust mạnh mem leak tốt để load gguf". mistral.rs
+  (pure Rust, MIT, 7.4k★) serves an OpenAI `/v1` endpoint from GGUF (local file, HF repo,
+  auto-detect quant/chat-template) and its `install.sh` ships a **prebuilt per-GPU CUDA or
+  CPU binary — no Rust/CUDA toolkit at install** (nvcc was MISSING here; prebuilt sidesteps
+  it, just needs the NVIDIA driver). Embedding candle/mistral.rs in the 8sync binary was
+  rejected: balloons the <4MB target + needs nvcc at build time. So `add-local-model`
+  SHELLS OUT to mistralrs (Rust does the mem-safe GGUF loading) and registers the endpoint
+  as an omp provider — runner-agnostic (any OpenAI endpoint works). models.yml edits use a
+  managed sentinel block + a TSV source-of-truth so `gateway apply` never clobbers them.
 - **validated: "read images to save 90% tokens" is TRUE only with a dedicated optical
   encoder (DeepSeek-OCR arXiv 2510.18234: 10× @97%), NOT by sending a PNG to
   Opus/GLM.** Claude bills images per 28×28 patch = `⌈W/28⌉×⌈H/28⌉` (pay-per-pixel;

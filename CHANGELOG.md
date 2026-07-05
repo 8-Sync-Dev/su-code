@@ -3,6 +3,26 @@
 Mọi thay đổi đáng kể của `8sync` ghi vào đây. Format theo [Keep a Changelog](https://keepachangelog.com),
 versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nhật mục `Unreleased`.
 
+## [Unreleased]
+
+### Added — `8sync harness add-local-model`: local GGUF models for omp (Rust runtime)
+- New subcommand `8sync harness add-local-model <path> [name]` loads a **GGUF** model
+  through **mistral.rs** (pure-Rust, memory-safe inference — no C++ `llama.cpp`) and
+  registers the served OpenAI endpoint as an omp provider `local/<name>`, so omp routes
+  to on-device models exactly like a cloud one (`8sync ai --model local/<name>`).
+- `<path>` auto-classifies: an existing `*.gguf` FILE, a HuggingFace repo id (`org/repo`),
+  or a `*.gguf` URL (downloaded to `~/.cache/8sync/models/`). GGUF-only this version
+  (validated by magic bytes); other formats auto-detect later. GGUF chosen for speed.
+- Runner is auto-installed via the official mistral.rs `install.sh` (prebuilt per-GPU
+  CUDA or CPU binary — no Rust/CUDA toolkit needed, just the NVIDIA driver for GPU).
+- Each model runs as a systemd **user** service `8sync-llm-<name>.service`
+  (`mistralrs serve --port <p> -m <src>`, port auto-allocated from 8770). A TSV registry
+  (`~/.config/8sync/local-models.tsv`) is the source of truth; the omp provider lives in
+  a managed sentinel block inside `~/.omp/agent/models.yml` that **`gateway apply`
+  preserves** across re-deploys. `list` / `rm <name>` manage the set.
+- `doctor` reports the registered local-model count; `~/.omp/capabilities.md` lists them
+  so the agent knows they exist.
+
 ## [0.42.0] — 2026-07-04
 
 ### Added — modality routing: read STRUCTURE as an image, PRECISE things as text

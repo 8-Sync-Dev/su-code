@@ -251,4 +251,14 @@ fn check_ai_engines(home: &std::path::Path) {
     } else {
         ui::info("  omp capabilities snapshot: run `8sync harness` to capture omp's live surface");
     }
+    let reg = home.join(".config/8sync/local-models.tsv");
+    if let Ok(raw) = std::fs::read_to_string(&reg) {
+        let n = raw.lines().filter(|l| !l.trim().is_empty()).count();
+        if n > 0 {
+            ui::ok(&format!(
+                "  local GGUF models: {} registered (mistral.rs → omp) — `8sync harness add-local-model list`",
+                n
+            ));
+        }
+    }
 }

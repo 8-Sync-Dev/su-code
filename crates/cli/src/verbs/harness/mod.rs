@@ -154,6 +154,7 @@ fn print_help() {
     println!("  8sync harness compaction [pct]  view/set omp auto-compaction threshold (anti-forget; default 50%)");
     println!("  8sync harness model [k v]       view/edit ~/.config/8sync/models.toml (model routing for /auto + 8sync ai)");
     println!("  8sync harness gateway [apply|key|verify]  deploy/verify omp model-gateway (9router + sonnet-5 thinking fix)");
+    println!("  8sync harness add-local-model <path> [name]  serve a local GGUF via mistral.rs (Rust) + register as omp `local/<name>`");
     println!("  8sync harness web [--port N]    local dashboard (axum+Vite): skills/memory/engines/team/submodules");
     println!("  8sync harness toolstats         SQLite tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails");
     println!("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)");

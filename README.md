@@ -142,6 +142,7 @@ System packages (`pacman -Syu`) **không** tự chạy — bạn tự quyết kh
 | `8sync harness up` | Refresh state: re-inject + refresh `KNOWLEDGE.md` + re-index codegraph. `--pull` re-pull skill · `--commit` git-commit memory (gitleaks scan trước) · `--loop 10m` (foreground) · `--timer 30m\|off` (systemd user timer, cho nền) |
 | **`8sync harness web`** | **Dashboard local** (axum + Vite, `http://127.0.0.1:8731`) — xem & **CRUD** toàn bộ agent-team qua trình duyệt (xem mục Dashboard) |
 | `8sync harness gateway [apply\|key <K>\|verify\|status]` | Deploy/verify omp model-gateway (`~/.omp/agent/models.yml`): 9router + `thinking.mode` fix cho claude-sonnet-5. `verify` ping HTTP 200 = healthy |
+| `8sync harness add-local-model <path.gguf\|org/repo\|url> [name]` | Load một **GGUF** cục bộ qua **mistral.rs** (Rust, memory-safe) → serve OpenAI endpoint + register thành omp provider `local/<name>`. `list`/`rm <name>` để quản lý. Rồi `8sync ai --model local/<name>` |
 | `8sync harness bench` | Đo context budget của loop (upfront vs deferred tokens + KV-cache gate) |
 | `8sync harness audit` | Scan docs: stale path / oversized / junk + churn (doc-hygiene) |
 | `8sync harness eval [--baseline]` | Chạy quality task-suite qua omp; `--baseline` lưu tham chiếu |
