@@ -232,3 +232,9 @@ _(consolidated 10 dòng cũ → agents/archive/KNOWLEDGE-1783248455.md)_
   survive a sweep re-run. Overwrite = explicit `--force` only. Managed layer (~/.omp bundled
   skills, 00-force-load, APPEND_SYSTEM, extensions) refreshes byte-compare on binary update —
   customize the PROJECT copy, not ~/.omp. Policy now printed in `harness help` + AGENTS.md §8.
+- failure: omp `Schema error: providers: must be an object (was null)` = 8sync wrote
+  `~/.omp/agent/models.yml` with a bare `providers:` key (empty local-model registry after
+  `add-local-model rm`). YAML: key with no children parses as null, NOT {}. Fix: single choke
+  point `local_model::insert_block` finalizes → `providers: {}` when no real (non-comment)
+  children; `ensure_providers` reopens `providers: {}` for later inserts. Rule: any managed
+  YAML map key must never be emitted bare.

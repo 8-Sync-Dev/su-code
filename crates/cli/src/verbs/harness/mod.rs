@@ -170,6 +170,17 @@ fn print_help() {
     println!("  8sync harness toolstats         SQLite tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails");
     println!("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)");
 
+    println!("\nLOCAL GGUF MODEL — real flow (mistral.rs serves it, omp sees `local/<name>`)");
+    println!("  8sync harness add-local-model ~/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf qwen-coder");
+    println!("  8sync harness add-local-model bartowski/Qwen2.5-Coder-7B-Instruct-GGUF        # HF repo id — auto-download");
+    println!("  8sync harness add-local-model https://host/model.gguf my-model                # direct .gguf URL");
+    println!("  8sync harness add-local-model list                                            # registered models + ports + status");
+    println!("  8sync ai --model local/qwen-coder \"refactor this function\"                     # use it for one prompt");
+    println!("  8sync harness model default local/qwen-coder                                  # make it the daily-driver model");
+    println!("  8sync harness model code local/qwen-coder                                     # or only for the `code` task class");
+    println!("  8sync harness add-local-model rm qwen-coder                                   # stop service + unregister");
+    println!("  → registry: ~/.config/8sync/local-models.tsv · provider block: ~/.omp/agent/models.yml (sentinel-managed)");
+
     println!("\nSKILLS (deployed by init)");
     println!("  always-on (read order): codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing");
     println!("  on-demand : code-review-and-quality · senior-security · senior-frontend · full-flow · last30days");

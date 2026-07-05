@@ -5,6 +5,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Fixed — omp startup error `providers: must be an object (was null)`
+- `~/.omp/agent/models.yml` was left with a bare `providers:` key (YAML null) when the
+  local-model registry became empty (e.g. after `add-local-model rm <last>`), making omp
+  print a schema error + disable custom providers on every start. `insert_block` now
+  finalizes the file: no real children ⇒ `providers: {}` (valid empty object); a later
+  add reopens `{}` and inserts under it. Both branches proven live via the real binary
+  and A/B'd against omp (`omp models list`): bare ⇒ error, `{}` ⇒ clean.
+
+### Added — `harness help`: LOCAL GGUF MODEL real-flow example block
+- Copy-paste flow: add from .gguf path / HF repo id / URL → `list` → use once via
+  `8sync ai --model local/<name>` → set as `default`/`code` model → `rm`. Points at the
+  TSV registry + sentinel-managed provider block.
+
 ## [0.44.0] — 2026-07-05
 
 ### Added — loop-engineering stop signals in the 8sync engine (doom-loop guard + real gate)

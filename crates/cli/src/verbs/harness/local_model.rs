@@ -449,14 +449,14 @@ fn render_block(reg: &[LocalModel]) -> String {
 }
 
 /// Insert the managed block right after the top-level `providers:` line,
-/// creating that key (and a header) if the file has none.
+/// creating that key (and a header) if the file has none. The result is always
+/// schema-valid for omp: a `providers:` key left with no real (non-comment)
+/// children is emitted as `providers: {}` — a bare `providers:` parses as YAML
+/// null and omp fails config validation with "providers: must be an object".
 pub(crate) fn insert_block(base: &str, block: &str) -> String {
     let base = ensure_providers(base);
-    if block.is_empty() {
-        return base;
-    }
     let mut out = String::new();
-    let mut inserted = false;
+    let mut inserted = block.is_empty(); // nothing to insert → skip straight to finalize
     for line in base.lines() {
         out.push_str(line);
         out.push('\n');
@@ -469,23 +469,60 @@ pub(crate) fn insert_block(base: &str, block: &str) -> String {
         out.push_str("providers:\n");
         out.push_str(block);
     }
-    out
+    finalize_providers(&out)
 }
 
-/// Guarantee a top-level `providers:` line exists.
+/// Guarantee an OPEN top-level `providers:` line exists (a `providers: {}`
+/// written by a previous finalize is reopened so entries can insert under it).
 fn ensure_providers(base: &str) -> String {
-    if base.lines().any(|l| l.trim_end() == "providers:") {
-        return base.to_string();
-    }
-    if base.trim().is_empty() {
-        return "# omp model providers — managed by 8sync (`harness gateway` / `add-local-model`)\nproviders:\n".to_string();
-    }
-    let mut s = base.to_string();
-    if !s.ends_with('\n') {
+    let reopened: Vec<String> = base
+        .lines()
+        .map(|l| {
+            let t = l.trim_end();
+            if t == "providers: {}" || t == "providers: { }" {
+                "providers:".to_string()
+            } else {
+                l.to_string()
+            }
+        })
+        .collect();
+    let mut s = reopened.join("\n");
+    if !s.is_empty() && !s.ends_with('\n') {
         s.push('\n');
+    }
+    if s.lines().any(|l| l.trim_end() == "providers:") {
+        return s;
+    }
+    if s.trim().is_empty() {
+        return "# omp model providers — managed by 8sync (`harness gateway` / `add-local-model`)\nproviders:\n".to_string();
     }
     s.push_str("providers:\n");
     s
+}
+
+/// If the top-level `providers:` key has no real (non-comment, indented) child,
+/// rewrite that single line to `providers: {}` so the YAML stays an object.
+fn finalize_providers(body: &str) -> String {
+    let lines: Vec<&str> = body.lines().collect();
+    let Some(idx) = lines.iter().position(|l| l.trim_end() == "providers:") else {
+        return body.to_string();
+    };
+    let has_child = lines[idx + 1..]
+        .iter()
+        .take_while(|l| l.trim().is_empty() || l.starts_with(' ') || l.starts_with('\t'))
+        .any(|l| {
+            let t = l.trim();
+            !t.is_empty() && !t.starts_with('#')
+        });
+    if has_child {
+        return body.to_string();
+    }
+    let mut out = String::new();
+    for (i, l) in lines.iter().enumerate() {
+        out.push_str(if i == idx { "providers: {}" } else { l });
+        out.push('\n');
+    }
+    out
 }
 
 /// Poll the OpenAI `/v1/models` endpoint until it returns 200 or the timeout.
