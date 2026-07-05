@@ -30,7 +30,7 @@ fn find_line(hay: &str, needle: &str) -> Option<usize> {
 /// Priority rank for always-on skills (lower = read earlier). The force-load
 /// block lists always-on skills in EXACTLY this order; agents read top-down so
 /// position == priority. The canonical chain is:
-///   codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing
+///   codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing → locate-anything
 /// codegraph (code intel), karpathy (engineering discipline) and ponytail
 /// (lazy-senior YAGNI) form the engineering core; the brand + frontend-design
 /// skills follow; the harness/token-routing tooling closes. Skills not listed
@@ -46,6 +46,7 @@ pub(crate) fn always_on_rank(dirname: &str) -> usize {
         "taste-skill" => 5,
         "8sync-cli" => 6,
         "image-routing" => 7,
+        "locate-anything" => 8,
         _ => usize::MAX,
     }
 }

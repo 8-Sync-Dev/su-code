@@ -33,6 +33,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `impeccable` — `/home/alexdev/Projects/tools/su-code/agents/skills/impeccable/SKILL.md`
 - `design-taste-frontend` — `/home/alexdev/Projects/tools/su-code/agents/skills/taste-skill/SKILL.md`
 - `image-routing` — `/home/alexdev/Projects/tools/su-code/agents/skills/image-routing/SKILL.md`
+- `locate-anything` — `/home/alexdev/Projects/tools/su-code/agents/skills/locate-anything/SKILL.md`
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 

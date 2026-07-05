@@ -95,7 +95,7 @@ fn direct_code_file_count(dir: &Path) -> usize {
 fn subfolder_index_block(root: &Path) -> String {
     let names = always_on_names_in_order(root);
     let chain = if names.is_empty() {
-        "codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing".to_string()
+        "codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing → locate-anything".to_string()
     } else {
         names.join(" → ")
     };

@@ -269,22 +269,49 @@ fn write_service(
 ) -> Result<()> {
     let dir = env.home.join(".config/systemd/user");
     std::fs::create_dir_all(&dir)?;
+    let exec = serve_cmdline(runner, port, source);
     let unit = format!(
         "[Unit]\n\
          Description=8sync local GGUF model `{name}` served by mistral.rs (Rust)\n\
          After=network-online.target\n\
          \n\
          [Service]\n\
-         ExecStart={runner} serve --port {port} -m {source}\n\
+         ExecStart={exec}\n\
          Restart=on-failure\n\
          RestartSec=3\n\
          \n\
          [Install]\n\
          WantedBy=default.target\n",
-        runner = runner.display(),
     );
     std::fs::write(dir.join(service_name(name)), unit)?;
     Ok(())
+}
+
+/// Build the mistral.rs `serve` command line. A local `.gguf` FILE needs
+/// `-m <dir> -f <file> --format gguf` (mistral.rs `--model-id` is a *directory*);
+/// an HF repo id goes straight to `-m` for auto-detection. Bound to localhost,
+/// web UI off (omp only needs the `/v1` API).
+fn serve_cmdline(runner: &Path, port: u16, source: &str) -> String {
+    let base = format!(
+        "{} serve --port {port} --host 127.0.0.1 --no-ui",
+        runner.display()
+    );
+    let p = Path::new(source);
+    let is_file = source.ends_with(".gguf") && (source.contains('/') || p.exists());
+    if is_file {
+        let dir = p
+            .parent()
+            .filter(|d| !d.as_os_str().is_empty())
+            .map(|d| d.display().to_string())
+            .unwrap_or_else(|| ".".to_string());
+        let file = p
+            .file_name()
+            .map(|f| f.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        format!("{base} --format gguf -m {dir} -f {file}")
+    } else {
+        format!("{base} -m {source}")
+    }
 }
 
 fn start_service(name: &str) {
@@ -406,8 +433,8 @@ fn render_block(reg: &[LocalModel]) -> String {
              \x20   apiKey: sk-local\n\
              \x20   api: openai-completions\n\
              \x20   models:\n\
-             \x20     - id: local/{name}\n\
-             \x20       name: {name} (local GGUF · mistral.rs)\n\
+             \x20     - id: default\n\
+             \x20       name: local/{name} (GGUF · mistral.rs)\n\
              \x20       input: [text]\n\
              \x20       contextWindow: 32768\n\
              \x20       maxTokens: 8192\n\

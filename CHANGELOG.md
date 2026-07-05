@@ -15,13 +15,21 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   (validated by magic bytes); other formats auto-detect later. GGUF chosen for speed.
 - Runner is auto-installed via the official mistral.rs `install.sh` (prebuilt per-GPU
   CUDA or CPU binary — no Rust/CUDA toolkit needed, just the NVIDIA driver for GPU).
-- Each model runs as a systemd **user** service `8sync-llm-<name>.service`
-  (`mistralrs serve --port <p> -m <src>`, port auto-allocated from 8770). A TSV registry
+- Each model runs as a systemd **user** service `8sync-llm-<name>.service`. For a local
+  `.gguf` the served command is `mistralrs serve --host 127.0.0.1 --no-ui --format gguf
+  -m <dir> -f <file>` (mistral.rs `--model-id` is a *directory*, not a file); an HF repo
+  goes straight to `-m`. Port auto-allocated from 8770. A TSV registry
   (`~/.config/8sync/local-models.tsv`) is the source of truth; the omp provider lives in
   a managed sentinel block inside `~/.omp/agent/models.yml` that **`gateway apply`
   preserves** across re-deploys. `list` / `rm <name>` manage the set.
+- The provider sends model **`id: default`** upstream (the only alias mistral.rs serves
+  besides the model-dir path); the clean `local/<name>` handle lives in the `name:` field
+  (omp fuzzy-matches both), so `--model local/<name>` still selects it.
 - `doctor` reports the registered local-model count; `~/.omp/capabilities.md` lists them
   so the agent knows they exist.
+- **E2E-validated** on this machine: mistral.rs 0.8.23 (auto-selected the prebuilt
+  `cuda131-sm120` RTX-5080 binary) serves a 135M GGUF; `add-local-model` → systemd unit →
+  `/v1/chat/completions` returns real text; `rm` tears down unit + block + registry clean.
 
 ### Added — `8sync locate`: visual grounding (NVIDIA LocateAnything-3B)
 - New verb `8sync locate <image> "<prompt>"` returns labeled **bounding boxes +
@@ -33,8 +41,10 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   port, prebuilt GGUFs, no Python). `--setup` clones + cmake-builds the CLI (CUDA if
   the toolkit is present, else CPU) and downloads the q8_0 GGUF (~6.3 GB) to
   `~/.cache/8sync/locate-anything/`. Model license: NVIDIA research / non-commercial.
-- New always-deployed on-demand skill `locate-anything` (SKILL.md) + an APPEND_SYSTEM
-  pointer so the agent reaches for it when it needs exact coordinates.
+- New **always-on specialist** skill `locate-anything` (`inject.rs::always_on_rank`,
+  rank 8 after `image-routing`): force-loaded into the AGENTS.md block every session and
+  re-deployed/refreshed on every `8sync harness` run (bundled). Body read on trigger
+  (token-lean); an APPEND_SYSTEM pointer surfaces it when exact coordinates are needed.
 
 ## [0.42.0] — 2026-07-04
 

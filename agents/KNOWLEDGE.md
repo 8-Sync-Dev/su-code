@@ -1,7 +1,7 @@
 <!-- 8sync:harness:begin -->
 ## 🧠 8sync harness
 
-- **Always-on (đọc theo thứ tự; CORE đọc body ngay, SPECIALIST đọc khi task khớp):** codegraph → karpathy-guidelines → ponytail → assp-skill → impeccable → taste-skill → 8sync-cli → image-routing.
+- **Always-on (đọc theo thứ tự; CORE đọc body ngay, SPECIALIST đọc khi task khớp):** codegraph → karpathy-guidelines → ponytail → assp-skill → impeccable → taste-skill → 8sync-cli → image-routing → locate-anything.
 - **Cách tận dụng:** codegraph = explore code (query/callers/callees, không grep) · karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · impeccable = design CHUẨN, BẮT BUỘC khi UI/design (đọc body lúc đó) + taste chống slop.
 - **Output lớn (>~50 dòng) → BẮT BUỘC `headroom_compress`** trước khi vào context.
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (Unreleased) + ghi học được vào file này (prefix `validated:` nếu test/build xác nhận, `hypothesis:` nếu chưa).
@@ -10,53 +10,17 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 101 dòng cũ → agents/archive/KNOWLEDGE-1783170628.md)_
-- **validated: local GGUF for omp = a Rust runtime (mistral.rs), NOT embed + NOT C++
-  llama.cpp.** User directive: "tận dụng rust mạnh mem leak tốt để load gguf". mistral.rs
-  (pure Rust, MIT, 7.4k★) serves an OpenAI `/v1` endpoint from GGUF (local file, HF repo,
-  auto-detect quant/chat-template) and its `install.sh` ships a **prebuilt per-GPU CUDA or
-  CPU binary — no Rust/CUDA toolkit at install** (nvcc was MISSING here; prebuilt sidesteps
-  it, just needs the NVIDIA driver). Embedding candle/mistral.rs in the 8sync binary was
-  rejected: balloons the <4MB target + needs nvcc at build time. So `add-local-model`
-  SHELLS OUT to mistralrs (Rust does the mem-safe GGUF loading) and registers the endpoint
-  as an omp provider — runner-agnostic (any OpenAI endpoint works). models.yml edits use a
-  managed sentinel block + a TSV source-of-truth so `gateway apply` never clobbers them.
-- **validated: "read images to save 90% tokens" is TRUE only with a dedicated optical
-  encoder (DeepSeek-OCR arXiv 2510.18234: 10× @97%), NOT by sending a PNG to
-  Opus/GLM.** Claude bills images per 28×28 patch = `⌈W/28⌉×⌈H/28⌉` (pay-per-pixel;
-  Opus 4.7+ dropped the cheap ~1.15MP cap, ~3× pricier). MEASURED on this repo:
-  STATE.md (7502 chars ≈ 1875 text tok) rendered 1200×1400 = 2150 vision tok = **0.87×
-  (image LOSES for text)**; the 12388-edge codegraph as 1400×2200 image = 3950 vision tok
-  vs ~99k text = **~25× (structure WINS)**. ⇒ gate: STRUCTURE (graph/diagram/dashboard/
-  PDF/UI) → image; code/exact-config/line-data → text. Wired into APPEND_SYSTEM +
-  image-routing skill + capabilities.md + `--advisor` enforcement. Correct memory pattern
-  = OCR-Memory (arXiv 2604.26622): image to LOCATE, exact text to READ (never OCR precise
-  content back out of a picture).
-- **validated: `8sync shot` was a no-op STUB** (like `diff-img`); made real via headless
-  Chromium — system first, else omp's bundled `~/.omp/puppeteer/chrome/<ver>/chrome-linux64/chrome`
-  (verified: valid PNG in 0.44s). `--virtual-time-budget=<ms>` lets SPA content render before
-  capture (confirmed: the Vite dashboard rendered fully).
-- **validated: dashboard deep-link fixed** — nav was in-memory (button, no URL), so
-  headless shot always rendered State. Added `pageFromUrl()` + `history.replaceState`
-  in `web/src/App.tsx`: `?page=<id>` (or `/<id>`) selects the initial page. `build.rs`
-  already rebuilds the Vite FE when `web/src` changes (`web_src_newer`) → plain `cargo
-  build` re-embeds; server SPA-fallback serves index.html for any path so the query
-  works headless. VERIFIED: `8sync shot .../?page=codegraph` renders the real graph
-  (4.8k nodes/12.4k edges, 12 Leiden clusters) — flagship "shot the memory graph" live.
-  mirrors to `agents/skills/`** — its setup scripts couldn't run; fixed 28 refs across SKILL.md + 4
-  reference docs. Note: headroom's router PROTECTS code/recent content (`router:protected:recent_code`)
-  → won't compress small code samples (0 saved); it compresses genuine large logs.
-- **validated: harness eval + concrete /gs worktree → v0.23.0.** `harness/eval.rs` `harness_eval` runs
-  bundled `assets/eval/<name>/` fixtures through `omp -p --no-session --auto-approve --max-time 300`
-  (cwd = a fresh `.cache/8sync/eval/<name>`), scores each with the fixture's `verify.sh` (verifier OWNS
-  the assertion — agent can't game it), writes JSON scorecard + `--baseline` to the gitignored cache,
-  diffs later runs. 3 fixtures: fix-failing-test / add-fn-with-test / locate-symbol. Verified 3/3 twice;
-  baseline diff prints `3/3 → 3/3 (+0)`. **Key omp facts:** `-p` non-interactive, `--auto-approve` for
-  headless tool use, `--max-time`, `--no-session` ephemeral; `omp worktree` manages ~/.omp/wt.
-  `/gs` guardrail now spells out L3 worktree: `git worktree add .gs/wt/<slug> -b gs/<slug>` → work+verify
-  +commit there → `git worktree remove`; `.gs/` is gitignored (v0.22.0). Verified worktree add/list/remove
-  + `git check-ignore .gs/wt/slice`. **Phase 3b (gstack omp host) DEFERRED:** additive (roles fall back to
-  bundled), and the host lives inside the deinitialized gstack submodule (foreign repo, pinned SHA) — not
+_(consolidated 47 dòng cũ → agents/archive/KNOWLEDGE-1783210590.md)_
+- **validated: local GGUF → omp via mistral.rs (real E2E on this box).** `mistralrs serve` for a
+  local `.gguf` needs `-m <DIR> -f <FILE> --format gguf` — `--model-id` is a *directory*, NOT the
+  file (passing the file → treated as HF repo → 401). Served model ids = `default` + the dir path
+  ONLY (no `--served-model-name` flag). So the omp provider block must send **`id: default`**; the
+  clean `local/<name>` selector goes in the `name:` field (omp fuzzy-matches both). `install.sh`
+  auto-picked `cuda131-sm120` for the RTX 5080 (driver only, no CUDA toolkit). Full loop proven:
+  `add-local-model smoketest.gguf` (SmolLM2-135M q8, 139M) → systemd user unit started → `[serving]`
+  → `/v1/chat/completions {"model":"default"}` returned real text → `rm` left unit/block/TSV clean.
+  failure-caught-pre-ship: 0.42.0-unreleased code had `-m <file>` + `id: local/<name>` — both broke
+  the primary local-file path; only a real serve+curl surfaced it (build/help checks passed green).
   su-code's binary; out of proportion to value given the tool/skill-verification focus.
 - **note: shell PATH pollution across bash calls.** A sandbox env in one bash/eval call can drop
   `~/.local/bin` from the persistent shell's PATH (codegraph/omp then "command not found" in a later
