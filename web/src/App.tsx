@@ -945,30 +945,54 @@ function CodegraphPage() {
 
 // ── Bench ──────────────────────────────────────────────────────────────────
 function BenchPage() {
-  const { data, error, refetch, isFetching } = useQuery({ queryKey: ["bench"], queryFn: api.bench, enabled: false });
+  const { data, error, refetch, isFetching } = useQuery({ queryKey: ["bench"], queryFn: api.bench });
+  const seg = (label: React.ReactNode, tok: number) => {
+    const pct = data && data.upfront > 0 ? Math.round((tok / data.upfront) * 100) : 0;
+    return (
+      <div className="row">
+        <span>{label}</span>
+        <span className="meter">
+          <span className="bar"><span style={{ width: `${pct}%` }} /></span>
+          <span className="pct meter-val-wide mono">~{tok} tok · {pct}%</span>
+        </span>
+      </div>
+    );
+  };
   return (
     <Page
       title="Bench"
-      sub="Token budget of the harness prefix."
+      sub="Per-session context budget — what the agent pays upfront vs. what progressive disclosure defers."
       action={
         <button className="primary" onClick={() => refetch()} disabled={isFetching}>
-          {isFetching ? "Running…" : "Run bench"}
+          {isFetching ? "Running…" : "Re-run"}
         </button>
       }
     >
       {error ? <ErrorState message={(error as Error).message} /> : null}
       {isFetching && !data ? <Loading rows={5} /> : null}
-      {!data && !isFetching && !error ? (
-        <EmptyState title="No bench run yet" hint="Run the bench to measure upfront vs. deferred prefix tokens." />
-      ) : null}
       {data ? (
-        <div className="card list">
-          <div className="row"><span>Upfront <span className="muted">(paid every session)</span></span><span className="pct mono">~{data.upfront} tok</span></div>
-          <div className="row"><span>Deferred <span className="muted">(on trigger)</span></span><span className="mono">~{data.deferred} tok</span></div>
-          <div className="row"><span>Force-load prefix</span><span className="mono">~{data.force_load_prefix} tok</span></div>
-          <div className="row"><span>A2 progressive disclosure saved</span><span className="pct">{data.a2_saved_pct}%</span></div>
-          <div className="row"><span>A1 stable-prefix (KV-cache)</span><span className={`tag ${data.a1_pass ? "ok" : "warn"}`}>{data.a1_pass ? "pass" : "fail"}</span></div>
-        </div>
+        <>
+          {data.spine_advice ? (
+            <div className="card list">
+              <div className="row"><span className="tag warn">spine</span><span>{data.spine_advice}</span></div>
+            </div>
+          ) : null}
+          <div className="card list">
+            <div className="row row-total">
+              <strong>Upfront <span className="muted">(paid every session)</span></strong>
+              <span className="pct mono">~{data.upfront} tok</span>
+            </div>
+            {seg("Force-load prefix", data.force_load_prefix)}
+            {seg("CORE skill bodies", data.core_tok)}
+            {seg(<>Memory spine <span className="muted">(agents/*.md)</span></>, data.spine_tok)}
+          </div>
+          <div className="card list">
+            <div className="row"><span>Deferred <span className="muted">(read only on trigger)</span></span><span className="mono">~{data.deferred} tok</span></div>
+            <div className="row"><span>Naive baseline <span className="muted">(all always-on upfront)</span></span><span className="mono">~{data.naive_tok} tok</span></div>
+            <div className="row"><span>A2 progressive disclosure saved</span><span className="pct">{data.a2_saved_pct}%</span></div>
+            <div className="row"><span>A1 stable-prefix (KV-cache)</span><span className={`tag ${data.a1_pass ? "ok" : "warn"}`}>{data.a1_pass ? "pass" : "fail"}</span></div>
+          </div>
+        </>
       ) : null}
     </Page>
   );

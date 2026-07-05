@@ -29,7 +29,7 @@ pub(crate) const BLOCK_END: &str = "  # <<< 8sync:local-models <<<";
 const PORT_BASE: u16 = 8770;
 
 /// One registered local model. The TSV registry is the source of truth.
-struct LocalModel {
+pub(crate) struct LocalModel {
     name: String,
     port: u16,
     /// The `-m` argument passed to mistral.rs (an absolute .gguf path or HF repo id).

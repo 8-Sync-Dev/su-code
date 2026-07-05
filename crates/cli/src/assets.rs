@@ -18,11 +18,6 @@ pub fn web_asset(path: &str) -> Option<Vec<u8>> {
     Some(WebAssets::get(path)?.data.into_owned())
 }
 
-/// Every embedded web-dist path (e.g. `index.html`, `assets/index-xxx.js`).
-pub fn web_asset_iter() -> Vec<String> {
-    WebAssets::iter().map(|p| p.into_owned()).collect()
-}
-
 pub fn read(path: &str) -> Option<String> {
     let f = Assets::get(path)?;
     String::from_utf8(f.data.into_owned()).ok()

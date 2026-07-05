@@ -5,6 +5,20 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Changed — bench now DRIVES optimization (breakdown + spine advisory, CLI/API/web)
+- `BenchMetrics` (`/api/bench`) exposes the upfront breakdown — `core_tok`, `spine_tok`,
+  `naive_tok` — plus `spine_advice`: a warning set when the memory spine (`agents/*.md`)
+  eats **more than half the upfront budget** (the single lever bench exposes; prefix +
+  CORE are fixed by design, the spine grows unbounded between consolidations).
+- CLI `8sync harness bench` prints the same advisory as a `!` line with the concrete
+  fix (trim `agents/STATE.md` / let `8sync harness` auto-archive KNOWLEDGE >200 lines).
+- Dashboard **Bench page rebuilt**: auto-loads on mount (was an empty state until a
+  manual "Run bench" click — the compute is 40 ms and deterministic), upfront breakdown
+  meters (prefix / CORE / spine share of upfront), advisory callout, naive-baseline row.
+  New `.meter-val-wide` for long meter values. Browser-verified: 0 console errors.
+- Warning sweep: removed dead `assets::web_asset_iter`, `LocalModel` → `pub(crate)`
+  (private-interface warning), unused `ctx` in `api_state`. `cargo build` is warning-free.
+
 ### Added — `8sync harness add-local-model`: local GGUF models for omp (Rust runtime)
 - New subcommand `8sync harness add-local-model <path> [name]` loads a **GGUF** model
   through **mistral.rs** (pure-Rust, memory-safe inference — no C++ `llama.cpp`) and

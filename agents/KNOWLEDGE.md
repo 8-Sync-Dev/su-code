@@ -10,28 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 47 dòng cũ → agents/archive/KNOWLEDGE-1783210590.md)_
-- **validated: local GGUF → omp via mistral.rs (real E2E on this box).** `mistralrs serve` for a
-  local `.gguf` needs `-m <DIR> -f <FILE> --format gguf` — `--model-id` is a *directory*, NOT the
-  file (passing the file → treated as HF repo → 401). Served model ids = `default` + the dir path
-  ONLY (no `--served-model-name` flag). So the omp provider block must send **`id: default`**; the
-  clean `local/<name>` selector goes in the `name:` field (omp fuzzy-matches both). `install.sh`
-  auto-picked `cuda131-sm120` for the RTX 5080 (driver only, no CUDA toolkit). Full loop proven:
-  `add-local-model smoketest.gguf` (SmolLM2-135M q8, 139M) → systemd user unit started → `[serving]`
-  → `/v1/chat/completions {"model":"default"}` returned real text → `rm` left unit/block/TSV clean.
-  failure-caught-pre-ship: 0.42.0-unreleased code had `-m <file>` + `id: local/<name>` — both broke
-  the primary local-file path; only a real serve+curl surfaced it (build/help checks passed green).
-  su-code's binary; out of proportion to value given the tool/skill-verification focus.
-- **note: shell PATH pollution across bash calls.** A sandbox env in one bash/eval call can drop
-  `~/.local/bin` from the persistent shell's PATH (codegraph/omp then "command not found" in a later
-  call though the binary exists). Pass an explicit `env: { PATH: "/home/alexdev/.local/bin:/home/alexdev/.bun/bin:/usr/local/bin:/usr/bin:/bin", HOME, XDG_CONFIG_HOME }` for any call that invokes 8sync/omp/codegraph.
-- **validated: declutter skill-registry (cắt feynman) + design lane.** Source-of-truth của skill set =
-  **`agents/skills.toml` committed** (∪ machine-local `~/.config/8sync/skills.toml`); `8sync harness`
-  re-pull từ đó (`update.rs:27-35`) và **git source reinstall MỌI sub-skill của collection**
-  (`update.rs:49`) → cắt một phần một `src=<repo>` collection là vô ích; phải cắt HẾT entry chung URL.
-  Đã bỏ 20 skill `companion-inc/feynman` khỏi cả 2 manifest + `rm` dir ở `~/.omp/skills/` +
-  `agents/skills/` (repo này gitignore `agents/skills/` — `.gitignore:25` — nên đó là regen output;
-  manifest mới là nguồn). `assets/configs/skills.toml` chỉ seed 4 builtin always-on (không feynman) → không
+_(consolidated 22 dòng cũ → agents/archive/KNOWLEDGE-1783219423.md)_
   mọc lại. Re-ran `8sync harness`: on-demand 55→35, feynman trong AGENTS.md = 0, force-load 1998→1717 tok,
   `harness bench` A1 PASS, `harness eval` 3/3 (vs baseline +0, không regression). Giữ addyosmani coding-eng
   + impeccable/taste/assp design payload.
@@ -221,3 +200,14 @@ _(consolidated 47 dòng cũ → agents/archive/KNOWLEDGE-1783210590.md)_
   import-from-folder/github (prefers a `rules/` subdir, RAII temp clone). failure:
   `tab.click('text/MCP')`/`text/Skills` matches BOTH the nav link AND marketplace
   seg tab — target `.seg button` via `tab.evaluate` or the nav via `observe` role.
+- **validated: bench-driven optimization → dashboard Bench rebuilt + spine advisory.** Full review
+  (browser, 15 pages × 0 console errors; project switcher verified end-to-end: `/api/state`+bench+
+  codegraph all follow the switched project via web-session.json + process chdir) found ONE real
+  gap: bench *measured* but didn't *drive* — the memory spine (agents/*.md) hit **55% of the
+  upfront budget** (7.5k/13.6k tok, bigger than prefix+CORE combined) and nothing warned. The
+  200-line KNOWLEDGE budget doesn't bound tokens (200 dense lines ≈ 5k tok). Fix:
+  `bench.rs::spine_advice` (warn at spine >50% upfront) in CLI + `BenchMetrics` (+`core_tok`/
+  `spine_tok`/`naive_tok`) + Bench page (auto-load on mount — deterministic 40ms compute never
+  deserved an empty-state gate; breakdown meters; advisory card). STATE trim −71% (8.4→2.4 KB)
+  dropped upfront ~13.6k→~12.2k tok. Pattern: a metric page must surface the *lever*, not just
+  totals; and cheap deterministic queries should `enabled: true`, not hide behind a button.

@@ -137,6 +137,9 @@ pub(crate) fn harness_bench(env: &env_detect::Env) -> Result<()> {
     } else {
         ui::err("A1 stable-prefix: block DIFFERS on rebuild — volatile content in the prefix");
     }
+    if let Some(advice) = spine_advice(spine_tok, upfront) {
+        ui::warn(&advice);
+    }
     ui::info("A3 headroom: route tool output > ~50 lines through headroom_compress (STEP 0)");
     ui::info(&format!(
         "scorecard: upfront ~{} tok · deferred ~{} tok · A2 saved {}% · A1 {}",
@@ -145,13 +148,32 @@ pub(crate) fn harness_bench(env: &env_detect::Env) -> Result<()> {
     Ok(())
 }
 
+/// Advisory shown when the memory spine eats more than half the upfront
+/// budget — the single biggest lever bench exposes (spine grows unbounded
+/// between consolidations; prefix + CORE are fixed by design).
+pub(crate) fn spine_advice(spine_tok: usize, upfront: usize) -> Option<String> {
+    if upfront == 0 || spine_tok * 2 <= upfront {
+        return None;
+    }
+    Some(format!(
+        "memory spine ~{} tok = {}% of upfront — trim agents/STATE.md (archive finished phases) · KNOWLEDGE >200 lines auto-archives on next `8sync harness`",
+        spine_tok,
+        spine_tok * 100 / upfront
+    ))
+}
+
 #[derive(serde::Serialize)]
 pub(crate) struct BenchMetrics {
     pub upfront: usize,
     pub deferred: usize,
     pub force_load_prefix: usize,
+    pub core_tok: usize,
+    pub spine_tok: usize,
+    pub naive_tok: usize,
     pub a2_saved_pct: usize,
     pub a1_pass: bool,
+    /// Set when the spine dominates the upfront budget (>50%).
+    pub spine_advice: Option<String>,
 }
 
 /// Summary metrics for the web dashboard (`/api/bench`). Same compute as the
@@ -171,5 +193,15 @@ pub(crate) fn bench_metrics(home: &std::path::Path) -> Option<BenchMetrics> {
     let saved = naive.saturating_sub(upfront);
     let saved_pct = if naive > 0 { saved * 100 / naive } else { 0 };
     let stable = build_force_load(home, &root).block == st.block;
-    Some(BenchMetrics { upfront, deferred, force_load_prefix: block_tok, a2_saved_pct: saved_pct, a1_pass: stable })
+    Some(BenchMetrics {
+        upfront,
+        deferred,
+        force_load_prefix: block_tok,
+        core_tok,
+        spine_tok,
+        naive_tok: naive,
+        a2_saved_pct: saved_pct,
+        a1_pass: stable,
+        spine_advice: spine_advice(spine_tok, upfront),
+    })
 }

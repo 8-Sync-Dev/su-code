@@ -106,7 +106,7 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/rules/import", post(api_rule_import))
 }
 
-async fn api_state(State(ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
+async fn api_state(State(_ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
     let root = detect_current_project_root().unwrap_or_default();
     let profile = std::env::var("OMP_PROFILE").unwrap_or_else(|_| "default".to_string());
     let state_md = std::fs::read_to_string(root.join("agents/STATE.md")).unwrap_or_default();
