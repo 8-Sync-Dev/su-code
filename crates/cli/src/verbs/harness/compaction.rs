@@ -47,6 +47,18 @@ fn current_threshold(cfg: &Path) -> Option<u64> {
     }
     None
 }
+/// Ensure `compaction.thresholdPercent` HAS a value — write `pct` only when the
+/// key is absent (never override a user's explicit setting). Used by
+/// `8sync harness global` as the Anthropic token-optimizer default (50%).
+pub(crate) fn ensure_threshold_default(home: &Path, pct: u64) -> Result<()> {
+    let cfg = home.join(".omp/agent/config.yml");
+    if current_threshold(&cfg).is_some() {
+        return Ok(());
+    }
+    set_threshold(&cfg, pct)?;
+    ui::ok(&format!("compaction.thresholdPercent = {pct} (default) → {}", cfg.display()));
+    Ok(())
+}
 
 /// Set `compaction.thresholdPercent` in config.yml. Updates the line in place if
 /// present (indentation preserved), inserts under an existing `compaction:` block,

@@ -16,6 +16,7 @@ pub(crate) mod audit;
 mod bench;
 mod eval;
 mod external;
+mod global;
 mod init;
 mod memory;
 mod model;
@@ -30,6 +31,8 @@ mod toolstats;
 #[command(after_help = indoc::indoc! {"
     EXAMPLES
       8sync harness                   ONE command — deploy/update skills + mirror + inject + memory + index (idempotent)
+      8sync harness global            apply omp rules MACHINE-WIDE (all projects) + Anthropic token-optimizer defaults
+      8sync harness global --sweep    …and stamp skills/memory into every omp project (has agents/ or AGENTS.md) under ~/Projects
       8sync harness init              explicit full bootstrap with progress UI (force re-deploy everything)
       8sync harness up                refresh skills/AGENTS.md/memory + re-index codegraph to current state
       8sync harness up --pull        refresh AND re-pull registered skills from their source repos
@@ -53,7 +56,7 @@ mod toolstats;
       external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)
 "})]
 pub struct Args {
-    /// init (default) | up | audit | bench | eval | toolstats | model | gateway | web | compaction | help
+    /// init (default) | up | global | audit | bench | eval | toolstats | model | gateway | web | compaction | help
     pub sub: Option<String>,
     /// Optional value for value-taking sub-commands (e.g. `compaction <pct>`).
     pub value: Option<String>,
@@ -94,6 +97,11 @@ pub struct Args {
     /// `web --no-open`: do not auto-open the browser.
     #[arg(long)]
     pub no_open: bool,
+    /// `global --sweep [DIR]`: also stamp the per-project layer (skills mirror +
+    /// AGENTS.md inject + memory seed + gitleaks hook) into every omp project
+    /// (repo with agents/ or AGENTS.md/CLAUDE.md) under DIR (default ~/Projects).
+    #[arg(long, value_name = "DIR", num_args = 0..=1, default_missing_value = "")]
+    pub sweep: Option<String>,
 }
 
 pub fn run(a: Args) -> Result<()> {
@@ -102,6 +110,7 @@ pub fn run(a: Args) -> Result<()> {
         None => auto::harness_auto(&env, a.force),
         Some("init") => init::harness_init(&env, a.force),
         Some("up") => up::harness_up(&env, a.loop_every.as_deref(), a.timer.as_deref(), a.pull, a.commit),
+        Some("global") => global::harness_global(&env, a.sweep.as_deref(), a.pull, a.force),
         Some("bench") => bench::harness_bench(&env),
         Some("audit") => audit::harness_audit(&env),
         Some("eval") if a.project => eval::harness_eval_project(&env),
@@ -128,7 +137,7 @@ pub fn run(a: Args) -> Result<()> {
         }
         Some(other) => {
             ui::warn(&format!("unknown subcommand: {}", other));
-            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | gateway | audit | eval | bench | help");
+            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | global [--sweep DIR] | gateway | audit | eval | bench | help");
             Ok(())
         }
     }
@@ -141,6 +150,8 @@ fn print_help() {
 
     println!("COMMANDS");
     println!("  8sync harness                   ONE command — skills+update+mirror+inject+memory+index (idempotent, re-run anytime)");
+    println!("  8sync harness global            apply omp rules MACHINE-WIDE: ~/.omp skills+APPEND_SYSTEM+MCP → ALL projects, + Anthropic token defaults");
+    println!("  8sync harness global --sweep [DIR]  …and stamp skills/memory into every omp project (agents/ or AGENTS.md) under DIR (default ~/Projects)");
     println!("  8sync harness init              full bootstrap: skills + codegraph + AGENTS.md + memory + CHANGELOG + .gitignore");
     println!("  8sync harness up                refresh: re-inject rules + KNOWLEDGE breadcrumb + codegraph index");
     println!("  8sync harness up --pull         …and re-pull registered skills from their source repos (network)");
@@ -171,6 +182,13 @@ fn print_help() {
     println!("  IGNORE : .codegraph/ · .cache/8sync/                                           (derived → rebuilt by init)");
     println!("  SECRET : .env · .env.* (keep .env.example)                                     (NEVER commit)");
     println!("  → init seeds these into a managed .gitignore block; `8sync doctor` warns if memory is ignored.");
+
+    println!("\nOVERWRITE POLICY (default = NEVER overwrite — only add what's missing)");
+    println!("  user-owned : agents/*.md · CHANGELOG.md · agents/skills/ · AGENTS.md outside sentinels · hooks · your config keys");
+    println!("               → seed-if-missing or sentinel-block updates ONLY; your edits are never clobbered");
+    println!("  managed    : ~/.omp/skills (bundled) · 00-force-load.md · APPEND_SYSTEM.md · extensions/commands");
+    println!("               → 8sync-shipped copies, refreshed when the binary updates (edit the PROJECT copy, not these)");
+    println!("  overwrite  : ONLY with an explicit flag — `--force` re-mirrors agents/skills/ over local edits");
 
     println!("\nNEW MACHINE (nothing lost)");
     println!("  1) git clone <repo> && cd <repo>     # agents/*.md + agents/skills/ arrive with the clone");

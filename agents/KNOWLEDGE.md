@@ -10,29 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1783222758.md)_
-  mọc lại. Re-ran `8sync harness`: on-demand 55→35, feynman trong AGENTS.md = 0, force-load 1998→1717 tok,
-  `harness bench` A1 PASS, `harness eval` 3/3 (vs baseline +0, không regression). Giữ addyosmani coding-eng
-  + impeccable/taste/assp design payload.
-- **note: chuẩn design UI/UX = impeccable (bundled always-on) + Lighthouse 4-gate (Perf/A11y/BP/SEO) +
-  full-flow verify (browser ⨉ Encore trace).** Clouds F (`/home/alexdev/Documents/clouds-f`) là skill FE
-  orchestration giàu hơn nhưng để **project-local** (không bundle vào su-code). Encode thành "UI/UX Design
-  Lane" §4b trong `outputs/agent-team-workflow-automation-plan.md`.
-- **validated: v0.24.0 — discoverability + `/gs` scope-handshake.** `8sync` help (`root.rs::print_cheatsheet`)
-  + `8sync flow` (`flow.rs`) giờ DẪN ĐẦU bằng section "AI TEAM" (`8sync harness` + `/gs`) — trước đó giấu 2
-  lệnh quan trọng nhất sau install + vibe loop. Fix dòng stale: `skill sync`→`skill update` (regen =
-  `8sync harness`), `up` ("binary + omp"→chỉ 8sync; omp qua `omp update`). **`/gs <goal>` thêm scope-handshake**
-  (`assets/commands/gs.md` §1b): goal medium+/mơ hồ → ground → đề xuất 2–4 option (scope·team·effort·tradeoff
-  rút từ bench senior) + default + 2–4 câu `AskUserQuestion` → user chọn → log STATE Assumptions → run; `auto`
-  + trivial bỏ qua. **Key:** gs source = embedded asset `assets/commands/gs.md` (`ensure_gs_command` đọc
-  `assets::read`) → sửa cần REBUILD; `8sync harness` redeploy ra `~/.omp/agent/commands/gs.md` +
-  `<repo>/.omp/commands/gs.md`. Verified: `8sync --version`=0.24.0, help show AI TEAM đầu tiên, §1b deploy 2
-  bản, bench A1 PASS (feature nằm trong binary + command deploy, KHÔNG phải stable-prefix → 0 prefix bloat).
-- **validated: omp docs research — memory/training/custom-command/platform/submodule.** (1) omp KHÔNG
-  train/fine-tune; local model = **ONNX q4 (transformers.js), KHÔNG GGUF**, chỉ title/memory/auto-classifier
-  (`omp://local-models.md`); mnemosyne doc: "does NOT run a local GGUF LLM". → "nhớ dự án sâu" = **Mnemopi
-  memory backend** (`memory.backend: mnemopi`, default OFF) + cbm + spine, KHÔNG phải weights. Chốt user:
-  dùng **model API** (`mnemopi.llmMode: smol` + `noEmbeddings: true` FTS) — 0 local, máy yếu vẫn chạy;
+_(consolidated 10 dòng cũ → agents/archive/KNOWLEDGE-1783248455.md)_
   tradeoff ~5k recall token/phiên (`omp://mnemosyne-memory-backend.md`, `omp://config-usage.md`). (2) Custom
   command = `.omp/commands/*.md` native prio 100 (`omp://slash-command-internals.md`) — su-code đã đúng base,
   chỉ ghi config dirs omp → omp update KHÔNG conflict; automation sâu hơn: extensions(90)/hooks/custom-tools.
@@ -224,3 +202,33 @@ _(consolidated 1 dòng cũ → agents/archive/KNOWLEDGE-1783222758.md)_
   `/api/workspaces/activate` BEFORE screenshots** or you leak another repo (hit: content-post-agency).
   (4) `agents/skills/` is fully gitignored (machine-local mirror); `git check-ignore` echoes the
   path — don't misread it as `ls-files` output. Source of truth = `assets/skills/` (committed).
+- validated: `8sync harness global` (0.44 dev) — machine-wide rule layer extracted into
+  `harness/global.rs::global_pass()` (shared with bare harness; auto.rs step-1 block deleted).
+  Key facts: (1) `~/.omp/agent/APPEND_SYSTEM.md` is what makes rules GLOBAL — every omp system
+  prompt, any project, no per-project run needed; byte-stable writes keep the Anthropic prompt
+  cache hot. (2) `mirror_global_to_local` count = skills PROCESSED (skips included), not newly
+  copied — label as "synced", never "+N mirrored". (3) `compaction::ensure_threshold_default`
+  writes 50 only when the key is absent (never override user config). (4) `--sweep` scanner:
+  repos are dirs containing `.git`, depth ≤ 4, found repos not descended, skips
+  node_modules/target/hidden; gitleaks hook still requires the gitleaks binary.
+- validated: loop-engineering audit vs Avi Chawla's 4-layer article (Jul 2026) — su-code already
+  covers prompt (APPEND_SYSTEM/skills), context (headroom/compaction-50/codegraph/STATE handoff),
+  harness (engine_* + worktree + MCP). The 2 REAL gaps were in the loop layer, both fixed
+  code-enforced in `assets/extensions/8sync-engine.ts`:
+  (1) `engine_advance` never checked verification — "code-enforced gate" was prompt-ware; now a
+  per-task `verified` flag makes advance REFUSE unverified tasks (agent say-so ≠ stop signal).
+  (2) no-progress detector: FNV-1a fingerprint of verify-failure output; identical ×2 warns,
+  ×3 blocks early below maxRetries — doom-loop guard. Old state.json loads via zod defaults.
+  Testing recipe: Bun.Transpiler + stub `pi` {zod, registerTool} + chdir to tmp → call
+  tools[name].execute directly; zod lives at ~/.bun/install/global/node_modules/zod.
+  Remember: assets are rust-embed'd — REBUILD the binary before `8sync harness` deploys them.
+- validated: `--sweep` detection = omp project ⇔ repo has `agents/` dir OR AGENTS.md/CLAUDE.md
+  (`global.rs::is_omp_project`) — sweep never injects into non-omp repos (skip + report).
+  Live run 2026-07-05: 8/8 omp projects under ~/Projects stamped, 0 failed, 0 foreign repos touched.
+- validated: no-overwrite contract audited end-to-end (2026-07-05) — user-owned files
+  (agents/*.md seed-if-missing memory.rs:129 · CHANGELOG once :146 · skills mirror additive
+  deploy.rs:105 · AGENTS.md sentinel-only · hook only-if-absent :239 · config key-detect) are
+  NEVER clobbered by default; proven live: custom edits to agents/skills/*/SKILL.md + STATE.md
+  survive a sweep re-run. Overwrite = explicit `--force` only. Managed layer (~/.omp bundled
+  skills, 00-force-load, APPEND_SYSTEM, extensions) refreshes byte-compare on binary update —
+  customize the PROJECT copy, not ~/.omp. Policy now printed in `harness help` + AGENTS.md §8.

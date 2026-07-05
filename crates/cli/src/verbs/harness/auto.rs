@@ -9,39 +9,17 @@ use std::process::Command;
 
 use anyhow::Result;
 
-use super::external::install_external_skill_packs;
 use super::memory::{consolidate_learnings, seed_gitleaks_hook, seed_harness_memory};
 use crate::verbs::skill::{deploy, discover, inject_agents_md, inject_subfolder_indexes, update};
-use crate::{assets, env_detect, ui};
+use crate::{env_detect, ui};
 
 pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
     ui::header("8sync harness");
 
-    // 1. Global skill library — idempotent. Re-deploys bundled skills new in this
-    //    binary (after `8sync up`) and the master force-load file.
-    let force_load = env.home.join(".omp/skills/00-force-load.md");
-    if let Some(p) = force_load.parent() {
-        std::fs::create_dir_all(p)?;
-    }
-    if let Some(c) = assets::read("skills/00-force-load.md") {
-        std::fs::write(&force_load, c)?;
-    }
-    deploy::install_bundled_global(env)?;
-    deploy::ensure_codegraph(env)?;
-    deploy::ensure_codebase_memory_mcp(env)?;
-    deploy::ensure_headroom_mcp(env)?;
-    let _ = deploy::ensure_omp_memory_config(&env.home);
-    let _ = deploy::ensure_recall_hook(&env.home);
-    let _ = deploy::ensure_append_system(&env.home);
-    let _ = deploy::ensure_serena_mcp(env);
-    let _ = deploy::ensure_zai_vision_mcp(env);
-    let _ = deploy::ensure_omp_capabilities_snapshot(&env.home);
-    deploy::ensure_feynman_cli();
-    let _ = install_external_skill_packs(env); // best-effort; skips packs already present
-    let global_dir = env.home.join(".omp/skills");
-    for d in discover::list_installed_skill_dirs(&global_dir).unwrap_or_default() {
-        deploy::ensure_skill_layout(&d);
-    }
+    // 1. Global skill library + rule layer — idempotent, shared with
+    //    `8sync harness global` (re-deploys bundled skills new in this binary
+    //    after `8sync up`, the master force-load file, APPEND_SYSTEM, MCPs).
+    super::global::global_pass(env)?;
 
     let Some(root) = discover::detect_current_project_root() else {
         ui::ok("global skills ready — `cd` into a project and re-run `8sync harness`");

@@ -5,6 +5,51 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.44.0] — 2026-07-05
+
+### Added — loop-engineering stop signals in the 8sync engine (doom-loop guard + real gate)
+- Per the loop-engineering literature (Avi Chawla, "Prompt, Context, Harness & Loop
+  Engineering", Jul 2026): an agent's own "done" is not a stop signal. Two code-enforced
+  fixes in `assets/extensions/8sync-engine.ts`:
+- **`engine_advance` now actually enforces the gate** — it REFUSES a task that has verify
+  commands but no passing `engine_verify` run (new `verified` flag per task; previously the
+  description claimed "code-enforced" but `advance` set `done` unconditionally). Tasks with
+  zero verify commands keep the documented trivial-advance path.
+- **No-progress detector (doom-loop guard)** — `engine_verify` fingerprints each failure
+  output (FNV-1a); 2 consecutive identical failures WARN ("change the approach"), 3 BLOCK
+  the task early even below `maxRetries` (a byte-identical failure means the retry did
+  nothing but burn tokens). New per-task `failStreak`/`lastFailureHash` state; old
+  `state.json` files load via zod defaults (backward compatible).
+- `/auto` command updated: different-fix-per-retry rule, advance-refusal note, and
+  unattended runs now require a hard token ceiling (omp budget `+Nk!`) as the third stop
+  signal (turn/token cap). Verified end-to-end in Bun: refuse-unverified, warn-at-2,
+  block-at-3 (retries 3/10), pass→advance, trivial-advance, old-state load.
+
+### Added — `8sync harness global`: omp rules machine-wide, one key (Anthropic token-optimized)
+- **`8sync harness global`** — applies the omp rule layer MACHINE-WIDE so every project that
+  runs omp gets it without a per-project run: `~/.omp/skills` + `00-force-load.md`,
+  `~/.omp/agent/APPEND_SYSTEM.md` (appended to EVERY omp system prompt), MCP servers
+  (codebase-memory · headroom · serena · zai-vision), recall hook, capabilities snapshot,
+  workflow extension + engine. CWD-independent — never touches the current project.
+- **Anthropic token-optimizer defaults**: `compaction.thresholdPercent = 50` written only when
+  unset (never overrides the user), headroom compression for >50-line outputs, and byte-stable
+  `APPEND_SYSTEM.md` deploys (identical ⇒ skip) so the system prefix stays hot for Anthropic
+  prompt caching. New `compaction::ensure_threshold_default` helper.
+- **`--sweep [DIR]`** (default `~/Projects`) — stamps the per-project layer into every **omp
+  project** under DIR (a git repo with `agents/` or `AGENTS.md`/`CLAUDE.md` — repos not using
+  omp are skipped + reported): mirror skills (additive), inject force-load into
+  AGENTS.md/CLAUDE.md, seed agents/ memory, install the gitleaks hook. Skips
+  `node_modules`/`target`/hidden dirs, depth ≤ 4, found repos are not descended into.
+  `--pull` re-pulls registered skills first.
+- Dedup: bare `8sync harness`'s global block now calls the shared `global::global_pass()`
+  (`crates/cli/src/verbs/harness/global.rs`) — one source of truth for the machine-wide layer.
+- **Overwrite policy made explicit** (default = NEVER overwrite, only add what's missing):
+  documented in `8sync harness help` (new OVERWRITE POLICY section) + AGENTS.md §8 as a
+  repo-wide invariant. Audited: agents/*.md seed-if-missing, CHANGELOG created once, skills
+  mirror additive (`--force` only), AGENTS.md sentinel-block only, gitleaks hook only-if-absent,
+  config key-detect. Proven live: hand edits to a mirrored SKILL.md + STATE.md survive a
+  sweep re-run byte-for-byte.
+
 ## [0.43.0] — 2026-07-05
 
 ### Added — codegraph canvas capture (`?shot=1`) + automatic locate for non-vision models

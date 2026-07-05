@@ -22,6 +22,9 @@ interface EngineTask {
   title: string;
   status: TaskStatus;
   retries: number;
+  verified: boolean;
+  failStreak: number;
+  lastFailureHash: string;
   verify: string[];
   note: string;
 }
@@ -51,6 +54,9 @@ export default function (pi: ExtensionAPI) {
     title: z.string(),
     status: z.enum(["pending", "in_progress", "done", "blocked"]),
     retries: z.number(),
+    verified: z.boolean().default(false),
+    failStreak: z.number().default(0),
+    lastFailureHash: z.string().default(""),
     verify: z.array(z.string()),
     note: z.string(),
   });
@@ -110,6 +116,17 @@ export default function (pi: ExtensionAPI) {
     return { ok: r.status === 0, output };
   }
 
+  /** FNV-1a 32-bit fingerprint of a failure output — lets the no-progress
+   * detector spot byte-identical consecutive failures (doom-loop guard). */
+  function fnv1a(s: string): string {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16);
+  }
+
   function text(s: string) {
     return { content: [{ type: "text" as const, text: s }] };
   }
@@ -147,7 +164,7 @@ export default function (pi: ExtensionAPI) {
             title: s.title,
             tasks: s.tasks.map((t) => {
               ti += 1;
-              return { id: `s${si}.t${ti}`, title: t.title, status: "pending", retries: 0, verify: t.verify, note: "" };
+              return { id: `s${si}.t${ti}`, title: t.title, status: "pending", retries: 0, verify: t.verify, note: "", verified: false, failStreak: 0, lastFailureHash: "" };
             }),
           };
         }),
@@ -200,7 +217,7 @@ export default function (pi: ExtensionAPI) {
     name: "engine_verify",
     label: "Engine: verify (auto-retry gate)",
     description:
-      "Run the task's verify commands (or the ones passed). All must pass to advance. On failure the retry counter increments; once it reaches maxRetries the task is BLOCKED. The gate is code-enforced — you cannot advance an unverified task.",
+      "Run the task's verify commands (or the ones passed). All must pass to advance. On failure the retry counter increments; once it reaches maxRetries the task is BLOCKED. Identical consecutive failures trip the no-progress guard: 2x warns, 3x BLOCKS early (doom-loop). The gate is code-enforced — engine_advance refuses an unverified task.",
     parameters: z.object({ taskId: z.string(), commands: z.array(z.string()).optional() }),
     async execute(_id, params) {
       const state = load();
@@ -216,9 +233,25 @@ export default function (pi: ExtensionAPI) {
         const r = run(cmd);
         if (!r.ok) failures.push(`$ ${cmd}\n${r.output}`);
       }
-      if (!failures.length) return text(`VERIFIED ${target.id}: all ${cmds.length} checks passed. Call engine_advance.`);
+      if (!failures.length) {
+        target.verified = true;
+        target.failStreak = 0;
+        target.lastFailureHash = "";
+        save(state);
+        return text(`VERIFIED ${target.id}: all ${cmds.length} checks passed. Call engine_advance.`);
+      }
 
+      target.verified = false;
       target.retries += 1;
+      const hash = fnv1a(failures.join("\n\n"));
+      target.failStreak = hash === target.lastFailureHash ? target.failStreak + 1 : 1;
+      target.lastFailureHash = hash;
+      if (target.failStreak >= 3) {
+        target.status = "blocked";
+        target.note = `no progress — ${target.failStreak} identical failures`;
+        save(state);
+        return text(`BLOCKED ${target.id}: NO PROGRESS — ${target.failStreak} consecutive identical failures (doom-loop guard). Repeating the same attempt cannot pass. Record a failure: in agents/KNOWLEDGE.md, then change approach, split the task, or escalate.\n\n${failures.join("\n\n")}`);
+      }
       if (target.retries >= state.maxRetries) {
         target.status = "blocked";
         target.note = `blocked after ${target.retries} failed verifies`;
@@ -226,14 +259,15 @@ export default function (pi: ExtensionAPI) {
         return text(`BLOCKED ${target.id} after ${target.retries} attempts (maxRetries=${state.maxRetries}). Record a failure: in agents/KNOWLEDGE.md and move on / escalate.\n\n${failures.join("\n\n")}`);
       }
       save(state);
-      return text(`FAILED ${target.id} (attempt ${target.retries}/${state.maxRetries}). Fix the cause, then call engine_verify again:\n\n${failures.join("\n\n")}`);
+      const loop = target.failStreak === 2 ? " WARNING: same failure twice in a row — a third identical failure BLOCKS the task (no-progress guard). Change the approach, don't retry the same fix." : "";
+      return text(`FAILED ${target.id} (attempt ${target.retries}/${state.maxRetries}).${loop} Fix the cause, then call engine_verify again:\n\n${failures.join("\n\n")}`);
     },
   });
 
   pi.registerTool({
     name: "engine_advance",
     label: "Engine: advance",
-    description: "Mark a verified task done and optionally commit the change (gitleaks-free commit is the caller's responsibility). Advances the plan.",
+    description: "Mark a verified task done and optionally commit the change (gitleaks-free commit is the caller's responsibility). REFUSES a task whose verify commands never passed — the agent's own say-so is not a stop signal. Advances the plan.",
     parameters: z.object({ taskId: z.string(), commit: z.boolean().default(false), message: z.string().optional() }),
     async execute(_id, params) {
       const state = load();
@@ -241,6 +275,11 @@ export default function (pi: ExtensionAPI) {
       let target: EngineTask | undefined;
       for (const s of state.slices) for (const t of s.tasks) if (t.id === params.taskId) target = t;
       if (!target) return text(`No task ${params.taskId}.`);
+      if (target.verify.length && !target.verified) {
+        return text(
+          `REFUSED ${target.id}: it has ${target.verify.length} verify command(s) but no passing engine_verify run. The gate is code-enforced — call engine_verify {taskId:"${target.id}"} first.`,
+        );
+      }
       target.status = "done";
       save(state);
       let committed = "";

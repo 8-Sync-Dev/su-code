@@ -1,0 +1,193 @@
+//! `8sync harness global` — ONE key that applies the omp operating rules
+//! MACHINE-WIDE, so every project that runs omp gets them (no per-project run
+//! needed for the rule layer):
+//!   ~/.omp/skills + 00-force-load.md        → skill library, read every session
+//!   ~/.omp/agent/APPEND_SYSTEM.md           → appended to EVERY omp system prompt
+//!   MCP servers (cbm · headroom · serena · zai-vision) + recall hook + capabilities
+//! plus the Anthropic token-optimizer defaults:
+//!   compaction 50% (only if unset) · headroom compress >50-line outputs ·
+//!   byte-stable APPEND_SYSTEM writes (identical ⇒ skip) so the system prefix
+//!   stays cache-hot for Anthropic prompt caching.
+//! CWD-independent — never touches the current project. `--sweep [DIR]` then
+//! stamps the per-project layer (mirror skills + inject AGENTS.md + seed memory
+//! + gitleaks hook) into every git repo under DIR (default ~/Projects).
+use std::path::{Path, PathBuf};
+
+use anyhow::Result;
+
+use super::compaction;
+use super::external::install_external_skill_packs;
+use super::memory::{seed_gitleaks_hook, seed_harness_memory};
+use crate::verbs::skill::{deploy, discover, inject_agents_md, update};
+use crate::{assets, env_detect, ui};
+
+/// The global (machine-wide) layer, shared by bare `8sync harness` and
+/// `8sync harness global`: master force-load + bundled skills + codegraph binary
+/// + MCP servers + omp memory config/recall hook + APPEND_SYSTEM directives +
+/// capabilities snapshot + external packs + layout normalization. Idempotent.
+pub(crate) fn global_pass(env: &env_detect::Env) -> Result<()> {
+    let force_load = env.home.join(".omp/skills/00-force-load.md");
+    if let Some(p) = force_load.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    if let Some(c) = assets::read("skills/00-force-load.md") {
+        std::fs::write(&force_load, c)?;
+    }
+    deploy::install_bundled_global(env)?;
+    deploy::ensure_codegraph(env)?;
+    deploy::ensure_codebase_memory_mcp(env)?;
+    deploy::ensure_headroom_mcp(env)?;
+    let _ = deploy::ensure_omp_memory_config(&env.home);
+    let _ = deploy::ensure_recall_hook(&env.home);
+    let _ = deploy::ensure_append_system(&env.home);
+    let _ = deploy::ensure_serena_mcp(env);
+    let _ = deploy::ensure_zai_vision_mcp(env);
+    let _ = deploy::ensure_omp_capabilities_snapshot(&env.home);
+    deploy::ensure_feynman_cli();
+    let _ = install_external_skill_packs(env); // best-effort; skips packs already present
+    let global_dir = env.home.join(".omp/skills");
+    for d in discover::list_installed_skill_dirs(&global_dir).unwrap_or_default() {
+        deploy::ensure_skill_layout(&d);
+    }
+    Ok(())
+}
+
+pub(crate) fn harness_global(
+    env: &env_detect::Env,
+    sweep: Option<&str>,
+    pull: bool,
+    force: bool,
+) -> Result<()> {
+    ui::header("8sync harness global");
+
+    // 1. Machine-wide rule layer (~/.omp) — applies to EVERY omp session anywhere.
+    ui::step("global rules → ~/.omp (skills · APPEND_SYSTEM · MCP · hooks)");
+    global_pass(env)?;
+    let _ = deploy::ensure_workflow_extension(&env.home, None);
+    let _ = deploy::ensure_engine(&env.home, None);
+    let _ = deploy::cleanup_legacy_gs(&env.home, None);
+
+    // 2. Anthropic token-optimizer defaults (never override a user setting).
+    ui::step("token-optimizer defaults (Anthropic)");
+    let _ = compaction::ensure_threshold_default(&env.home, 50);
+
+    // 3. Optional: re-pull registered skills from their sources (network).
+    if pull {
+        ui::step("re-pull registered skills (network)");
+        let _ = update::update_skills(env, &env.xdg_config.join("8sync/skills.toml"), None);
+    }
+
+    // 4. Optional: stamp the per-project layer into every git repo under DIR.
+    if let Some(dir) = sweep {
+        let root = sweep_root(env, dir);
+        ui::step(&format!("sweep projects under {}", root.display()));
+        let (repos, skipped): (Vec<_>, Vec<_>) =
+            find_git_repos(&root, 4).into_iter().partition(|r| is_omp_project(r));
+        if repos.is_empty() {
+            ui::warn(&format!("no omp projects (agents/ or AGENTS.md/CLAUDE.md) found under {}", root.display()));
+        }
+        let (mut ok, mut failed) = (0usize, 0usize);
+        for repo in &repos {
+            match stamp_project(env, repo, force) {
+                Ok(mirrored) => {
+                    ok += 1;
+                    let name = repo.strip_prefix(&root).unwrap_or(repo);
+                    ui::ok(&format!("{} ({} skill(s) synced)", name.display(), mirrored));
+                }
+                Err(e) => {
+                    failed += 1;
+                    ui::warn(&format!("{}: {}", repo.display(), e));
+                }
+            }
+        }
+        if !skipped.is_empty() {
+            ui::skip(
+                &format!("{} repo(s) not using omp", skipped.len()),
+                "no agents/ or AGENTS.md/CLAUDE.md — onboard one with `cd <repo> && 8sync harness`",
+            );
+        }
+        ui::info(&format!(
+            "sweep: {} omp project(s) stamped{} — full pass (codegraph index) per project: `cd <repo> && 8sync harness`",
+            ok,
+            if failed > 0 { format!(", {failed} failed") } else { String::new() }
+        ));
+    }
+
+    // 5. Summary — what now applies to every omp session on this machine.
+    ui::ok("omp rules are now GLOBAL — every omp session in every project gets:");
+    ui::info("  • ~/.omp/agent/APPEND_SYSTEM.md appended to EVERY system prompt (code-intel-first, never compacted)");
+    ui::info("  • skills @ ~/.omp/skills + 00-force-load.md · MCP: codebase-memory · headroom · serena · zai-vision");
+    ui::info("  • token optimizer: headroom compress >50-line outputs · compaction 50% · stable prefix → Anthropic prompt-cache hits");
+    if sweep.is_none() {
+        ui::info("stamp the per-project layer everywhere: `8sync harness global --sweep` (default ~/Projects)");
+    }
+    Ok(())
+}
+
+/// An omp project = a repo already carrying the agent-memory layer: an `agents/`
+/// dir or an `AGENTS.md`/`CLAUDE.md` at the root. The sweep only stamps these —
+/// it never injects into repos that don't use omp (onboard those by running
+/// `8sync harness` inside them once).
+fn is_omp_project(repo: &Path) -> bool {
+    repo.join("agents").is_dir() || repo.join("AGENTS.md").is_file() || repo.join("CLAUDE.md").is_file()
+}
+
+/// Resolve the sweep root: explicit DIR > `~/Projects` (if present) > cwd.
+fn sweep_root(env: &env_detect::Env, dir: &str) -> PathBuf {
+    if !dir.is_empty() {
+        return PathBuf::from(dir);
+    }
+    let projects = env.home.join("Projects");
+    if projects.is_dir() {
+        return projects;
+    }
+    std::env::current_dir().unwrap_or_else(|_| env.home.clone())
+}
+
+/// Iterative scan for git repos (dirs containing `.git`) up to `max_depth`.
+/// A found repo is not descended into; hidden and build/dependency dirs are skipped.
+fn find_git_repos(root: &Path, max_depth: usize) -> Vec<PathBuf> {
+    const SKIP: &[&str] = &[
+        "node_modules", "target", "dist", "build", "vendor", "venv", ".venv", "__pycache__",
+    ];
+    let mut repos = Vec::new();
+    let mut frontier = vec![(root.to_path_buf(), 0usize)];
+    while let Some((dir, depth)) = frontier.pop() {
+        if dir.join(".git").exists() {
+            repos.push(dir);
+            continue;
+        }
+        if depth >= max_depth {
+            continue;
+        }
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if !p.is_dir() {
+                continue;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with('.') || SKIP.contains(&name.as_ref()) {
+                continue;
+            }
+            frontier.push((p, depth + 1));
+        }
+    }
+    repos.sort();
+    repos
+}
+
+/// Per-project layer for one repo (the light, additive subset of bare
+/// `8sync harness`): mirror skills, inject force-load into AGENTS.md/CLAUDE.md,
+/// seed agents/ memory, install the gitleaks hook. Returns mirrored-skill count.
+fn stamp_project(env: &env_detect::Env, root: &Path, force: bool) -> Result<usize> {
+    let mirrored = deploy::mirror_global_to_local(&env.home, root, force)?;
+    for d in discover::list_installed_skill_dirs(&root.join("agents/skills")).unwrap_or_default() {
+        deploy::ensure_skill_layout(&d);
+    }
+    inject_agents_md(&env.home, root)?;
+    seed_harness_memory(root)?;
+    seed_gitleaks_hook(root);
+    Ok(mirrored)
+}

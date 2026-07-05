@@ -25,8 +25,8 @@ Then call **engine_plan** with the goal + slices; each slice's atomic tasks; eac
 ## 3. Loop until done (in an autonomous run, do not yield between tasks)
 1. **engine_next** → next task + scoped context. Understand before editing (codegraph callers/deps + `git log/blame` + `agents/DECISIONS.md`).
 2. Implement at the right size. Prefer **serena** symbol-level edits over blind whole-file rewrites.
-3. **engine_verify** `{taskId}` — the gate runs the commands. FAILED → fix the cause, call engine_verify again. BLOCKED (retries exhausted) → write a `failure:` to `agents/KNOWLEDGE.md`, move to the next unblocked task or escalate.
-4. **engine_advance** `{taskId, commit:true}` only after VERIFIED (gitleaks clean).
+3. **engine_verify** `{taskId}` — the gate runs the commands. FAILED → fix the cause, call engine_verify again — with a DIFFERENT fix: 2 identical failures warn, 3 BLOCK the task early (no-progress/doom-loop guard). BLOCKED → write a `failure:` to `agents/KNOWLEDGE.md`, move to the next unblocked task or escalate.
+4. **engine_advance** `{taskId, commit:true}` — code-REFUSED unless engine_verify passed (your own "done" is not a stop signal); gitleaks clean.
 5. Tick `agents/STATE.md` (Current/Next); distill a `validated:` runbook into `agents/PLAYBOOKS.md` when a multi-step procedure worked.
 6. Loop. Use **engine_worktree** to isolate a risky/large slice (open → work → merge squash → remove).
 
@@ -43,7 +43,7 @@ When engine_status shows all done, hand over ONLY if green:
 - **irc** — coordinate with siblings before editing a shared file.
 
 ## Guardrails
-Verify-gate before every commit (engine_verify enforces it) · scope to the change + `agents/` memory · NO `git push` / PR unless asked · unattended needs omp `tools.approvalMode: yolo` · stop only on a true blocker (missing credential, irreversible/destructive action), never on ambiguity — pick the reversible option and log it.
+Verify-gate before every commit (engine_verify enforces it; engine_advance refuses unverified tasks) · scope to the change + `agents/` memory · NO `git push` / PR unless asked · unattended needs omp `tools.approvalMode: yolo` AND a hard token ceiling (budget `+Nk!`) — a turn/token cap is a stop signal, agent say-so is not · stop only on a true blocker (missing credential, irreversible/destructive action), never on ambiguity — pick the reversible option and log it.
 
 ## Model + context budget
 Use the models in `~/.config/8sync/models.toml` (view/edit: `8sync harness model`); route per task class — cheaper for trivial, stronger for review/debug — **never above the configured ceiling**, and let omp fall back to an authenticated model when the configured one isn't logged in. When context nears the limit (auto-compacts at 50%), write a structured handoff into `agents/STATE.md` BEFORE it fires so the next session resumes clean.
