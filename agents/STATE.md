@@ -25,11 +25,15 @@ its `install.sh` ships a prebuilt CUDA/CPU binary (no nvcc — was missing here)
   models.yml (sentinel block; TSV registry source-of-truth) → verify `/v1`. `list`/`rm`.
 - [x] **Slice 2 — coexist+wire**: `gateway apply` preserves the local block; `doctor` +
   `capabilities.md` report local models; help/README/CHANGELOG/KNOWLEDGE.
-- [ ] **Slice 3 — LocateAnything-3B**: `8sync locate <img> <prompt>` via mudler/
+- [x] **Slice 3 — LocateAnything-3B**: `8sync locate <img> <prompt>` via mudler/
   locate-anything.cpp (MIT ggml port, prebuilt q8_0 GGUF on HF) → boxes JSON for GUI
   grounding/OCR-localization; `--setup` builds the CLI. Skill + NVIDIA non-commercial caveat.
-- [ ] **Slice 4 — closeout**: release build + REAL E2E (tiny GGUF via mistral.rs; locate).
-Engine plan drives it (`engine_status`). No push until asked.
+- [x] **Slice 4 — closeout**: real E2E proven on this box — mistral.rs 0.8.23 (auto
+  `cuda131-sm120` RTX 5080) serves SmolLM2-135M GGUF; `add-local-model` → systemd unit →
+  `/v1/chat/completions` real text → `rm` clean. Caught+fixed 2 bugs: serve needs
+  `-m <dir> -f <file> --format gguf` (not `-m <file>`); omp `id: default` (mistral.rs
+  serves only `default`+dir-path), `local/<name>` selector via `name:` field.
+**8/8 tasks done (`engine_status`).** No push until asked — commit a9140c2 local.
 
 ## Previous (Unreleased, shipped earlier this session)
 Shipped 2 fixes (Unreleased): **(1) zai-vision MCP + skill** — `8sync harness`
