@@ -19,6 +19,7 @@ mod external;
 mod init;
 mod memory;
 mod model;
+mod local_model;
 mod gateway;
 mod up;
 mod web;
@@ -42,6 +43,8 @@ mod toolstats;
       8sync harness eval [--baseline] run the quality task-suite through omp (pass/fail + wall-time; --baseline saves the reference)
       8sync harness compaction [pct]  view/set omp auto-compaction threshold (default 50% — anti-forget)
       8sync harness gateway [apply|key <KEY>|verify|status]  deploy/verify the omp model-gateway (9router + thinking fix)
+      8sync harness add-local-model <path.gguf|org/repo|url> [name]  serve a local GGUF via mistral.rs + register with omp
+      8sync harness add-local-model list|rm <name>  list / remove registered local models
 
     WHAT init DEPLOYS
       always-on : codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing
@@ -113,6 +116,11 @@ pub fn run(a: Args) -> Result<()> {
         Some("gateway") => {
             let args: Vec<String> = [a.value.clone(), a.value2.clone()].into_iter().flatten().collect();
             gateway::harness_gateway(&env, &args)
+        }
+        Some("add-local-model") | Some("add-model") => {
+            let args: Vec<String> =
+                [a.value.clone(), a.value2.clone()].into_iter().flatten().collect();
+            local_model::harness_add_local_model(&env, &args, a.port)
         }
         Some("help") => {
             print_help();
