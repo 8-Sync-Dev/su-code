@@ -15,7 +15,7 @@ use anyhow::{Context, Result};
 
 use super::memory::{consolidate_learnings, seed_gitleaks_hook, seed_harness_memory};
 use crate::verbs::skill::{discover, inject_agents_md, inject_subfolder_indexes};
-use crate::{env_detect, ui};
+use crate::{env_detect, platform, ui};
 
 pub(crate) fn harness_up(
     env: &env_detect::Env,
@@ -25,10 +25,10 @@ pub(crate) fn harness_up(
     commit: bool,
 ) -> Result<()> {
     if let Some(spec) = timer {
-        return manage_timer(env, spec);
+        return manage_timer(spec);
     }
     if let Some(dur) = loop_every {
-        let secs = parse_dur_secs(dur).max(60);
+        let secs = platform::parse_dur_secs(dur).max(60);
         ui::header(&format!("8sync harness up --loop ({}s interval)", secs));
         ui::info("Ctrl-C to stop. Each pass re-injects rules + refreshes memory + re-indexes codegraph.");
         loop {
@@ -150,81 +150,27 @@ fn commit_memory(root: &Path) {
     }
 }
 
-/// Parse a human duration (`10m`, `1h`, `30s`, or bare seconds) into seconds.
-fn parse_dur_secs(s: &str) -> u64 {
-    let s = s.trim();
-    let (num, mult) = if let Some(n) = s.strip_suffix('h') {
-        (n, 3600)
-    } else if let Some(n) = s.strip_suffix('m') {
-        (n, 60)
-    } else if let Some(n) = s.strip_suffix('s') {
-        (n, 1)
-    } else {
-        (s, 1)
-    };
-    num.trim().parse::<u64>().unwrap_or(600).saturating_mul(mult)
-}
-
-/// Install/remove a systemd USER timer that runs `8sync harness up` in the
-/// project directory every `<dur>` (proven pattern, mirrors `8sync clean --timer`).
-fn manage_timer(env: &env_detect::Env, spec: &str) -> Result<()> {
-    let unit_dir = env.home.join(".config/systemd/user");
-    let svc = unit_dir.join("8sync-harness-up.service");
-    let timer = unit_dir.join("8sync-harness-up.timer");
-
+/// Install/remove the periodic `8sync harness up` background job (systemd user
+/// timer on Linux, launchd LaunchAgent on macOS, Scheduled Task on Windows).
+/// Bounded to its own cgroup on Linux so a heavy `codegraph index` tick can't
+/// OOM the machine.
+fn manage_timer(spec: &str) -> Result<()> {
     if spec.eq_ignore_ascii_case("off") {
         ui::header("8sync harness up --timer off");
-        let _ = Command::new("systemctl")
-            .args(["--user", "disable", "--now", "8sync-harness-up.timer"])
-            .status();
-        let _ = std::fs::remove_file(&svc);
-        let _ = std::fs::remove_file(&timer);
-        let _ = Command::new("systemctl").args(["--user", "daemon-reload"]).status();
-        ui::ok("timer removed");
-        return Ok(());
+        return platform::remove_timer("harness-up");
     }
-
     ui::header(&format!("8sync harness up --timer {}", spec));
     let root = discover::detect_current_project_root()
         .context("`harness up --timer` must run inside a project (it sets WorkingDirectory)")?;
-    let exe = std::env::current_exe().context("current_exe")?;
-    std::fs::create_dir_all(&unit_dir)?;
-
-    // Background refresh unit. Bounded to its own cgroup + low priority so a
-    // heavy `codegraph index` / cbm re-index (peak RSS can hit multiple GB on a
-    // big repo) can NEVER OOM-kill the machine again: MemoryHigh applies reclaim
-    // pressure (throttle, don't explode), MemoryMax is a hard cgroup ceiling that
-    // kills only THIS unit, MemorySwapMax stops swap thrash, OOMPolicy=stop exits
-    // cleanly. Nice/CPUWeight/IOWeight keep it out of the way of foreground work.
-    let svc_body = format!(
-        "[Unit]\nDescription=8sync harness up ({proj})\n\n\
-         [Service]\nType=oneshot\nTimeoutStartSec=900\n\
-         WorkingDirectory={wd}\nExecStart={exe} harness up\n\
-         Nice=15\nCPUWeight=10\nIOWeight=10\n\
-         MemoryHigh=2G\nMemoryMax=4G\nMemorySwapMax=512M\nOOMPolicy=stop\n",
-        proj = root.file_name().and_then(|s| s.to_str()).unwrap_or("project"),
-        wd = root.display(),
-        exe = exe.display(),
-    );
-    let timer_body = format!(
-        "[Unit]\nDescription=8sync harness up timer (every {dur})\n\n[Timer]\nOnBootSec=5min\nOnUnitActiveSec={dur}\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n",
-        dur = spec
-    );
-    std::fs::write(&svc, svc_body)?;
-    std::fs::write(&timer, timer_body)?;
-    ui::ok(&format!("wrote {} + .timer", svc.display()));
-
-    let _ = Command::new("systemctl").args(["--user", "daemon-reload"]).status();
-    let st = Command::new("systemctl")
-        .args(["--user", "enable", "--now", "8sync-harness-up.timer"])
-        .status();
-    match st {
-        Ok(s) if s.success() => {
-            ui::ok(&format!("timer enabled — refreshes `{}` every {}", root.display(), spec));
-            ui::info("status: systemctl --user list-timers 8sync-harness-up.timer");
-            ui::info("note: boot-time runs need `loginctl enable-linger $USER`");
-        }
-        _ => ui::warn("could not enable timer (is `systemctl --user` available?)"),
-    }
-    Ok(())
+    let proj = root.file_name().and_then(|s| s.to_str()).unwrap_or("project").to_string();
+    let desc = format!("8sync harness up ({proj})");
+    platform::install_timer(&platform::TimerSpec {
+        name: "harness-up",
+        description: &desc,
+        exec_args: &["harness", "up"],
+        workdir: Some(&root),
+        every: spec,
+        memory_bounded: true,
+        timeout_secs: 900,
+    })
 }

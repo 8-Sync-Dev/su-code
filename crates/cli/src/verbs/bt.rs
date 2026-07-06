@@ -12,7 +12,7 @@ use anyhow::Result;
 use clap::Args as ClapArgs;
 use std::process::Command;
 
-use crate::ui;
+use crate::{platform, ui};
 
 #[derive(ClapArgs, Debug)]
 #[command(
@@ -31,6 +31,9 @@ pub struct Args {
 }
 
 pub fn run(a: Args) -> Result<()> {
+    if !platform::require_linux("bt", "bluez/rfkill are Linux-only") {
+        return Ok(());
+    }
     if !present() {
         ui::warn("bluez not installed — `8sync setup --profile bluetooth` (bluez + bluez-utils)");
         return Ok(());

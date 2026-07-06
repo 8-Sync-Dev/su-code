@@ -4,6 +4,7 @@
 mod ui;
 mod env_detect;
 mod pkg;
+mod platform;
 mod assets;
 mod models;
 mod verbs;

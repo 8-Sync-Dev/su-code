@@ -244,3 +244,21 @@ _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   (rusqlite `bundled`, for `harness toolstats`) + `zstd-sys` (via `include-flate`) compile bundled C in
   `build.rs`, so cross-from-Linux needs mingw-w64/osxcross — **native CI runners (macos-14, windows-latest)
   build them cleanly**, which is the recommended release path.
+- **validated (v0.47.0 — cross-platform ship, option B):** the v0.46.2 finding held — porting to
+  macOS/Windows needed NO `std::os::unix` removal. Pattern that worked: a single `crate::platform`
+  module with `pub const fn os()` (cfg-selected variant per target) + runtime `match os()` dispatch,
+  so ONE code body compiles on every target and the wrong-OS branch just never runs (add
+  `#[allow(dead_code)]` on the `Os` enum — only one variant is constructed per compiled target, so the
+  others read as dead code on any given build). Timer abstraction: systemd user unit (Linux) / launchd
+  `StartInterval` plist (macOS) / `schtasks /SC MINUTE /MO <min>` (Windows) — schtasks has no per-task
+  cwd so wrap `cmd /c cd /d "<wd>" && "<exe>" <args>`; launchd/schtasks have no cgroup memory cap, so
+  the OOM-bound is Linux-only (fine — it was a Linux-only bug). Linux-only verbs (`sec`/`bt`/`clean`)
+  gated with a `require_linux()` no-op guard rather than `#[cfg]` stubs (keeps one binary, honest msg).
+- **validated (release engineering):** portable Linux prebuilts = **musl-static** (`x86_64/aarch64-unknown-linux-musl`)
+  not gnu — dodges `GLIBC_2.xx not found`. `musl-tools` covers x86_64 native; aarch64-musl + the bundled
+  C deps build cleanly via **`cross`** (dockerized toolchain) on ubuntu. mac/Win = native runners
+  (macos-13 x86_64, macos-14 arm64, windows-latest MSVC) — the ONLY way (Linux can't emit Apple-SDK/MSVC).
+- **failure (local cross-verify):** `cargo check --target x86_64-pc-windows-gnu` from Linux ABORTS on
+  `libsqlite3-sys` build.rs (needs a Windows C compiler / mingw). Without passwordless sudo to install
+  mingw-w64, local win/mac compile-verification is impossible — CI native runners are authoritative, and
+  that's not a shortcut, it's the standard. Don't burn time trying to cross-build C-FFI crates from Linux.

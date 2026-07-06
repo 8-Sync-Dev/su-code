@@ -16,11 +16,11 @@
 //   8sync clean --timer 1h   install a systemd USER timer (1h | 30min | …)
 //   8sync clean --timer off  remove the timer
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Args as ClapArgs;
 use std::process::Command;
 
-use crate::ui;
+use crate::{platform, ui};
 
 #[derive(ClapArgs, Debug)]
 #[command(
@@ -76,7 +76,12 @@ pub struct Args {
 
 pub fn run(a: Args) -> Result<()> {
     if let Some(spec) = a.timer.as_deref() {
+        // Timer removal works anywhere; install too (harmless if clean is a
+        // no-op on this OS). Only the reclaim body below is Linux-only.
         return manage_timer(spec);
+    }
+    if !platform::require_linux("clean", "it reclaims pacman/journal/tmpfiles + reports NVIDIA/amd-pstate") {
+        return Ok(());
     }
     if let Some(secs) = a.watch {
         let secs = secs.max(60); // never busy-loop
@@ -411,55 +416,21 @@ fn human_mb_delta(mb: i64) -> String {
     }
 }
 
-// ── systemd user timer ──────────────────────────────────────────────
+// ── periodic timer (systemd / launchd / schtasks via platform) ──────
 
 fn manage_timer(spec: &str) -> Result<()> {
-    let home = dirs::home_dir().context("no HOME")?;
-    let unit_dir = home.join(".config/systemd/user");
-    let svc = unit_dir.join("8sync-clean.service");
-    let timer = unit_dir.join("8sync-clean.timer");
-
     if spec.eq_ignore_ascii_case("off") {
         ui::header("8sync clean --timer off");
-        let _ = Command::new("systemctl")
-            .args(["--user", "disable", "--now", "8sync-clean.timer"])
-            .status();
-        let _ = std::fs::remove_file(&svc);
-        let _ = std::fs::remove_file(&timer);
-        let _ = Command::new("systemctl").args(["--user", "daemon-reload"]).status();
-        ui::ok("timer removed");
-        return Ok(());
+        return platform::remove_timer("clean");
     }
-
     ui::header(&format!("8sync clean --timer {}", spec));
-    let exe = std::env::current_exe().context("current_exe")?;
-    std::fs::create_dir_all(&unit_dir)?;
-
-    let svc_body = format!(
-        "[Unit]\nDescription=8sync periodic clean\n\n[Service]\nType=oneshot\nTimeoutStartSec=300\nExecStart={} clean\n",
-        exe.display()
-    );
-    let timer_body = format!(
-        "[Unit]\nDescription=8sync clean timer (every {dur})\n\n[Timer]\nOnBootSec=10min\nOnUnitActiveSec={dur}\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n",
-        dur = spec
-    );
-    std::fs::write(&svc, svc_body)?;
-    std::fs::write(&timer, timer_body)?;
-    ui::ok(&format!("wrote {} + .timer", svc.display()));
-
-    let _ = Command::new("systemctl").args(["--user", "daemon-reload"]).status();
-    let st = Command::new("systemctl")
-        .args(["--user", "enable", "--now", "8sync-clean.timer"])
-        .status();
-    match st {
-        Ok(s) if s.success() => {
-            ui::ok(&format!("timer enabled — runs `8sync clean` every {}", spec));
-            ui::info("status: systemctl --user list-timers 8sync-clean.timer");
-            ui::info("note: needs lingering for boot-time runs → `loginctl enable-linger $USER`");
-            ui::info("note: headless timer can't sudo — auto-runs only do user-cache/paru cleanup;");
-            ui::info("      run `8sync clean` in a terminal for pacman-cache + journal + tmpfiles too.");
-        }
-        _ => ui::warn("could not enable timer (is `systemctl --user` available?)"),
-    }
-    Ok(())
+    platform::install_timer(&platform::TimerSpec {
+        name: "clean",
+        description: "8sync periodic clean",
+        exec_args: &["clean"],
+        workdir: None,
+        every: spec,
+        memory_bounded: false,
+        timeout_secs: 300,
+    })
 }

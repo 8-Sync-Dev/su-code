@@ -12,7 +12,7 @@ use anyhow::Result;
 use clap::Args as ClapArgs;
 use std::process::Command;
 
-use crate::ui;
+use crate::{platform, ui};
 
 #[derive(ClapArgs, Debug)]
 #[command(
@@ -34,6 +34,9 @@ pub struct Args {
 }
 
 pub fn run(a: Args) -> Result<()> {
+    if !platform::require_linux("sec", "WARP + ufw are managed via Linux CLIs") {
+        return Ok(());
+    }
     match a.action.as_deref() {
         None | Some("status") => { status(); Ok(()) }
         Some("on")     => { warp_on(); ufw_on(); Ok(()) }

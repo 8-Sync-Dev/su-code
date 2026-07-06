@@ -1,2 +1,4 @@
-[build]
-rustflags = ["-C", "target-cpu=native"]
+# No `target-cpu=native`: release binaries are distributed as prebuilts (GitHub
+# Releases → install.sh / install.ps1), so they must run on any CPU of the target
+# arch. `target-cpu=native` bakes in the build host's ISA extensions and makes the
+# binary SIGILL on older CPUs. Local dev can still opt in via RUSTFLAGS if wanted.

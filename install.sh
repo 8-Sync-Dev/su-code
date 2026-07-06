@@ -25,15 +25,23 @@ if [ "${1:-}" = "--uninstall" ]; then
   exit 0
 fi
 
-# 1. Platform check — only a Linux x86_64 prebuilt ships today.
+# 1. Platform check — resolve os first, then arch (arm64 naming differs per-os).
 os="$(uname -s)"
 arch="$(uname -m)"
 case "$os" in
   Linux) os="linux" ;;
+  Darwin) os="darwin" ;;
   *) echo "8sync: no prebuilt binary for '$os' yet — build from source: https://github.com/$REPO (scripts/bootstrap.sh)" >&2; exit 1 ;;
 esac
 case "$arch" in
   x86_64|amd64) arch="x86_64" ;;
+  aarch64|arm64)
+    # Apple Silicon reports/uses arm64; Linux uses aarch64.
+    case "$os" in
+      linux) arch="aarch64" ;;
+      darwin) arch="arm64" ;;
+    esac
+    ;;
   *) echo "8sync: no prebuilt binary for '$arch' yet — build from source: https://github.com/$REPO (scripts/bootstrap.sh)" >&2; exit 1 ;;
 esac
 

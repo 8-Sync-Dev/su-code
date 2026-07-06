@@ -1,0 +1,133 @@
+name: Release
+
+# Build native 8sync binaries on real macOS / Windows / Linux runners and
+# publish them to a GitHub Release when a vX.Y.Z tag is pushed.
+#
+# Asset names follow the scheme consumed by install.sh / install.ps1:
+#   8sync-${tag}-${os}-${arch}[.exe]
+# where ${tag} is the pushed tag (e.g. v0.46.2).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag for asset names on manual dispatch (e.g. v0.46.2)"
+        required: false
+        type: string
+
+jobs:
+  build:
+    name: build ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux — musl static builds for glibc-independent portability.
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            label: linux-x86_64
+            ext: ""
+            cross: false
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            label: linux-aarch64
+            ext: ""
+            cross: true
+          # macOS — native builds on each architecture's runner.
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            label: darwin-x86_64
+            ext: ""
+            cross: false
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            label: darwin-arm64
+            ext: ""
+            cross: false
+          # Windows — native MSVC build.
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            label: windows-x86_64
+            ext: ".exe"
+            cross: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install musl toolchain
+        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross
+        if: ${{ matrix.cross }}
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build (native)
+        if: ${{ !matrix.cross }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Build (cross)
+        if: ${{ matrix.cross }}
+        run: cross build --release --locked --target ${{ matrix.target }}
+
+      - name: Compute asset name
+        shell: bash
+        run: |
+          version="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "ASSET=8sync-${version}-${{ matrix.label }}${{ matrix.ext }}" >> "$GITHUB_ENV"
+
+      - name: Package binary (unix)
+        if: ${{ runner.os != 'Windows' }}
+        shell: bash
+        run: cp "target/${{ matrix.target }}/release/8sync" "$ASSET"
+
+      - name: Package binary (windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash
+        run: cp "target/${{ matrix.target }}/release/8sync.exe" "$ASSET"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

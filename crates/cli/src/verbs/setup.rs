@@ -3,7 +3,7 @@ use clap::Args as ClapArgs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::{assets, env_detect, pkg, ui, verbs::profile};
+use crate::{assets, env_detect, pkg, platform, ui, verbs::profile};
 
 #[derive(ClapArgs, Debug)]
 #[command(
@@ -93,11 +93,16 @@ pub fn run(a: Args) -> Result<()> {
 
     ui::header("8sync setup");
     let env = env_detect::Env::detect()?;
-    if !env.is_cachyos_or_arch() {
-        ui::warn(&format!(
+    match platform::os() {
+        platform::Os::Linux if !env.is_cachyos_or_arch() => ui::warn(&format!(
             "OS `{}` is not CachyOS/Arch — some steps may fail.",
             env.os_id
-        ));
+        )),
+        platform::Os::Macos | platform::Os::Windows => ui::info(&format!(
+            "{} — installing the cross-platform AI-harness core (Stage A); Arch-only profiles are skipped.",
+            platform::os_name()
+        )),
+        _ => {}
     }
 
     // ── YOLO mode setup: auto-on for any unattended path ─────────
@@ -128,16 +133,27 @@ pub fn run(a: Args) -> Result<()> {
         ui::info("would patch PATH in zsh/bash + ~/.config/fish/conf.d/8sync-path.fish");
         ui::info("would register codegraph as a global+local skill");
     } else {
-        try_step("github-cli", yolo, &mut failures, || {
-            pkg::pacman_install_safe(&["github-cli"], true)
+        try_step("gh cli", yolo, &mut failures, || {
+            platform::install_core_pkg("gh", "github-cli", "gh", "GitHub.cli")
         })?;
         try_step("omp",        yolo, &mut failures, install_omp)?;
-        try_step("paru",       yolo, &mut failures, install_aur_helper)?;
+        if platform::os() == platform::Os::Linux {
+            try_step("paru",   yolo, &mut failures, install_aur_helper)?;
+        }
         try_step("codegraph",  yolo, &mut failures, install_codegraph)?;
         try_step("path-bootstrap", yolo, &mut failures, || { ensure_path_in_shells(); Ok(()) })?;
         try_step("configs",    yolo, &mut failures, || install_configs(&env))?;
         try_step("skills",     yolo, &mut failures, || install_skills(&env))?;
         try_step("codegraph-skill", yolo, &mut failures, || register_codegraph_skill(&env))?;
+    }
+    // Stage B profiles are Arch/Linux packages (pacman/AUR) — skip on other OSes.
+    if platform::os() != platform::Os::Linux {
+        ui::info(&format!(
+            "Stage B profiles are Arch/Linux-only — skipping on {}",
+            platform::os_name()
+        ));
+        finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
+        return Ok(());
     }
 
     // ── Stage B: Profiles (optional) ─────────────────────────────
