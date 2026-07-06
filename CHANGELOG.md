@@ -5,6 +5,12 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — plan: Agent Terminal App (deep-researched, build later)
+- `agents/plans/agent-terminal-app.md` — Tauri v2 + xterm.js/WebGL + portable-pty +
+  Zellij-backend (resurrection sau reboot) + omp sidecar. Positioning: "cmux for every OS"
+  (cmux: 22.3k stars/4 tháng, macOS-only → khe cross-platform đang mở). Gồm stack đã chốt,
+  4 phase MVP, trend mechanics, rủi ro, metrics, next actions + sources.
+
 ### Fixed — omp startup error `providers: must be an object (was null)`
 - `~/.omp/agent/models.yml` was left with a bare `providers:` key (YAML null) when the
   local-model registry became empty (e.g. after `add-local-model rm <last>`), making omp
