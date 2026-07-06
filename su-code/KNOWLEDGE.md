@@ -211,3 +211,36 @@ _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   trivial no-verify advance; commit path creates a real commit. **Gap fixed:** `engine_advance {commit:true}`
   did `git add -A` + `git commit` with NO secret scan (doctor: gitleaks absent) → added a gitleaks gate
   (`if command -v gitleaks; then gitleaks protect --staged; fi` — no-op when absent, aborts+resets on a finding).
+- **failure→fix: `harness up --timer` OOM-killed the whole machine (v0.46.2).** The generated
+  `8sync-harness-up.service` was a `Type=oneshot` timer unit with **no cgroup resource limits**.
+  Per tick (`--timer 10m`) it ran `codegraph index`, whose Node process (`~/.codegraph/versions/v0.9.2/node`)
+  hit ~5.3 GB RSS on a big repo (`zus`) → kernel OOM killer fired (`Result: oom-kill, Mem peak 5.3G`),
+  thrashing swap and killing other apps, every 10 min. **Not a slow leak — a periodic memory spike with
+  no ceiling.** Fix: bound the generated unit to its own cgroup + de-prioritize it — `MemoryHigh=2G`
+  (reclaim throttle, slows instead of exploding), `MemoryMax=4G` (hard cgroup ceiling — kills only THIS
+  unit, never the box), `MemorySwapMax=512M`, `OOMPolicy=stop`, `Nice=15`/`CPUWeight=10`/`IOWeight=10`,
+  `TimeoutStartSec=900`. cgroup v2 `memory` controller is delegated to the user slice on CachyOS so
+  `systemctl --user` units honor these. Verified live: codegraph held ~2.05 GB by `MemoryHigh` reclaim
+  pressure (was 5.3 GB). **Lesson: any unattended background unit that shells out to a memory-hungry
+  indexer MUST be cgroup-bounded** — scope the danger to the timer (unattended); manual/`--loop` runs stay
+  unbounded (user-visible, interruptible).
+- **validated: `--sweep` must redeploy PROJECT-level `/auto`, not just migrate the folder (v0.46.1).**
+  omp resolves slash commands with **project `.omp/commands/*.md` taking precedence over global**
+  `~/.omp/agent/commands/*.md`. After the `agents/`→`su-code/` rename, sweep migrated the memory folder
+  but `stamp_project` never refreshed the project's `.omp/commands/auto.md` (+ `8sync-engine.ts`), so
+  `/auto` in a swept repo kept executing a stale copy pointing at `agents/STATE.md`. Fix: `stamp_project`
+  now calls `deploy::ensure_engine(&env.home, Some(root))` (byte-identical writes stay quiet). **Lesson:
+  a rename/migration must chase every deployed COPY of a config, especially higher-precedence project-local ones.**
+- **failure (tooling): embedded-shell `grep '\|'` BRE alternation silently returns nothing (false negative).**
+  Verified "clean" migration state twice with `grep "agents/\|su-code/"` and got 0 hits → wrongly concluded
+  no `agents/` refs remained. The bundled shell doesn't honor GNU BRE `\|`; must use `grep -E 'a|b'` (or the
+  built-in grep tool, Rust regex). **Lesson: never trust `\|` alternation in the embedded shell — a false
+  negative reads as "verified clean".**
+- **finding (cross-platform build, v0.46.2 investigation):** code compiles cross-platform as-is — 0
+  `std::os::unix`/`PermissionsExt`, 0 `#[cfg]` gating; `cargo check --target x86_64-pc-windows-gnu` passes
+  all Rust code + pure-Rust deps. Two gotchas for portable/multi-OS release: (1) `.cargo/config.toml`
+  `rustflags = target-cpu=native` tunes the binary to the BUILD CPU → prebuilts can SIGILL on older CPUs
+  (affects the CURRENT Linux prebuilt too) — drop it for release builds; (2) C-FFI deps `libsqlite3-sys`
+  (rusqlite `bundled`, for `harness toolstats`) + `zstd-sys` (via `include-flate`) compile bundled C in
+  `build.rs`, so cross-from-Linux needs mingw-w64/osxcross — **native CI runners (macos-14, windows-latest)
+  build them cleanly**, which is the recommended release path.
