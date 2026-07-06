@@ -1,12 +1,12 @@
 //! Agent-memory + CHANGELOG seeding and the managed harness breadcrumb in
-//! agents/KNOWLEDGE.md.
+//! su-code/KNOWLEDGE.md.
 use anyhow::Result;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::ui;
 use crate::verbs::skill::index::always_on_names_in_order;
 
-/// Structured live-plan seed for `agents/STATE.md` — the loop-engineering
+/// Structured live-plan seed for `su-code/STATE.md` — the loop-engineering
 /// recitation anchor (Manus todo.md pattern): the agent rewrites it at each
 /// phase boundary and reads it at session start, keeping the plan in recent
 /// context (anti lost-in-the-middle). Seeded once; never overwritten if present.
@@ -38,7 +38,7 @@ _none_
 _none — khi context gần đầy: ghi Done · In-flight · Next · Open-questions vào đây + bài học vào KNOWLEDGE, rồi reinit phiên mới chỉ đọc spine._
 ";
 
-/// Procedural-memory seed for `agents/PLAYBOOKS.md` (Voyager-style skill
+/// Procedural-memory seed for `su-code/PLAYBOOKS.md` (Voyager-style skill
 /// library): validated multi-step procedures distilled into reusable runbooks
 /// indexed by a `When:` line. Seeded once; appended to by the agent.
 const PLAYBOOKS_TEMPLATE: &str = "\
@@ -95,7 +95,7 @@ pub(crate) fn upsert_block(path: &Path, begin: &str, end: &str, body: &str) -> R
 /// Seed/refresh a managed block in `<root>/.gitignore` so durable agent memory
 /// + skills stay committed (portable to a new machine) while derived caches and
 /// secrets are ignored. Only the sentinel-bounded block is owned; any user
-/// entries outside it (incl. a tool-repo's own `agents/skills/` rule) survive.
+/// entries outside it (incl. a tool-repo's own `su-code/skills/` rule) survive.
 pub(crate) fn seed_gitignore(root: &Path) -> Result<()> {
     let body = concat!(
         "# Derived / machine-local — rebuilt by `8sync harness init` + codegraph. Safe to ignore:\n",
@@ -106,7 +106,7 @@ pub(crate) fn seed_gitignore(root: &Path) -> Result<()> {
         ".env\n",
         ".env.*\n",
         "!.env.example\n",
-        "# KEEP COMMITTED (do NOT add here): agents/ (memory), agents/skills/, AGENTS.md, CHANGELOG.md",
+        "# KEEP COMMITTED (do NOT add here): su-code/ (memory), su-code/skills/, AGENTS.md, CHANGELOG.md",
     );
     upsert_block(
         &root.join(".gitignore"),
@@ -116,12 +116,78 @@ pub(crate) fn seed_gitignore(root: &Path) -> Result<()> {
     )
 }
 
+/// One-time legacy `agents/` → `su-code/` migration. Renames the old agent-memory
+/// dir to the new `su-code/` marker and rewrites `agents/` → `su-code/` path
+/// references in the anchor + live memory markdown. Only fires on a real 8sync
+/// memory dir (identified by its files), so a source package literally named
+/// `agents/` is never touched. Idempotent: no-op once `su-code/` exists or when
+/// no legacy dir is present.
+pub(crate) fn migrate_legacy_layout(root: &Path) -> Result<bool> {
+    let legacy = root.join("agents");
+    let dest = root.join("su-code");
+    if dest.is_dir() || !legacy.is_dir() {
+        return Ok(false);
+    }
+    let is_memory = ["STATE.md", "KNOWLEDGE.md", "PROJECT.md", "PLAYBOOKS.md", "skills.toml"]
+        .iter()
+        .any(|f| legacy.join(f).exists())
+        || legacy.join("skills").is_dir();
+    if !is_memory {
+        return Ok(false);
+    }
+    std::fs::rename(&legacy, &dest)?;
+    let _ = rewrite_legacy_refs(root);
+    let _ = seed_gitignore(root); // re-emit the managed block with `su-code/` wording
+    ui::ok(&format!("migrated agents/ → su-code/ ({})", root.display()));
+    Ok(true)
+}
+
+/// Rewrite `agents/` → `su-code/` path references in the anchor files and the
+/// live memory markdown (root `*.md` + top-level `su-code/*.md`). Scoped to text
+/// docs; never rewrites source code or historical archives. `.agents/` (a foreign
+/// skill convention) and `subagents/` are protected. Best-effort per file.
+fn rewrite_legacy_refs(root: &Path) -> Result<()> {
+    let mut targets: Vec<PathBuf> = Vec::new();
+    for f in ["AGENTS.md", "CLAUDE.md"] {
+        let p = root.join(f);
+        if p.is_file() {
+            targets.push(p);
+        }
+    }
+    for dir in [root.to_path_buf(), root.join("su-code")] {
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("md") {
+                    targets.push(p);
+                }
+            }
+        }
+    }
+    for p in targets {
+        let Ok(s) = std::fs::read_to_string(&p) else {
+            continue;
+        };
+        let n = s
+            .replace(".agents/", "\u{0}D\u{0}")
+            .replace("subagents/", "\u{0}S\u{0}")
+            .replace("agents/", "su-code/")
+            .replace("\u{0}S\u{0}", "subagents/")
+            .replace("\u{0}D\u{0}", ".agents/");
+        if n != s {
+            let _ = std::fs::write(&p, n);
+        }
+    }
+    Ok(())
+}
+
 /// Ensure the project carries the 8sync agent-memory files + a CHANGELOG, and
-/// refresh the managed harness breadcrumb in agents/KNOWLEDGE.md. Memory files
+/// refresh the managed harness breadcrumb in su-code/KNOWLEDGE.md. Memory files
 /// are seeded only when missing; the KNOWLEDGE block is a sentinel-bounded
 /// managed region (always current, never spam-appended).
 pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
-    let agents_dir = root.join("agents");
+    let _ = migrate_legacy_layout(root);
+    let agents_dir = root.join("su-code");
     std::fs::create_dir_all(&agents_dir)?;
     seed_gitignore(root)?;
     for f in ["PROJECT.md", "KNOWLEDGE.md", "DECISIONS.md", "PREFERENCES.md", "STATE.md", "PLAYBOOKS.md", "NOTES.md"] {
@@ -182,13 +248,13 @@ pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Bound the append-only `## Learnings` zone in agents/KNOWLEDGE.md (anti
+/// Bound the append-only `## Learnings` zone in su-code/KNOWLEDGE.md (anti
 /// context-rot, Hindsight 4-lever): when it exceeds the budget, archive the
-/// OLDER lines to agents/archive/ and keep the most recent, leaving a pointer.
+/// OLDER lines to su-code/archive/ and keep the most recent, leaving a pointer.
 /// Best-effort; git history preserves the full trail.
 pub(crate) fn consolidate_learnings(root: &Path) -> Result<()> {
     const BUDGET: usize = 200;
-    let path = root.join("agents/KNOWLEDGE.md");
+    let path = root.join("su-code/KNOWLEDGE.md");
     let Ok(content) = std::fs::read_to_string(&path) else {
         return Ok(());
     };
@@ -209,14 +275,14 @@ pub(crate) fn consolidate_learnings(root: &Path) -> Result<()> {
     let archived = body_lines[..keep_from].join("\n");
     let kept = body_lines[keep_from..].join("\n");
     let stamp = now_stamp().trim_start_matches("epoch:").to_string();
-    let archive_dir = root.join("agents/archive");
+    let archive_dir = root.join("su-code/archive");
     std::fs::create_dir_all(&archive_dir)?;
     std::fs::write(
         archive_dir.join(format!("KNOWLEDGE-{}.md", stamp)),
         format!("# Archived learnings ({})\n\n{}\n", now_stamp(), archived),
     )?;
     let new = format!(
-        "{}_(consolidated {} dòng cũ → agents/archive/KNOWLEDGE-{}.md)_\n{}",
+        "{}_(consolidated {} dòng cũ → su-code/archive/KNOWLEDGE-{}.md)_\n{}",
         head, keep_from, stamp, kept
     );
     std::fs::write(&path, new)?;

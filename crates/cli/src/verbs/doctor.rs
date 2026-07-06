@@ -135,12 +135,12 @@ fn check_portability() {
     let durable = [
         "AGENTS.md",
         "CHANGELOG.md",
-        "agents/PROJECT.md",
-        "agents/KNOWLEDGE.md",
-        "agents/DECISIONS.md",
-        "agents/STATE.md",
-        "agents/PREFERENCES.md",
-        "agents/NOTES.md",
+        "su-code/PROJECT.md",
+        "su-code/KNOWLEDGE.md",
+        "su-code/DECISIONS.md",
+        "su-code/STATE.md",
+        "su-code/PREFERENCES.md",
+        "su-code/NOTES.md",
     ];
     let mut present = false;
     let mut ignored_any = false;

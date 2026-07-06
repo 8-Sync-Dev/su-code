@@ -16,7 +16,7 @@ use crate::ui;
           8sync ai --model glm \"plan the refactor\"   override the auto-picked model for one prompt
 
         NOTES
-          · omp auto-loads project context from AGENTS.md + agents/* (memory + skills).
+          · omp auto-loads project context from AGENTS.md + su-code/* (memory + skills).
           · run inside the project root after `8sync .` for best results.
           · pass the prompt as ONE quoted argument so the shell doesn't split it.
           · advisor (per-turn rule/tool reviewer) is ON by default; add --no-advisor to disable, or set advisor=false in ~/.config/8sync/models.toml.

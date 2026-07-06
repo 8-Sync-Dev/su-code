@@ -14,10 +14,10 @@ use crate::ui;
           8sync note --tag bug  \"login fails when password contains double-quote\"
           8sync note --tag idea \"add dark mode toggle in settings\"
           8sync note --tag todo \"write integration test for /api/login\"
-          8sync note                                  open agents/NOTES.md in $EDITOR
+          8sync note                                  open su-code/NOTES.md in $EDITOR
 
         WHERE IT'S WRITTEN
-          Notes are appended to <repo>/agents/NOTES.md with a timestamp + tag.
+          Notes are appended to <repo>/su-code/NOTES.md with a timestamp + tag.
           AI tools (omp / claude-code / aider) read NOTES.md via AGENTS.md anchor
           on the next session, so use this to leave context for future-you.
 
@@ -26,7 +26,7 @@ use crate::ui;
     "}
 )]
 pub struct Args {
-    /// Note content. Omit to open agents/NOTES.md in $EDITOR.
+    /// Note content. Omit to open su-code/NOTES.md in $EDITOR.
     pub message: Vec<String>,
 
     /// Optional category tag: arch | bug | idea | todo | learn | perf | security | ...
@@ -37,7 +37,7 @@ pub struct Args {
 pub fn run(a: Args) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let root = find_root(&cwd).unwrap_or(cwd);
-    let agents_dir = root.join("agents");
+    let agents_dir = root.join("su-code");
     std::fs::create_dir_all(&agents_dir)?;
     let notes = agents_dir.join("NOTES.md");
     if !notes.exists() {

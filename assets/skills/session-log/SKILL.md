@@ -16,4 +16,4 @@ Ported from `companion-inc/feynman`'s `/log` slash-command. Self-contained omp-n
 5. Include direct source URLs for any external claims that matter.
 6. Save the log to `notes/` as Markdown with a date-oriented filename (e.g. `notes/2026-07-02-session.md`).
 
-If this project already uses `agents/STATE.md`/`agents/KNOWLEDGE.md` (8sync harness convention), prefer updating those over a bespoke `notes/` file — check for their existence first.
+If this project already uses `su-code/STATE.md`/`su-code/KNOWLEDGE.md` (8sync harness convention), prefer updating those over a bespoke `notes/` file — check for their existence first.

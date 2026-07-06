@@ -78,7 +78,7 @@ fn refresh_once(env: &env_detect::Env, pull: bool, commit: bool) -> Result<()> {
 /// code) and commit them, so learnings persist to git in the same pass. No-op
 /// when nothing changed; best-effort — warns, never bails.
 fn commit_memory(root: &Path) {
-    let candidates = ["agents", "AGENTS.md", "CLAUDE.md", "CHANGELOG.md", ".gitignore"];
+    let candidates = ["su-code", "agents", "AGENTS.md", "CLAUDE.md", "CHANGELOG.md", ".gitignore"];
     let present: Vec<&str> = candidates
         .into_iter()
         .filter(|p| root.join(p).exists())

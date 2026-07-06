@@ -1,7 +1,7 @@
 # su-code (`8sync`)
 
 > Terminal-first AI coding harness for CachyOS/Arch + Kitty + Helix + [omp](https://omp.sh).
-> Keep your normal CLI workflow; AI agents observe project context, load `agents/*` memory, and execute tasks on demand.
+> Keep your normal CLI workflow; AI agents observe project context, load `su-code/*` memory, and execute tasks on demand.
 
 ![8sync harness web — the agent-team dashboard showing this repo's live plan](docs/assets/dashboard-state.png)
 
@@ -124,7 +124,7 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 | `8sync .` | Open/attach the current project's session. Kitty with `allow_remote_control yes` → 3-pane; otherwise → soft 1-pane + `omp --continue` inside abduco |
 | `8sync ai [prompt]` | Empty/`continue` → `omp --continue`; with a prompt → `omp -p "..."` |
 | `8sync find <kw>` | rg/fd + fzf preview → open the editor at `file:line` |
-| `8sync note "msg" [-t tag]` | Append to `agents/NOTES.md` |
+| `8sync note "msg" [-t tag]` | Append to `su-code/NOTES.md` |
 | `8sync run [dev\|build\|test\|fmt\|lint]` | Project runner via per-stack recipe |
 | `8sync ship "msg"` | `git add -A && commit && push && gh pr create` |
 
@@ -136,7 +136,7 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 
 | Command | Description |
 |---|---|
-| `8sync harness` | **One command (idempotent):** deploy/update bundled skills + codegraph binary + external packs (ponytail/addyosmani, best-effort) → `~/.omp/skills/`, mirror into `agents/skills/`, `codegraph init`, seed `agents/*` + `CHANGELOG.md`, inject the force-load block into `AGENTS.md`/`CLAUDE.md`. Always safe to re-run |
+| `8sync harness` | **One command (idempotent):** deploy/update bundled skills + codegraph binary + external packs (ponytail/addyosmani, best-effort) → `~/.omp/skills/`, mirror into `su-code/skills/`, `codegraph init`, seed `su-code/*` + `CHANGELOG.md`, inject the force-load block into `AGENTS.md`/`CLAUDE.md`. Always safe to re-run |
 | `8sync harness init` | First-time full bootstrap (progress UI) + managed `.gitignore` + gitleaks pre-commit hook. `--force` re-mirrors everything, overwriting |
 | `8sync harness up` | Refresh state: re-inject + refresh `KNOWLEDGE.md` + re-index codegraph. `--pull` re-pulls skills · `--commit` git-commits memory (gitleaks scan first) · `--loop 10m` (foreground) · `--timer 30m\|off` (systemd user timer, for background runs) |
 | **`8sync harness web`** | **Local dashboard** (axum + Vite, `http://127.0.0.1:8731`) — view & **CRUD** the whole agent-team from the browser (see the Dashboard section) |
@@ -153,7 +153,7 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 
 | Command | Description |
 |---|---|
-| `8sync skill` | List global (`~/.omp/skills/`) + local (`agents/skills/`) skills |
+| `8sync skill` | List global (`~/.omp/skills/`) + local (`su-code/skills/`) skills |
 | `8sync skill add <github-url>` | Clone into **both** global + project; **collection-aware** (repo with `skills/<name>/` → installs every sub-skill, e.g. `addyosmani/agent-skills`). Rewrites the `<!-- 8sync:skills:* -->` block in `AGENTS.md` |
 | `8sync skill add gh:owner/repo` · `<url>@<ref>` · `builtin:<name>` | Short form · pin a commit/tag (writes `rev` into `skills.toml` = lockfile) · enable an opt-in bundled skill (e.g. `builtin:social-growth`) |
 | `8sync skill update [name]` | Re-pull from `src` (git dedup by URL, honors `rev` pins) |
@@ -212,7 +212,7 @@ The sidebar is grouped — every page reads **real data** (no mocks), and most p
 
 | Group | Page | What you can do |
 |---|---|---|
-| Session | **State · Context** | Live plan (`agents/STATE.md`), real session token/compaction stats |
+| Session | **State · Context** | Live plan (`su-code/STATE.md`), real session token/compaction stats |
 | Configure | **Models · Skills · Memory · Rules** | Change the model per role/task (writes `models.toml` immediately) · filter + cycle tiers across the 35 skills · edit the 6 memory files (STATE/KNOWLEDGE…) · add/remove rules |
 | Runtime | **Engines · Codegraph · MCP · Submodules** | Engine status (codegraph/cbm/headroom/serena/mnemopi) · **codebase graph**: package call graph (elk) + 12 Leiden clusters + symbol search + caller/callee tracing · MCP servers · git submodules |
 | Quality | **Bench · Readiness · Team** | Run `harness bench` live — the page auto-loads with upfront breakdown meters (prefix / CORE / memory-spine) + a spine advisory · readiness gate · team roster |
@@ -236,7 +236,7 @@ The first time you run `8sync .` inside a project, these files/folders are seede
 ```
 <repo>/
 ├── AGENTS.md                    ← anchor for every AI tool; holds the force-load skills block
-└── agents/                      ← shared memory (omp/claude-code/cursor/opencode/aider)
+└── su-code/                      ← shared memory (omp/claude-code/cursor/opencode/aider)
     ├── PROJECT.md               fixed facts (stack, entrypoints)
     ├── KNOWLEDGE.md             append-only: what the AI has learned
     ├── DECISIONS.md             append-only: architecture decisions
@@ -246,7 +246,7 @@ The first time you run `8sync .` inside a project, these files/folders are seede
     └── skills/                  project-local skills (cloned via `8sync skill add <url>`)
 ```
 
-`omp` manages session memory itself (`retain` / `recall` / auto-compact) — you do **not** hand-edit `agents/*.md`. `8sync note` is the only exception (appends to `NOTES.md`).
+`omp` manages session memory itself (`retain` / `recall` / auto-compact) — you do **not** hand-edit `su-code/*.md`. `8sync note` is the only exception (appends to `NOTES.md`).
 
 ---
 

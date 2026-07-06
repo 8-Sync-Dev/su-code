@@ -65,7 +65,7 @@ fn path_candidates(body: &str) -> BTreeSet<String> {
 }
 
 /// Collect the docs to audit: fixed top-level docs, every `*.md` at the repo
-/// root, and every `agents/*.md`. Non-recursive (skills/reference trees are
+/// root, and every `su-code/*.md`. Non-recursive (skills/reference trees are
 /// vendored/derived, not authored docs).
 fn scan_docs(root: &Path) -> Vec<String> {
     let mut docs: BTreeSet<String> = BTreeSet::new();
@@ -84,12 +84,12 @@ fn scan_docs(root: &Path) -> Vec<String> {
             }
         }
     }
-    if let Ok(rd) = std::fs::read_dir(root.join("agents")) {
+    if let Ok(rd) = std::fs::read_dir(root.join("su-code")) {
         for e in rd.flatten() {
             let p = e.path();
             if p.extension().and_then(|s| s.to_str()) == Some("md") {
                 if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-                    docs.insert(format!("agents/{}", name));
+                    docs.insert(format!("su-code/{}", name));
                 }
             }
         }

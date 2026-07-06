@@ -38,10 +38,10 @@ pub(crate) fn list_skills(env: &env_detect::Env, toml_path: &Path) -> Result<()>
     if let Some(root) = detect_current_project_root() {
         println!("\n[current project context]");
         println!("  root   : {}", root.display());
-        println!("  agents : {}", root.join("agents").display());
+        println!("  agents : {}", root.join("su-code").display());
         println!("  anchor : {}", root.join("AGENTS.md").display());
-        println!("  skills : {}", root.join("agents/skills").display());
-        print_skill_list(&root.join("agents/skills"));
+        println!("  skills : {}", root.join("su-code/skills").display());
+        print_skill_list(&root.join("su-code/skills"));
     } else {
         println!("\n[current project context]");
         println!("  not inside a detected project root");
@@ -103,7 +103,7 @@ pub(crate) fn print_help(env: &env_detect::Env, toml_path: &Path) -> Result<()> 
 
     println!("\nAUTO-INJECT FLOW");
     println!("  1) `8sync skill add <url>` clones into ~/.omp/skills/<name>/  (global)");
-    println!("     and (if inside a project) <root>/agents/skills/<name>/    (local)");
+    println!("     and (if inside a project) <root>/su-code/skills/<name>/    (local)");
     println!("  2) <root>/AGENTS.md is rewritten between `<!-- 8sync:skills:* -->` sentinels");
     println!("     to list every global + local skill with its frontmatter description.");
     println!("  3) omp reads ~/.omp/skills/00-force-load.md + AGENTS.md every session.");
@@ -116,7 +116,7 @@ pub(crate) fn print_help(env: &env_detect::Env, toml_path: &Path) -> Result<()> 
     if let Some(root) = detect_current_project_root() {
         println!("  local project root: {}", root.display());
         println!("  local anchor file : {}", root.join("AGENTS.md").display());
-        println!("  local skills dir  : {}", root.join("agents/skills").display());
+        println!("  local skills dir  : {}", root.join("su-code/skills").display());
     }
     Ok(())
 }

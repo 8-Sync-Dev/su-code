@@ -109,7 +109,7 @@ fn api_routes() -> Router<Arc<Ctx>> {
 async fn api_state(State(_ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
     let root = detect_current_project_root().unwrap_or_default();
     let profile = std::env::var("OMP_PROFILE").unwrap_or_else(|_| "default".to_string());
-    let state_md = std::fs::read_to_string(root.join("agents/STATE.md")).unwrap_or_default();
+    let state_md = std::fs::read_to_string(root.join("su-code/STATE.md")).unwrap_or_default();
     Ok(Json(serde_json::json!({
         "project": root.display().to_string(),
         "profile": profile,
@@ -120,10 +120,10 @@ async fn api_state(State(_ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Valu
 async fn api_skills(State(ctx): State<Arc<Ctx>>) -> Result<Json<Vec<serde_json::Value>>, ApiErr> {
     let root = detect_current_project_root().unwrap_or_default();
     let reg_g = discover::read_registry(&ctx.home.join(".config/8sync/skills.toml"));
-    let proj_man = root.join("agents/skills.toml");
+    let proj_man = root.join("su-code/skills.toml");
     let reg_p = if proj_man.exists() { discover::read_registry(&proj_man) } else { Default::default() };
     let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    for base in [ctx.home.join(".omp/skills"), root.join("agents/skills")] {
+    for base in [ctx.home.join(".omp/skills"), root.join("su-code/skills")] {
         if let Ok(entries) = std::fs::read_dir(&base) {
             for e in entries.flatten() {
                 if let Some(n) = e.file_name().to_str() {
@@ -145,7 +145,7 @@ async fn api_skills(State(ctx): State<Arc<Ctx>>) -> Result<Json<Vec<serde_json::
             "tier": tier,
             "source": entry.map(|e| e.src.clone()).unwrap_or_default(),
             "global": ctx.home.join(format!(".omp/skills/{}", name)).exists(),
-            "local": root.join(format!("agents/skills/{}", name)).exists(),
+            "local": root.join(format!("su-code/skills/{}", name)).exists(),
         }));
     }
     Ok(Json(out))
@@ -165,7 +165,7 @@ async fn api_skill_toggle(
         return Err((StatusCode::BAD_REQUEST, "`when` must be always|on-demand|off".into()));
     }
     let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
-    let path = root.join("agents/skills.toml");
+    let path = root.join("su-code/skills.toml");
     let mut reg = discover::read_registry(&path);
     let reg_g = discover::read_registry(&ctx.home.join(".config/8sync/skills.toml"));
     if body.when == "off" {
@@ -192,7 +192,7 @@ async fn api_memory_get(
     if !MEMORY_ALLOWLIST.contains(&file.as_str()) {
         return Err((StatusCode::BAD_REQUEST, "file not in allowlist".into()));
     }
-    let content = std::fs::read_to_string(root.join(format!("agents/{}.md", file)))
+    let content = std::fs::read_to_string(root.join(format!("su-code/{}.md", file)))
         .map_err(|_| (StatusCode::NOT_FOUND, "file missing".into()))?;
     Ok(Json(serde_json::json!({ "file": file, "content": content })))
 }
@@ -210,7 +210,7 @@ async fn api_memory_set(
         return Err((StatusCode::BAD_REQUEST, "file not in allowlist".into()));
     }
     let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
-    let target = root.join(format!("agents/{}.md", file));
+    let target = root.join(format!("su-code/{}.md", file));
     if let Some(p) = target.parent() {
         std::fs::create_dir_all(p).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
@@ -859,14 +859,14 @@ async fn api_rule_delete(
 }
 // ---- Workflow viz (react-flow) + export → omp extension tool ----
 //
-// Workflows are stored as react-flow node/edge JSON in <root>/agents/workflows/.
+// Workflows are stored as react-flow node/edge JSON in <root>/su-code/workflows/.
 // `export` generates a STANDALONE omp extension <root>/.omp/extensions/<name>.ts
 // (NOT appended to the harness-managed 8sync-workflow.ts, which is redeployed
 // verbatim) that registers a model-callable `<name>_run` tool dispatching the
 // steps as followUp messages.
 
 fn workflows_dir(root: &std::path::Path) -> std::path::PathBuf {
-    root.join("agents/workflows")
+    root.join("su-code/workflows")
 }
 
 fn validate_wf_name(name: &str) -> Result<(), ApiErr> {

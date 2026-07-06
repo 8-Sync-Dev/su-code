@@ -9,7 +9,7 @@ use super::inject::{always_on_rank, is_always_on, rewrite_md_with_block, BEGIN, 
 
 /// Always-on skill dir names present in the project, in canonical rank order.
 pub(crate) fn always_on_names_in_order(root: &Path) -> Vec<String> {
-    let dir = root.join("agents/skills");
+    let dir = root.join("su-code/skills");
     let mut names: Vec<String> = list_installed_skill_dirs(&dir)
         .unwrap_or_default()
         .iter()
@@ -21,7 +21,7 @@ pub(crate) fn always_on_names_in_order(root: &Path) -> Vec<String> {
 }
 
 const SUBDIR_IGNORE: &[&str] = &[
-    ".git", ".hg", ".svn", ".jj", ".codegraph", "agents", "node_modules", "target",
+    ".git", ".hg", ".svn", ".jj", ".codegraph", "su-code", "agents", "node_modules", "target",
     "dist", "build", "out", ".next", ".nuxt", ".svelte-kit", ".venv", "venv",
     "vendor", "__pycache__", ".cache", "coverage", ".idea", ".vscode", "assets",
 ];
@@ -33,7 +33,7 @@ const CODE_EXTS: &[&str] = &[
 
 /// Sub-directories worth their own skill-index AGENTS.md: any dir within depth 3
 /// of `root` that DIRECTLY holds ≥ 4 source files, skipping vendor/build/hidden
-/// dirs and the `agents/` memory tree. Capped at 60.
+/// dirs and the `su-code/` memory tree. Capped at 60.
 fn significant_subdirs(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     collect_significant(root, 0, &mut out);
@@ -110,13 +110,13 @@ Bạn đang ở **sub-folder**. Rule + skill force-load đầy đủ KHÔNG lặ
 - **Master skills (omp đọc đầu tiên):** `~/.omp/skills/00-force-load.md`\n\
 \n\
 **Always-on (đọc trước tool call đầu tiên, ĐÚNG thứ tự):** {chain}.\n\
-SKILL.md ở `<root>/agents/skills/<name>/` hoặc `~/.omp/skills/<name>/`.\n\
+SKILL.md ở `<root>/su-code/skills/<name>/` hoặc `~/.omp/skills/<name>/`.\n\
 \n\
 **Cách tận dụng (bắt buộc):** `codegraph` cho mọi explore code (query/callers/callees — KHÔNG grep) · \
 `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` cho copy/offer hướng người dùng · \
 **`impeccable` = design system CHUẨN, BẮT BUỘC cho mọi UI/design/redesign/audit (kèm `references/house/*`)** + `taste` chống slop.\n\
 \n\
-**Quy tắc:** cite `path:line` · ưu tiên verb `8sync` hơn shell · sau mỗi thay đổi cập nhật `CHANGELOG.md` + `agents/KNOWLEDGE.md`.\n\
+**Quy tắc:** cite `path:line` · ưu tiên verb `8sync` hơn shell · sau mỗi thay đổi cập nhật `CHANGELOG.md` + `su-code/KNOWLEDGE.md`.\n\
 {END}",
         root = root_agents.display(),
     )

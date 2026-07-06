@@ -32,7 +32,7 @@ QUICK START
   8sync flow                        same as above but ordered by workflow
   8sync setup                       install harness, then ask y/N per profile
   8sync setup --community           install harness + dev-stack + bluetooth, no prompts
-  8sync .                           seed agents/* context and run `omp --continue`
+  8sync .                           seed su-code/* context and run `omp --continue`
   8sync ai \"add dark mode toggle\"   one-shot AI prompt (or resume with `8sync ai`)
   8sync find \"useAuth\"              rg + fzf preview, open at file:line
   8sync ship \"feat: dark mode\"      commit + push + open a GitHub PR
@@ -55,7 +55,7 @@ enum Cmd {
     /// Health-check; report what's installed and what's missing
     Doctor,
 
-    /// Seed agents/* context for the current project and exec `omp --continue`
+    /// Seed su-code/* context for the current project and exec `omp --continue`
     #[command(name = ".", alias = "here")]
     Here(verbs::here::Args),
 
@@ -112,7 +112,7 @@ enum Cmd {
     /// Search code (rg + fzf) or filenames (fd); pick → open in $EDITOR or hx
     Find(verbs::find::Args),
 
-    /// Append a one-line note to agents/NOTES.md (AI will read it in the next session)
+    /// Append a one-line note to su-code/NOTES.md (AI will read it in the next session)
     Note(verbs::note::Args),
 }
 

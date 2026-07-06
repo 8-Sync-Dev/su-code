@@ -1,6 +1,6 @@
 //! `8sync harness init` — one command to stand up a maximal agent harness:
 //! deploy every bundled skill (+ codegraph binary + external skill packs),
-//! pull registered skills (agents/skills.toml), mirror them into the project,
+//! pull registered skills (su-code/skills.toml), mirror them into the project,
 //! init codegraph, seed agent memory + CHANGELOG,
 //! and inject force-load rules into the root AGENTS.md/CLAUDE.md plus a compact
 //! index into every significant sub-folder. Progress is tracked step by step.
@@ -83,17 +83,17 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
 
     // 5-9. Project-scoped scaffolding.
     if let Some(root) = discover::detect_current_project_root() {
-        // Pull every skill registered in agents/skills.toml from its source
+        // Pull every skill registered in su-code/skills.toml from its source
         // (git collections like feynman, builtin:, path:) — mirrors bare
         // `8sync harness` so init is a true superset, not a smaller bootstrap.
-        p.step("pull registered skills (agents/skills.toml: feynman, …)");
+        p.step("pull registered skills (su-code/skills.toml: feynman, …)");
         let _ = update::update_skills(env, &env.xdg_config.join("8sync/skills.toml"), None);
-        p.step("mirror skills → agents/skills/");
+        p.step("mirror skills → su-code/skills/");
         let count = deploy::mirror_global_to_local(&env.home, &root, force)?;
         if count > 0 {
-            ui::ok(&format!("mirrored {} skill(s) into {}", count, root.join("agents/skills").display()));
+            ui::ok(&format!("mirrored {} skill(s) into {}", count, root.join("su-code/skills").display()));
         }
-        let local_dir = root.join("agents/skills");
+        let local_dir = root.join("su-code/skills");
         for d in discover::list_installed_skill_dirs(&local_dir).unwrap_or_default() {
             deploy::ensure_skill_layout(&d);
         }

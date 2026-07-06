@@ -5,6 +5,31 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.46.0] — 2026-07-06
+
+### Changed — the agent-memory folder is now `su-code/` (was `agents/`), a distinctive project marker
+- **BREAKING (auto-migrated):** every project's agent-memory dir is renamed
+  `agents/` → **`su-code/`** so a su-code-managed repo is unambiguously
+  identifiable (the old `agents/`/`AGENTS.md` markers are generic — every repo
+  has them). The `AGENTS.md` anchor file stays (open-standard entry point); only
+  the folder moves, and its links are rewritten to point at `su-code/`.
+- **Detection now keys on `su-code/`.** `is_omp_project` (sweep) + the harness
+  project-root detection recognise `su-code/` (with `agents/` kept only as a
+  legacy migration trigger). `8sync harness global --sweep [DIR]` (the sweep
+  command — **not** `harness all up`) migrates every legacy project it finds.
+- **Auto-migration** (`memory::migrate_legacy_layout`, runs in
+  `here`/`init`/`up`/bare-harness/sweep): renames `agents/` → `su-code/` and
+  rewrites `agents/` → `su-code/` references in the anchor + live memory
+  markdown. **Guarded:** only fires on a real 8sync memory dir (identified by
+  `STATE.md`/`KNOWLEDGE.md`/`PROJECT.md`/`PLAYBOOKS.md`/`skills.toml`/`skills/`),
+  so a source package literally named `agents/` is never touched. `.agents/`
+  and `subagents/` are protected from the text rewrite. Idempotent.
+- All 8sync-authored code, assets, skills, docs, and the recall hook (with an
+  `agents/` fallback for un-migrated repos) updated to `su-code/`. Historical
+  CHANGELOG entries left as-written (they document the `agents/` era).
+  Verified E2E: legacy project migrated (folder + refs), guard skipped a
+  non-memory `agents/` source dir, this repo dogfood-migrated, build clean.
+
 ## [0.45.0] — 2026-07-06
 
 ### Added — MCP `server.json` standard conformance (marketplace install) + the spec as a machine-wide default

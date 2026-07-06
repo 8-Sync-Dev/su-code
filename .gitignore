@@ -7,7 +7,7 @@
 .env
 .env.*
 !.env.example
-# KEEP COMMITTED (do NOT add here): agents/ (memory), agents/skills/, AGENTS.md, CHANGELOG.md
+# KEEP COMMITTED (do NOT add here): su-code/ (memory), su-code/skills/, AGENTS.md, CHANGELOG.md
 # <<< 8sync <<<
 
 target/
@@ -22,7 +22,7 @@ dist/
 # ~/.omp/skills/. Don't vendor the 3rd-party skill contents — only the
 # 8sync-managed force-load block in AGENTS.md / CLAUDE.md tracks which
 # skills the repo expects.
-agents/skills/
+su-code/skills/
 
 reference/
 # `8sync harness web` FE (derived — rebuilt by build.rs / pnpm)

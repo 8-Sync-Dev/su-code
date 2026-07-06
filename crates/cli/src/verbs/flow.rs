@@ -23,8 +23,8 @@ pub fn run() -> Result<()> {
 
     section("2. VIBE LOOP — open a project, code with AI, ship a PR", &[
         ("cd ~/code/my-app", ""),
-        ("8sync .", "seed agents/* memory + run `omp --continue` (omp manages its own session)"),
-        ("8sync ai \"explain this codebase\"", "AI reads AGENTS.md + agents/* automatically for memory"),
+        ("8sync .", "seed su-code/* memory + run `omp --continue` (omp manages its own session)"),
+        ("8sync ai \"explain this codebase\"", "AI reads AGENTS.md + su-code/* automatically for memory"),
         ("8sync ai \"add login form with email + password\"", "vibe code — omp edits files directly"),
         ("8sync run dev", "start the dev server"),
         ("8sync shot http://localhost:3000/login", "screenshot the UI so omp can review it visually (cheap on tokens)"),
@@ -36,7 +36,7 @@ pub fn run() -> Result<()> {
 
     section("3. RESUME later (next day, after reboot)", &[
         ("cd ~/code/my-app", ""),
-        ("8sync .", "omp re-reads AGENTS.md + agents/* and picks up where you left off"),
+        ("8sync .", "omp re-reads AGENTS.md + su-code/* and picks up where you left off"),
     ]);
 
     section("4. BLUETOOTH (bluez)", &[
@@ -60,7 +60,7 @@ pub fn run() -> Result<()> {
         ("8sync clean",                    "reclaim disk + tidy caches + CPU/GPU/RAM report (--deep/--timer 1h)"),
         ("8sync doctor",                   "full health check"),
         ("8sync skill",                    "list installed skills + project-local skills"),
-        ("8sync skill add <url>",          "clone a skill repo into ~/.omp/skills/ and project agents/skills/"),
+        ("8sync skill add <url>",          "clone a skill repo into ~/.omp/skills/ and project su-code/skills/"),
         ("8sync harness",                  "(bare) refresh skills + memory + /gs + MCP + reindex"),
         ("8sync setup profile list",       "show all profiles and which are applied"),
         ("8sync setup profile show warp",  "show resolved content of a profile"),

@@ -10,32 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 22 dòng cũ → agents/archive/KNOWLEDGE-1783313206.md)_
-  wallpaper pipeline (`deploy_wallpaper`: bundled `assets/wallpapers/default.png` → `[ui].wallpaper_url`).
-  Helix `hx` fix: dropped the dead `"helix"` fallback (Arch ships `/usr/bin/hx`); `find`/`note` share `pick_editor()`.
-  (5) Web dashboard redesigned to glassmorphism (designer + impeccable); `build.rs` robust (bun→pnpm→npm +
-  styled fallback). Browser-verified: 13 pages render, 0 console errors. Binary 0.26.0 built + installed.
-- **failure: image generation unavailable (no XAI/OpenAI/Gemini/OpenRouter key in env).** The default
-  anime/dark wallpaper could NOT be auto-generated. The pipeline + `assets/wallpapers/` drop-in are ready;
-  shipping the actual art needs an image-API key (then `generate_image`) or a user-provided `default.png`.
-- **validated: unified to ONE `/auto` → v0.28.0** (executed `outputs/one-auto-unification-plan.md` P1–P6).
-  Removed `/gs` entirely (asset cmd + skill + `ensure_gs_command` + 5 call sites + help/flow/force-load/
-  engine-comment refs); added `deploy::cleanup_legacy_gs` (removes stale `/gs` cmd+skill global+repo on
-  every harness run — clean cutover for old machines, verified gone here). `/auto` (auto.md) upgraded to
-  gsd-pi-grade: research-in-plan (codegraph/cbm/serena + feynman) · fresh-context per task · verify-gate ·
-  hard Closeout (full suite + browser QA/UAT + independent re-review vs DoD) · Tauri-v2 web-debug→browser
-  convention · model+context-budget. New **`8sync harness model`** (view/edit `models.toml` = single
-  source; `<key> <value>` sets roles/tasks; omp fuzzy-resolves + `retry.modelFallback` to authed). `harness up`
-  now deploys APPEND_SYSTEM+engine+workflow (was bare/init only). Grounded in `reference/gsd-pi` auto-mode +
-  dynamic-model-routing (read real submodule). Verified: build clean, bare harness deploys `/auto` only,
-  bench A1 PASS. DEFERRED: full capability-scoring per-task model router (gsd-pi-level, TS engine) — documented as target.
-- **validated: dashboard redesign + model-routing UI → v0.29.0.** `8sync harness web` rebuilt
-  (FE `web/src`, impeccable product-register; backend `web.rs`). New: **Models page** (`/api/models`
-  get+post → live-edit `models.toml` roles/tasks), **project switcher** (`/api/projects`, status dots),
-  **workflow templates** (`/api/workflows/templates`), **markdown renderer** (`web/src/markdown.tsx`,
-  XSS-safe — watch: shared module-level RegExp `.lastIndex` clobber froze the tab → per-call RegExp).
-  Fixes: **serena showed off** = false-negative (`which serena` fails; serena is uvx-launched) → detect
-  via `mcpServers.serena` in `~/.omp/agent/mcp.json` + `uvx`/`uv` on PATH; **context honesty** (`assumed:true`,
+_(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   `windowTok`, `thresholdPct`, `willCompact` — 1M window is an estimate, not authoritative); **workflow
   canvas** fixed (was tiny broken box → 560px react-flow viewport). Model philosophy locked in
   `models.toml`+omp `config.yml`: **Opus = thinking** (plan/review/debug/vision), **GLM = mechanical**
@@ -160,7 +135,7 @@ _(consolidated 22 dòng cũ → agents/archive/KNOWLEDGE-1783313206.md)_
 - **validated: bench-driven optimization → dashboard Bench rebuilt + spine advisory.** Full review
   (browser, 15 pages × 0 console errors; project switcher verified end-to-end: `/api/state`+bench+
   codegraph all follow the switched project via web-session.json + process chdir) found ONE real
-  gap: bench *measured* but didn't *drive* — the memory spine (agents/*.md) hit **55% of the
+  gap: bench *measured* but didn't *drive* — the memory spine (su-code/*.md) hit **55% of the
   upfront budget** (7.5k/13.6k tok, bigger than prefix+CORE combined) and nothing warned. The
   200-line KNOWLEDGE budget doesn't bound tokens (200 dense lines ≈ 5k tok). Fix:
   `bench.rs::spine_advice` (warn at spine >50% upfront) in CLI + `BenchMetrics` (+`core_tok`/
@@ -179,7 +154,7 @@ _(consolidated 22 dòng cũ → agents/archive/KNOWLEDGE-1783313206.md)_
   not the repo file. Stale binary → silent no-op deploy (hit this live).
   (3) `harness web` restores the last web-session project — **activate the target project via
   `/api/workspaces/activate` BEFORE screenshots** or you leak another repo (hit: content-post-agency).
-  (4) `agents/skills/` is fully gitignored (machine-local mirror); `git check-ignore` echoes the
+  (4) `su-code/skills/` is fully gitignored (machine-local mirror); `git check-ignore` echoes the
   path — don't misread it as `ls-files` output. Source of truth = `assets/skills/` (committed).
 - validated: `8sync harness global` (0.44 dev) — machine-wide rule layer extracted into
   `harness/global.rs::global_pass()` (shared with bare harness; auto.rs step-1 block deleted).
@@ -201,13 +176,13 @@ _(consolidated 22 dòng cũ → agents/archive/KNOWLEDGE-1783313206.md)_
   Testing recipe: Bun.Transpiler + stub `pi` {zod, registerTool} + chdir to tmp → call
   tools[name].execute directly; zod lives at ~/.bun/install/global/node_modules/zod.
   Remember: assets are rust-embed'd — REBUILD the binary before `8sync harness` deploys them.
-- validated: `--sweep` detection = omp project ⇔ repo has `agents/` dir OR AGENTS.md/CLAUDE.md
+- validated: `--sweep` detection = omp project ⇔ repo has `su-code/` dir OR AGENTS.md/CLAUDE.md
   (`global.rs::is_omp_project`) — sweep never injects into non-omp repos (skip + report).
   Live run 2026-07-05: 8/8 omp projects under ~/Projects stamped, 0 failed, 0 foreign repos touched.
 - validated: no-overwrite contract audited end-to-end (2026-07-05) — user-owned files
-  (agents/*.md seed-if-missing memory.rs:129 · CHANGELOG once :146 · skills mirror additive
+  (su-code/*.md seed-if-missing memory.rs:129 · CHANGELOG once :146 · skills mirror additive
   deploy.rs:105 · AGENTS.md sentinel-only · hook only-if-absent :239 · config key-detect) are
-  NEVER clobbered by default; proven live: custom edits to agents/skills/*/SKILL.md + STATE.md
+  NEVER clobbered by default; proven live: custom edits to su-code/skills/*/SKILL.md + STATE.md
   survive a sweep re-run. Overwrite = explicit `--force` only. Managed layer (~/.omp bundled
   skills, 00-force-load, APPEND_SYSTEM, extensions) refreshes byte-compare on binary update —
   customize the PROJECT copy, not ~/.omp. Policy now printed in `harness help` + AGENTS.md §8.

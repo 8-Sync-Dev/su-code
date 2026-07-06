@@ -250,13 +250,13 @@ export default function (pi: ExtensionAPI) {
         target.status = "blocked";
         target.note = `no progress — ${target.failStreak} identical failures`;
         save(state);
-        return text(`BLOCKED ${target.id}: NO PROGRESS — ${target.failStreak} consecutive identical failures (doom-loop guard). Repeating the same attempt cannot pass. Record a failure: in agents/KNOWLEDGE.md, then change approach, split the task, or escalate.\n\n${failures.join("\n\n")}`);
+        return text(`BLOCKED ${target.id}: NO PROGRESS — ${target.failStreak} consecutive identical failures (doom-loop guard). Repeating the same attempt cannot pass. Record a failure: in su-code/KNOWLEDGE.md, then change approach, split the task, or escalate.\n\n${failures.join("\n\n")}`);
       }
       if (target.retries >= state.maxRetries) {
         target.status = "blocked";
         target.note = `blocked after ${target.retries} failed verifies`;
         save(state);
-        return text(`BLOCKED ${target.id} after ${target.retries} attempts (maxRetries=${state.maxRetries}). Record a failure: in agents/KNOWLEDGE.md and move on / escalate.\n\n${failures.join("\n\n")}`);
+        return text(`BLOCKED ${target.id} after ${target.retries} attempts (maxRetries=${state.maxRetries}). Record a failure: in su-code/KNOWLEDGE.md and move on / escalate.\n\n${failures.join("\n\n")}`);
       }
       save(state);
       const loop = target.failStreak === 2 ? " WARNING: same failure twice in a row — a third identical failure BLOCKS the task (no-progress guard). Change the approach, don't retry the same fix." : "";

@@ -64,7 +64,7 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
                 write_synth_skill(&global_target, &body)?;
                 audit_skill_layout(&global_target);
                 if let Some(root) = project_root.as_ref() {
-                    let lt = root.join("agents/skills").join(&name);
+                    let lt = root.join("su-code/skills").join(&name);
                     write_synth_skill(&lt, &body)?;
                     audit_skill_layout(&lt);
                 }
@@ -73,7 +73,7 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
                 ui::ok(&format!("{} → {} skill(s)", url, found.len()));
                 for (sname, sdir) in &found {
                     let gt = env.home.join(".omp/skills").join(sname);
-                    let lt = project_root.as_ref().map(|r| r.join("agents/skills").join(sname));
+                    let lt = project_root.as_ref().map(|r| r.join("su-code/skills").join(sname));
                     // Additive by default: don't clobber an already-installed skill.
                     if (gt.exists() || lt.as_ref().is_some_and(|p| p.exists())) && !force {
                         ui::skip(sname, "already installed (--force to overwrite)");
@@ -103,7 +103,7 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
             install_path_skill(src, &global_target)?;
             audit_skill_layout(&global_target);
             if let Some(root) = project_root.as_ref() {
-                let local_target = root.join("agents/skills").join(&name);
+                let local_target = root.join("su-code/skills").join(&name);
                 if force {
                     let _ = std::fs::remove_file(&local_target);
                 }
@@ -127,7 +127,7 @@ pub(crate) fn add_skill(env: &env_detect::Env, toml_path: &Path, spec: Option<&s
                 ui::ok(&format!("enabled builtin `{}` ({} file(s)) → {}", name, w, global_target.display()));
                 audit_skill_layout(&global_target);
                 if let Some(root) = project_root.as_ref() {
-                    let lt = root.join("agents/skills").join(&name);
+                    let lt = root.join("su-code/skills").join(&name);
                     let _ = assets::install_tree(&prefix, &lt)?;
                     audit_skill_layout(&lt);
                 }

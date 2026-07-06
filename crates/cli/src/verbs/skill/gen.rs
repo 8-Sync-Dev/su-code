@@ -8,7 +8,7 @@ use super::meta::{meta_for_dir, SkillMeta};
 use super::spec::yaml_quote;
 use crate::{env_detect, ui};
 
-/// Resolve a CLI arg into a local skill dir under `<root>/agents/skills/`.
+/// Resolve a CLI arg into a local skill dir under `<root>/su-code/skills/`.
 /// Accepts either a 1-based index (matching the order shown in `8sync skill`
 /// list and AGENTS.md), or a skill name (the directory name OR the frontmatter
 /// `name`).
@@ -69,7 +69,7 @@ pub(crate) fn gen_skill(env: &env_detect::Env, args: &[String]) -> Result<()> {
     }
     let root = detect_current_project_root()
         .ok_or_else(|| anyhow!("`skill gen` must run inside a project (no .git / Cargo.toml / package.json found)"))?;
-    let local_dir = root.join("agents/skills");
+    let local_dir = root.join("su-code/skills");
     let locals = list_installed_skill_dirs(&local_dir).unwrap_or_default();
     if locals.is_empty() {
         return Err(anyhow!(
@@ -142,7 +142,7 @@ pub(crate) fn gen_skill(env: &env_detect::Env, args: &[String]) -> Result<()> {
         body.push('\n');
     }
 
-    // Write to <root>/agents/skills/<fused_name>/SKILL.md (and global mirror).
+    // Write to <root>/su-code/skills/<fused_name>/SKILL.md (and global mirror).
     let local_target = local_dir.join(&fused_name);
     let global_target = env.home.join(".omp/skills").join(&fused_name);
     std::fs::create_dir_all(&local_target)?;

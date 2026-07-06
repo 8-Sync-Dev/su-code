@@ -27,7 +27,9 @@ export default function (pi: HookAPI): void {
 
   function stateHead(): string {
     try {
-      const state = join(process.cwd(), "agents/STATE.md");
+      const cwd = process.cwd();
+      let state = join(cwd, "su-code/STATE.md");
+      if (!existsSync(state)) state = join(cwd, "agents/STATE.md"); // pre-migration fallback
       if (!existsSync(state)) return "";
       const md = readFileSync(state, "utf8");
       const grab = (heading: string): string => {

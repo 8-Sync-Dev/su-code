@@ -34,9 +34,9 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
     let _ = update::update_skills(env, &env.xdg_config.join("8sync/skills.toml"), None);
     let count = deploy::mirror_global_to_local(&env.home, &root, force)?;
     if count > 0 {
-        ui::ok(&format!("skills vendored → {}", root.join("agents/skills").display()));
+        ui::ok(&format!("skills vendored → {}", root.join("su-code/skills").display()));
     }
-    for d in discover::list_installed_skill_dirs(&root.join("agents/skills")).unwrap_or_default() {
+    for d in discover::list_installed_skill_dirs(&root.join("su-code/skills")).unwrap_or_default() {
         deploy::ensure_skill_layout(&d);
     }
 

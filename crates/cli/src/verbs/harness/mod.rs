@@ -18,7 +18,7 @@ mod eval;
 mod external;
 mod global;
 mod init;
-mod memory;
+pub(crate) mod memory;
 mod model;
 mod local_model;
 mod gateway;
@@ -32,7 +32,7 @@ mod toolstats;
     EXAMPLES
       8sync harness                   ONE command — deploy/update skills + mirror + inject + memory + index (idempotent)
       8sync harness global            apply omp rules MACHINE-WIDE (all projects) + Anthropic token-optimizer defaults
-      8sync harness global --sweep    …and stamp skills/memory into every omp project (has agents/ or AGENTS.md) under ~/Projects
+      8sync harness global --sweep    …and stamp skills/memory into every omp project (has su-code/ or AGENTS.md) under ~/Projects
       8sync harness init              explicit full bootstrap with progress UI (force re-deploy everything)
       8sync harness up                refresh skills/AGENTS.md/memory + re-index codegraph to current state
       8sync harness up --pull        refresh AND re-pull registered skills from their source repos
@@ -73,10 +73,10 @@ pub struct Args {
     #[arg(long)]
     pub pull: bool,
     /// `up --commit`: also `git commit` the refreshed agent memory (scoped to
-    /// agents/ + AGENTS.md/CLAUDE.md/CHANGELOG.md/.gitignore; never your code)
+    /// su-code/ + AGENTS.md/CLAUDE.md/CHANGELOG.md/.gitignore; never your code)
     #[arg(long)]
     pub commit: bool,
-    /// `init --force`: re-mirror skills into agents/skills/, overwriting existing.
+    /// `init --force`: re-mirror skills into su-code/skills/, overwriting existing.
     /// Default is additive — never clobber an already-vendored (maybe edited) skill.
     #[arg(long)]
     pub force: bool,
@@ -99,7 +99,7 @@ pub struct Args {
     pub no_open: bool,
     /// `global --sweep [DIR]`: also stamp the per-project layer (skills mirror +
     /// AGENTS.md inject + memory seed + gitleaks hook) into every omp project
-    /// (repo with agents/ or AGENTS.md/CLAUDE.md) under DIR (default ~/Projects).
+    /// (repo with su-code/ or AGENTS.md/CLAUDE.md) under DIR (default ~/Projects).
     #[arg(long, value_name = "DIR", num_args = 0..=1, default_missing_value = "")]
     pub sweep: Option<String>,
 }
@@ -151,7 +151,7 @@ fn print_help() {
     println!("COMMANDS");
     println!("  8sync harness                   ONE command — skills+update+mirror+inject+memory+index (idempotent, re-run anytime)");
     println!("  8sync harness global            apply omp rules MACHINE-WIDE: ~/.omp skills+APPEND_SYSTEM+MCP → ALL projects, + Anthropic token defaults");
-    println!("  8sync harness global --sweep [DIR]  …and stamp skills/memory into every omp project (agents/ or AGENTS.md) under DIR (default ~/Projects)");
+    println!("  8sync harness global --sweep [DIR]  …and stamp skills/memory into every omp project (su-code/ or AGENTS.md) under DIR (default ~/Projects)");
     println!("  8sync harness init              full bootstrap: skills + codegraph + AGENTS.md + memory + CHANGELOG + .gitignore");
     println!("  8sync harness up                refresh: re-inject rules + KNOWLEDGE breadcrumb + codegraph index");
     println!("  8sync harness up --pull         …and re-pull registered skills from their source repos (network)");
@@ -189,20 +189,20 @@ fn print_help() {
     println!("  external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)");
 
     println!("\nFILE TAXONOMY (portability — survives a move to a new machine)");
-    println!("  COMMIT : AGENTS.md · CLAUDE.md · agents/*.md · CHANGELOG.md · agents/skills/   (learned/decided)");
+    println!("  COMMIT : AGENTS.md · CLAUDE.md · su-code/*.md · CHANGELOG.md · su-code/skills/   (learned/decided)");
     println!("  IGNORE : .codegraph/ · .cache/8sync/                                           (derived → rebuilt by init)");
     println!("  SECRET : .env · .env.* (keep .env.example)                                     (NEVER commit)");
     println!("  → init seeds these into a managed .gitignore block; `8sync doctor` warns if memory is ignored.");
 
     println!("\nOVERWRITE POLICY (default = NEVER overwrite — only add what's missing)");
-    println!("  user-owned : agents/*.md · CHANGELOG.md · agents/skills/ · AGENTS.md outside sentinels · hooks · your config keys");
+    println!("  user-owned : su-code/*.md · CHANGELOG.md · su-code/skills/ · AGENTS.md outside sentinels · hooks · your config keys");
     println!("               → seed-if-missing or sentinel-block updates ONLY; your edits are never clobbered");
     println!("  managed    : ~/.omp/skills (bundled) · 00-force-load.md · APPEND_SYSTEM.md · extensions/commands");
     println!("               → 8sync-shipped copies, refreshed when the binary updates (edit the PROJECT copy, not these)");
-    println!("  overwrite  : ONLY with an explicit flag — `--force` re-mirrors agents/skills/ over local edits");
+    println!("  overwrite  : ONLY with an explicit flag — `--force` re-mirrors su-code/skills/ over local edits");
 
     println!("\nNEW MACHINE (nothing lost)");
-    println!("  1) git clone <repo> && cd <repo>     # agents/*.md + agents/skills/ arrive with the clone");
+    println!("  1) git clone <repo> && cd <repo>     # su-code/*.md + su-code/skills/ arrive with the clone");
     println!("  2) 8sync up                          # install/refresh the 8sync binary + omp");
     println!("  3) 8sync harness init                # rebuild .codegraph + global skills, re-inject rules");
     println!("  3b) 8sync harness gateway apply     # deploy omp gateway config (set $NINE_ROUTER_KEY first)");

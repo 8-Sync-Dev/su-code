@@ -24,10 +24,10 @@ pub(crate) fn update_skills(
     filter: Option<&str>,
 ) -> Result<()> {
     ui::header("8sync skill update");
-    // Global registry (machine-local) ∪ project manifest (agents/skills.toml,
+    // Global registry (machine-local) ∪ project manifest (su-code/skills.toml,
     // committed) — the manifest is what makes skills reproducible on a new machine.
     let project_root = detect_current_project_root();
-    let proj_manifest = project_root.as_ref().map(|r| r.join("agents/skills.toml"));
+    let proj_manifest = project_root.as_ref().map(|r| r.join("su-code/skills.toml"));
     let mut reg = discover::read_registry(toml_path);
     if let Some(pm) = &proj_manifest {
         for (k, v) in discover::read_registry(pm) {
@@ -35,7 +35,7 @@ pub(crate) fn update_skills(
         }
     }
     if reg.is_empty() {
-        ui::info("no registered skills — `8sync skill add <url>` (or commit agents/skills.toml)");
+        ui::info("no registered skills — `8sync skill add <url>` (or commit su-code/skills.toml)");
         return Ok(());
     }
     let omp_skills = env.home.join(".omp/skills");
@@ -95,7 +95,7 @@ pub(crate) fn update_skills(
                 continue;
             }
             if let Some(root) = project_root.as_ref() {
-                let lt = root.join("agents/skills").join(sname);
+                let lt = root.join("su-code/skills").join(sname);
                 let _ = std::fs::remove_dir_all(&lt);
                 let _ = copy_dir_recursive(sdir, &lt);
             }
@@ -126,7 +126,7 @@ pub(crate) fn update_skills(
         let gt = omp_skills.join(name);
         let (w, _) = assets::install_tree(&prefix, &gt)?;
         if let Some(root) = project_root.as_ref() {
-            let lt = root.join("agents/skills").join(name);
+            let lt = root.join("su-code/skills").join(name);
             let _ = assets::install_tree(&prefix, &lt)?;
         }
         ui::ok(&format!("updated builtin `{}` ({} file(s))", name, w));
@@ -146,7 +146,7 @@ pub(crate) fn update_skills(
         let gt = omp_skills.join(name);
         let _ = install_path_skill(Path::new(p), &gt);
         if let Some(root) = project_root.as_ref() {
-            let lt = root.join("agents/skills").join(name);
+            let lt = root.join("su-code/skills").join(name);
             let _ = install_path_skill(Path::new(p), &lt);
         }
         updated += 1;

@@ -9,11 +9,11 @@ use crate::{env_detect, ui, verbs::skill};
 #[command(
     after_help = indoc::indoc! {"
         EXAMPLES
-          8sync .                       seed agents/* context for the current project and run `omp --continue`
+          8sync .                       seed su-code/* context for the current project and run `omp --continue`
 
         BEHAVIOR
           · Walks up from cwd to find the project root (.git / Cargo.toml / package.json / pyproject.toml / go.mod / deno.json).
-          · Detects stack (rust/node/python/nextjs/tauri/react-native/go) and seeds AGENTS.md + agents/{PROJECT,KNOWLEDGE,DECISIONS,PREFERENCES,STATE,NOTES}.md when missing.
+          · Detects stack (rust/node/python/nextjs/tauri/react-native/go) and seeds AGENTS.md + su-code/{PROJECT,KNOWLEDGE,DECISIONS,PREFERENCES,STATE,NOTES}.md when missing.
           · Re-injects the dynamic skills block in AGENTS.md so omp sees up-to-date skill list.
           · Execs `omp --continue` in the project root. Session lifetime is owned by omp (retain/recall/auto-compact); 8sync no longer manages abduco sockets or kitty panes.
           · If omp is missing, drops into the user shell instead (run `8sync setup` to fix).
@@ -94,6 +94,7 @@ fn detect_stack(root: &Path) -> Vec<String> {
 }
 
 fn seed_project_context(env: &env_detect::Env, root: &Path, stack: &[String]) -> Result<()> {
+    let _ = crate::verbs::harness::memory::migrate_legacy_layout(root);
     let agents = root.join("AGENTS.md");
     if !agents.exists() {
         let name = root.file_name().and_then(|s| s.to_str()).unwrap_or("project");
@@ -118,12 +119,12 @@ fn seed_project_context(env: &env_detect::Env, root: &Path, stack: &[String]) ->
 
 | File | Mục đích |
 |---|---|
-| `agents/PROJECT.md`     | facts cố định (stack, entrypoint, conventions) |
-| `agents/KNOWLEDGE.md`   | append-only: AI học được gì về codebase |
-| `agents/DECISIONS.md`   | append-only: quyết định kiến trúc |
-| `agents/PREFERENCES.md` | append-only: user style preferences |
-| `agents/STATE.md`       | việc đang dở, next-step concrete |
-| `agents/NOTES.md`       | quick notes appended via `8sync note` |
+| `su-code/PROJECT.md`     | facts cố định (stack, entrypoint, conventions) |
+| `su-code/KNOWLEDGE.md`   | append-only: AI học được gì về codebase |
+| `su-code/DECISIONS.md`   | append-only: quyết định kiến trúc |
+| `su-code/PREFERENCES.md` | append-only: user style preferences |
+| `su-code/STATE.md`       | việc đang dở, next-step concrete |
+| `su-code/NOTES.md`       | quick notes appended via `8sync note` |
 
 Session memory được omp tự quản (retain/recall/auto-compact). Không cần capture tay.
 
@@ -134,14 +135,14 @@ Session memory được omp tự quản (retain/recall/auto-compact). Không c�
 - Screenshot UI / PDF / diff: ưu tiên `8sync shot|pdf-img|diff-img` thay vì
   dump text (tiết kiệm token 3-10×).
 - Tìm symbol/file: `8sync find <kw>` (không gọi `rg`/`fd` thô).
-- Ghi nhớ ý tưởng nhanh: `8sync note "..."` (append vào `agents/NOTES.md`).
+- Ghi nhớ ý tưởng nhanh: `8sync note "..."` (append vào `su-code/NOTES.md`).
 "#
         );
         std::fs::write(&agents, content)?;
         ui::ok(&format!("seeded {}", agents.display()));
     }
 
-    let agents_dir = root.join("agents");
+    let agents_dir = root.join("su-code");
     std::fs::create_dir_all(&agents_dir)?;
     let project_md = agents_dir.join("PROJECT.md");
     if !project_md.exists() {

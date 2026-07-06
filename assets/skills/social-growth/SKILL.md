@@ -100,7 +100,7 @@ Khi user hỏi "lên plan tháng", sản xuất file `social-plan-{thang}-{sản
 
 - **Weekly review**: 1 bảng, top/flop 3 content, 1 quyết định "double-down / kill / iterate".
 - **Quy tắc:** kill content < ngưỡng sau 48h; double-down clip pass retention bằng cách cắt biến thể + boost.
-- **Insight ghi lại** vào `agents/KNOWLEDGE.md` để tháng sau không lặp lỗi.
+- **Insight ghi lại** vào `su-code/KNOWLEDGE.md` để tháng sau không lặp lỗi.
 
 ## 8. Bàn giao
 

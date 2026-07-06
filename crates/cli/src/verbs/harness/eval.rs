@@ -174,7 +174,7 @@ pub(crate) struct EvalData {
 pub(crate) fn eval_project_data(home: &std::path::Path) -> Option<EvalData> {
     use crate::verbs::skill::discover::detect_current_project_root;
     let root = detect_current_project_root()?;
-    let skill = |n: &str| home.join(".omp/skills").join(n).exists() || root.join("agents/skills").join(n).exists();
+    let skill = |n: &str| home.join(".omp/skills").join(n).exists() || root.join("su-code/skills").join(n).exists();
     let bin = |n: &str| which::which(n).is_ok();
     let has = |p: &str| root.join(p).exists();
     let pkg = std::fs::read_to_string(root.join("package.json")).unwrap_or_default();
@@ -190,11 +190,11 @@ pub(crate) fn eval_project_data(home: &std::path::Path) -> Option<EvalData> {
         ("dev", vec![("codegraph", has(".codegraph")), ("cbm-graph", cbm), ("build", build_cmd), ("karpathy+ponytail", skill("karpathy-guidelines") && skill("ponytail"))]),
         ("qa/testing", vec![("test", test_cmd), ("full-flow", skill("full-flow")), ("browser-testing", skill("browser-testing-with-devtools")), ("headroom", bin("headroom"))]),
         ("research", vec![("omp/web_search", bin("omp")), ("agent-reach|deep-research", skill("agent-reach") || skill("deep-research")), ("last30days", skill("last30days"))]),
-        ("ba/po", vec![("planning", skill("planning-and-task-breakdown")), ("spec-driven", skill("spec-driven-development")), ("STATE+DECISIONS", has("agents/STATE.md") && has("agents/DECISIONS.md"))]),
+        ("ba/po", vec![("planning", skill("planning-and-task-breakdown")), ("spec-driven", skill("spec-driven-development")), ("STATE+DECISIONS", has("su-code/STATE.md") && has("su-code/DECISIONS.md"))]),
         ("fe", vec![("frontend-stack", frontend), ("impeccable+taste", skill("impeccable") && skill("taste-skill")), ("senior-frontend", skill("senior-frontend"))]),
         ("be", vec![("backend-stack", backend), ("api-design", skill("api-and-interface-design")), ("security", skill("senior-security") || skill("security-and-hardening"))]),
         ("docs", vec![("docs-skill", skill("documentation-and-adrs")), ("AGENTS.md", has("AGENTS.md")), ("CHANGELOG", has("CHANGELOG.md"))]),
-        ("memory/learn", vec![("Mnemopi-ON", cfg.contains("backend: mnemopi")), ("KNOWLEDGE+PLAYBOOKS", has("agents/KNOWLEDGE.md") && has("agents/PLAYBOOKS.md")), ("cbm-graph", cbm)]),
+        ("memory/learn", vec![("Mnemopi-ON", cfg.contains("backend: mnemopi")), ("KNOWLEDGE+PLAYBOOKS", has("su-code/KNOWLEDGE.md") && has("su-code/PLAYBOOKS.md")), ("cbm-graph", cbm)]),
         ("token-opt", vec![("codegraph", bin("codegraph")), ("cbm", cbm), ("headroom", bin("headroom"))]),
     ];
     let mut roles_out = Vec::new();
@@ -226,6 +226,6 @@ pub(crate) fn harness_eval_project(env: &env_detect::Env) -> Result<()> {
     }
     println!();
     ui::info(&format!("OVERALL team readiness: {}%  ({}/{} capabilities present)", data.overall, data.present, data.total));
-    ui::info("close gaps (·): `8sync harness` (engines+skills) · enable Mnemopi · add a stack skill · seed agents/*");
+    ui::info("close gaps (·): `8sync harness` (engines+skills) · enable Mnemopi · add a stack skill · seed su-code/*");
     Ok(())
 }

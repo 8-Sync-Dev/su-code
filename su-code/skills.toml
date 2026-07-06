@@ -1,4 +1,4 @@
-# agents/skills.toml — project skill manifest (committed). `8sync harness` re-pulls these on any machine.
+# su-code/skills.toml — project skill manifest (committed). `8sync harness` re-pulls these on any machine.
 
 [8sync-cli]
 src = "builtin:8sync-cli"

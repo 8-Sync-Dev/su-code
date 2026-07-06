@@ -52,7 +52,7 @@ pub(crate) fn cleanup_legacy_gs(home: &Path, root: Option<&Path>) {
     let _ = std::fs::remove_dir_all(home.join(".omp/skills/gs"));
     if let Some(r) = root {
         let _ = std::fs::remove_file(r.join(".omp/commands/gs.md"));
-        let _ = std::fs::remove_dir_all(r.join("agents/skills/gs"));
+        let _ = std::fs::remove_dir_all(r.join("su-code/skills/gs"));
     }
 }
 
@@ -69,10 +69,10 @@ pub(crate) fn ensure_skill_layout(dir: &Path) {
 }
 
 /// For every skill dir under `~/.omp/skills/`, create or refresh a copy under
-/// `<root>/agents/skills/<name>/`. Returns the number of skills processed.
+/// `<root>/su-code/skills/<name>/`. Returns the number of skills processed.
 pub(crate) fn mirror_global_to_local(home: &Path, root: &Path, force: bool) -> Result<usize> {
     let global_dir = home.join(".omp/skills");
-    let local_dir = root.join("agents/skills");
+    let local_dir = root.join("su-code/skills");
     std::fs::create_dir_all(&local_dir)?;
     let globals = list_installed_skill_dirs(&global_dir).unwrap_or_default();
     let mut count = 0usize;
@@ -830,7 +830,7 @@ pub(crate) fn ensure_omp_capabilities_snapshot(home: &Path) -> Result<()> {
     Ok(())
 }
 /// Best-effort: ensure the `feynman` research CLI (companion-inc/feynman) is
-/// available so the 20 feynman research skills registered in agents/skills.toml
+/// available so the 20 feynman research skills registered in su-code/skills.toml
 /// (deep-research, alpha-research, literature-review, …) are functional rather
 /// than inert — they shell out to `feynman`/`alpha`. A failed install is
 /// non-fatal (skills still list; the user can `npx @companion-ai/feynman`
