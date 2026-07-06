@@ -194,5 +194,9 @@ fn stamp_project(env: &env_detect::Env, root: &Path, force: bool) -> Result<usiz
     inject_agents_md(&env.home, root)?;
     seed_harness_memory(root)?;
     seed_gitleaks_hook(root);
+    // Redeploy the /auto command + engine to the project so a swept repo's
+    // `.omp/commands/auto.md` (precedence over global) points at su-code/, not
+    // a stale agents/ copy from an older binary.
+    deploy::ensure_engine(&env.home, Some(root))?;
     Ok(mirrored)
 }

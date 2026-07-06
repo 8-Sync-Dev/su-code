@@ -5,6 +5,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.46.1] — 2026-07-06
+
+### Fixed — sweep now redeploys the project-level `/auto` command
+- `8sync harness global --sweep` migrated a project's memory folder
+  (`agents/` → `su-code/`) but left the project's `.omp/commands/auto.md`
+  (and `8sync-engine.ts`) untouched — so `/auto` in a swept repo kept reading
+  `agents/STATE.md` from a stale copy deployed by an older binary (project
+  commands take precedence over the global one in omp).
+- `stamp_project` (the per-repo sweep layer) now calls `deploy::ensure_engine`,
+  refreshing both the `/auto` command and the engine extension in every swept
+  project. Byte-identical writes stay quiet. Verified: all projects under
+  `~/Projects` now have `su-code/`-only `/auto` commands (0 stale).
+
 ## [0.46.0] — 2026-07-06
 
 ### Changed — the agent-memory folder is now `su-code/` (was `agents/`), a distinctive project marker

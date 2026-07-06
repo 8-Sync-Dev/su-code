@@ -33,7 +33,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `impeccable` — `/home/alexdev/Projects/tools/su-code/su-code/skills/impeccable/SKILL.md`
 - `design-taste-frontend` — `/home/alexdev/Projects/tools/su-code/su-code/skills/taste-skill/SKILL.md`
 - `image-routing` — `/home/alexdev/Projects/tools/su-code/su-code/skills/image-routing/SKILL.md`
-- `locate-anything` — `/home/alexdev/.omp/skills/locate-anything/SKILL.md`
+- `locate-anything` — `/home/alexdev/Projects/tools/su-code/su-code/skills/locate-anything/SKILL.md`
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
@@ -92,7 +92,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `token-bench` — `su-code/skills/token-bench/SKILL.md`
 - `using-agent-skills` — `su-code/skills/using-agent-skills/SKILL.md`
 - `watch` — `su-code/skills/watch/SKILL.md`
-- `zai-vision` — `~/.omp/skills/zai-vision/SKILL.md`
+- `zai-vision` — `su-code/skills/zai-vision/SKILL.md`
 
 ### Quy tắc bất biến
 
