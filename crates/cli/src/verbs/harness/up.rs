@@ -2,7 +2,8 @@
 //! re-inject AGENTS.md + sub-folder indexes, refresh the KNOWLEDGE breadcrumb,
 //! and re-index codegraph so the agent keeps learning as the project grows.
 //! `--loop <dur>` runs it in the foreground; `--timer <dur|off>` installs a
-//! systemd user timer (the recommended background option). Per tick the harness
+//! systemd user timer (the recommended background option — memory-bounded to its
+//! own cgroup so a heavy re-index can't OOM the machine). Per tick the harness
 //! refreshes context (re-inject + re-index + consolidate); the agent then drives
 //! the L1→L3 loop off STATE.md (read STATE → Next → verify-gate → update spine →
 //! `--commit`), per the loop-engineering rules in 00-force-load.md.
@@ -189,8 +190,18 @@ fn manage_timer(env: &env_detect::Env, spec: &str) -> Result<()> {
     let exe = std::env::current_exe().context("current_exe")?;
     std::fs::create_dir_all(&unit_dir)?;
 
+    // Background refresh unit. Bounded to its own cgroup + low priority so a
+    // heavy `codegraph index` / cbm re-index (peak RSS can hit multiple GB on a
+    // big repo) can NEVER OOM-kill the machine again: MemoryHigh applies reclaim
+    // pressure (throttle, don't explode), MemoryMax is a hard cgroup ceiling that
+    // kills only THIS unit, MemorySwapMax stops swap thrash, OOMPolicy=stop exits
+    // cleanly. Nice/CPUWeight/IOWeight keep it out of the way of foreground work.
     let svc_body = format!(
-        "[Unit]\nDescription=8sync harness up ({proj})\n\n[Service]\nType=oneshot\nTimeoutStartSec=300\nWorkingDirectory={wd}\nExecStart={exe} harness up\n",
+        "[Unit]\nDescription=8sync harness up ({proj})\n\n\
+         [Service]\nType=oneshot\nTimeoutStartSec=900\n\
+         WorkingDirectory={wd}\nExecStart={exe} harness up\n\
+         Nice=15\nCPUWeight=10\nIOWeight=10\n\
+         MemoryHigh=2G\nMemoryMax=4G\nMemorySwapMax=512M\nOOMPolicy=stop\n",
         proj = root.file_name().and_then(|s| s.to_str()).unwrap_or("project"),
         wd = root.display(),
         exe = exe.display(),
