@@ -122,8 +122,11 @@ pub fn run_self_update(force: bool) -> Result<bool> {
         let _ = std::fs::remove_file(&tmp);
         bail!("download failed: {}", asset_url);
     }
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    }
     std::fs::rename(&tmp, &bin_dst)?;
 
     let _ = std::fs::write(last_seen_tag_file(), &tag);
@@ -153,8 +156,11 @@ pub fn install_tag(tag: &str) -> Result<bool> {
         let _ = std::fs::remove_file(&tmp);
         bail!("download failed: {}", asset_url);
     }
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    }
     std::fs::rename(&tmp, &bin_dst)?;
     let _ = std::fs::write(last_seen_tag_file(), &tag);
     ui::ok(&format!("installed {} → {}", tag, bin_dst.display()));
