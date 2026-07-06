@@ -42,7 +42,7 @@ fn entry(
         "updated": updated,
         "url": url,
         "new": is_new,
-        "install": install,  // { type:"stdio", command, args, env:[..] } | { type:"http", url } | { type:"skill", spec }
+        "install": install,  // { type:"stdio", command, args, env:{..} } | { type:"http"|"sse", url, headers:{..} } | { type:"skill", spec }
     })
 }
 
@@ -127,47 +127,160 @@ fn cache_write(root: &Path, key: &str, rows: &[serde_json::Value]) {
 
 // ── MCP: official registry ─────────────────────────────────────────────────
 
-/// Build an `mcp.json` install descriptor from an official-registry package or
-/// remote. Prefers a stdio package (npx/uvx) since those need no auth; falls
-/// back to a remote HTTP/SSE endpoint.
+/// Map a package's `registryType` (npm/pypi/oci/nuget/mcpb) — or an explicit
+/// `runtimeHint` when present — to the runtime command, its leading args, and
+/// whether env vars must be forwarded with `-e NAME` (docker). Returns `None`
+/// for package kinds we can't launch directly (e.g. `mcpb` bundles).
+fn runtime_for(registry_type: &str, runtime_hint: &str) -> Option<(String, Vec<String>, bool)> {
+    let hint = if !runtime_hint.is_empty() {
+        runtime_hint.to_string()
+    } else {
+        match registry_type {
+            "npm" => "npx",
+            "pypi" => "uvx",
+            "oci" => "docker",
+            "nuget" => "dnx",
+            _ => return None, // mcpb / unknown → not directly runnable
+        }
+        .to_string()
+    };
+    Some(match hint.as_str() {
+        "npx" => ("npx".into(), vec!["-y".into()], false),
+        "uvx" => ("uvx".into(), vec![], false),
+        "docker" => ("docker".into(), vec!["run".into(), "-i".into(), "--rm".into()], true),
+        "dnx" => ("dnx".into(), vec![], false),
+        other => (other.to_string(), vec![], false),
+    })
+}
+
+/// Render a spec `Argument[]` (NamedArgument | PositionalArgument, each
+/// extending Input) into CLI tokens. Named → `--flag` [value]; positional →
+/// value. Value = `value` ?? `default` (a named flag with no value stays a bare
+/// flag). Best-effort: most registry servers ship no arguments.
+fn render_args(arr: Option<&Vec<serde_json::Value>>) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(arr) = arr else { return out };
+    for a in arr {
+        let val = a
+            .get("value")
+            .and_then(|v| v.as_str())
+            .or_else(|| a.get("default").and_then(|v| v.as_str()));
+        match a.get("type").and_then(|v| v.as_str()).unwrap_or("positional") {
+            "named" => {
+                if let Some(name) = a.get("name").and_then(|v| v.as_str()) {
+                    out.push(name.to_string());
+                    if let Some(v) = val {
+                        out.push(v.to_string());
+                    }
+                }
+            }
+            _ => {
+                if let Some(v) = val {
+                    out.push(v.to_string());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Build a `{NAME: value}` map from a `KeyValueInput[]` (env vars or HTTP
+/// headers). Value = `value` ?? `default` ?? "" (an empty required entry is a
+/// placeholder the user fills in `mcp.json`). Also returns the names of required
+/// entries left empty, for a post-install hint. `additionalProperties` order is
+/// irrelevant here — a JSON object is the shape every MCP client expects.
+fn kv_map(arr: Option<&Vec<serde_json::Value>>) -> (serde_json::Map<String, serde_json::Value>, Vec<String>) {
+    let mut map = serde_json::Map::new();
+    let mut required_empty = Vec::new();
+    let Some(arr) = arr else { return (map, required_empty) };
+    for e in arr {
+        let Some(name) = e.get("name").and_then(|v| v.as_str()) else { continue };
+        let val = e
+            .get("value")
+            .and_then(|v| v.as_str())
+            .or_else(|| e.get("default").and_then(|v| v.as_str()))
+            .unwrap_or("");
+        if val.is_empty() && e.get("isRequired").and_then(|v| v.as_bool()).unwrap_or(false) {
+            required_empty.push(name.to_string());
+        }
+        map.insert(name.to_string(), serde_json::Value::String(val.to_string()));
+    }
+    (map, required_empty)
+}
+
+/// Build an `mcp.json` install descriptor from an official-registry `server.json`
+/// (schema `2025-12-11`). Honors `registryType`→runtime, `version` pinning,
+/// `transport`, `runtimeArguments`/`packageArguments`, and `environmentVariables`
+/// (as a proper `{NAME: value}` map). Prefers a runnable package; falls back to a
+/// remote HTTP/SSE endpoint.
 fn official_install(server: &serde_json::Value) -> Option<serde_json::Value> {
     if let Some(pkgs) = server.get("packages").and_then(|v| v.as_array()) {
-        if let Some(p) = pkgs.first() {
+        for p in pkgs {
             let id = p.get("identifier").and_then(|v| v.as_str()).unwrap_or("");
-            let hint = p.get("runtimeHint").and_then(|v| v.as_str()).unwrap_or("");
-            let env: Vec<serde_json::Value> = p
-                .get("environmentVariables")
-                .and_then(|v| v.as_array())
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|e| {
-                            let name = e.get("name").and_then(|v| v.as_str())?;
-                            Some(serde_json::json!({
-                                "name": name,
-                                "required": e.get("isRequired").and_then(|v| v.as_bool()).unwrap_or(false),
-                                "description": e.get("description").and_then(|v| v.as_str()).unwrap_or(""),
-                            }))
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            let (command, args) = match hint {
-                "uvx" => ("uvx".to_string(), vec![id.to_string()]),
-                _ => ("npx".to_string(), vec!["-y".to_string(), id.to_string()]),
-            };
-            if !id.is_empty() {
-                return Some(serde_json::json!({
-                    "type": "stdio", "command": command, "args": args, "env": env,
-                }));
+            if id.is_empty() {
+                continue;
             }
+            let registry_type = p.get("registryType").and_then(|v| v.as_str()).unwrap_or("");
+            let runtime_hint = p.get("runtimeHint").and_then(|v| v.as_str()).unwrap_or("");
+            let version = p.get("version").and_then(|v| v.as_str()).unwrap_or("");
+            let transport = p.get("transport");
+            let ttype = transport.and_then(|t| t.get("type")).and_then(|v| v.as_str()).unwrap_or("stdio");
+
+            // A package that serves over HTTP/SSE after launch → remote-style entry.
+            if ttype == "streamable-http" || ttype == "sse" {
+                if let Some(u) = transport.and_then(|t| t.get("url")).and_then(|v| v.as_str()) {
+                    let (headers, _) = kv_map(transport.and_then(|t| t.get("headers")).and_then(|v| v.as_array()));
+                    let mut o = serde_json::json!({ "type": if ttype == "sse" { "sse" } else { "http" }, "url": u });
+                    if !headers.is_empty() {
+                        o["headers"] = serde_json::Value::Object(headers);
+                    }
+                    return Some(o);
+                }
+            }
+
+            let Some((command, mut args, docker_env_forward)) = runtime_for(registry_type, runtime_hint) else {
+                continue;
+            };
+            args.extend(render_args(p.get("runtimeArguments").and_then(|v| v.as_array())));
+            let (env, _required) = kv_map(p.get("environmentVariables").and_then(|v| v.as_array()));
+            // docker: forward each env var into the container with `-e NAME`.
+            if docker_env_forward {
+                for k in env.keys() {
+                    args.push("-e".into());
+                    args.push(k.clone());
+                }
+            }
+            // Package spec, version-pinned: `id@version` (npm/pypi/nuget) or
+            // `id:version` (docker image), unless already tagged.
+            let spec = if version.is_empty() {
+                id.to_string()
+            } else if command == "docker" {
+                if id.contains(':') { id.to_string() } else { format!("{id}:{version}") }
+            } else if id.strip_prefix('@').unwrap_or(id).contains('@') {
+                id.to_string()
+            } else {
+                format!("{id}@{version}")
+            };
+            args.push(spec);
+            args.extend(render_args(p.get("packageArguments").and_then(|v| v.as_array())));
+
+            let mut o = serde_json::json!({ "type": "stdio", "command": command, "args": args });
+            if !env.is_empty() {
+                o["env"] = serde_json::Value::Object(env);
+            }
+            return Some(o);
         }
     }
     if let Some(remotes) = server.get("remotes").and_then(|v| v.as_array()) {
         if let Some(r) = remotes.first() {
             if let Some(u) = r.get("url").and_then(|v| v.as_str()) {
-                let t = r.get("type").and_then(|v| v.as_str()).unwrap_or("http");
-                let t = if t.contains("sse") { "sse" } else { "http" };
-                return Some(serde_json::json!({ "type": t, "url": u }));
+                let t = r.get("type").and_then(|v| v.as_str()).unwrap_or("streamable-http");
+                let (headers, _) = kv_map(r.get("headers").and_then(|v| v.as_array()));
+                let mut o = serde_json::json!({ "type": if t.contains("sse") { "sse" } else { "http" }, "url": u });
+                if !headers.is_empty() {
+                    o["headers"] = serde_json::Value::Object(headers);
+                }
+                return Some(o);
             }
         }
     }
@@ -241,7 +354,6 @@ fn fetch_mcp_smithery(search: &str) -> Vec<serde_json::Value> {
             "type": "stdio",
             "command": "npx",
             "args": ["-y", "@smithery/cli@latest", "run", qn],
-            "env": [],
         });
         out.push(entry(
             qn,
@@ -420,4 +532,233 @@ pub(crate) fn catalog(root: &Path, kind: &str, search: &str, sort: &str) -> Vec<
         });
     }
     rows
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── runtime_for ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn runtime_for_maps_each_registry_type() {
+        assert_eq!(runtime_for("npm", ""), Some(("npx".into(), vec!["-y".into()], false)));
+        assert_eq!(runtime_for("pypi", ""), Some(("uvx".into(), vec![], false)));
+        assert_eq!(
+            runtime_for("oci", ""),
+            Some(("docker".into(), vec!["run".into(), "-i".into(), "--rm".into()], true))
+        );
+        assert_eq!(runtime_for("nuget", ""), Some(("dnx".into(), vec![], false)));
+    }
+
+    #[test]
+    fn runtime_for_unknown_kinds_are_unlaunchable() {
+        assert_eq!(runtime_for("mcpb", ""), None);
+        assert_eq!(runtime_for("weird", ""), None);
+        assert_eq!(runtime_for("", ""), None);
+    }
+
+    #[test]
+    fn runtime_hint_overrides_registry_type() {
+        // npm package but explicit docker hint → docker triple, env forwarding on.
+        assert_eq!(
+            runtime_for("npm", "docker"),
+            Some(("docker".into(), vec!["run".into(), "-i".into(), "--rm".into()], true))
+        );
+        // A hint even rescues an otherwise-unlaunchable registry type.
+        assert_eq!(runtime_for("mcpb", "uvx"), Some(("uvx".into(), vec![], false)));
+    }
+
+    // ── render_args ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn render_args_named_and_positional_forms() {
+        // named with value → two tokens.
+        let a = serde_json::json!([{"type":"named","name":"--flag","value":"v"}]);
+        assert_eq!(render_args(a.as_array()), vec!["--flag".to_string(), "v".into()]);
+
+        // named without value → bare flag, no trailing token.
+        let a = serde_json::json!([{"type":"named","name":"--verbose"}]);
+        assert_eq!(render_args(a.as_array()), vec!["--verbose".to_string()]);
+
+        // named falls back to `default` when `value` absent.
+        let a = serde_json::json!([{"type":"named","name":"--level","default":"info"}]);
+        assert_eq!(render_args(a.as_array()), vec!["--level".to_string(), "info".into()]);
+
+        // positional value → single token.
+        let a = serde_json::json!([{"type":"positional","value":"x"}]);
+        assert_eq!(render_args(a.as_array()), vec!["x".to_string()]);
+
+        // positional falls back to `default`.
+        let a = serde_json::json!([{"type":"positional","default":"d"}]);
+        assert_eq!(render_args(a.as_array()), vec!["d".to_string()]);
+
+        // positional with neither value nor default → skipped entirely.
+        let a = serde_json::json!([{"type":"positional"}]);
+        assert!(render_args(a.as_array()).is_empty());
+    }
+
+    #[test]
+    fn render_args_none_is_empty() {
+        assert!(render_args(None).is_empty());
+    }
+
+    // ── kv_map ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn kv_map_value_default_and_required_empty_flagging() {
+        let a = serde_json::json!([
+            {"name":"WITH_VALUE","value":"v"},
+            {"name":"WITH_DEFAULT","default":"d"},
+            {"name":"REQ_EMPTY","isRequired":true},
+            {"name":"OPT_EMPTY"},
+            {"name":"REQ_WITH_VALUE","value":"x","isRequired":true}
+        ]);
+        let (map, required) = kv_map(a.as_array());
+        assert_eq!(map.get("WITH_VALUE").and_then(|v| v.as_str()), Some("v"));
+        assert_eq!(map.get("WITH_DEFAULT").and_then(|v| v.as_str()), Some("d"));
+        // required + empty → "" placeholder in the map.
+        assert_eq!(map.get("REQ_EMPTY").and_then(|v| v.as_str()), Some(""));
+        // non-required empty → "" placeholder too.
+        assert_eq!(map.get("OPT_EMPTY").and_then(|v| v.as_str()), Some(""));
+        assert_eq!(map.get("REQ_WITH_VALUE").and_then(|v| v.as_str()), Some("x"));
+        // Only the required-AND-empty entry is flagged: not the optional-empty
+        // one, not the required-but-filled one.
+        assert_eq!(required, vec!["REQ_EMPTY".to_string()]);
+    }
+
+    // ── official_install ────────────────────────────────────────────────────
+
+    #[test]
+    fn official_install_npm_env_is_object_not_array() {
+        let server = serde_json::json!({
+            "packages": [{
+                "identifier": "server-everything",
+                "registryType": "npm",
+                "version": "1.0.0",
+                "environmentVariables": [
+                    {"name":"FOO","value":"bar"},
+                    {"name":"SECRET","isRequired":true}
+                ]
+            }]
+        });
+        let v = official_install(&server).expect("npm package should project to an install");
+        assert_eq!(v["type"], "stdio");
+        assert_eq!(v["command"], "npx");
+        assert_eq!(v["args"], serde_json::json!(["-y", "server-everything@1.0.0"]));
+        // Regression under test: `env` MUST be a JSON object map, never an
+        // array of environment-variable descriptors.
+        assert!(v["env"].is_object());
+        assert_eq!(v["env"]["FOO"], "bar");
+        assert_eq!(v["env"]["SECRET"], "");
+    }
+
+    #[test]
+    fn official_install_npm_scoped_identifier_version_pinning() {
+        // Regression: a scoped npm id (leading `@scope/`) must still get its
+        // version pinned — the already-tagged check strips the scope `@` first.
+        let server = serde_json::json!({
+            "packages": [{
+                "identifier": "@scope/pkg",
+                "registryType": "npm",
+                "version": "1.2.3"
+            }]
+        });
+        let v = official_install(&server).expect("scoped npm package should project to an install");
+        assert_eq!(v["args"], serde_json::json!(["-y", "@scope/pkg@1.2.3"]));
+
+        // An already-tagged scoped id (`@scope/pkg@x.y.z`) stays untouched.
+        let server = serde_json::json!({
+            "packages": [{
+                "identifier": "@scope/pkg@9.9.9",
+                "registryType": "npm",
+                "version": "1.2.3"
+            }]
+        });
+        let v = official_install(&server).expect("tagged scoped npm package should project to an install");
+        assert_eq!(v["args"], serde_json::json!(["-y", "@scope/pkg@9.9.9"]));
+    }
+
+    #[test]
+    fn official_install_pypi_uses_uvx_and_pins_version() {
+        let server = serde_json::json!({
+            "packages": [{
+                "identifier": "mcp-server-git",
+                "registryType": "pypi",
+                "version": "2.0.0"
+            }]
+        });
+        let v = official_install(&server).expect("pypi package should project to an install");
+        assert_eq!(v["command"], "uvx");
+        assert_eq!(v["args"], serde_json::json!(["mcp-server-git@2.0.0"]));
+        // No env vars → no `env` key emitted at all.
+        assert!(v.get("env").is_none());
+    }
+
+    #[test]
+    fn official_install_oci_docker_forwards_env_and_appends_package_args() {
+        let server = serde_json::json!({
+            "packages": [{
+                "identifier": "mcp/everything",
+                "registryType": "oci",
+                "version": "1.2.3",
+                "environmentVariables": [{"name":"API_KEY","isRequired":true}],
+                "packageArguments": [{"type":"positional","value":"--verbose"}]
+            }]
+        });
+        let v = official_install(&server).expect("oci package should project to an install");
+        assert_eq!(v["command"], "docker");
+        // Order contract: run/-i/--rm, then `-e NAME` per env var, then the
+        // version-pinned image `id:version`, then packageArguments AFTER it.
+        assert_eq!(
+            v["args"],
+            serde_json::json!(["run", "-i", "--rm", "-e", "API_KEY", "mcp/everything:1.2.3", "--verbose"])
+        );
+        assert!(v["env"].is_object());
+        assert_eq!(v["env"]["API_KEY"], "");
+    }
+
+    #[test]
+    fn official_install_package_streamable_http_returns_remote() {
+        let server = serde_json::json!({
+            "packages": [{
+                "identifier": "some-server",
+                "registryType": "npm",
+                "transport": {"type":"streamable-http","url":"https://example.com/mcp"}
+            }]
+        });
+        let v = official_install(&server).expect("http-transport package should project to a remote");
+        assert_eq!(v["type"], "http");
+        assert_eq!(v["url"], "https://example.com/mcp");
+        // Remote descriptor, not stdio: no launch command/args.
+        assert!(v.get("command").is_none());
+        assert!(v.get("args").is_none());
+    }
+
+    #[test]
+    fn official_install_remotes_only_maps_headers_to_object() {
+        let server = serde_json::json!({
+            "remotes": [{
+                "type":"sse",
+                "url":"https://remote.example.com/sse",
+                "headers":[{"name":"Authorization","value":"Bearer xyz"}]
+            }]
+        });
+        let v = official_install(&server).expect("remote-only server should project to a remote");
+        assert_eq!(v["type"], "sse");
+        assert_eq!(v["url"], "https://remote.example.com/sse");
+        assert!(v["headers"].is_object());
+        assert_eq!(v["headers"]["Authorization"], "Bearer xyz");
+    }
+
+    #[test]
+    fn official_install_mcpb_only_without_remote_is_none() {
+        let server = serde_json::json!({
+            "packages": [{
+                "identifier": "some-bundle",
+                "registryType": "mcpb"
+            }]
+        });
+        assert!(official_install(&server).is_none());
+    }
 }

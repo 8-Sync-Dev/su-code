@@ -1463,6 +1463,12 @@ struct McpAddBody {
     /// Raw spec typed by the user: `npx -y pkg`, a remote URL, or `uvx pkg`.
     #[serde(default)]
     spec: Option<String>,
+    /// `{NAME: value}` env map (stdio) from a marketplace `server.json` descriptor.
+    #[serde(default)]
+    env: Option<std::collections::HashMap<String, String>>,
+    /// `{Header: value}` map for a remote (http/sse) server.
+    #[serde(default)]
+    headers: Option<std::collections::HashMap<String, String>>,
 }
 
 /// Merge one server into `~/.omp/agent/mcp.json` (creating the file/map if
@@ -1477,7 +1483,7 @@ async fn api_mcp_add(
         return Err((StatusCode::BAD_REQUEST, "server name required".into()));
     }
     // Build the server object.
-    let server: serde_json::Value = if let Some(spec) = body.spec.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    let mut server: serde_json::Value = if let Some(spec) = body.spec.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         if spec.starts_with("http://") || spec.starts_with("https://") {
             serde_json::json!({ "type": "http", "url": spec })
         } else {
@@ -1495,12 +1501,31 @@ async fn api_mcp_add(
     } else {
         return Err((StatusCode::BAD_REQUEST, "need spec, url, or command".into()));
     };
+    // Structured env/headers from a marketplace `server.json` descriptor.
+    if let Some(obj) = server.as_object_mut() {
+        if let Some(env) = body.env.as_ref().filter(|m| !m.is_empty()) {
+            obj.insert("env".into(), serde_json::json!(env));
+        }
+        if let Some(h) = body.headers.as_ref().filter(|m| !m.is_empty()) {
+            obj.insert("headers".into(), serde_json::json!(h));
+        }
+    }
     // Warn (don't fail) if the runtime binary is missing — npx/uvx fetch lazily.
     let mut note = String::new();
     if let Some(cmd) = server.get("command").and_then(|v| v.as_str()) {
         if which::which(cmd).is_err() {
             note = format!("runtime '{cmd}' not on PATH — install it to run this server");
         }
+    }
+    // Required env vars with no value → tell the user to fill them in mcp.json.
+    let empty_env: Vec<&str> = server
+        .get("env")
+        .and_then(|v| v.as_object())
+        .map(|m| m.iter().filter(|(_, v)| v.as_str() == Some("")).map(|(k, _)| k.as_str()).collect())
+        .unwrap_or_default();
+    if !empty_env.is_empty() {
+        let msg = format!("set env in ~/.omp/agent/mcp.json: {}", empty_env.join(", "));
+        note = if note.is_empty() { msg } else { format!("{note}; {msg}") };
     }
     let path = ctx.home.join(".omp/agent/mcp.json");
     if let Some(parent) = path.parent() {

@@ -4,16 +4,16 @@
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
 ## Current step
-**v0.43.0 ship (this session).** Bench-driven optimization (breakdown + `spine_advice` >50% upfront,
-CLI `!` line + `/api/bench` + Bench page auto-load/meters/advisory — browser-verified 0 errors;
-spine trim → advisory tự tắt sau consolidation, upfront 13.6k→12.0k tok). Plus:
-- **`/codegraph?shot=1`** — canvas-only React-Flow graph capture cho `8sync shot` (~2k vision tok);
-  auto-rule trong APPEND_SYSTEM + codegraph/image-routing/locate-anything skills: model không vision
-  đọc vị trí/phân bổ ảnh → **tự động `8sync locate`** (LocateAnything-3B, CPU/GPU).
-- **README + GitHub Pages 100% English-first** + 5 screenshot demo (docs/assets/dashboard-*.png,
-  leak-checked — không lộ repo khác; web-session từng restore content-post-agency → phải activate
-  su-code TRƯỚC khi capture).
-- Release: tag v0.43.0 + gh release kèm binary `8sync-v0.43.0-linux-x86_64`.
+**v0.45.0 ship (this session).** MCP `server.json` standard conformance + the spec as a machine-wide default + `/auto` review.
+- **Tool conformance:** `official_install` (marketplace.rs) projects registry `server.json` → `mcp.json` per schema
+  `2025-12-11`: `registryType`→runtime (npm/pypi/oci/nuget), version pin, runtime/packageArguments, transport,
+  **env/headers as `{NAME:value}` maps** (was a broken array). Threaded env/headers end-to-end (web.rs/api.ts/App.tsx).
+  E2E on live registry via UI (docker apithreshold + pypi armor-mcp), 13 unit tests (incl scoped-npm pin regression).
+- **Spec = machine default + AI-forced:** `assets/specs/mcp-server.md` bundled → `ensure_mcp_spec` deploys to
+  `~/.omp/specs/` (global/init/up) + short rule in APPEND_SYSTEM points every omp session at it.
+- **`/auto` reviewed:** functional-tested (verify-gate/doom-loop/refuse-unverified all pass); fixed gap — added a
+  gitleaks gate before `engine_advance {commit:true}` so unattended runs can't leak secrets when the hook is absent.
+- Release: tag v0.45.0 + gh release with binary `8sync-v0.45.0-linux-x86_64`.
 
 ## Next (chưa làm — tùy chọn)
 - [ ] Phase 3b — gstack host `omp` (DEFERRED; xem archive + `reference/gstack` docs/ADDING_A_HOST.md).

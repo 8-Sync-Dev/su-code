@@ -30,6 +30,9 @@ Self-check first: *can I see pixels?* (Opus-class = yes; GLM-5.2 = no.)
 - **8sync-cli** — `~/.omp/skills/8sync-cli/SKILL.md` — prefer `8sync` verbs over raw shell.
 Specialist (open the body only when the task matches): **impeccable** (UI/design — mandatory for any frontend), **assp** (copy/brand), **taste** (anti-slop), **image-routing** (image/PDF/diff routing decision), **zai-vision** (after image-routing says "image" — the GLM-5.2 vision bridge).
 
+## MCP config — follow the bundled `server.json` standard (never guess field shapes)
+When you write/edit an `mcp.json` server, or reason about a registry `server.json`, follow the on-disk standard at **`~/.omp/specs/mcp-server.md`** (MCP registry schema, machine-local ground truth) — do NOT invent fields. Non-negotiable invariants: `env`/`headers` are `{NAME: value}` **maps, never arrays of descriptors**; the runtime derives from `registryType` (npm→`npx -y` · pypi→`uvx` · oci→`docker run` · nuget→`dnx`); **pin `version`** (`@ver`, or `:ver` for docker images); a `streamable-http`/`sse` transport is a remote (`url`+`headers`), not stdio. `8sync harness` marketplace install already emits exactly this shape.
+
 ## Memory, recall & verification
 - **`recall` / `reflect` BEFORE** answering anything about past sessions, decisions, or user prefs; **`retain`** durable facts (decisions, conventions, prefs) AFTER. omp Mnemopi long-term memory — the recall hook also auto-injects the live skill index + STATE every turn.
 - **`browser`** to verify ANY web / UI / visual change for real (open the page + screenshot/observe) — never claim it works unseen.

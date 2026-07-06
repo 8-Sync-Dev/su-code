@@ -458,6 +458,27 @@ pub(crate) fn ensure_append_system(home: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Deploy the bundled MCP `server.json` standard spec to `~/.omp/specs/` so it's
+/// present on the machine by default — the on-disk ground truth every omp session
+/// follows when writing/reasoning about `mcp.json`. APPEND_SYSTEM points here.
+/// Idempotent (byte-identical skip).
+pub(crate) fn ensure_mcp_spec(home: &Path) -> Result<()> {
+    let Some(body) = assets::read("specs/mcp-server.md") else {
+        return Ok(());
+    };
+    let target = home.join(".omp/specs/mcp-server.md");
+    if let Some(p) = target.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    if std::fs::read_to_string(&target).ok().as_deref() == Some(body.as_str()) {
+        ui::skip("mcp-server.md", "spec already deployed");
+        return Ok(());
+    }
+    std::fs::write(&target, &body)?;
+    ui::ok(&format!("MCP standard spec → {}", target.display()));
+    Ok(())
+}
+
 /// Register serena (LSP-based semantic code toolkit) as an omp MCP server, giving
 /// the agent symbol-level find + precise edits — token-cheaper than blind file
 /// reads/rewrites. Launched via `uvx` (always-latest, no install); bootstraps

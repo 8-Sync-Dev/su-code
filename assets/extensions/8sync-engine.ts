@@ -267,7 +267,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "engine_advance",
     label: "Engine: advance",
-    description: "Mark a verified task done and optionally commit the change (gitleaks-free commit is the caller's responsibility). REFUSES a task whose verify commands never passed — the agent's own say-so is not a stop signal. Advances the plan.",
+    description: "Mark a verified task done and optionally commit the change (a gitleaks gate blocks the commit if a secret is staged, matching the 8sync pre-commit hook). REFUSES a task whose verify commands never passed — the agent's own say-so is not a stop signal. Advances the plan.",
     parameters: z.object({ taskId: z.string(), commit: z.boolean().default(false), message: z.string().optional() }),
     async execute(_id, params) {
       const state = load();
@@ -285,9 +285,18 @@ export default function (pi: ExtensionAPI) {
       let committed = "";
       if (params.commit) {
         run("git add -A");
-        const msg = params.message ?? `feat: ${target.title}`;
-        const r = run(`git commit -m ${JSON.stringify(msg)}`);
-        committed = r.ok ? `\nCommitted: ${msg}` : `\nCommit skipped/failed: ${r.output}`;
+        // Secret gate before every autonomous commit — same check as the 8sync
+        // pre-commit hook. gitleaks absent → `if` runs no branch, exits 0 (best-
+        // effort skip); present + a finding → non-zero → abort and unstage.
+        const scan = run("if command -v gitleaks >/dev/null 2>&1; then gitleaks protect --staged --no-banner; fi");
+        if (!scan.ok) {
+          run("git reset");
+          committed = `\nCommit ABORTED: gitleaks flagged a secret in the staged diff. Task is done; resolve the leak, then commit manually.\n${scan.output}`;
+        } else {
+          const msg = params.message ?? `feat: ${target.title}`;
+          const r = run(`git commit -m ${JSON.stringify(msg)}`);
+          committed = r.ok ? `\nCommitted: ${msg}` : `\nCommit skipped/failed: ${r.output}`;
+        }
       }
       const c = counts(state);
       return text(`DONE ${target.id}. Progress ${c.done}/${c.total}.${committed}\nCall engine_next for the next task.`);

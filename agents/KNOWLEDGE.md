@@ -1,7 +1,7 @@
 <!-- 8sync:harness:begin -->
 ## 🧠 8sync harness
 
-- **Always-on (đọc theo thứ tự; CORE đọc body ngay, SPECIALIST đọc khi task khớp):** codegraph → karpathy-guidelines → ponytail → assp-skill → impeccable → taste-skill → 8sync-cli → image-routing → locate-anything.
+- **Always-on (đọc theo thứ tự; CORE đọc body ngay, SPECIALIST đọc khi task khớp):** codegraph → karpathy-guidelines → ponytail → assp-skill → impeccable → taste-skill → 8sync-cli → image-routing.
 - **Cách tận dụng:** codegraph = explore code (query/callers/callees, không grep) · karpathy + ponytail = YAGNI, làm ít nhất, xoá > thêm · impeccable = design CHUẨN, BẮT BUỘC khi UI/design (đọc body lúc đó) + taste chống slop.
 - **Output lớn (>~50 dòng) → BẮT BUỘC `headroom_compress`** trước khi vào context.
 - **Sau mỗi thay đổi:** cập nhật `CHANGELOG.md` (Unreleased) + ghi học được vào file này (prefix `validated:` nếu test/build xác nhận, `hypothesis:` nếu chưa).
@@ -10,28 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 10 dòng cũ → agents/archive/KNOWLEDGE-1783248455.md)_
-  tradeoff ~5k recall token/phiên (`omp://mnemosyne-memory-backend.md`, `omp://config-usage.md`). (2) Custom
-  command = `.omp/commands/*.md` native prio 100 (`omp://slash-command-internals.md`) — su-code đã đúng base,
-  chỉ ghi config dirs omp → omp update KHÔNG conflict; automation sâu hơn: extensions(90)/hooks/custom-tools.
-  (3) gstack KHÔNG có team tự động (persona slash-cmd + tự mở nhiều session); team THẬT omp = `task`+`irc`.
-  (4) submodule PIN SHA ≠ auto-pull; skill auto-latest qua manifest+`harness up --pull`; reference repo nên
-  `read` on-demand (0 disk). (5) agent-reach (Panniantong 41k★) = capability layer đọc internet qua CLI+MCP+
-  SKILL.md → thêm làm skill, không phải team engine. Full: `outputs/omp-customization-memory-platform-research.md`.
-
-- **validated: adaptive model + gsd-pi engine + context-always-read + glass terminal/web (this session).**
-  (1) `crate::models` + `assets/configs/models.toml` classify the prompt → omp `--model/--plan/--smol/--slow`
-  (omp owns catalog; 8sync only steers). Wired in `ai.rs` (+`--model` override) and `here.rs`. Unit tests 2/2.
-  (2) gsd-pi-style engine = `assets/extensions/8sync-engine.ts` (durable slice/task JSON state at
-  `.cache/8sync/engine/` + CODE-enforced verify-retry gate + git worktree tools) + `/auto` command.
-  100% on omp core (config dirs, no patch). Both engine + recall-hook TS transpile clean via bun.
-  `/gs` demoted to skill-only (was an old skill forced into a command — not gsd-pi's intent).
-  (3) `APPEND_SYSTEM.md` → `~/.omp/agent/` = always-in-system-prompt RULE#0 + skill manifest
-  (fixes ">50% of the time the agent ignores defined skills/rules"); recall hook rewritten to the
-  LIVE half only; serena MCP registered via `uvx` (skips with hint when `uv` absent);
-  `8sync harness compaction [pct]` view/set knob (config.yml `thresholdPercent`, default 50).
-  (4) Terminal: `setup` installs kitty + helix + docker + docker-compose + JetBrains Nerd font;
-  deploys glass `~/.config/kitty/8sync.conf` via an `include` line (never clobbers kitty.conf) +
+_(consolidated 22 dòng cũ → agents/archive/KNOWLEDGE-1783313206.md)_
   wallpaper pipeline (`deploy_wallpaper`: bundled `assets/wallpapers/default.png` → `[ui].wallpaper_url`).
   Helix `hx` fix: dropped the dead `"helix"` fallback (Arch ships `/usr/bin/hx`); `find`/`note` share `pick_editor()`.
   (5) Web dashboard redesigned to glassmorphism (designer + impeccable); `build.rs` robust (bun→pnpm→npm +
@@ -238,3 +217,22 @@ _(consolidated 10 dòng cũ → agents/archive/KNOWLEDGE-1783248455.md)_
   point `local_model::insert_block` finalizes → `providers: {}` when no real (non-comment)
   children; `ensure_providers` reopens `providers: {}` for later inserts. Rule: any managed
   YAML map key must never be emitted bare.
+- **validated: MCP marketplace install now conforms to `server.json` spec (2025-12-11) → v0.45.0.**
+  `official_install` (marketplace.rs) projects registry `server.json` → `mcp.json`: `registryType`→runtime
+  (npm→`npx -y` · pypi→`uvx` · oci→`docker run -i --rm`+`-e NAME` · nuget→`dnx`), version pin
+  (`id@ver`/`img:ver`), `runtimeArguments`+`packageArguments`, `transport.type` streamable-http/sse→remote.
+  **BUGFIX + failure lesson: `env`/`headers` MUST be `{NAME:value}` maps, NEVER arrays of descriptors** —
+  the old code wrote `env:[{name,required,desc}]` which is unusable in mcp.json. Threaded env/headers
+  end-to-end (McpAddBody + api.ts + App.tsx were dropping them). E2E via UI on live registry: docker
+  `apithreshold` (run…-e KEY…img:0.1.0) + pypi `armor-mcp@0.6.1`+env map, 0 console errors.
+- **validated: an open spec becomes "machine default + AI-forced" via the harness global layer.** Bundle
+  the distilled spec as an asset (`assets/specs/mcp-server.md`) → `ensure_mcp_spec` deploys to
+  `~/.omp/specs/` in global_pass/init/up (byte-stable skip) → a SHORT rule in `APPEND_SYSTEM.md` points
+  every omp session at the on-disk file. Keep the full spec OUT of APPEND_SYSTEM (prompt stays cache-hot);
+  APPEND holds only the pointer + invariants. Pattern reusable for any standard (skills/AGENTS.md/…).
+- **validated: `/auto` engine reviewed + functional-tested (Bun harness, v0.45).** All 6 `engine_*` register;
+  verify-gate FAIL→WARN(2×)→BLOCK(3× doom-loop even at maxRetries=10, so it's the FNV-1a no-progress guard,
+  not maxRetries); `engine_advance` REFUSES a task with verify cmds but no passing run; pass→advance→done;
+  trivial no-verify advance; commit path creates a real commit. **Gap fixed:** `engine_advance {commit:true}`
+  did `git add -A` + `git commit` with NO secret scan (doctor: gitleaks absent) → added a gitleaks gate
+  (`if command -v gitleaks; then gitleaks protect --staged; fi` — no-op when absent, aborts+resets on a finding).

@@ -40,6 +40,7 @@ pub(crate) fn global_pass(env: &env_detect::Env) -> Result<()> {
     let _ = deploy::ensure_omp_memory_config(&env.home);
     let _ = deploy::ensure_recall_hook(&env.home);
     let _ = deploy::ensure_append_system(&env.home);
+    let _ = deploy::ensure_mcp_spec(&env.home);
     let _ = deploy::ensure_serena_mcp(env);
     let _ = deploy::ensure_zai_vision_mcp(env);
     let _ = deploy::ensure_omp_capabilities_snapshot(&env.home);

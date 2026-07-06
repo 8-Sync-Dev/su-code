@@ -33,7 +33,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `impeccable` — `/home/alexdev/Projects/tools/su-code/agents/skills/impeccable/SKILL.md`
 - `design-taste-frontend` — `/home/alexdev/Projects/tools/su-code/agents/skills/taste-skill/SKILL.md`
 - `image-routing` — `/home/alexdev/Projects/tools/su-code/agents/skills/image-routing/SKILL.md`
-- `locate-anything` — `/home/alexdev/Projects/tools/su-code/agents/skills/locate-anything/SKILL.md`
+- `locate-anything` — `/home/alexdev/.omp/skills/locate-anything/SKILL.md`
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
@@ -45,6 +45,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `code-review-and-quality` — `agents/skills/code-review-and-quality/SKILL.md`
 - `code-simplification` — `agents/skills/code-simplification/SKILL.md`
 - `context-engineering` — `agents/skills/context-engineering/SKILL.md`
+- `contributing` — `agents/skills/contributing/SKILL.md`
 - `debugging-and-error-recovery` — `agents/skills/debugging-and-error-recovery/SKILL.md`
 - `deep-research` — `agents/skills/deep-research/SKILL.md`
 - `deprecation-and-migration` — `agents/skills/deprecation-and-migration/SKILL.md`
@@ -66,11 +67,11 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `observability-and-instrumentation` — `agents/skills/observability-and-instrumentation/SKILL.md`
 - `paper-code-audit` — `agents/skills/paper-code-audit/SKILL.md`
 - `paper-writing` — `agents/skills/paper-writing/SKILL.md`
+- `peer-review` — `agents/skills/peer-review/SKILL.md`
 - `performance-optimization` — `agents/skills/performance-optimization/SKILL.md`
 - `planning-and-task-breakdown` — `agents/skills/planning-and-task-breakdown/SKILL.md`
 - `ponytail-audit` — `agents/skills/ponytail-audit/SKILL.md`
 - `ponytail-debt` — `agents/skills/ponytail-debt/SKILL.md`
-- `ponytail-gain` — `agents/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `agents/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `agents/skills/ponytail-review/SKILL.md`
 - `preview` — `agents/skills/preview/SKILL.md`
@@ -91,7 +92,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `token-bench` — `agents/skills/token-bench/SKILL.md`
 - `using-agent-skills` — `agents/skills/using-agent-skills/SKILL.md`
 - `watch` — `agents/skills/watch/SKILL.md`
-- `zai-vision` — `agents/skills/zai-vision/SKILL.md`
+- `zai-vision` — `~/.omp/skills/zai-vision/SKILL.md`
 
 ### Quy tắc bất biến
 

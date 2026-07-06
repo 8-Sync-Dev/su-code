@@ -8,7 +8,7 @@ Bạn đang ở **sub-folder**. Rule + skill force-load đầy đủ KHÔNG lặ
 - **Root rules + skill list:** `/home/alexdev/Projects/tools/su-code/AGENTS.md`
 - **Master skills (omp đọc đầu tiên):** `~/.omp/skills/00-force-load.md`
 
-**Always-on (đọc trước tool call đầu tiên, ĐÚNG thứ tự):** codegraph → karpathy-guidelines → ponytail → assp-skill → impeccable → taste-skill → 8sync-cli → image-routing → locate-anything.
+**Always-on (đọc trước tool call đầu tiên, ĐÚNG thứ tự):** codegraph → karpathy-guidelines → ponytail → assp-skill → impeccable → taste-skill → 8sync-cli → image-routing.
 SKILL.md ở `<root>/agents/skills/<name>/` hoặc `~/.omp/skills/<name>/`.
 
 **Cách tận dụng (bắt buộc):** `codegraph` cho mọi explore code (query/callers/callees — KHÔNG grep) · `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` cho copy/offer hướng người dùng · **`impeccable` = design system CHUẨN, BẮT BUỘC cho mọi UI/design/redesign/audit (kèm `references/house/*`)** + `taste` chống slop.

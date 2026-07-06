@@ -71,7 +71,8 @@ export type MarketInstall = {
   args?: string[];
   url?: string;
   spec?: string;
-  env?: { name: string; required: boolean; description: string }[];
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
 };
 export type MarketItem = {
   id: string;
@@ -288,7 +289,7 @@ export const api = {
     json<MarketResponse>(
       `/api/marketplace?kind=${kind}&sort=${sort}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
     ),
-  mcpAdd: (body: { name: string; command?: string; args?: string[]; type?: string; url?: string; spec?: string }) =>
+  mcpAdd: (body: { name: string; command?: string; args?: string[]; type?: string; url?: string; spec?: string; env?: Record<string, string>; headers?: Record<string, string> }) =>
     json<{ ok: boolean; name: string; note: string }>("/api/mcp/add", POST_JSON(body)),
   mcpRemove: (name: string) => json<{ ok: boolean; removed: boolean }>("/api/mcp/remove", POST_JSON({ name })),
   ruleImport: (source: string, scope?: string) =>

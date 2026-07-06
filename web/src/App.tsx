@@ -1344,8 +1344,8 @@ function MarketplacePage() {
     mutationFn: async (it: MarketItem): Promise<{ ok: boolean }> => {
       if (it.kind === "skill") return api.skillAdd(it.install.spec ?? it.url);
       const i = it.install;
-      if (i.type === "stdio") return api.mcpAdd({ name: it.name, command: i.command, args: i.args, type: "stdio" });
-      return api.mcpAdd({ name: it.name, url: i.url, type: i.type });
+      if (i.type === "stdio") return api.mcpAdd({ name: it.name, command: i.command, args: i.args, type: "stdio", env: i.env });
+      return api.mcpAdd({ name: it.name, url: i.url, type: i.type, headers: i.headers });
     },
     onSuccess: (_r, it) => qc.invalidateQueries({ queryKey: [it.kind === "skill" ? "skills" : "mcp"] }),
   });
