@@ -37,8 +37,10 @@ jobs:
             label: linux-aarch64
             ext: ""
             cross: true
-          # macOS — native builds on each architecture's runner.
-          - runner: macos-13
+          # macOS — both slices on Apple-Silicon runners (macos-13 Intel is
+          # deprecated / scarce). arm64 builds native; x86_64 cross-compiles via
+          # the rustup target (Apple clang handles the C deps for both arches).
+          - runner: macos-14
             target: x86_64-apple-darwin
             label: darwin-x86_64
             ext: ""
