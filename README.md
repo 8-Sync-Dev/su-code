@@ -1,6 +1,6 @@
 # su-code (`8sync`)
 
-> Terminal-first AI coding harness for CachyOS/Arch + Kitty + Helix + [omp](https://omp.sh).
+> Terminal-first AI coding harness — **Linux (CachyOS/Arch), macOS, Windows** · Kitty + Helix + [omp](https://omp.sh).
 > Keep your normal CLI workflow; AI agents observe project context, load `su-code/*` memory, and execute tasks on demand.
 
 ![8sync harness web — the agent-team dashboard showing this repo's live plan](docs/assets/dashboard-state.png)
@@ -46,18 +46,26 @@ cd <project>
 
 ### 1. One-liner (recommended) — download the prebuilt binary
 
-No git, rustup, or cargo needed. `install.sh` resolves the latest release, downloads `8sync-<tag>-linux-x86_64` from GitHub Releases, and places it at `~/.local/bin/8sync` (atomically replacing any previous version).
+No git, rustup, or cargo needed. `install.sh` resolves the latest release and downloads the matching `8sync-<tag>-<os>-<arch>` prebuilt (Linux `x86_64`/`aarch64`, macOS `x86_64`/`arm64`) from GitHub Releases into `~/.local/bin/8sync` (atomically replacing any previous version). On **Windows**, use `install.ps1` instead (below).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
 ```
 
+On **Windows** (PowerShell), use `install.ps1`:
+
+```powershell
+irm https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.ps1 | iex
+```
+
 - **Upgrade**: run the exact same command again, or `8sync up`.
-- **Pin a version**: `curl -fsSL .../install.sh | SUSYNC_VERSION=v0.12.1 sh`
+- **Pin a version**: `curl -fsSL .../install.sh | SUSYNC_VERSION=v0.48.0 sh` (or `$env:SUSYNC_VERSION` for `install.ps1`)
 - **Change the install dir**: `... | SUSYNC_BIN_DIR=~/bin sh`
 - **Uninstall**: `curl -fsSL .../install.sh | sh -s -- --uninstall`
 
 PATH entries for `~/.local/bin`, `~/.cargo/bin`, `~/.bun/bin`, `~/.encore/bin` are auto-patched into zsh / bash / fish the first time you run `8sync setup` (see Stage A). If `~/.local/bin` is not on PATH at install time, the script prints a hint.
+
+> **Platform support**: the AI-harness core (`omp`, `harness`, skills, the dashboard, `feature`, `ai`, `find`, `ship`) runs on **Linux, macOS, and Windows**. The Arch-only profiles (`dev-stack` pacman, `warp`, `bluetooth`, `nvidia`) and desktop bits (kitty session, HyDE) are **Linux-only** — skipped with a clear note off-Linux.
 
 ### 2. Build from source (contributors) — `scripts/bootstrap.sh`
 

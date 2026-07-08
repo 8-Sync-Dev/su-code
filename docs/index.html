@@ -159,7 +159,7 @@
     <!-- INSTALL -->
     <section id="install">
       <h2>Quick start</h2>
-      <p class="lede">CachyOS / Arch Linux, Kitty terminal (enable <code>allow_remote_control yes</code> for the 3-pane layout).</p>
+      <p class="lede"><b>Linux (CachyOS/Arch), macOS, Windows.</b> On Linux + Kitty, enable <code>allow_remote_control yes</code> for the 3-pane layout. Arch-only profiles &amp; desktop bits are skipped off-Linux.</p>
       <div class="codeblock">
         <span class="lbl">bash</span>
 <pre><code># 1. Install — one-liner, prebuilt binary (NO git/rust/cargo needed)
@@ -176,6 +176,7 @@ cd ~/code/my-app
 8sync harness web                # → http://127.0.0.1:8731</code></pre>
       </div>
       <p class="lede" style="margin-top:14px;">
+        <b>Windows</b> (PowerShell): <code>irm https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.ps1 | iex</code>.
         Build from source: <code>git clone … &amp;&amp; bash scripts/bootstrap.sh</code>.
         Common setup flags: <code>--dry-run</code>, <code>--no-profile</code>, <code>--community</code>, <code>--profile &lt;name&gt;</code>.
       </p>
