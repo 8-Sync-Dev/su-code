@@ -39,6 +39,7 @@ impl Progress {
 
 pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     ui::header("8sync harness init");
+    deploy::migrate_namespace(&env.home);
     let in_project = discover::detect_current_project_root().is_some();
     let total = if in_project { 9 } else { 4 };
     let mut p = Progress::new(total);
@@ -47,7 +48,9 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     p.step("master skill list → ~/.omp/skills/00-force-load.md");
     let target = env.home.join(".omp/skills/00-force-load.md");
     std::fs::create_dir_all(target.parent().unwrap())?;
-    let content = assets::read("skills/00-force-load.md").unwrap_or_default();
+    let content = assets::read("skills/00-force-load.md")
+        .map(|c| crate::brand::render(&c).into_owned())
+        .unwrap_or_default();
     std::fs::write(&target, content)?;
 
     // 2. Deploy bundled skills (embedded assets → ~/.omp/skills).

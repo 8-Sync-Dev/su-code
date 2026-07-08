@@ -27,6 +27,23 @@ fn find_line(hay: &str, needle: &str) -> Option<usize> {
     None
 }
 
+/// Locate the skills block, preferring the current (possibly rebranded)
+/// sentinels and falling back to the legacy `8sync:` sentinels so a rebranded
+/// binary migrates an existing file IN PLACE (no duplicate block). Returns
+/// `(begin_offset, end_offset, end_marker_len)`.
+fn find_block(existing: &str) -> Option<(usize, usize, usize)> {
+    let cur_b = crate::brand::sentinel_begin();
+    let cur_e = crate::brand::sentinel_end();
+    for (bm, em) in [(cur_b.as_str(), cur_e.as_str()), (BEGIN, END)] {
+        if let (Some(b), Some(e)) = (find_line(existing, bm), find_line(existing, em)) {
+            if b < e {
+                return Some((b, e, em.len()));
+            }
+        }
+    }
+    None
+}
+
 /// Priority rank for always-on skills (lower = read earlier). The force-load
 /// block lists always-on skills in EXACTLY this order; agents read top-down so
 /// position == priority. The canonical chain is:
@@ -242,6 +259,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 {END}"
     );
 
+    let block = crate::brand::render(&block).into_owned();
     ForceLoadStats { block, core, specialist, ondemand }
 }
 
@@ -303,14 +321,12 @@ enum EntryKind {
 /// Markdown injection: replace existing sentinel block, or insert after the first
 /// H1, or create a minimal skeleton if the file is empty.
 pub(crate) fn rewrite_md_with_block(existing: &str, block: &str, h1_title: &str) -> String {
-    if let (Some(b), Some(e)) = (find_line(existing, BEGIN), find_line(existing, END)) {
-        if b < e {
-            let mut s = String::with_capacity(existing.len() + block.len());
-            s.push_str(&existing[..b]);
-            s.push_str(block);
-            s.push_str(&existing[e + END.len()..]);
-            return s;
-        }
+    if let Some((b, e, elen)) = find_block(existing) {
+        let mut s = String::with_capacity(existing.len() + block.len());
+        s.push_str(&existing[..b]);
+        s.push_str(block);
+        s.push_str(&existing[e + elen..]);
+        return s;
     }
     if existing.is_empty() {
         return format!("# {h1_title}\n\n{block}\n");
@@ -321,14 +337,12 @@ pub(crate) fn rewrite_md_with_block(existing: &str, block: &str, h1_title: &str)
 /// Plain-text injection (.cursorrules / .windsurfrules): replace existing
 /// sentinel block, or prepend the block at the top of the file.
 fn rewrite_plain_with_block(existing: &str, block: &str) -> String {
-    if let (Some(b), Some(e)) = (find_line(existing, BEGIN), find_line(existing, END)) {
-        if b < e {
-            let mut s = String::with_capacity(existing.len() + block.len());
-            s.push_str(&existing[..b]);
-            s.push_str(block);
-            s.push_str(&existing[e + END.len()..]);
-            return s;
-        }
+    if let Some((b, e, elen)) = find_block(existing) {
+        let mut s = String::with_capacity(existing.len() + block.len());
+        s.push_str(&existing[..b]);
+        s.push_str(block);
+        s.push_str(&existing[e + elen..]);
+        return s;
     }
     let sep = if existing.is_empty() { "" } else { "\n\n" };
     format!("{block}{sep}{existing}")

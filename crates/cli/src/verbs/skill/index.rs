@@ -100,7 +100,7 @@ fn subfolder_index_block(root: &Path) -> String {
         names.join(" → ")
     };
     let root_agents = root.join("AGENTS.md");
-    format!(
+    let block = format!(
         "{BEGIN}\n\
 ## 🚨 8sync harness — sub-folder index\n\
 \n\
@@ -119,7 +119,8 @@ SKILL.md ở `<root>/su-code/skills/<name>/` hoặc `~/.omp/skills/<name>/`.\n\
 **Quy tắc:** cite `path:line` · ưu tiên verb `8sync` hơn shell · sau mỗi thay đổi cập nhật `CHANGELOG.md` + `su-code/KNOWLEDGE.md`.\n\
 {END}",
         root = root_agents.display(),
-    )
+    );
+    crate::brand::render(&block).into_owned()
 }
 
 /// Drop/refresh a compact skill-index AGENTS.md in every significant sub-folder.

@@ -11,6 +11,8 @@
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
 _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
+- **validated: v0.47.0 — large-scope `feature` GSD framework + single-source CLI name (`brand.rs`).** Ported the reference `feature` skill to su-code (`.planning/`→`su-code/planning/`; `Agent(slot)`→omp `task` roles; `AskUserQuestion`→`ask`; `codegraph_explore`→codegraph/cbm/serena; dropped PHP/GitLab/PMS rules R2/R4/R9/R11) as a bundled skill + `/feature` command + deterministic `8sync feature new/switch/status/list` verb; `/feature go` delegates to the existing `engine_*` loop (no new engine). `brand.rs` = one source for `CMD` (command name) + `NS` (config namespace/sentinels/deployed filenames), default `8sync` or `SC_CMD`/`SC_NS` at build. `render()` early-returns `Cow::Borrowed` when default ⇒ **byte-identical default build** (verified: `8sync {help,flow}` diff empty vs pre-change baseline). Rebrand chokepoints, each ONE place: clap-tree `rebrand` pass (every help/EXAMPLES), `ui::*` → `render` (all runtime prose), `brand::config_dir`/`ns_file`/`sentinel_*` at path/filename/sentinel sites, `render` at deploy sites (deploy_omp_pair `.md`-gated · install_tree `.md`/`.txt` · append_system · 00-force-load · inject/index). `SC_CMD=sc SC_NS=sc` build verified: `Usage: sc`, all verbs `sc <v>`, 0 stray `8sync ` tokens, `~/.config/sc/`+`kitty/sc.conf`, migration renames + removes stale `8sync-*.ts` + legacy-sentinel AGENTS self-heal.
+- **failure→gotcha: verbatim `.ts` omp extensions embed literal `8sync` paths.** `8sync-engine.ts` hard-codes `.cache/8sync/engine/state.json` (`const STATE_REL`) and deploys VERBATIM (rendering `.ts` code is out of scope/risky). So the `.cache/` namespace MUST stay literal `8sync` (guarded in `brand::render` via `cache/8sync`), else the Rust dashboard reader (`web.rs`) and the JS engine writer split. Only the `.ts` FILENAME rebrands (`<NS>-engine.ts`), never its content. The config namespace (`~/.config`) has NO verbatim-.ts coupling → safe to rebrand. `8sync-cli` skill dir + `8-Sync-Dev`/`github.com` URLs are fixed identifiers → also guarded/untouched by `render`.
   `windowTok`, `thresholdPct`, `willCompact` — 1M window is an estimate, not authoritative); **workflow
   canvas** fixed (was tiny broken box → 560px react-flow viewport). Model philosophy locked in
   `models.toml`+omp `config.yml`: **Opus = thinking** (plan/review/debug/vision), **GLM = mechanical**
@@ -244,6 +246,39 @@ _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   (rusqlite `bundled`, for `harness toolstats`) + `zstd-sys` (via `include-flate`) compile bundled C in
   `build.rs`, so cross-from-Linux needs mingw-w64/osxcross — **native CI runners (macos-14, windows-latest)
   build them cleanly**, which is the recommended release path.
+- **validated: `harness model <strong>+<cheap>` combo preset writes omp roles directly.** There are TWO
+  model layers: 8sync's `~/.config/8sync/models.toml` (its own routing for `8sync ai`/`/auto`) and omp's
+  `~/.omp/agent/config.yml` `modelRoles` (the `/model` picker — what actually drives every omp session).
+  `8sync harness model` used to only touch the former; the user's pain ("set sai") was the latter pointing
+  at `9router-cc/*` + reviewer `9router-cx/cx/gpt-5.5` (providers they'd stopped using). The combo
+  (`model=claude+glm`, `=`-shorthand normalized in harness dispatch) now writes BOTH: it rewrites the omp
+  `modelRoles` block + `task.agentModelOverrides.reviewer` **line-based** (find the top-level `modelRoles:`
+  line, splice until the next non-indented line; preserves every other key — verified: memory/mnemopi/
+  compaction/setupVersion untouched) and syncs models.toml. Optimal split: cheap=mechanical
+  (default/task high · smol/tiny/commit minimal · advisor), strong=thinking (vision/slow high ·
+  plan/designer/reviewer **xhigh**). `vision`→strong because glm-5.2 is `images:no` (text-only).
+- **correction: `xhigh` IS valid on DIRECT `anthropic/*`, but NOT on the 9router gateway (`cc/*`).** The
+  earlier blanket "NO xhigh" rule was 9router-specific: `omp models` shows `cc/claude-opus-4-8` (9router)
+  efforts = `minimal,low,medium,high` (no xhigh), while `anthropic/claude-opus-4-8` (direct) =
+  `minimal,low,medium,high,xhigh`. omp's `ReasoningEffort` enum includes `xhigh`. So design/plan/review on
+  direct anthropic opus can use `:xhigh` (user's explicit ask); the gateway-models.yml "NO xhigh" comment
+  stays correct for the 9router path. **Verify a thinking level exists before setting it: `omp models`
+  prints the per-model efforts list.**
+- **validated: dashboard Knowledge browser + Create-Project (this session, engine-built A–E).** Reuse map that
+  paid off: `marketplace.rs` curl+cache pattern → `knowledge.rs` (raw `sindresorhus/awesome` README via
+  `curl`, 6h cache, markdown `##`/`###` + `- [n](u) - d` parse → 679 resources/26 cats, browser-verified);
+  `here::seed_project_context` → extracted `pub(crate) fn scaffold_project` (mkdir+git init+seed, headless,
+  no omp exec) for `POST /api/projects/create`; `deploy::copy_dir_recursive` to vendor skills. FE: new
+  `Page` id + `NAV_GROUPS` entry + render arm + `icons.tsx` glyph + `api.ts` method are the 5 touch-points
+  to add a dashboard page.
+- **failure→fix: `8sync skill add builtin:<name>` does NOT vendor an already-global skill into a project**
+  (prints "already installed", no-op for the project's `su-code/skills/`). To vendor a bundled skill into a
+  new project, COPY the dir `~/.omp/skills/<name>` → `<proj>/su-code/skills/<name>` (via
+  `deploy::copy_dir_recursive`), don't shell `skill add`. Caught in browser QA (skill dir stayed empty).
+- **finding: `/api/skills` lists `00-force-load.md` as a "skill"** (it's the force-load index file, not a
+  skill). Any UI offering a skill picker must filter `*.md` entries. The dashboard create-modal now does.
+- **note: rust-embed (`WebAssets`) embeds `web/dist` at COMPILE time** — after `bun run build`, `touch
+  crates/cli/src/assets.rs` before `cargo build --release` or the binary keeps serving the stale FE.
 - **validated (v0.47.0 — cross-platform ship, option B):** the v0.46.2 finding held — porting to
   macOS/Windows needed NO `std::os::unix` removal. Pattern that worked: a single `crate::platform`
   module with `pub const fn os()` (cfg-selected variant per target) + runtime `match os()` dispatch,

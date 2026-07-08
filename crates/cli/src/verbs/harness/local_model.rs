@@ -331,7 +331,7 @@ fn run_user_systemctl(args: &[&str]) {
 }
 
 fn registry_path(env: &env_detect::Env) -> PathBuf {
-    env.xdg_config.join("8sync/local-models.tsv")
+    env.xdg_config.join(crate::brand::NS).join("local-models.tsv")
 }
 
 fn load_registry(env: &env_detect::Env) -> Vec<LocalModel> {

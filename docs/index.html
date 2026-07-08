@@ -6,7 +6,7 @@
   <title>8sync — terminal-first AI coding harness</title>
   <meta name="description" content="8sync: terminal-first AI coding harness for CachyOS/Arch + Kitty + Helix + omp. Keep your normal terminal workflow; AI observes project context and executes when you ask." />
   <meta property="og:title" content="8sync — terminal-first AI coding harness" />
-  <meta property="og:description" content="Keep your normal terminal workflow; AI agents observe project context, load agents/* memory, execute tasks on demand." />
+  <meta property="og:description" content="Keep your normal terminal workflow; AI agents observe project context, load su-code/* memory, execute tasks on demand." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://8-sync-dev.github.io/su-code/" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" />
@@ -127,7 +127,7 @@
       <span class="eyebrow">⚡ <b>terminal-first</b> · AI coding harness</span>
       <h1>Use the terminal as usual,<br/><span class="grad">AI observes from behind.</span></h1>
       <p class="sub">
-        You still <code>cd</code>, code, build, and test from the CLI. AI agents (omp) follow project context, load <code>agents/*</code> memory, and execute tasks on demand.
+        You still <code>cd</code>, code, build, and test from the CLI. AI agents (omp) follow project context, load <code>su-code/*</code> memory, and execute tasks on demand.
       </p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/8-Sync-Dev/su-code">View on GitHub →</a>
@@ -148,11 +148,11 @@
       </article>
       <article class="card">
         <h3><span class="dot"></span>Context-aware</h3>
-        <p>Whichever project you enter, the AI picks up its context. Memory is shared via <code>AGENTS.md</code> + <code>agents/*</code>. <code>8sync harness</code> builds it all with one command.</p>
+        <p>Whichever project you enter, the AI picks up its context. Memory is shared via <code>AGENTS.md</code> + <code>su-code/*</code>. <code>8sync harness</code> builds it all with one command.</p>
       </article>
       <article class="card">
         <h3><span class="dot"></span>Skill injection</h3>
-        <p><b>35 skills</b> bundled. <code>8sync skill add &lt;github-url&gt;</code> clones into both the global <code>~/.omp/skills/</code> and the project's <code>agents/skills/</code>.</p>
+        <p><b>37 skills</b> bundled. <code>8sync skill add &lt;github-url&gt;</code> clones into both the global <code>~/.omp/skills/</code> and the project's <code>su-code/skills/</code>.</p>
       </article>
     </section>
 
@@ -244,9 +244,10 @@ cd ~/code/my-app
               <tr><td><code>8sync .</code></td><td>Open/attach a session (kitty 3-pane + <code>omp --continue</code> inside abduco)</td></tr>
               <tr><td><code>8sync ai [prompt]</code></td><td>Empty → resume; with a prompt → one-shot <code>omp -p</code></td></tr>
               <tr><td><code>8sync find &lt;kw&gt;</code></td><td>rg/fd + fzf, opens the editor at <code>file:line</code></td></tr>
-              <tr><td><code>8sync note "msg"</code></td><td>Appends to <code>agents/NOTES.md</code></td></tr>
+              <tr><td><code>8sync note "msg"</code></td><td>Appends to <code>su-code/NOTES.md</code></td></tr>
               <tr><td><code>8sync run dev|build|test|fmt|lint</code></td><td>Recipe-based project runner</td></tr>
               <tr><td><code>8sync ship "msg"</code></td><td><code>git add -A &amp;&amp; commit &amp;&amp; push &amp;&amp; gh pr create</code></td></tr>
+              <tr><td><code>8sync feature new|switch &lt;slug&gt;</code></td><td>Large multi-phase scopes (GSD): planning tree + AC gates + <code>ACTIVE</code> switch; then <code>/feature plan|go|ship</code> in omp</td></tr>
             </tbody>
           </table>
         </div>
@@ -275,10 +276,10 @@ cd ~/code/my-app
     <!-- SKILLS -->
     <section id="skills">
       <h2>Skill injection</h2>
-      <p class="lede">A skill is an instruction module for the AI. 8sync bundles <b>35 skills</b> (codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing + 18 research skills · …); <code>8sync skill add</code> is collection-aware and pulls whole sets from GitHub.</p>
+      <p class="lede">A skill is an instruction module for the AI. 8sync bundles <b>37 skills</b> (codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing · feature (large-scope GSD) + 18 research skills · …); <code>8sync skill add</code> is collection-aware and pulls whole sets from GitHub.</p>
       <div class="codeblock">
         <span class="lbl">bash</span>
-<pre><code># Clone from a URL: installs into BOTH ~/.omp/skills/ (global, read by omp) and agents/skills/ (project)
+<pre><code># Clone from a URL: installs into BOTH ~/.omp/skills/ (global, read by omp) and su-code/skills/ (project)
 # Also rewrites the &lt;!-- 8sync:skills:* --&gt; block in AGENTS.md
 8sync skill add https://github.com/colbymchenry/codegraph
 

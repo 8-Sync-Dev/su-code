@@ -55,26 +55,32 @@ fn log_line(prefix: &str, msg: &str) {
 }
 
 pub fn ok(msg: &str) {
+    let msg = crate::brand::render(msg);
     println!("{} {}", "✓".green().bold(), msg);
-    log_line("OK", msg);
+    log_line("OK", &msg);
 }
 
 pub fn warn(msg: &str) {
+    let msg = crate::brand::render(msg);
     println!("{} {}", "!".yellow().bold(), msg.yellow());
-    log_line("WARN", msg);
+    log_line("WARN", &msg);
 }
 
 pub fn err(msg: &str) {
+    let msg = crate::brand::render(msg);
     eprintln!("{} {}", "✗".red().bold(), msg.red());
-    log_line("ERR", msg);
+    log_line("ERR", &msg);
 }
 
 pub fn info(msg: &str) {
+    let msg = crate::brand::render(msg);
     println!("{} {}", "·".blue().bold(), msg);
-    log_line("INFO", msg);
+    log_line("INFO", &msg);
 }
 
 pub fn skip(name: &str, reason: &str) {
+    let name = crate::brand::render(name);
+    let reason = crate::brand::render(reason);
     println!(
         "{} {} {}",
         "↷".bright_black().bold(),
@@ -85,17 +91,19 @@ pub fn skip(name: &str, reason: &str) {
 }
 
 pub fn step(msg: &str) {
+    let msg = crate::brand::render(msg);
     println!("\n{} {}", "▶".cyan().bold(), msg.bold());
-    log_line("STEP", msg);
+    log_line("STEP", &msg);
 }
 
 pub fn header(title: &str) {
+    let title = crate::brand::render(title);
     println!(
         "\n{}\n{}\n",
         title.bold().cyan(),
         "─".repeat(title.len()).cyan()
     );
-    log_line("===", title);
+    log_line("===", &title);
 }
 
 pub fn prompt_yes_no(question: &str, default: bool) -> bool {

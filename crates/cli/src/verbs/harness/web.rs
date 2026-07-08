@@ -54,7 +54,7 @@ pub(crate) fn harness_web(home: &std::path::Path, port: u16, no_open: bool) -> R
 /// dashboard is single-user/local → a process-global cwd is the simplest reliable
 /// switch and it persists across server restarts.
 fn apply_active_project(home: &std::path::Path) {
-    let sess = std::fs::read_to_string(home.join(".config/8sync/web-session.json")).unwrap_or_default();
+    let sess = std::fs::read_to_string(crate::brand::config_dir(home).join("web-session.json")).unwrap_or_default();
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&sess) {
         if let Some(p) = v.get("project").and_then(|x| x.as_str()) {
             if std::path::Path::new(p).is_dir() {
@@ -93,6 +93,7 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/rules/delete", post(api_rule_delete))
         .route("/api/models", get(api_models_get).post(api_models_set))
         .route("/api/projects", get(api_projects))
+        .route("/api/projects/create", post(api_project_create))
         .route("/api/workflows", get(api_workflows))
         .route("/api/workflows/templates", get(api_workflow_templates))
         .route("/api/workflows/:name", get(api_workflow_get).post(api_workflow_save).delete(api_workflow_delete))
@@ -104,6 +105,8 @@ fn api_routes() -> Router<Arc<Ctx>> {
         .route("/api/mcp/add", post(api_mcp_add))
         .route("/api/mcp/remove", post(api_mcp_remove))
         .route("/api/rules/import", post(api_rule_import))
+        .route("/api/knowledge", get(api_knowledge))
+        .route("/api/knowledge/apply", post(api_knowledge_apply))
 }
 
 async fn api_state(State(_ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Value>, ApiErr> {
@@ -119,7 +122,7 @@ async fn api_state(State(_ctx): State<Arc<Ctx>>) -> Result<Json<serde_json::Valu
 
 async fn api_skills(State(ctx): State<Arc<Ctx>>) -> Result<Json<Vec<serde_json::Value>>, ApiErr> {
     let root = detect_current_project_root().unwrap_or_default();
-    let reg_g = discover::read_registry(&ctx.home.join(".config/8sync/skills.toml"));
+    let reg_g = discover::read_registry(&crate::brand::config_dir(&ctx.home).join("skills.toml"));
     let proj_man = root.join("su-code/skills.toml");
     let reg_p = if proj_man.exists() { discover::read_registry(&proj_man) } else { Default::default() };
     let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
@@ -167,7 +170,7 @@ async fn api_skill_toggle(
     let root = detect_current_project_root().ok_or((StatusCode::NOT_FOUND, "not in a project".into()))?;
     let path = root.join("su-code/skills.toml");
     let mut reg = discover::read_registry(&path);
-    let reg_g = discover::read_registry(&ctx.home.join(".config/8sync/skills.toml"));
+    let reg_g = discover::read_registry(&crate::brand::config_dir(&ctx.home).join("skills.toml"));
     if body.when == "off" {
         reg.remove(&body.name);
     } else {
@@ -366,7 +369,7 @@ async fn api_workspaces(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> 
     let project = detect_current_project_root()
         .map(|p| p.display().to_string())
         .unwrap_or_default();
-    let sess = std::fs::read_to_string(ctx.home.join(".config/8sync/web-session.json"))
+    let sess = std::fs::read_to_string(crate::brand::config_dir(&ctx.home).join("web-session.json"))
         .unwrap_or_default();
     Json(serde_json::json!({ "profiles": profiles, "project": project, "session": sess }))
 }
@@ -383,7 +386,7 @@ async fn api_workspace_activate(
 ) -> Result<Json<serde_json::Value>, ApiErr> {
     // Advisory: records the chosen profile/project. Actual isolation happens
     // when omp runs with `--profile <name>` in that project dir.
-    let path = ctx.home.join(".config/8sync/web-session.json");
+    let path = crate::brand::config_dir(&ctx.home).join("web-session.json");
     if let Some(p) = path.parent() {
         std::fs::create_dir_all(p).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
@@ -1094,7 +1097,8 @@ fn topo_order(nodes: &[serde_json::Value], edges: &[serde_json::Value]) -> Vec<u
 fn models_toml_path(home: &std::path::Path) -> std::path::PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| home.join(".config"))
-        .join("8sync/models.toml")
+        .join(crate::brand::NS)
+        .join("models.toml")
 }
 
 /// The `/api/models` JSON shape: config path + parsed roles/tasks + the fixed
@@ -1447,6 +1451,190 @@ async fn api_marketplace(
     let sort = q.sort.as_deref().unwrap_or("top");
     let rows = super::marketplace::catalog(&root, kind, search, sort);
     Ok(Json(serde_json::json!({ "kind": kind, "count": rows.len(), "items": rows })))
+}
+
+#[derive(Deserialize)]
+struct KnowledgeQuery {
+    #[serde(default)]
+    search: Option<String>,
+    #[serde(default)]
+    refresh: Option<String>,
+}
+
+/// `GET /api/knowledge` — the curated `sindresorhus/awesome` catalog
+/// (categories → entries), cached per-project. `?search=` filters, `?refresh=1`
+/// bypasses the cache.
+async fn api_knowledge(
+    State(ctx): State<Arc<Ctx>>,
+    Query(q): Query<KnowledgeQuery>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    let root = detect_current_project_root().unwrap_or_else(|| ctx.home.clone());
+    let search = q.search.as_deref().unwrap_or("").trim();
+    let refresh = matches!(q.refresh.as_deref(), Some("1") | Some("true"));
+    super::knowledge::catalog(&root, search, refresh)
+        .map(Json)
+        .map_err(|e| (StatusCode::BAD_GATEWAY, e))
+}
+
+#[derive(Deserialize)]
+struct KnowledgeApplyBody {
+    /// Absolute project path; defaults to the active project.
+    #[serde(default)]
+    project: Option<String>,
+    /// Selected entries: `{ name, url, desc, category }`.
+    items: Vec<serde_json::Value>,
+}
+
+/// `POST /api/knowledge/apply` — save the selected entries into the target
+/// project's `su-code/REFERENCES.md` (deduped by URL).
+async fn api_knowledge_apply(
+    State(_ctx): State<Arc<Ctx>>,
+    Json(body): Json<KnowledgeApplyBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    if body.items.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "no entries selected".into()));
+    }
+    let proj = match body.project.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(p) => std::path::PathBuf::from(p),
+        None => detect_current_project_root()
+            .ok_or((StatusCode::BAD_REQUEST, "no active project — open one first".into()))?,
+    };
+    if !proj.is_dir() {
+        return Err((StatusCode::BAD_REQUEST, format!("not a directory: {}", proj.display())));
+    }
+    let (added, path) = super::knowledge::apply_entries(&proj, &body.items)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "added": added,
+        "path": path.display().to_string(),
+    })))
+}
+
+#[derive(Deserialize)]
+struct McpPick {
+    name: String,
+    #[serde(default)]
+    spec: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CreateProjectBody {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    path: Option<String>,
+    /// Skill specs to add into the new project (`builtin:<name>` or a repo URL).
+    #[serde(default)]
+    skills: Vec<String>,
+    /// MCP servers → project `.omp/mcp.json` (`{name, spec}` where spec is a
+    /// command line like `npx -y pkg` or a remote URL).
+    #[serde(default)]
+    mcp: Vec<McpPick>,
+    /// Curated knowledge entries → project `su-code/REFERENCES.md`.
+    #[serde(default)]
+    knowledge: Vec<serde_json::Value>,
+}
+
+/// `POST /api/projects/create` — scaffold a brand-new 8sync project: create the
+/// dir + `git init` + seed AGENTS.md/su-code memory/skills block, then apply the
+/// selected skills (`8sync skill add`), MCP servers (project `.omp/mcp.json`),
+/// and knowledge (REFERENCES.md), and activate it in the dashboard.
+async fn api_project_create(
+    State(ctx): State<Arc<Ctx>>,
+    Json(body): Json<CreateProjectBody>,
+) -> Result<Json<serde_json::Value>, ApiErr> {
+    // Resolve target dir: explicit path (supports ~), else name under ~/Projects.
+    let target: std::path::PathBuf = if let Some(p) = body.path.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if let Some(rest) = p.strip_prefix("~/") { ctx.home.join(rest) } else { std::path::PathBuf::from(p) }
+    } else if let Some(name) = body.name.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if name.contains('/') || name.contains("..") {
+            return Err((StatusCode::BAD_REQUEST, "name must be a single folder (no / or ..)".into()));
+        }
+        ctx.home.join("Projects").join(name)
+    } else {
+        return Err((StatusCode::BAD_REQUEST, "need a project name or path".into()));
+    };
+    // Never clobber an existing non-empty dir (reversible-only).
+    if target.is_dir() && std::fs::read_dir(&target).map(|mut d| d.next().is_some()).unwrap_or(false) {
+        return Err((StatusCode::CONFLICT, format!("exists and not empty: {}", target.display())));
+    }
+
+    let env = crate::env_detect::Env::detect().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    crate::verbs::here::scaffold_project(&env, &target)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("scaffold: {e}")))?;
+
+    // Selected skills → vendored into the project by copying the global skill
+    // dir (`~/.omp/skills/<name>` → `<proj>/su-code/skills/<name>`). `skill add`
+    // would no-op for already-global skills, so copy the tree directly.
+    let mut skills = Vec::new();
+    for name in body.skills.iter().map(|s| s.trim().trim_start_matches("builtin:")).filter(|s| !s.is_empty()) {
+        let src = ctx.home.join(".omp/skills").join(name);
+        let ok = src.is_dir()
+            && crate::verbs::skill::deploy::copy_dir_recursive(&src, &target.join("su-code/skills").join(name)).is_ok();
+        skills.push(serde_json::json!({ "spec": name, "ok": ok }));
+    }
+
+    // Selected MCP servers → project-scoped `.omp/mcp.json`.
+    let mut mcp_added = 0usize;
+    if !body.mcp.is_empty() {
+        let mpath = target.join(".omp/mcp.json");
+        if let Some(parent) = mpath.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let raw = std::fs::read_to_string(&mpath).unwrap_or_default();
+        let mut rootj: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+        if !rootj.is_object() { rootj = serde_json::json!({}); }
+        let servers = rootj.as_object_mut().unwrap().entry("mcpServers").or_insert(serde_json::json!({}));
+        if !servers.is_object() { *servers = serde_json::json!({}); }
+        let sobj = servers.as_object_mut().unwrap();
+        for pick in &body.mcp {
+            let name = pick.name.trim();
+            let Some(spec) = pick.spec.as_deref().map(str::trim).filter(|s| !s.is_empty()) else { continue };
+            if name.is_empty() { continue; }
+            let server = if spec.starts_with("http://") || spec.starts_with("https://") {
+                serde_json::json!({ "type": "http", "url": spec })
+            } else {
+                let mut it = spec.split_whitespace();
+                let cmd = it.next().unwrap_or("").to_string();
+                let args: Vec<String> = it.map(String::from).collect();
+                serde_json::json!({ "type": "stdio", "command": cmd, "args": args })
+            };
+            sobj.insert(name.to_string(), server);
+            mcp_added += 1;
+        }
+        if let Ok(pretty) = serde_json::to_string_pretty(&rootj) {
+            let _ = std::fs::write(&mpath, pretty);
+        }
+    }
+
+    // Selected knowledge → REFERENCES.md.
+    let mut knowledge_added = 0usize;
+    if !body.knowledge.is_empty() {
+        if let Ok((n, _)) = super::knowledge::apply_entries(&target, &body.knowledge) {
+            knowledge_added = n;
+        }
+    }
+
+    // Activate the new project in the dashboard (preserve any profile).
+    let sess = crate::brand::config_dir(&ctx.home).join("web-session.json");
+    if let Some(parent) = sess.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let mut obj: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&sess).unwrap_or_default()).unwrap_or(serde_json::json!({}));
+    if !obj.is_object() { obj = serde_json::json!({}); }
+    obj["project"] = serde_json::Value::String(target.display().to_string());
+    let _ = std::fs::write(&sess, serde_json::to_string_pretty(&obj).unwrap_or_default());
+    apply_active_project(&ctx.home);
+
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "path": target.display().to_string(),
+        "skills": skills,
+        "mcp_added": mcp_added,
+        "knowledge_added": knowledge_added,
+    })))
 }
 
 #[derive(Deserialize)]

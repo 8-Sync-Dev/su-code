@@ -26,12 +26,13 @@ use crate::{assets, env_detect, ui};
 /// + MCP servers + omp memory config/recall hook + APPEND_SYSTEM directives +
 /// capabilities snapshot + external packs + layout normalization. Idempotent.
 pub(crate) fn global_pass(env: &env_detect::Env) -> Result<()> {
+    deploy::migrate_namespace(&env.home);
     let force_load = env.home.join(".omp/skills/00-force-load.md");
     if let Some(p) = force_load.parent() {
         std::fs::create_dir_all(p)?;
     }
     if let Some(c) = assets::read("skills/00-force-load.md") {
-        std::fs::write(&force_load, c)?;
+        std::fs::write(&force_load, crate::brand::render(&c).as_ref())?;
     }
     deploy::install_bundled_global(env)?;
     deploy::ensure_codegraph(env)?;

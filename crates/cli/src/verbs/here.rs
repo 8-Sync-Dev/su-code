@@ -53,11 +53,24 @@ pub fn run(_args: Args) -> Result<()> {
     }
 }
 
+/// Scaffold a brand-new project directory headlessly (no omp exec): create the
+/// dir, `git init` (so sweep + project detection recognize it), then seed the
+/// full 8sync context (AGENTS.md + su-code memory + injected skills block).
+/// Used by the dashboard `POST /api/projects/create`. Idempotent on an existing dir.
+pub(crate) fn scaffold_project(env: &env_detect::Env, root: &Path) -> Result<()> {
+    std::fs::create_dir_all(root).with_context(|| format!("create {}", root.display()))?;
+    if !root.join(".git").exists() {
+        let _ = Command::new("git").arg("-C").arg(root).arg("init").arg("-q").status();
+    }
+    let stack = detect_stack(root);
+    seed_project_context(env, root, &stack)
+}
+
 // ═════════════════════════════════════════════════════════════════
 // helpers
 // ═════════════════════════════════════════════════════════════════
 
-fn detect_project_root(start: &Path) -> Option<PathBuf> {
+pub(crate) fn detect_project_root(start: &Path) -> Option<PathBuf> {
     let markers = [".git", "Cargo.toml", "package.json", "pyproject.toml", "deno.json", "go.mod"];
     let mut p = start.to_path_buf();
     loop {
@@ -138,7 +151,7 @@ Session memory được omp tự quản (retain/recall/auto-compact). Không c�
 - Ghi nhớ ý tưởng nhanh: `8sync note "..."` (append vào `su-code/NOTES.md`).
 "#
         );
-        std::fs::write(&agents, content)?;
+        std::fs::write(&agents, crate::brand::render(&content).as_ref())?;
         ui::ok(&format!("seeded {}", agents.display()));
     }
 

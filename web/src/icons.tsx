@@ -65,6 +65,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M10 20v-4h4v4" />
     </>,
   ),
+  knowledge: svg(
+    <>
+      <path d="M12 6.5C10.5 5 8 4.5 4.5 4.5V18c3.5 0 6 .5 7.5 2 1.5-1.5 4-2 7.5-2V4.5C16 4.5 13.5 5 12 6.5z" />
+      <path d="M12 6.5V20" />
+    </>,
+  ),
   engines: svg(
     <>
       <rect x="6" y="6" width="12" height="12" rx="2" />

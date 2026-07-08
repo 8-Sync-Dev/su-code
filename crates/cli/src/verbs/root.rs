@@ -3,7 +3,7 @@ use owo_colors::OwoColorize;
 pub fn print_cheatsheet() {
     println!(
         "{}",
-        "8sync — vibe coding harness for CachyOS + omp".bold().cyan()
+        crate::brand::render("8sync — vibe coding harness for CachyOS + omp").bold().cyan()
     );
     println!("{}", "Single Rust binary. Embeds configs, profiles, skills. Every verb is idempotent.".dimmed());
     println!("{}\n", "Run any verb with `-h` for detailed help and examples.".dimmed());
@@ -14,7 +14,7 @@ pub fn print_cheatsheet() {
         ("8sync harness audit|bench|eval", "doc-hygiene · token budget · loop-quality probe"),
         ("8sync harness web",              "local dashboard (axum+Vite): skills/memory/engines/readiness/team"),
     ]);
-    println!("  {}", "Inside omp (after `8sync .`) — drive the autonomous engine:".dimmed());
+    println!("  {}", crate::brand::render("Inside omp (after `8sync .`) — drive the autonomous engine:").dimmed());
     rows(&[
         ("/auto <goal>",  "research → plan → slices → tasks → verify each → QA/closeout → done"),
         ("/auto status",  "report progress from the saved plan"),
@@ -27,11 +27,11 @@ pub fn print_cheatsheet() {
     println!("  {}", "1. clone + bootstrap — installs rustup if missing, builds binary into ~/.local/bin".dimmed());
     println!("     {}", "git clone https://github.com/8-Sync-Dev/su-code && cd su-code && bash scripts/bootstrap.sh".cyan());
     println!("  {}", "2. install harness + pick personal profiles (asks y/N for each)".dimmed());
-    println!("     {}", "8sync setup".cyan());
-    println!("  {}", "3. log in to GitHub (so `8sync ship` can open PRs)".dimmed());
+    println!("     {}", crate::brand::render("8sync setup").cyan());
+    println!("  {}", crate::brand::render("3. log in to GitHub (so `8sync ship` can open PRs)").dimmed());
     println!("     {}", "gh auth login".cyan());
     println!("  {}", "4. verify".dimmed());
-    println!("     {}\n", "8sync doctor".cyan());
+    println!("     {}\n", crate::brand::render("8sync doctor").cyan());
 
     println!("{}", "DAILY VIBE LOOP (inside a project)".bold().yellow());
     rows(&[
@@ -42,7 +42,7 @@ pub fn print_cheatsheet() {
         ("8sync run dev|build|test|fmt|lint", "project runner via per-stack recipe"),
         ("8sync ship \"<msg>\"",   "git add -A + commit + push + `gh pr create` in one shot"),
     ]);
-    println!("  {}", "→ each project gets an AGENTS.md (managed) + su-code/ folder (memory) on first `8sync .`".dimmed());
+    println!("  {}", crate::brand::render("→ each project gets an AGENTS.md (managed) + su-code/ folder (memory) on first `8sync .`").dimmed());
 
     println!("\n{}", "BLUETOOTH (bluez)".bold().yellow());
     rows(&[
@@ -51,7 +51,7 @@ pub fn print_cheatsheet() {
         ("8sync bt fix",     "troubleshoot a dead adapter (rfkill, btusb reload, restart, power on)"),
         ("8sync bt restart", "restart bluetooth.service + power on"),
     ]);
-    println!("  {}", "→ requires `bluetooth` profile applied (8sync setup --profile bluetooth)".dimmed());
+    println!("  {}", crate::brand::render("→ requires `bluetooth` profile applied (8sync setup --profile bluetooth)").dimmed());
 
     println!("\n{}", "CLEAN / OPTIMIZE".bold().yellow());
     rows(&[
@@ -91,7 +91,7 @@ pub fn print_cheatsheet() {
     println!("  {}", "  vietnamese · hardware-cooling · hardware-lianli · displaylink · apps-personal · warp".dimmed());
     println!("  {}", "  nvidia (auto-detect: Blackwell→Turing→open-dkms; Maxwell/Pascal→dkms)".dimmed());
     println!("  {}", "  alexdev (bundle: nvidia driver + all personal profiles)".dimmed());
-    println!("  {}", "Override any built-in: drop a TOML into ~/.config/8sync/profiles/<name>.toml".dimmed());
+    println!("  {}", crate::brand::render("Override any built-in: drop a TOML into ~/.config/8sync/profiles/<name>.toml").dimmed());
 
     println!("\n{}", "SECURITY (VPN + firewall)".bold().yellow());
     rows(&[
@@ -101,7 +101,7 @@ pub fn print_cheatsheet() {
         ("8sync sec warp on|off|status", "control WARP only"),
         ("8sync sec ufw  on|off|status", "control ufw only"),
     ]);
-    println!("  {}", "→ requires `warp` profile applied (8sync setup --profile warp) for WARP control".dimmed());
+    println!("  {}", crate::brand::render("→ requires `warp` profile applied (8sync setup --profile warp) for WARP control").dimmed());
 
     println!("\n{}", "AI TOOLING (cheap visual context for omp)".bold().yellow());
     rows(&[
@@ -122,26 +122,26 @@ pub fn print_cheatsheet() {
     ]);
 
     println!("\n{}", "WHERE THINGS LIVE".bold().yellow());
-    println!("  {:<38}  {}", "~/.local/bin/8sync".cyan(),                 "the binary itself");
-    println!("  {:<38}  {}", "~/.config/8sync/{global,skills}.toml".cyan(), "8sync own config (idempotent install)");
-    println!("  {:<38}  {}", "~/.config/8sync/profile.toml".cyan(),       "state: which profiles are applied");
-    println!("  {:<38}  {}", "~/.config/8sync/profiles/*.toml".cyan(),    "user-defined / overriding profiles");
+    println!("  {:<38}  {}", crate::brand::render("~/.local/bin/8sync").cyan(),                 "the binary itself");
+    println!("  {:<38}  {}", crate::brand::render("~/.config/8sync/{global,skills}.toml").cyan(), crate::brand::render("8sync own config (idempotent install)"));
+    println!("  {:<38}  {}", crate::brand::render("~/.config/8sync/profile.toml").cyan(),       "state: which profiles are applied");
+    println!("  {:<38}  {}", crate::brand::render("~/.config/8sync/profiles/*.toml").cyan(),    "user-defined / overriding profiles");
     println!("  {:<38}  {}", "~/.omp/skills/{name}/SKILL.md".cyan(),      "global omp skills (always-on)");
-    println!("  {:<38}  {}", "~/.omp/skills/00-force-load.md".cyan(),     "master force-load (regenerated by `8sync harness`)");
+    println!("  {:<38}  {}", "~/.omp/skills/00-force-load.md".cyan(),     crate::brand::render("master force-load (regenerated by `8sync harness`)"));
     println!("  {:<38}  {}", "<repo>/AGENTS.md".cyan(),                   "project entry point — every AI reads this first");
     println!("  {:<38}  {}", "<repo>/su-code/{PROJECT,STATE,…}.md".cyan(), "per-project memory (committed, shared with team)");
     println!("  {:<38}  {}", "<repo>/su-code/skills/<name>/".cyan(),       "per-project skills (cloned by `skill add`)");
 
     println!("\n{}", "TIPS".bold().yellow());
     println!("  · Every verb has {} and {} with EXAMPLES.", "-h".bold().green(), "--help".bold().green());
-    println!("  · Stuck? run {} to verify, or {} for a workflow walkthrough.", "8sync doctor".cyan(), "8sync flow".cyan());
+    println!("  · Stuck? run {} to verify, or {} for a workflow walkthrough.", crate::brand::render("8sync doctor").cyan(), crate::brand::render("8sync flow").cyan());
     println!("  · Inspect before installing: any setup flag combines with {}.", "--dry-run".bold().green());
     println!("  · Repo: {}", "https://github.com/8-Sync-Dev/su-code".cyan().underline());
 }
 
 fn rows(items: &[(&str, &str)]) {
-    let w = items.iter().map(|(k, _)| k.len()).max().unwrap_or(8).min(38);
+    let w = items.iter().map(|(k, _)| crate::brand::render(k).len()).max().unwrap_or(8).min(38);
     for (k, v) in items {
-        println!("  {:<width$}  {}", k.cyan().bold(), v, width = w);
+        println!("  {:<width$}  {}", crate::brand::render(k).cyan().bold(), crate::brand::render(v), width = w);
     }
 }

@@ -102,6 +102,8 @@ pub(crate) fn seed_gitignore(root: &Path) -> Result<()> {
         ".codegraph/\n",
         ".cache/8sync/\n",
         ".gs/\n",
+        "# Large-scope feature-planning evidence screenshots (regenerable binaries):\n",
+        "su-code/planning/**/evidence-*.png\n",
         "# Secrets — NEVER commit:\n",
         ".env\n",
         ".env.*\n",

@@ -27,13 +27,13 @@ import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
 type Page =
   | "state" | "context" | "models" | "skills" | "memory" | "rules"
   | "engines" | "codegraph" | "mcp" | "submodules"
-  | "bench" | "eval" | "team" | "workspaces" | "workflow" | "marketplace";
+  | "bench" | "eval" | "team" | "workspaces" | "workflow" | "marketplace" | "knowledge";
 
 const NAV_GROUPS: { label: string; items: { id: Page; label: string }[] }[] = [
   { label: "Session", items: [{ id: "state", label: "State" }, { id: "context", label: "Context" }] },
   { label: "Configure", items: [{ id: "models", label: "Models" }, { id: "skills", label: "Skills" }, { id: "memory", label: "Memory" }, { id: "rules", label: "Rules" }] },
   { label: "Runtime", items: [{ id: "engines", label: "Engines" }, { id: "codegraph", label: "Codegraph" }, { id: "mcp", label: "MCP" }, { id: "submodules", label: "Submodules" }] },
-  { label: "Discover", items: [{ id: "marketplace", label: "Marketplace" }] },
+  { label: "Discover", items: [{ id: "marketplace", label: "Marketplace" }, { id: "knowledge", label: "Knowledge" }] },
   { label: "Quality", items: [{ id: "bench", label: "Bench" }, { id: "eval", label: "Readiness" }, { id: "team", label: "Team" }] },
   { label: "Projects", items: [{ id: "workspaces", label: "Workspaces" }] },
   { label: "Build", items: [{ id: "workflow", label: "Workflow" }] },
@@ -118,6 +118,7 @@ export default function App() {
           {page === "workspaces" && <WorkspacesPage />}
           {page === "workflow" && <WorkflowPage />}
           {page === "marketplace" && <MarketplacePage />}
+          {page === "knowledge" && <KnowledgePage />}
         </div>
       </main>
     </div>
@@ -1060,12 +1061,18 @@ function EvalPage() {
 function WorkspacesPage() {
   const { data, isLoading, error } = useQuery({ queryKey: ["workspaces"], queryFn: api.workspaces });
   const qc = useQueryClient();
+  const [creating, setCreating] = useState(false);
   const activate = useMutation({
     mutationFn: (profile: string) => api.activateWorkspace(profile),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["workspaces"] }),
   });
   return (
-    <Page title="Workspaces" sub={<>omp profiles + current project. Activate records the choice (advisory — run omp with <code>--profile</code> in that dir to isolate).</>}>
+    <Page
+      title="Workspaces"
+      sub={<>omp profiles + current project. Activate records the choice (advisory — run omp with <code>--profile</code> in that dir to isolate).</>}
+      action={<button className="primary" onClick={() => setCreating(true)}><Glyph name="plus" /> New project</button>}
+    >
+      {creating ? <NewProjectModal onClose={() => setCreating(false)} onCreated={() => { setCreating(false); qc.invalidateQueries(); }} /> : null}
       {isLoading ? <Loading rows={4} /> : error ? <ErrorState message={(error as Error).message} /> : !data ? (
         <EmptyState title="No workspace data" />
       ) : (
@@ -1090,6 +1097,149 @@ function WorkspacesPage() {
         </>
       )}
     </Page>
+  );
+}
+
+// ── New project modal (scaffold + skills + MCP + knowledge) ─────────────────
+function toggleInSet<T>(set: (u: (s: Set<T>) => Set<T>) => void, v: T) {
+  set((s) => {
+    const n = new Set(s);
+    if (n.has(v)) n.delete(v);
+    else n.add(v);
+    return n;
+  });
+}
+
+function ModalSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="modal-sec">
+      <button className="modal-sec-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <Glyph name="chevron" />
+        <span>{title}</span>
+        {count > 0 ? <span className="tag accent">{count}</span> : null}
+      </button>
+      {open ? <div className="modal-sec-body">{children}</div> : null}
+    </div>
+  );
+}
+
+function NewProjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [skills, setSkills] = useState<Set<string>>(new Set());
+  const [mcp, setMcp] = useState<Map<string, string>>(new Map());
+  const [cats, setCats] = useState<Set<string>>(new Set());
+  const skillsQ = useQuery({ queryKey: ["skills"], queryFn: api.skills });
+  const mcpQ = useQuery({ queryKey: ["mp", "mcp", "", "top"], queryFn: () => api.marketplace("mcp", "", "top") });
+  const knQ = useQuery({ queryKey: ["knowledge", ""], queryFn: () => api.knowledge("") });
+  const create = useMutation({
+    mutationFn: () => {
+      const knowledge = (knQ.data?.categories ?? [])
+        .filter((c) => cats.has(c.name))
+        .flatMap((c) => c.entries.map((e) => ({ name: e.name, url: e.url, desc: e.desc, category: c.name })));
+      return api.projectCreate({
+        name: name.trim(),
+        skills: [...skills],
+        mcp: [...mcp].map(([n, spec]) => ({ name: n, spec })),
+        knowledge,
+      });
+    },
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const mcpSpec = (it: MarketItem): string => {
+    const i = it.install;
+    if (i.command) return [i.command, ...(i.args ?? [])].join(" ");
+    if (i.url) return i.url;
+    return i.spec ?? "";
+  };
+  const done = create.isSuccess && create.data;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Create project" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <strong>New project</strong>
+          <button className="icon-btn ghost" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        {done ? (
+          <>
+            <div className="modal-body">
+              <div className="empty">
+                <strong>Created ✓</strong>
+                <span className="muted mono">{create.data.path}</span>
+                <span className="muted">
+                  {create.data.skills.filter((s) => s.ok).length}/{create.data.skills.length} skills · {create.data.mcp_added} MCP · {create.data.knowledge_added} knowledge links
+                </span>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <span className="muted hint-inline">Switched the dashboard to it.</span>
+              <button className="primary" onClick={onCreated}>Done</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="modal-body">
+              <div className="field">
+                <span className="field-label">Project name</span>
+                <input type="text" placeholder="my-new-project" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+                <span className="hint-inline muted mono">~/Projects/{name.trim() || "<name>"}</span>
+              </div>
+              <ModalSection title="Skills to vendor" count={skills.size}>
+                {(skillsQ.data ?? []).filter((s) => !s.name.endsWith(".md")).map((s) => (
+                  <label className={`kn-entry${skills.has(s.name) ? " on" : ""}`} key={s.name}>
+                    <input type="checkbox" checked={skills.has(s.name)} onChange={() => toggleInSet(setSkills, s.name)} />
+                    <span className="kn-entry-main"><span className="kn-entry-name">{s.name}</span></span>
+                  </label>
+                ))}
+              </ModalSection>
+              <ModalSection title="MCP tools" count={mcp.size}>
+                {(mcpQ.data?.items ?? []).slice(0, 24).map((it) => {
+                  const on = mcp.has(it.name);
+                  return (
+                    <label className={`kn-entry${on ? " on" : ""}`} key={it.id}>
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => setMcp((m) => { const n = new Map(m); if (on) n.delete(it.name); else n.set(it.name, mcpSpec(it)); return n; })}
+                      />
+                      <span className="kn-entry-main">
+                        <span className="kn-entry-name">{it.name}</span>
+                        <span className="kn-entry-desc">{it.description}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </ModalSection>
+              <ModalSection title="Knowledge (by category)" count={cats.size}>
+                {(knQ.data?.categories ?? []).map((c) => (
+                  <label className={`kn-entry${cats.has(c.name) ? " on" : ""}`} key={c.name}>
+                    <input type="checkbox" checked={cats.has(c.name)} onChange={() => toggleInSet(setCats, c.name)} />
+                    <span className="kn-entry-main">
+                      <span className="kn-entry-name">{c.name}</span>
+                      <span className="kn-entry-desc">{c.count} resources</span>
+                    </span>
+                  </label>
+                ))}
+              </ModalSection>
+            </div>
+            <div className="modal-foot">
+              {create.error ? <span className="hint-err">{(create.error as Error).message}</span>
+                : <span className="muted hint-inline">Scaffolds AGENTS.md + su-code memory + selected extras.</span>}
+              <div className="row-actions">
+                <button onClick={onClose}>Cancel</button>
+                <button className="primary" disabled={!name.trim() || create.isPending} onClick={() => create.mutate()}>
+                  {create.isPending ? "Creating…" : "Create project"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1423,6 +1573,114 @@ function MarketplacePage() {
           })}
         </div>
       )}
+    </Page>
+  );
+}
+
+// ── Knowledge (curated sindresorhus/awesome) ────────────────────────────────
+// Auto-fetched "awesome list of awesome lists": browse categories, search,
+// select high-signal entries, save them into the active project's
+// su-code/REFERENCES.md so the agent can consult them.
+type KnSel = { name: string; url: string; desc: string; category: string };
+
+function KnowledgePage() {
+  const [draft, setDraft] = useState("");
+  const [search, setSearch] = useState("");
+  const [sel, setSel] = useState<Map<string, KnSel>>(new Map());
+  const [saved, setSaved] = useState("");
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
+    queryKey: ["knowledge", search],
+    queryFn: () => api.knowledge(search),
+  });
+  const apply = useMutation({
+    mutationFn: () => api.knowledgeApply([...sel.values()]),
+    onSuccess: (r) => { setSaved(`Saved ${r.added} → ${r.path}`); setSel(new Map()); },
+  });
+  const cats = data?.categories ?? [];
+  const toggle = (category: string, e: { name: string; url: string; desc: string }) =>
+    setSel((m) => {
+      const n = new Map(m);
+      if (n.has(e.url)) n.delete(e.url);
+      else n.set(e.url, { name: e.name, url: e.url, desc: e.desc, category });
+      return n;
+    });
+  const selectCat = (c: (typeof cats)[number], on: boolean) =>
+    setSel((m) => {
+      const n = new Map(m);
+      for (const e of c.entries) {
+        if (on) n.set(e.url, { name: e.name, url: e.url, desc: e.desc, category: c.name });
+        else n.delete(e.url);
+      }
+      return n;
+    });
+  return (
+    <Page
+      title="Knowledge"
+      sub={<>Curated from <b>sindresorhus/awesome</b> — pick high-signal resources, save them into this project's <code>su-code/REFERENCES.md</code>.</>}
+      action={
+        <button className="ghost" disabled={isFetching}
+          onClick={async () => { await api.knowledge(search, true); refetch(); }}>
+          <Glyph name="refresh" /> Refresh
+        </button>
+      }
+    >
+      <div className="card">
+        <div className="toolbar">
+          <input className="grow" placeholder="Search resources (e.g. rust, react, security)…"
+            value={draft} onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") setSearch(draft.trim()); }} aria-label="knowledge search" />
+          <button className="primary" onClick={() => setSearch(draft.trim())}>Search</button>
+          {search ? <button onClick={() => { setDraft(""); setSearch(""); }}>Clear</button> : null}
+        </div>
+        <p className="muted list-count">
+          {isLoading || isFetching ? "Loading…" : `${data?.total ?? 0} resources · ${data?.category_count ?? 0} categories${search ? ` for “${search}”` : ""}`}
+        </p>
+      </div>
+
+      {error ? <ErrorState message={(error as Error).message} />
+        : isLoading ? <Loading rows={6} />
+        : cats.length === 0 ? <EmptyState title="Nothing found" hint="Try another search term, or Refresh." />
+        : (
+        <div className="kn-list">
+          {cats.map((c) => {
+            const allOn = c.entries.length > 0 && c.entries.every((e) => sel.has(e.url));
+            return (
+              <div className="card kn-cat" key={c.name}>
+                <div className="kn-cat-head">
+                  <strong>{c.name}</strong>
+                  <span className="muted mono">{c.count}</span>
+                  <button className="link" onClick={() => selectCat(c, !allOn)}>{allOn ? "clear" : "select all"}</button>
+                </div>
+                <div className="kn-entries">
+                  {c.entries.map((e) => (
+                    <label className={`kn-entry${sel.has(e.url) ? " on" : ""}`} key={e.url}>
+                      <input type="checkbox" checked={sel.has(e.url)} onChange={() => toggle(c.name, e)} />
+                      <span className="kn-entry-main">
+                        <a className="kn-entry-name" href={e.url} target="_blank" rel="noopener" onClick={(ev) => ev.stopPropagation()}>{e.name}</a>
+                        {e.desc ? <span className="kn-entry-desc">{e.desc}</span> : null}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sel.size > 0 ? (
+        <div className="kn-bar">
+          <span className="kn-bar-count">{sel.size} selected</span>
+          <div className="row-actions">
+            <button onClick={() => setSel(new Map())}>Clear</button>
+            <button className="primary" disabled={apply.isPending} onClick={() => { setSaved(""); apply.mutate(); }}>
+              {apply.isPending ? "Saving…" : "Save to project"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {saved ? <p className="hint hint-ok">{saved}</p> : null}
+      {apply.error ? <p className="hint hint-err">{(apply.error as Error).message}</p> : null}
     </Page>
   );
 }

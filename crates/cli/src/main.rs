@@ -6,6 +6,7 @@ mod env_detect;
 mod pkg;
 mod platform;
 mod assets;
+mod brand;
 mod models;
 mod verbs;
 
@@ -14,8 +15,8 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
-    name = "8sync",
-    bin_name = "8sync",
+    name = brand::CMD,
+    bin_name = brand::CMD,
     version,
     about = "vibe coding harness for CachyOS + omp",
     long_about = None,
@@ -115,10 +116,21 @@ enum Cmd {
 
     /// Append a one-line note to su-code/NOTES.md (AI will read it in the next session)
     Note(verbs::note::Args),
+
+    /// Large multi-phase feature scopes: new/switch/status/list (GSD planning tree)
+    Feature(verbs::feature::Args),
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    // Single-source rebrand: when `brand::CMD`/`NS` differ from the default,
+    // rewrite the command name + every help/EXAMPLES block through `brand::render`
+    // in one pass. No-op (vanilla clap) on the default build → byte-identical help.
+    let cli = {
+        use clap::{CommandFactory, FromArgMatches};
+        let cmd = rebrand_cmd(Cli::command());
+        let matches = cmd.get_matches();
+        Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit())
+    };
     if !matches!(
         cli.cmd,
         Some(Cmd::Up(_)) | Some(Cmd::Setup(_)) | Some(Cmd::Help)
@@ -152,5 +164,30 @@ fn main() -> Result<()> {
         Some(Cmd::Flow)       => verbs::flow::run(),
         Some(Cmd::Find(a))    => verbs::find::run(a),
         Some(Cmd::Note(a))    => verbs::note::run(a),
+        Some(Cmd::Feature(a)) => verbs::feature::run(a),
     }
+}
+
+/// Rebrand a clap `Command` tree in place: run `brand::render` over `about`,
+/// `long_about`, and `after_help` for the root and every (nested) subcommand.
+/// Identity fast-path on the default build so help output is byte-for-byte
+/// unchanged. One interception point covers `HELP_AFTER` + all verb EXAMPLES.
+fn rebrand_cmd(mut cmd: clap::Command) -> clap::Command {
+    if brand::CMD == "8sync" && brand::NS == "8sync" {
+        return cmd;
+    }
+    let re = |s: String| brand::render(&s).into_owned();
+    if let Some(s) = cmd.get_about().map(ToString::to_string) {
+        cmd = cmd.about(re(s));
+    }
+    if let Some(s) = cmd.get_long_about().map(ToString::to_string) {
+        cmd = cmd.long_about(re(s));
+    }
+    if let Some(s) = cmd.get_after_help().map(ToString::to_string) {
+        cmd = cmd.after_help(re(s));
+    }
+    for sub in cmd.get_subcommands_mut() {
+        *sub = rebrand_cmd(sub.clone());
+    }
+    cmd
 }

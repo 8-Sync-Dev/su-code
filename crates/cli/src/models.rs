@@ -74,7 +74,7 @@ impl ModelConfig {
     /// decides everything — graceful when nothing is configured).
     pub fn load() -> Self {
         if let Some(dir) = dirs::config_dir() {
-            let p = dir.join("8sync/models.toml");
+            let p = dir.join(crate::brand::NS).join("models.toml");
             if let Ok(s) = std::fs::read_to_string(&p) {
                 if let Ok(c) = toml::from_str::<ModelConfig>(&s) {
                     return c;

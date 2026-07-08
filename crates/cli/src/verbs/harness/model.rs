@@ -1,8 +1,18 @@
-//! `8sync harness model` — view / edit the adaptive-model config
-//! (`~/.config/8sync/models.toml`), the single source of truth for which model
-//! `8sync ai`/`8sync .` and the `/auto` engine steer omp toward per task class.
-//! omp resolves names fuzzily and falls back to an authenticated model when the
-//! configured one isn't logged in (`retry.modelFallback`).
+//! `8sync harness model` — view / edit the adaptive-model config.
+//!
+//! Two layers, one command:
+//!   • `~/.config/8sync/models.toml` — 8sync's own per-task routing (which model
+//!     `8sync ai`/`8sync .`/`/auto` steer omp toward).
+//!   • `~/.omp/agent/config.yml` `modelRoles` — omp's OWN role routing (the
+//!     `/model` picker: default·smol·slow·vision·plan·designer·commit·tiny·task·
+//!     advisor + `task.agentModelOverrides.reviewer`). This is what actually
+//!     drives every omp session.
+//!
+//! The **combo preset** `8sync harness model <strong>+<cheap>` (e.g.
+//! `claude+glm`, or `model=claude+glm`) sets ALL roles across two providers in
+//! one shot — the optimal split: the cheap model does the mechanical bulk
+//! (default/task/smol/tiny/commit/advisor), the strong model does the thinking
+//! (vision/slow high · plan/designer/reviewer xhigh). Keeps both layers in sync.
 use anyhow::Result;
 
 use crate::{assets, env_detect, ui};
@@ -10,7 +20,8 @@ use crate::{assets, env_detect, ui};
 const ROLE_KEYS: &[&str] = &["default", "plan", "smol", "slow"];
 
 pub(crate) fn harness_model(env: &env_detect::Env, args: &[String]) -> Result<()> {
-    let path = env.xdg_config.join("8sync/models.toml");
+    let path = env.xdg_config.join(crate::brand::NS).join("models.toml");
+    let omp_cfg = env.home.join(".omp/agent/config.yml");
     // Seed the user file from the embedded default on first touch.
     if !path.exists() {
         if let (Some(def), Some(parent)) = (assets::read("configs/models.toml"), path.parent()) {
@@ -19,7 +30,12 @@ pub(crate) fn harness_model(env: &env_detect::Env, args: &[String]) -> Result<()
         }
     }
 
-    // Set mode: `harness model <key> <value>`.
+    // Combo preset: `harness model claude+glm` (or `model=claude+glm`).
+    if args.len() == 1 && args[0].contains('+') {
+        return apply_combo(&path, &omp_cfg, &args[0]);
+    }
+
+    // Set mode: `harness model <key> <value>` (single 8sync-routing key).
     if args.len() >= 2 {
         let key = args[0].trim().to_string();
         let val = args[1..].join(" ").trim().to_string();
@@ -34,9 +50,9 @@ pub(crate) fn harness_model(env: &env_detect::Env, args: &[String]) -> Result<()
     ui::header("8sync harness model — adaptive model routing");
     let cfg = crate::models::ModelConfig::load();
     let shown = |s: &str| if s.is_empty() { "(omp default)".to_string() } else { s.to_string() };
-    println!("  config: {}", path.display());
+    println!("  8sync config: {}", path.display());
     println!();
-    println!("  [roles]  (omp's own routing: --plan/--smol/--slow + main)");
+    println!("  [roles]  (8sync → omp --plan/--smol/--slow + main)");
     println!("   default = {}", shown(&cfg.roles.default));
     println!("   plan    = {}", shown(&cfg.roles.plan));
     println!("   smol    = {}", shown(&cfg.roles.smol));
@@ -51,9 +67,187 @@ pub(crate) fn harness_model(env: &env_detect::Env, args: &[String]) -> Result<()
         }
     }
     println!();
-    ui::info("set: 8sync harness model <default|plan|smol|slow | plan|review|debug|code|trivial> <model>");
-    ui::info("e.g. 8sync harness model review opus · 8sync harness model default codex");
-    ui::info("names resolve fuzzily in omp; unconfigured/unauthed → omp falls back to an authed model.");
+    print_omp_roles(&omp_cfg);
+    ui::info("combo: 8sync harness model claude+glm   (set ALL omp roles: opus=thinking, glm=mechanical)");
+    ui::info("aliases: claude|opus → anthropic/claude-opus-4-8 · sonnet → sonnet-5 · glm|zai → zai/glm-5.2");
+    ui::info("one role: 8sync harness model <default|plan|smol|slow | review|debug|code|trivial> <model>");
+    Ok(())
+}
+
+/// Apply a two-model preset across every omp role + the 8sync routing layer.
+/// `combo` = `<strong>+<cheap>` (e.g. `claude+glm`). Strong carries the thinking
+/// roles (xhigh on plan/designer/reviewer); cheap carries the mechanical bulk.
+fn apply_combo(toml_path: &std::path::Path, omp_cfg: &std::path::Path, combo: &str) -> Result<()> {
+    let (a, b) = combo.split_once('+').unwrap();
+    let (strong, cheap) = (resolve_alias(a.trim()), resolve_alias(b.trim()));
+    if strong.is_empty() || cheap.is_empty() {
+        anyhow::bail!("combo must be <strong>+<cheap>, e.g. claude+glm");
+    }
+
+    // omp modelRoles — the optimal split. `high` general, `xhigh` on the three
+    // roles the strong model must nail (plan/designer/reviewer), `minimal` on the
+    // cheap micro-roles (titles/commit/tiny). advisor stays bare (frequent → cheap).
+    let roles: Vec<(&str, String)> = vec![
+        ("default", format!("{cheap}:high")),
+        ("task", format!("{cheap}:high")),
+        ("smol", format!("{cheap}:minimal")),
+        ("tiny", format!("{cheap}:minimal")),
+        ("commit", format!("{cheap}:minimal")),
+        ("advisor", cheap.clone()),
+        ("vision", format!("{strong}:high")),
+        ("slow", format!("{strong}:high")),
+        ("plan", format!("{strong}:xhigh")),
+        ("designer", format!("{strong}:xhigh")),
+    ];
+    let reviewer = format!("{strong}:xhigh");
+    apply_omp_roles(omp_cfg, &roles, &reviewer)?;
+
+    // Keep 8sync's own routing (models.toml) consistent with the split.
+    let (s, c) = (short_name(&strong), short_name(&cheap));
+    for (k, v) in [("default", &c), ("plan", &s), ("smol", &c), ("slow", &s)] {
+        set_model_toml(toml_path, "roles", k, v)?;
+    }
+    for (k, v) in [("plan", &s), ("review", &s), ("debug", &s), ("code", &c), ("trivial", &c)] {
+        set_model_toml(toml_path, "tasks", k, v)?;
+    }
+
+    ui::ok(&format!("applied combo: strong={strong}  cheap={cheap}"));
+    println!();
+    println!("  omp modelRoles → {}", omp_cfg.display());
+    for (k, v) in &roles {
+        println!("   {:<9} = {}", k, v);
+    }
+    println!("   {:<9} = {}   (task.agentModelOverrides)", "reviewer", reviewer);
+    println!();
+    println!("  8sync routing → {}", toml_path.display());
+    println!("   roles: default={c} plan={s} smol={c} slow={s}");
+    println!("   tasks: plan/review/debug={s} · code/trivial={c}");
+    println!();
+    ui::info("takes effect on the NEXT omp session (start a new `8sync ai`/`8sync .`).");
+    ui::info("tweak one role: 8sync harness model plan <model>  ·  view: 8sync harness model");
+    Ok(())
+}
+
+/// Friendly alias → concrete omp model id. Anything with a `/` is passed through
+/// as an explicit id. Unknown bare tokens pass through (omp resolves fuzzily).
+fn resolve_alias(tok: &str) -> String {
+    if tok.contains('/') {
+        return tok.to_string();
+    }
+    match tok.to_ascii_lowercase().as_str() {
+        "claude" | "opus" | "anthropic" => "anthropic/claude-opus-4-8".to_string(),
+        "sonnet" => "anthropic/claude-sonnet-5".to_string(),
+        "haiku" => "anthropic/claude-haiku-4-5-20251001".to_string(),
+        "glm" | "zai" => "zai/glm-5.2".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// Short label for the 8sync models.toml layer (omp resolves it fuzzily).
+fn short_name(id: &str) -> String {
+    let low = id.to_ascii_lowercase();
+    for k in ["opus", "sonnet", "haiku", "glm"] {
+        if low.contains(k) {
+            return k.to_string();
+        }
+    }
+    id.to_string()
+}
+
+/// Print the current omp `modelRoles` + reviewer override from config.yml, so
+/// the view answers "which model does omp actually use per role?".
+fn print_omp_roles(omp_cfg: &std::path::Path) {
+    let Ok(raw) = std::fs::read_to_string(omp_cfg) else {
+        return;
+    };
+    println!("  omp modelRoles: {}", omp_cfg.display());
+    let mut in_roles = false;
+    let mut printed = false;
+    for line in raw.lines() {
+        let indented = line.starts_with([' ', '\t']);
+        if !indented {
+            in_roles = line.trim_start().starts_with("modelRoles:");
+            continue;
+        }
+        if in_roles {
+            let t = line.trim();
+            if !t.is_empty() {
+                println!("   {t}");
+                printed = true;
+            }
+        }
+        if let Some(rv) = line.trim().strip_prefix("reviewer:") {
+            println!("   reviewer:{rv}   (subagent)");
+            printed = true;
+        }
+    }
+    if !printed {
+        println!("   (none set — omp uses its bundled defaults)");
+    }
+    println!();
+}
+
+/// Rewrite the `modelRoles:` block + `task.agentModelOverrides.reviewer` in an
+/// omp `config.yml`, preserving every other key. Line-based (no serde_yaml dep):
+/// the file is machine-written and flat, so block replacement is robust and
+/// keeps the user's layout for the keys we don't touch.
+fn apply_omp_roles(
+    omp_cfg: &std::path::Path,
+    roles: &[(&str, String)],
+    reviewer: &str,
+) -> Result<()> {
+    if let Some(parent) = omp_cfg.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let raw = std::fs::read_to_string(omp_cfg).unwrap_or_default();
+    let mut lines: Vec<String> = raw.lines().map(String::from).collect();
+
+    // Fresh modelRoles block.
+    let mut block = vec!["modelRoles:".to_string()];
+    for (k, v) in roles {
+        block.push(format!("  {k}: {v}"));
+    }
+
+    // Replace the existing top-level `modelRoles:` block, else prepend it.
+    let start = lines.iter().position(|l| {
+        !l.starts_with([' ', '\t']) && l.trim_start().starts_with("modelRoles:")
+    });
+    match start {
+        Some(s) => {
+            let mut e = s + 1;
+            while e < lines.len() && lines[e].starts_with([' ', '\t']) {
+                e += 1;
+            }
+            lines.splice(s..e, block);
+        }
+        None => {
+            lines.splice(0..0, block);
+        }
+    }
+
+    // Reviewer subagent override (nested task.agentModelOverrides.reviewer).
+    let rline = format!("    reviewer: {reviewer}");
+    if let Some(p) = lines
+        .iter()
+        .position(|l| l.starts_with([' ', '\t']) && l.trim_start().starts_with("reviewer:"))
+    {
+        lines[p] = rline;
+    } else if let Some(tp) = lines
+        .iter()
+        .position(|l| !l.starts_with([' ', '\t']) && l.trim_start().starts_with("task:"))
+    {
+        lines.splice(tp + 1..tp + 1, vec!["  agentModelOverrides:".to_string(), rline]);
+    } else {
+        lines.push("task:".to_string());
+        lines.push("  agentModelOverrides:".to_string());
+        lines.push(rline);
+    }
+
+    let mut out = lines.join("\n");
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    std::fs::write(omp_cfg, out)?;
     Ok(())
 }
 

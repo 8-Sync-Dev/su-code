@@ -14,7 +14,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
     // (asset prefix, target subdir name). always-on first (read order), then
     // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
-    let bundled: [(&str, &str); 17] = [
+    let bundled: [(&str, &str); 18] = [
         ("skills/codegraph",               "codegraph"),
         ("skills/karpathy",                "karpathy-guidelines"),
         ("skills/ponytail",                "ponytail"),
@@ -32,6 +32,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
         ("skills/encore-deploy",           "encore-deploy"),
         ("skills/last30days",              "last30days"),
         ("skills/token-bench",             "token-bench"),
+        ("skills/feature",                 "feature"),
     ];
     for (asset_prefix, name) in bundled {
         let target_dir = skills_dir.join(name);
@@ -425,7 +426,7 @@ pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
 pub(crate) fn ensure_recall_hook(home: &Path) -> Result<()> {
     let dir = home.join(".omp/hooks/pre");
     std::fs::create_dir_all(&dir)?;
-    let target = dir.join("8sync-recall.ts");
+    let target = dir.join(crate::brand::ns_file("recall.ts"));
     let Some(body) = assets::read("hooks/8sync-recall.ts") else { return Ok(()); };
     if std::fs::read(&target).ok().as_deref() == Some(body.as_bytes()) {
         ui::skip("recall hook", "already deployed");
@@ -445,6 +446,7 @@ pub(crate) fn ensure_append_system(home: &Path) -> Result<()> {
     let Some(body) = assets::read("configs/omp/APPEND_SYSTEM.md") else {
         return Ok(());
     };
+    let body = crate::brand::render(&body).into_owned();
     let target = home.join(".omp/agent/APPEND_SYSTEM.md");
     if let Some(p) = target.parent() {
         std::fs::create_dir_all(p)?;
@@ -466,6 +468,7 @@ pub(crate) fn ensure_mcp_spec(home: &Path) -> Result<()> {
     let Some(body) = assets::read("specs/mcp-server.md") else {
         return Ok(());
     };
+    let body = crate::brand::render(&body).into_owned();
     let target = home.join(".omp/specs/mcp-server.md");
     if let Some(p) = target.parent() {
         std::fs::create_dir_all(p)?;
@@ -867,7 +870,7 @@ pub(crate) fn ensure_workflow_extension(home: &Path, root: Option<&Path>) -> Res
     let Some(body) = assets::read("extensions/8sync-workflow.ts") else {
         return Ok(());
     };
-    let global = home.join(".omp/agent/extensions/8sync-workflow.ts");
+    let global = home.join(".omp/agent/extensions").join(crate::brand::ns_file("workflow.ts"));
     if let Some(p) = global.parent() {
         std::fs::create_dir_all(p)?;
     }
@@ -877,7 +880,7 @@ pub(crate) fn ensure_workflow_extension(home: &Path, root: Option<&Path>) -> Res
         ui::ok(&format!("8sync-workflow extension → {}", global.display()));
     }
     if let Some(r) = root {
-        let proj = r.join(".omp/extensions/8sync-workflow.ts");
+        let proj = r.join(".omp/extensions").join(crate::brand::ns_file("workflow.ts"));
         if let Some(p) = proj.parent() {
             std::fs::create_dir_all(p)?;
         }
@@ -903,6 +906,7 @@ fn deploy_omp_pair(
     let Some(body) = assets::read(asset) else {
         return Ok(());
     };
+    let body = if asset.ends_with(".md") { crate::brand::render(&body).into_owned() } else { body };
     let global = home.join(global_rel);
     if let Some(p) = global.parent() {
         std::fs::create_dir_all(p)?;
@@ -931,12 +935,13 @@ fn deploy_omp_pair(
 /// worktree tools) and its `/auto` orchestration command. 100% on omp core (config
 /// dirs only, never patches omp) so updates stay safe. Mirrors the workflow ext.
 pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
+    let eng = crate::brand::ns_file("engine.ts");
     deploy_omp_pair(
         home,
         root,
         "extensions/8sync-engine.ts",
-        ".omp/agent/extensions/8sync-engine.ts",
-        ".omp/extensions/8sync-engine.ts",
+        &format!(".omp/agent/extensions/{eng}"),
+        &format!(".omp/extensions/{eng}"),
         "8sync-engine extension",
     )?;
     deploy_omp_pair(
@@ -946,5 +951,60 @@ pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
         ".omp/agent/commands/auto.md",
         ".omp/commands/auto.md",
         "/auto command",
+    )?;
+    deploy_omp_pair(
+        home,
+        root,
+        "commands/feature.md",
+        ".omp/agent/commands/feature.md",
+        ".omp/commands/feature.md",
+        "/feature command",
     )
+}
+
+/// One-time rebrand migration: when the binary is rebranded (`brand::NS` differs
+/// from the historical `8sync`), move the `8sync`-namespaced persistent config to
+/// the new namespace and remove stale deployed artifacts left under the old
+/// `8sync-` filenames (the new ones deploy under `<NS>-`, so a leftover
+/// `8sync-engine.ts` would make omp load the engine tools twice). AGENTS.md
+/// sentinels self-heal via `skill::inject`'s legacy-aware block finder, and the
+/// `.cache/` namespace is intentionally left literal (see `brand.rs`). No-op on
+/// the default build and idempotent once migrated. Best-effort: never bails.
+pub(crate) fn migrate_namespace(home: &Path) {
+    if crate::brand::NS == "8sync" {
+        return;
+    }
+    // 1. Config namespace: ~/.config/8sync → ~/.config/<NS>, kitty conf filename.
+    if let Some(cfg) = dirs::config_dir() {
+        rename_if_new_absent(&cfg.join("8sync"), &cfg.join(crate::brand::NS));
+        rename_if_new_absent(
+            &cfg.join("kitty").join("8sync.conf"),
+            &cfg.join("kitty").join(format!("{}.conf", crate::brand::NS)),
+        );
+        // 3. Old systemd user timer (the NS-named unit installs on next `up --timer`).
+        let unit_dir = cfg.join("systemd/user");
+        if unit_dir.join("8sync-harness-up.timer").exists() {
+            let _ = std::process::Command::new("systemctl")
+                .args(["--user", "disable", "--now", "8sync-harness-up.timer"])
+                .status();
+            let _ = std::fs::remove_file(unit_dir.join("8sync-harness-up.service"));
+            let _ = std::fs::remove_file(unit_dir.join("8sync-harness-up.timer"));
+        }
+    }
+    // 2. Stale global deployed artifacts under the old `8sync-` names.
+    for stale in [
+        home.join(".omp/hooks/pre/8sync-recall.ts"),
+        home.join(".omp/agent/extensions/8sync-engine.ts"),
+        home.join(".omp/agent/extensions/8sync-workflow.ts"),
+    ] {
+        let _ = std::fs::remove_file(&stale);
+    }
+}
+
+/// `rename(old → new)` only when the old path exists and the new one does not —
+/// so a rebrand migrates once and never clobbers freshly-written state.
+fn rename_if_new_absent(old: &Path, new: &Path) {
+    if old.exists() && !new.exists() {
+        let _ = std::fs::rename(old, new);
+    }
 }

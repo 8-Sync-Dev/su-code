@@ -92,15 +92,15 @@ pub fn run(a: Args) -> Result<()> {
 // ─── paths ──────────────────────────────────────────────────────────────
 
 fn conf_path(env: &Env) -> PathBuf {
-    env.xdg_config.join("kitty/8sync.conf")
+    env.xdg_config.join("kitty").join(format!("{}.conf", crate::brand::NS))
 }
 
 fn collection_dir(env: &Env) -> PathBuf {
-    env.xdg_config.join("8sync/wallpapers")
+    env.xdg_config.join(crate::brand::NS).join("wallpapers")
 }
 
 fn record_path(env: &Env) -> PathBuf {
-    env.xdg_config.join("8sync/wallpaper")
+    env.xdg_config.join(crate::brand::NS).join("wallpaper")
 }
 
 /// Parse the active wallpaper from the `background_image` line in 8sync.conf.

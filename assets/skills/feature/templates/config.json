@@ -1,0 +1,15 @@
+{
+  "active_feature": "",
+  "workflow": {
+    "parallelization": true,
+    "min_parallel_tasks": 3,
+    "plan_review": "complex",
+    "review_dimensions": ["security", "correctness", "convention"],
+    "code_review": true,
+    "verifier": true
+  },
+  "paths": {
+    "planning_root": "su-code/planning",
+    "archive": "su-code/planning/_archive"
+  }
+}

@@ -2,7 +2,7 @@ use anyhow::Result;
 use owo_colors::OwoColorize;
 
 pub fn run() -> Result<()> {
-    println!("{}\n", "8sync flow — commands in the order you'll actually use them".bold().cyan());
+    println!("{}\n", crate::brand::render("8sync flow — commands in the order you'll actually use them").bold().cyan());
 
     section("1. FIRST-TIME INSTALL (new machine)", &[
         ("curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh", "download the prebuilt binary into ~/.local/bin (no git/rust needed)"),
@@ -19,6 +19,7 @@ pub fn run() -> Result<()> {
         ("/auto status | resume", "report · continue the saved plan to Definition-of-Done"),
         ("8sync harness audit|bench|eval", "doc-hygiene · token budget · loop-quality probe"),
         ("8sync harness web",              "(bare) local dashboard — manage skills/memory/engines/team/submodules"),
+        ("8sync feature new <slug>",       "large multi-phase scope (GSD): planning tree + AC gates; then /feature plan|go|ship in omp"),
     ]);
 
     section("2. VIBE LOOP — open a project, code with AI, ship a PR", &[
@@ -77,18 +78,18 @@ pub fn run() -> Result<()> {
     ]);
 
     println!("Every verb supports {} and {} for detailed help.", "-h".bold().green(), "--help".bold().green());
-    println!("Show this page anytime: {} or {}.", "8sync flow".bold().cyan(), "8sync".bold().cyan());
+    println!("Show this page anytime: {} or {}.", crate::brand::render("8sync flow").bold().cyan(), crate::brand::render("8sync").bold().cyan());
     Ok(())
 }
 
 fn section(title: &str, rows: &[(&str, &str)]) {
-    println!("{}", title.bold().yellow());
-    let w = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(20).min(45);
+    println!("{}", crate::brand::render(title).bold().yellow());
+    let w = rows.iter().map(|(k, _)| crate::brand::render(k).len()).max().unwrap_or(20).min(45);
     for (cmd, desc) in rows {
         if desc.is_empty() {
-            println!("  {}", cmd.cyan());
+            println!("  {}", crate::brand::render(cmd).cyan());
         } else {
-            println!("  {:<w$}  {}", cmd.cyan(), desc.dimmed(), w = w);
+            println!("  {:<w$}  {}", crate::brand::render(cmd).cyan(), crate::brand::render(desc).dimmed(), w = w);
         }
     }
     println!();

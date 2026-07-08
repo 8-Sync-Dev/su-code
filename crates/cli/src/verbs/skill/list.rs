@@ -20,7 +20,7 @@ pub(crate) fn list_skills(env: &env_detect::Env, toml_path: &Path) -> Result<()>
             }
         }
     } else {
-        println!("  (missing) — run `8sync setup` first");
+        println!("{}", crate::brand::render("  (missing) — run `8sync setup` first"));
     }
 
     let omp_skills = env.home.join(".omp/skills");
@@ -32,7 +32,7 @@ pub(crate) fn list_skills(env: &env_detect::Env, toml_path: &Path) -> Result<()>
     if force_load.exists() {
         println!("  status: present (global auto-inject entrypoint)");
     } else {
-        println!("  status: missing (run `8sync harness init`)");
+        println!("{}", crate::brand::render("  status: missing (run `8sync harness init`)"));
     }
 
     if let Some(root) = detect_current_project_root() {
@@ -49,10 +49,10 @@ pub(crate) fn list_skills(env: &env_detect::Env, toml_path: &Path) -> Result<()>
 
     println!("\n[injection model]");
     println!("  global : ~/.omp/skills/00-force-load.md loads on every omp session");
-    println!("  local  : <repo>/AGENTS.md has a `<!-- 8sync:skills:* -->` block listing local skills");
+    println!("{}", crate::brand::render("  local  : <repo>/AGENTS.md has a `<!-- 8sync:skills:* -->` block listing local skills"));
     println!("  spec   : Agent Skills open standard — each skill dir has `SKILL.md` with YAML frontmatter");
 
-    println!("\nUse `8sync skill help` (add/gen) or `8sync harness init` (deploy + force-load).");
+    println!("{}", crate::brand::render("\nUse `8sync skill help` (add/gen) or `8sync harness init` (deploy + force-load)."));
     Ok(())
 }
 
@@ -83,13 +83,13 @@ fn truncate(s: &str, max: usize) -> String {
 pub(crate) fn print_help(env: &env_detect::Env, toml_path: &Path) -> Result<()> {
     ui::header("8sync skill help");
     println!("SYNTAX");
-    println!("  8sync skill");
-    println!("  8sync skill list");
-    println!("  8sync skill help");
-    println!("  8sync skill add <https URL|gh:owner/repo|path:/abs|builtin:name>");
-    println!("  8sync skill gen <id1> <id2> [id3 …]   # fuse N local skills into one combined SKILL.md");
-    println!("  8sync skill update [name]              # re-pull registered skills from skills.toml src");
-    println!("  (deploy + force-load + memory + CHANGELOG → `8sync harness init`)");
+    println!("{}", crate::brand::render("  8sync skill"));
+    println!("{}", crate::brand::render("  8sync skill list"));
+    println!("{}", crate::brand::render("  8sync skill help"));
+    println!("{}", crate::brand::render("  8sync skill add <https URL|gh:owner/repo|path:/abs|builtin:name>"));
+    println!("{}", crate::brand::render("  8sync skill gen <id1> <id2> [id3 …]   # fuse N local skills into one combined SKILL.md"));
+    println!("{}", crate::brand::render("  8sync skill update [name]              # re-pull registered skills from skills.toml src"));
+    println!("{}", crate::brand::render("  (deploy + force-load + memory + CHANGELOG → `8sync harness init`)"));
 
     println!("\nSPEC (Agent Skills open standard)");
     println!("  Each skill is a directory containing `SKILL.md` at its root.");
@@ -102,9 +102,9 @@ pub(crate) fn print_help(env: &env_detect::Env, toml_path: &Path) -> Result<()> 
     println!("  Collection repos (skills/<name>/SKILL.md) install every sub-skill.");
 
     println!("\nAUTO-INJECT FLOW");
-    println!("  1) `8sync skill add <url>` clones into ~/.omp/skills/<name>/  (global)");
+    println!("{}", crate::brand::render("  1) `8sync skill add <url>` clones into ~/.omp/skills/<name>/  (global)"));
     println!("     and (if inside a project) <root>/su-code/skills/<name>/    (local)");
-    println!("  2) <root>/AGENTS.md is rewritten between `<!-- 8sync:skills:* -->` sentinels");
+    println!("{}", crate::brand::render("  2) <root>/AGENTS.md is rewritten between `<!-- 8sync:skills:* -->` sentinels"));
     println!("     to list every global + local skill with its frontmatter description.");
     println!("  3) omp reads ~/.omp/skills/00-force-load.md + AGENTS.md every session.");
 

@@ -98,7 +98,7 @@ pub fn load_all() -> Result<HashMap<String, Profile>> {
 
     // User override
     let home = dirs::home_dir().context("no HOME")?;
-    let user_dir = home.join(".config/8sync/profiles");
+    let user_dir = crate::brand::config_dir(&home).join("profiles");
     if user_dir.is_dir() {
         for entry in std::fs::read_dir(&user_dir)? {
             let entry = entry?;
@@ -287,7 +287,7 @@ pub struct State {
 
 pub fn state_path() -> Result<PathBuf> {
     let cfg = dirs::config_dir().context("no XDG_CONFIG")?;
-    Ok(cfg.join("8sync/profile.toml"))
+    Ok(cfg.join(crate::brand::NS).join("profile.toml"))
 }
 
 pub fn load_state() -> State {

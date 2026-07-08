@@ -93,6 +93,7 @@ pub fn run(a: Args) -> Result<()> {
 
     ui::header("8sync setup");
     let env = env_detect::Env::detect()?;
+    crate::verbs::skill::deploy::migrate_namespace(&env.home);
     match platform::os() {
         platform::Os::Linux if !env.is_cachyos_or_arch() => ui::warn(&format!(
             "OS `{}` is not CachyOS/Arch — some steps may fail.",
@@ -733,7 +734,9 @@ fn install_skills(env: &env_detect::Env) -> Result<()> {
         }
     }
     let master = skills_dir.join("00-force-load.md");
-    assets::install("skills/00-force-load.md", &master, true)?;
+    if let Some(c) = assets::read("skills/00-force-load.md") {
+        std::fs::write(&master, crate::brand::render(&c).as_ref())?;
+    }
     ui::ok(&format!("wrote {}", master.display()));
     Ok(())
 }

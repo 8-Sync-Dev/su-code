@@ -100,8 +100,8 @@ fn scan_docs(root: &Path) -> Vec<String> {
 /// Line count of the managed force-load block in AGENTS.md, if present.
 fn agents_block_lines(root: &Path) -> Option<usize> {
     let s = std::fs::read_to_string(root.join("AGENTS.md")).ok()?;
-    let b = s.find("<!-- 8sync:skills:begin -->")?;
-    let e = s.find("<!-- 8sync:skills:end -->")?;
+    let b = s.find(crate::brand::sentinel_begin().as_str()).or_else(|| s.find(crate::brand::LEGACY_SENTINEL_BEGIN))?;
+    let e = s.find(crate::brand::sentinel_end().as_str()).or_else(|| s.find(crate::brand::LEGACY_SENTINEL_END))?;
     (b < e).then(|| s[b..e].lines().count())
 }
 

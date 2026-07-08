@@ -4,11 +4,11 @@
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
 ## Current step
-**v0.47.0 — cross-platform (macOS + Windows), option B "full parity" (this session)**. Was Linux/Arch-only. Code + CI + installers done; `Cargo.toml` = **v0.47.0** (release/tag pending commit+push).
-- **New `platform` module** (`crates/cli/src/platform.rs`) — the OS seam: `os()` (compile-time const), `require_linux()` guard, `pkg_manager()` (pacman/brew/winget) + `install_core_pkg()`, and a cross-platform periodic timer `install_timer`/`remove_timer` → **systemd (Linux) / launchd LaunchAgent (macOS) / schtasks (Windows)**. Only cross-platform std/crate APIs (no `std::os::unix`).
-- **Portability:** dropped `target-cpu=native` (`.cargo/config.toml`) → prebuilts run on any CPU of the arch (was SIGILL-prone). `harness up --timer` + `clean --timer` route through `platform::*` (Linux keeps the 0.46.2 cgroup bounds). `setup` Stage A cross-platform (`gh` via native pkg mgr; `paru`/AUR + Arch Stage B skipped off-Linux). `sec`/`bt`/`clean` → `require_linux` clean no-op off-Linux.
-- **CI + dist:** `.github/workflows/release.yml` — on `v*` tag, matrix builds native binaries (musl-static linux x86_64/aarch64 [aarch64 via `cross`], macOS x86_64/arm64, Windows MSVC) → GitHub Release, `8sync-<tag>-<os>-<arch>` scheme. `install.sh` full os×arch matrix + new `install.ps1` (Windows). Orphan `agents/` skill mirror cleaned.
-- Verified: Linux release build clean (0 warn, 6.16 MB) + runtime smoke (sec/clean/help) unaffected. **mac/Windows binaries build + verify on CI native runners** — a Linux host can't build MSVC/Apple-SDK targets or the C deps (`rusqlite`/`zstd-sys`) without each platform's toolchain (no passwordless sudo for mingw here; `x86_64-pc-windows-gnu` check blocks on `libsqlite3-sys` C build as expected).
+**v0.48.0 (this machine) — `/feature` GSD framework + single-source CLI name (`brand.rs`) + dashboard Knowledge/Create-Project + `harness model` combo, REBASED onto the other machine's v0.47.0 cross-platform release. Integrated + built; pushing + releasing v0.48.0.**
+  - **This machine's features (now v0.48.0)**: `feature` GSD framework (bundled skill + `/feature` command + `8sync feature new/switch/status/list` verb; planning tree `su-code/planning/<slug>/`; `ACTIVE` cross-feature switch; `/feature go` → `engine_*` verify-gate loop) · single-source CLI name `brand.rs` (`CMD`+`NS`, default `8sync` byte-identical, `SC_CMD`/`SC_NS` rebrands everything + migration shim) · dashboard Knowledge browser + Create-Project · `harness model <strong>+<cheap>` combo.
+  - **Other machine's v0.47.0 (rebased under mine)**: cross-platform macOS/Windows — `platform.rs` OS seam, `require_linux` guards, cross-platform timer, `.github/workflows/release.yml` matrix CI, `install.ps1`, dropped `target-cpu=native`.
+  - **Merge resolution**: `up.rs`/`setup.rs` took the cross-platform `platform::*` version (my systemd-specific `ns_file` timer edit was superseded); `main.rs` auto-merged (`mod platform` + `mod brand` + feature verb); CHANGELOG = `[0.48.0]` (mine) over `[0.47.0]` (cross-platform); KNOWLEDGE keeps both sessions' learnings.
+  - `Cargo.toml` = **0.48.0**. Pushing `main` + tagging `v0.48.0` → `release.yml` matrix CI builds the multi-platform GitHub Release.
 
 ## Next (chưa làm)
 - [ ] **Push tag v0.47.0** → CI produces the 5 assets → first mac/Windows prebuilts land on Releases. Then a real *runtime* smoke on a mac + a Windows box (only venue left; can't be done from this Linux host).
@@ -22,6 +22,8 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - Default autonomy = L2 (assisted); L3 bật bằng `/auto` + `8sync harness up --timer`.
 - Reference submodules để deinit mặc định (token-lean hơn luôn-có-sẵn).
 - Spine advisory threshold = spine >50% upfront (relative, không absolute floor).
+- **Knowledge feature (this session):** source = `curl` raw `sindresorhus/awesome` README (`raw.githubusercontent.com/.../main/readme.md`; lighter than git-clone, it's one README), cached `.cache/8sync/knowledge/` 6h TTL. Parse `##`/`###` headings → `- [name](url) - desc` entries (skip TOC `#` anchors). Apply target = `<proj>/su-code/REFERENCES.md` (new curated-links file; KNOWLEDGE.md stays append-only learnings). Reuse `marketplace.rs` curl+cache pattern.
+- **Create-project feature (this session):** `POST /api/projects/create` {name|path, skills[], mcp[], knowledge[]} → mkdir (default parent `~/Projects/<name>`, refuse if exists = reversible) + `git init` + full 8sync stamp (AGENTS.md + su-code memory + skills mirror + inject) + `8sync skill add` per extra skill + selected MCP → `<proj>/.omp/mcp.json` (project-scoped) + knowledge → REFERENCES.md + activate. Reuse `here::seed_project_context` + `skill_cmd`.
 
 ## Handoff (đổi máy — làm theo thứ tự)
 1. `git clone https://github.com/8-Sync-Dev/su-code.git && cd su-code`

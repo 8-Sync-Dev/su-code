@@ -4,6 +4,7 @@ use crate::{env_detect, ui, verbs::{profile, sec, bt}};
 pub fn run() -> Result<()> {
     ui::header("8sync doctor");
     let env = env_detect::Env::detect()?;
+    crate::verbs::skill::deploy::migrate_namespace(&env.home);
 
     // OS / desktop stack
     check("OS", &env.os_id);
@@ -39,7 +40,7 @@ pub fn run() -> Result<()> {
         ui::info("terminal stack (kitty/helix/docker): not installed — opt-in via `8sync setup --profile terminal` / dev-stack");
     } else {
         ui::ok(&format!("terminal stack: {}", term.join(", ")));
-        let kitty_glass = env.xdg_config.join("kitty/8sync.conf");
+        let kitty_glass = env.xdg_config.join("kitty").join(format!("{}.conf", crate::brand::NS));
         if kitty_glass.exists() {
             ui::ok(&format!("kitty glass theme: {}", kitty_glass.display()));
         }
@@ -171,9 +172,10 @@ fn check_portability() {
     // Context budget: the injected force-load block must stay lean (Gloaguen
     // 2026, arXiv 2602.11988 — bloated/auto context cuts success + ~20% cost).
     if let Ok(s) = std::fs::read_to_string(root.join("AGENTS.md")) {
+        let (sb, se) = (crate::brand::sentinel_begin(), crate::brand::sentinel_end());
         if let (Some(b), Some(e)) = (
-            s.find("<!-- 8sync:skills:begin -->"),
-            s.find("<!-- 8sync:skills:end -->"),
+            s.find(sb.as_str()).or_else(|| s.find(crate::brand::LEGACY_SENTINEL_BEGIN)),
+            s.find(se.as_str()).or_else(|| s.find(crate::brand::LEGACY_SENTINEL_END)),
         ) {
             if b < e {
                 let lines = s[b..e].lines().count();
@@ -239,7 +241,7 @@ fn check_ai_engines(home: &std::path::Path) {
     } else {
         ui::warn("  mnemopi memory OFF — `8sync harness` enables deep project recall (API-only)");
     }
-    let hook = home.join(".omp/hooks/pre/8sync-recall.ts").exists();
+    let hook = home.join(".omp/hooks/pre").join(crate::brand::ns_file("recall.ts")).exists();
     if hook && cfg.contains("thresholdPercent: 50") {
         ui::ok("  anti-forget: recall hook + compaction@50% ON");
     } else {
@@ -251,7 +253,7 @@ fn check_ai_engines(home: &std::path::Path) {
     } else {
         ui::info("  omp capabilities snapshot: run `8sync harness` to capture omp's live surface");
     }
-    let reg = home.join(".config/8sync/local-models.tsv");
+    let reg = crate::brand::config_dir(home).join("local-models.tsv");
     if let Ok(raw) = std::fs::read_to_string(&reg) {
         let n = raw.lines().filter(|l| !l.trim().is_empty()).count();
         if n > 0 {

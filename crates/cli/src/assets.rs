@@ -89,6 +89,13 @@ pub fn install_tree(asset_prefix: &str, target_dir: &Path) -> anyhow::Result<(us
             Some(b) => b,
             None => continue,
         };
+        // Rebrand command refs in deployed skill prose (identity on the default
+        // build). Text only — never touch binary assets (PNGs, etc.).
+        let body = if rel.ends_with(".md") || rel.ends_with(".txt") {
+            crate::brand::render(&body).into_owned()
+        } else {
+            body
+        };
         let target = target_dir.join(rel);
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
