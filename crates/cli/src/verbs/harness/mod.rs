@@ -126,9 +126,10 @@ pub struct Args {
     /// `add-model --vision`: the model accepts image input.
     #[arg(long)]
     pub vision: bool,
-    /// `add-model --think "minimal,low,medium,high"`: reasoning efforts (presence
-    /// marks the model reasoning-capable).
-    #[arg(long, value_name = "EFFORTS")]
+    /// `add-model --think` (bare) → the FULL reasoning range (minimal…xhigh, what a
+    /// native reasoning model like grok-4.5 exposes); `--think "low,medium,high"` →
+    /// a subset; `--think off` → none. Sets `mode: effort` (openai) / `anthropic-budget-effort`.
+    #[arg(long, value_name = "EFFORTS", num_args = 0..=1, default_missing_value = "full")]
     pub think: Option<String>,
 }
 
@@ -232,7 +233,7 @@ fn print_help() {
     println!("{}", crate::brand::render("  → registry: ~/.config/8sync/local-models.tsv · provider block: ~/.omp/agent/models.yml (sentinel-managed)"));
 
     println!("\nREMOTE CUSTOM MODEL — when omp's catalog lacks a new model (e.g. omp not yet updated)");
-    println!("{}", crate::brand::render("  8sync harness add-model xai/grok-4.5 --url https://api.x.ai/v1 --key $XAI_API_KEY --ctx 256000 --max 32000"));
+    println!("{}", crate::brand::render("  8sync harness add-model xai/grok-4.5 --url https://api.x.ai/v1 --key $XAI_API_KEY --ctx 256000 --max 32000 --think   # --think (bare) = full range minimal…xhigh"));
     println!("{}", crate::brand::render("  8sync harness add-model openrouter/some-new-model --url https://openrouter.ai/api/v1 --key $OPENROUTER_API_KEY --vision"));
     println!("{}", crate::brand::render("  8sync harness add-model myco/claude-x --url https://api.myco.com --api anthropic --think \"low,medium,high\""));
     println!("{}", crate::brand::render("  8sync harness add-model list                                                  # registered remote models"));

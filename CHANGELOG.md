@@ -5,6 +5,23 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.49.1] — 2026-07-09
+
+### Fixed — `add-model --think` now exposes a model's FULL reasoning range
+- `--think` defaulted to only the efforts the user typed and always wrote
+  `mode: anthropic-budget-effort` — so a reasoning model like `xai/grok-4.5` got a
+  truncated set in omp's `/model` thinking picker instead of the native
+  `minimal · low · medium · high · xhigh`.
+- **Bare `--think`** (or `full`/`all`/`max`) now emits the **complete canonical tier
+  set** `[minimal, low, medium, high, xhigh]` — matching what a native grok/claude
+  reasoning model exposes. A subset (`--think "min,high"`) is mapped to canonical
+  tiers and reordered; `--think off` disables. `defaultLevel` = `high`.
+- **`mode` now follows the API**: `effort` for `openai-completions` (the generic
+  `reasoning_effort` wire param — correct for xAI/OpenAI/most), `anthropic-budget-effort`
+  for `anthropic-messages`. (omp's valid modes: `effort|budget|google-level|
+  anthropic-adaptive|anthropic-budget-effort`; the flat `thinking: [..]` list form is
+  rejected as input — the nested `mode`/`efforts`/`defaultLevel` block is required.)
+
 ## [0.49.0] — 2026-07-09
 
 ### Added — `8sync harness add-model`: register a REMOTE model omp's catalog lacks

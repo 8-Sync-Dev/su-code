@@ -107,10 +107,7 @@ fn add(env: &env_detect::Env, selector: &str, flags: Flags) -> Result<()> {
         });
 
     let api = normalize_api(flags.api.as_deref());
-    let think = flags
-        .think
-        .map(|s| s.split(',').map(|e| e.trim()).filter(|e| !e.is_empty()).collect::<Vec<_>>().join(","))
-        .unwrap_or_default();
+    let think = flags.think.map(|s| normalize_efforts(&s)).unwrap_or_default();
 
     let m = CustomModel {
         selector: selector.clone(),
@@ -205,6 +202,58 @@ fn normalize_api(api: Option<&str>) -> String {
         other => other, // pass through any exact dialect omp supports
     }
     .to_string()
+}
+
+/// omp's canonical reasoning-effort tiers, low→high. `--think` levels are mapped
+/// to these + reordered so the omp `/model` picker shows the full native range.
+const EFFORT_ORDER: &[&str] = &["minimal", "low", "medium", "high", "xhigh"];
+
+/// Normalize `--think <spec>` into a canonical, ordered CSV of effort tiers.
+/// Bare `--think` (or `full`/`all`/`max`) → the complete tier set (what a native
+/// reasoning model like grok-4.5 exposes); `off`/`none` → "" (no thinking);
+/// a subset like `"min,high"` → those tiers only, in canonical order (aliases:
+/// `min`→minimal, `med`→medium, `x`/`extra`→xhigh). Empty = no thinking block.
+fn normalize_efforts(raw: &str) -> String {
+    let raw = raw.trim().to_lowercase();
+    if matches!(raw.as_str(), "off" | "none" | "false" | "no" | "0") {
+        return String::new();
+    }
+    if matches!(raw.as_str(), "" | "full" | "all" | "max" | "true" | "yes" | "on") {
+        return EFFORT_ORDER.join(",");
+    }
+    let mut set: Vec<&str> = Vec::new();
+    for tok in raw.split([',', ' ', '|']) {
+        let canon = match tok.trim() {
+            "minimal" | "min" => "minimal",
+            "low" => "low",
+            "medium" | "med" => "medium",
+            "high" => "high",
+            "xhigh" | "x-high" | "x" | "extra" | "extreme" => "xhigh",
+            _ => continue,
+        };
+        if !set.contains(&canon) {
+            set.push(canon);
+        }
+    }
+    EFFORT_ORDER
+        .iter()
+        .filter(|e| set.contains(*e))
+        .copied()
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// The default selected tier: prefer `high`, else the highest tier present.
+fn default_level(efforts: &[&str]) -> &'static str {
+    if efforts.contains(&"high") {
+        return "high";
+    }
+    EFFORT_ORDER
+        .iter()
+        .rev()
+        .find(|e| efforts.contains(*e))
+        .copied()
+        .unwrap_or("medium")
 }
 
 fn registry_path(env: &env_detect::Env) -> PathBuf {
@@ -352,11 +401,13 @@ fn render_block(reg: &[CustomModel]) -> String {
             b.push_str("        cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}\n");
             if !m.think.is_empty() {
                 let efforts: Vec<&str> = m.think.split(',').map(str::trim).filter(|e| !e.is_empty()).collect();
-                let default = efforts.last().copied().unwrap_or("high");
+                // `effort` = generic OpenAI-style `reasoning_effort` (correct for xAI/
+                // OpenAI/most); `anthropic-budget-effort` = Anthropic `budget_tokens`.
+                let mode = if m.api == "anthropic-messages" { "anthropic-budget-effort" } else { "effort" };
                 b.push_str("        thinking:\n");
-                b.push_str("          mode: anthropic-budget-effort\n");
+                b.push_str(&format!("          mode: {mode}\n"));
                 b.push_str(&format!("          efforts: [{}]\n", efforts.join(", ")));
-                b.push_str(&format!("          defaultLevel: {default}\n"));
+                b.push_str(&format!("          defaultLevel: {}\n", default_level(&efforts)));
             }
         }
     }
@@ -396,9 +447,9 @@ fn usage() {
     println!();
     println!("  flags: --url <baseUrl>   (required)   --key <apiKey | $<PROVIDER>_API_KEY>");
     println!("         --api openai|anthropic (default openai)   --ctx <N>   --max <N>");
-    println!("         --vision (accept images)   --think \"minimal,low,medium,high\" (reasoning)");
+    println!("         --vision (accept images)   --think (bare = FULL range minimal…xhigh · or \"low,medium,high\" · off)");
     println!();
-    ui::info("e.g. 8sync harness add-model xai/grok-4.5 --url https://api.x.ai/v1 --key $XAI_API_KEY --ctx 256000 --max 32000");
+    ui::info("e.g. 8sync harness add-model xai/grok-4.5 --url https://api.x.ai/v1 --key $XAI_API_KEY --ctx 256000 --max 32000 --think");
     ui::info("Writes a custom provider into ~/.omp/agent/models.yml; selector = <provider>/<model>.");
     ui::info("For a local GGUF instead, use `8sync harness add-local-model`.");
 }
