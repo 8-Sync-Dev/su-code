@@ -311,3 +311,13 @@ _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   MUST be `#[cfg(unix)]`-gated — the module is ABSENT on Windows and breaks MSVC compile. selfup.rs shipped
   ungated in 0.47.0 and only CI's windows-x86_64 job caught it (fixed 7f50c59). grep gate before shipping:
   `std::os::unix|PermissionsExt|set_mode|from_mode|CommandExt|signal::unix`.
+
+- **validated (0.49.1 — omp thinking config):** omp's valid `thinking.mode` enum =
+  `effort | budget | google-level | anthropic-adaptive | anthropic-budget-effort` (found in the binary:
+  `"effort" | "budget" | "google-level" | "anthropic-adaptive" | "anthropic-budget-effort"`). For a custom
+  model, pick mode by API: **`effort`** for `openai-completions` (generic `reasoning_effort` wire param —
+  correct for xAI/OpenAI), **`anthropic-budget-effort`** for `anthropic-messages` (sends `budget_tokens`).
+  The config block MUST be nested `{mode, efforts, defaultLevel}` — the flat `thinking: [minimal,...]` list
+  (what `omp models --json` OUTPUTS) is REJECTED as input, and `mode` is required. Canonical effort tiers
+  low→high = `minimal, low, medium, high, xhigh` (picker abbreviates minimal→"min", adds meta inherit/off/auto).
+  Full native range for grok-4.5/claude = all 5 tiers; `add-model --think` (bare) now emits the full set.
