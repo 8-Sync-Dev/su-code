@@ -5,6 +5,30 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.49.0] — 2026-07-09
+
+### Added — `8sync harness add-model`: register a REMOTE model omp's catalog lacks
+- **New `harness add-model <provider/model> --url <baseUrl>`** (`crates/cli/src/verbs/harness/custom_model.rs`).
+  For the case where omp hasn't shipped a model yet — or lists it with **null metadata**
+  (e.g. a brand-new `xai/grok-4.5` shows `context: -`, `max-out: -`): register it as a
+  full custom provider in `~/.omp/agent/models.yml`, so it appears in `/model` and routes.
+- **Empirically grounded** (`omp` 16.3.12): a metadata-only merge into a built-in provider is
+  **rejected** (`"baseUrl" is required when defining custom models`), so `--url` is mandatory;
+  the model selector omp exposes is `<providerKey>/<modelId>`.
+- Flags: `--url` (required) · `--key` (else `$<PROVIDER>_API_KEY`, else a visible placeholder) ·
+  `--api openai|anthropic` (default openai-completions) · `--ctx <N>` (default 256000) ·
+  `--max <N>` (default 32000) · `--vision` (adds image input) · `--think "min,low,med,high"`
+  (emits a valid `anthropic-budget-effort` thinking block + marks the model reasoning-capable).
+  Sub-verbs `list` / `rm <provider/model>`.
+- **Source of truth** = TSV registry `~/.config/8sync/custom-models.tsv`; regenerates a
+  sentinel-managed block that **coexists** with the local-models block and the 9router gateway
+  providers (each `sync` strips only its own block; `gateway apply` now re-attaches both).
+  Models sharing a provider are grouped under one provider key (YAML forbids dup keys).
+  After writing, `add` calls `omp models --json` to **verify the config still loads** (a bad
+  `--think`/`--api` combo is a loud warning, not a silent broken file).
+- `add-model` was previously an undocumented alias of `add-local-model`; it now means the
+  remote path. GGUF stays on `add-local-model`.
+
 ## [0.48.0] — 2026-07-08
 
 ### Added — large-scope `feature` framework (GSD) + the `8sync feature` verb

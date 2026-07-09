@@ -298,3 +298,16 @@ _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   `libsqlite3-sys` build.rs (needs a Windows C compiler / mingw). Without passwordless sudo to install
   mingw-w64, local win/mac compile-verification is impossible — CI native runners are authoritative, and
   that's not a shortcut, it's the standard. Don't burn time trying to cross-build C-FFI crates from Linux.
+- **validated (0.49.0 — omp custom models):** to add a model omp's fetched catalog lacks (or lists with
+  null metadata, e.g. new `xai-oauth/grok-4.5` shows context/max `-`), write a FULL custom provider under
+  `providers:` in `~/.omp/agent/models.yml`. Empirically (omp 16.3.12): a metadata-ONLY merge
+  under a built-in provider is REJECTED — `Validate(models): Provider X: "baseUrl" is required when
+  defining custom models`. So baseUrl is mandatory; selector omp exposes = `<providerKey>/<modelId>`
+  (e.g. provider key `xai` + id `grok-4.5` → `xai/grok-4.5`). A bad thinking/api combo makes omp reject
+  the WHOLE file (all custom models vanish) → always re-validate with `omp models --json` after writing.
+  `8sync harness add-model` does exactly this; registry `~/.config/<NS>/custom-models.tsv`, sentinel
+  block coexists with local-models + gateway (strip-only-own-block pattern from local_model.rs).
+- **validated (windows portability):** any `std::os::unix::*` (e.g. `PermissionsExt`/`from_mode` chmod)
+  MUST be `#[cfg(unix)]`-gated — the module is ABSENT on Windows and breaks MSVC compile. selfup.rs shipped
+  ungated in 0.47.0 and only CI's windows-x86_64 job caught it (fixed 7f50c59). grep gate before shipping:
+  `std::os::unix|PermissionsExt|set_mode|from_mode|CommandExt|signal::unix`.

@@ -97,12 +97,17 @@ fn apply(path: &Path) -> Result<()> {
     }
 
     let rendered = tmpl.replace(PLACEHOLDER, &key);
-    // Preserve any local GGUF providers added by `8sync harness add-local-model`
-    // across a gateway re-deploy (the sentinel block is re-attached under `providers:`).
+    // Preserve managed provider blocks (local GGUF via `add-local-model`, remote
+    // custom models via `add-model`) across a gateway re-deploy — each sentinel
+    // block is re-attached under `providers:`.
+    let old = std::fs::read_to_string(path).unwrap_or_default();
     let rendered = super::local_model::insert_block(
         &rendered,
-        &super::local_model::extract_block(&std::fs::read_to_string(path).unwrap_or_default())
-            .unwrap_or_default(),
+        &super::local_model::extract_block(&old).unwrap_or_default(),
+    );
+    let rendered = super::local_model::insert_block(
+        &rendered,
+        &super::custom_model::extract_block(&old).unwrap_or_default(),
     );
 
     if let Some(parent) = path.parent() {

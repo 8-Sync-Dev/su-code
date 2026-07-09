@@ -21,6 +21,7 @@ mod init;
 pub(crate) mod memory;
 mod model;
 mod local_model;
+mod custom_model;
 mod gateway;
 mod up;
 mod web;
@@ -49,6 +50,8 @@ mod toolstats;
       8sync harness gateway [apply|key <KEY>|verify|status]  deploy/verify the omp model-gateway (9router + thinking fix)
       8sync harness add-local-model <path.gguf|org/repo|url> [name]  serve a local GGUF via mistral.rs + register with omp
       8sync harness add-local-model list|rm <name>  list / remove registered local models
+      8sync harness add-model <provider/model> --url <baseUrl> [--key|--api|--ctx|--max|--vision|--think]  register a REMOTE model omp's catalog lacks
+      8sync harness add-model list|rm <provider/model>  list / remove registered remote models
 
     WHAT init DEPLOYS
       always-on : codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing
@@ -103,6 +106,30 @@ pub struct Args {
     /// (repo with su-code/ or AGENTS.md/CLAUDE.md) under DIR (default ~/Projects).
     #[arg(long, value_name = "DIR", num_args = 0..=1, default_missing_value = "")]
     pub sweep: Option<String>,
+    /// `add-model --url <baseUrl>`: the model's API endpoint (REQUIRED — omp
+    /// rejects a custom model without one).
+    #[arg(long, value_name = "URL")]
+    pub url: Option<String>,
+    /// `add-model --key <KEY>`: API key (else `$<PROVIDER>_API_KEY`, else a
+    /// placeholder you edit in models.yml).
+    #[arg(long, value_name = "KEY")]
+    pub key: Option<String>,
+    /// `add-model --api openai|anthropic`: API dialect (default openai).
+    #[arg(long, value_name = "API")]
+    pub api: Option<String>,
+    /// `add-model --ctx <N>`: context window (default 256000).
+    #[arg(long, value_name = "N")]
+    pub ctx: Option<u64>,
+    /// `add-model --max <N>`: max output tokens (default 32000).
+    #[arg(long = "max", value_name = "N")]
+    pub max_out: Option<u64>,
+    /// `add-model --vision`: the model accepts image input.
+    #[arg(long)]
+    pub vision: bool,
+    /// `add-model --think "minimal,low,medium,high"`: reasoning efforts (presence
+    /// marks the model reasoning-capable).
+    #[arg(long, value_name = "EFFORTS")]
+    pub think: Option<String>,
 }
 
 pub fn run(a: Args) -> Result<()> {
@@ -133,10 +160,24 @@ pub fn run(a: Args) -> Result<()> {
             let args: Vec<String> = [v1.clone(), a.value2.clone()].into_iter().flatten().collect();
             gateway::harness_gateway(&env, &args)
         }
-        Some("add-local-model") | Some("add-model") => {
+        Some("add-local-model") => {
             let args: Vec<String> =
                 [v1.clone(), a.value2.clone()].into_iter().flatten().collect();
             local_model::harness_add_local_model(&env, &args, a.port)
+        }
+        Some("add-model") => {
+            let args: Vec<String> =
+                [a.value.clone(), a.value2.clone()].into_iter().flatten().collect();
+            let flags = custom_model::Flags {
+                url: a.url.clone(),
+                key: a.key.clone(),
+                api: a.api.clone(),
+                ctx: a.ctx,
+                max: a.max_out,
+                vision: a.vision,
+                think: a.think.clone(),
+            };
+            custom_model::harness_add_model(&env, &args, flags)
         }
         Some("help") => {
             print_help();
@@ -173,6 +214,7 @@ fn print_help() {
     println!("{}", crate::brand::render("  8sync harness model [combo|k v]  view/set model routing; combo `model=claude+glm` sets ALL omp roles (opus=think, glm=work)"));
     println!("{}", crate::brand::render("  8sync harness gateway [apply|key|verify]  deploy/verify omp model-gateway (9router + sonnet-5 thinking fix)"));
     println!("{}", crate::brand::render("  8sync harness add-local-model <path> [name]  serve a local GGUF via mistral.rs (Rust) + register as omp `local/<name>`"));
+    println!("{}", crate::brand::render("  8sync harness add-model <provider/model> --url <baseUrl>  register a REMOTE model omp's catalog lacks (custom provider)"));
     println!("{}", crate::brand::render("  8sync harness web [--port N]    local dashboard (axum+Vite): skills/memory/engines/team/submodules"));
     println!("{}", crate::brand::render("  8sync harness toolstats         SQLite tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails"));
     println!("{}", crate::brand::render("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)"));
@@ -188,6 +230,15 @@ fn print_help() {
     println!("{}", crate::brand::render("  8sync harness model code local/qwen-coder                                     # or only for the `code` task class"));
     println!("{}", crate::brand::render("  8sync harness add-local-model rm qwen-coder                                   # stop service + unregister"));
     println!("{}", crate::brand::render("  → registry: ~/.config/8sync/local-models.tsv · provider block: ~/.omp/agent/models.yml (sentinel-managed)"));
+
+    println!("\nREMOTE CUSTOM MODEL — when omp's catalog lacks a new model (e.g. omp not yet updated)");
+    println!("{}", crate::brand::render("  8sync harness add-model xai/grok-4.5 --url https://api.x.ai/v1 --key $XAI_API_KEY --ctx 256000 --max 32000"));
+    println!("{}", crate::brand::render("  8sync harness add-model openrouter/some-new-model --url https://openrouter.ai/api/v1 --key $OPENROUTER_API_KEY --vision"));
+    println!("{}", crate::brand::render("  8sync harness add-model myco/claude-x --url https://api.myco.com --api anthropic --think \"low,medium,high\""));
+    println!("{}", crate::brand::render("  8sync harness add-model list                                                  # registered remote models"));
+    println!("{}", crate::brand::render("  8sync ai --model xai/grok-4.5 \"…\"   ·   8sync harness model default xai/grok-4.5   ·   add-model rm xai/grok-4.5"));
+    println!("{}", crate::brand::render("  → registry: ~/.config/8sync/custom-models.tsv · provider block: ~/.omp/agent/models.yml (sentinel-managed)"));
+    println!("{}", crate::brand::render("  note: selector = <provider>/<model>; --url is required (omp rejects custom models without it). GGUF? use add-local-model."));
 
     println!("\nSKILLS (deployed by init)");
     println!("{}", crate::brand::render("  always-on (read order): codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing"));

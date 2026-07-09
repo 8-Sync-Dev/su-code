@@ -45,7 +45,6 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `code-review-and-quality` — `su-code/skills/code-review-and-quality/SKILL.md`
 - `code-simplification` — `su-code/skills/code-simplification/SKILL.md`
 - `context-engineering` — `su-code/skills/context-engineering/SKILL.md`
-- `contributing` — `su-code/skills/contributing/SKILL.md`
 - `debugging-and-error-recovery` — `su-code/skills/debugging-and-error-recovery/SKILL.md`
 - `deep-research` — `su-code/skills/deep-research/SKILL.md`
 - `deprecation-and-migration` — `su-code/skills/deprecation-and-migration/SKILL.md`
@@ -67,11 +66,11 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `observability-and-instrumentation` — `su-code/skills/observability-and-instrumentation/SKILL.md`
 - `paper-code-audit` — `su-code/skills/paper-code-audit/SKILL.md`
 - `paper-writing` — `su-code/skills/paper-writing/SKILL.md`
-- `peer-review` — `su-code/skills/peer-review/SKILL.md`
 - `performance-optimization` — `su-code/skills/performance-optimization/SKILL.md`
 - `planning-and-task-breakdown` — `su-code/skills/planning-and-task-breakdown/SKILL.md`
 - `ponytail-audit` — `su-code/skills/ponytail-audit/SKILL.md`
 - `ponytail-debt` — `su-code/skills/ponytail-debt/SKILL.md`
+- `ponytail-gain` — `su-code/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `su-code/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `su-code/skills/ponytail-review/SKILL.md`
 - `preview` — `su-code/skills/preview/SKILL.md`
