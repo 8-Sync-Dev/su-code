@@ -3,6 +3,24 @@
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
+## 🚚 HANDOFF — sang máy khác làm tiếp (2026-07-09)
+**Repo state:** `main` @ `d60e245`, tag **v0.50.0** đã push, CI xanh cả 5 platform + publish, cây làm việc SẠCH (0 uncommitted). Không còn gì để commit về code.
+
+**Trên máy mới — runbook (theo thứ tự):**
+1. `git clone https://github.com/8-Sync-Dev/su-code.git && cd su-code` (hoặc `git pull` nếu đã có).
+2. `bash scripts/bootstrap.sh` (build từ source) **hoặc** cài binary prebuilt: `curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh` (v0.50.0 đã có asset).
+3. `8sync setup` → cài AI core (omp + codegraph + MCP/skills + gh). Cấu hình omp API key.
+4. `8sync harness init` → deploy skills + AGENTS.md + codegraph index + gitleaks hook.
+5. **Config KHÔNG theo repo (phải làm lại per-máy, nằm trong `~`, không phải trong git):**
+   - `8sync harness browser` → ghim omp browser vào system Chromium (cài `ungoogled-chromium-bin` + export env vào rc). Rồi **mở shell mới**. Đây là fix #2 của 0.50.0 — code đi theo repo nhưng việc *áp dụng* lên máy thì phải chạy lệnh này lại.
+   - Nếu cần custom model: `8sync harness add-model <provider/model> --url <baseUrl> [--key|--think ...]` (models.yml live local, không commit).
+
+**Đã xong (0.50.0, không cần làm lại):** code cả 2 fix (`/new` `--cwd` root pin + `harness browser`), CHANGELOG, KNOWLEDGE (2 learnings), README row, help/examples. Tag + CI + publish xong.
+
+**Việc còn lại / cần quyết:**
+- [ ] **grok-4.5 loose end** (chỉ trên MÁY NÀY, trong `~/.omp/agent/models.yml`): entry `xai/grok-4.5` đang có **placeholder key**. Hoặc `export XAI_API_KEY=... && 8sync harness add-model xai/grok-4.5 --url https://api.x.ai/v1 --ctx 500000 --think` (dùng API key thật), hoặc `8sync harness add-model rm xai/grok-4.5` (bạn vốn dùng grok qua OAuth `xai-oauth`). KHÔNG theo repo — chỉ ảnh hưởng máy này.
+- [ ] (tùy) Máy mới: `8sync harness browser status` để confirm wiring sau khi mở shell mới.
+
 ## Current step
 **v0.50.0 — omp `/new` root fix + `8sync harness browser` (browser reaches internet)**. `Cargo.toml` = **v0.50.0**.
 - **`/new` wrong-root fix**: omp's `/new` = `newSession({parentSession})` — inherits the LAUNCH root, does NOT re-detect cwd. So a drifting cwd made `/new` land in the wrong project. `8sync .` + `8sync ai` now pin omp's `--cwd <detected-root>` (+ `current_dir`); `ai.rs` previously launched omp in ambient cwd unpinned. (`crate::verbs::here::detect_project_root` reused.)
