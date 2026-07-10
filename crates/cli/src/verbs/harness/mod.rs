@@ -22,6 +22,7 @@ pub(crate) mod memory;
 mod model;
 mod local_model;
 mod custom_model;
+mod browser;
 mod gateway;
 mod up;
 mod web;
@@ -52,6 +53,7 @@ mod toolstats;
       8sync harness add-local-model list|rm <name>  list / remove registered local models
       8sync harness add-model <provider/model> --url <baseUrl> [--key|--api|--ctx|--max|--vision|--think]  register a REMOTE model omp's catalog lacks
       8sync harness add-model list|rm <provider/model>  list / remove registered remote models
+      8sync harness browser [fix|status|off]  point omp's browser at system Chromium (ungoogled) so it reaches the internet
 
     WHAT init DEPLOYS
       always-on : codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing
@@ -180,6 +182,10 @@ pub fn run(a: Args) -> Result<()> {
             };
             custom_model::harness_add_model(&env, &args, flags)
         }
+        Some("browser") => {
+            let args: Vec<String> = [v1.clone(), a.value2.clone()].into_iter().flatten().collect();
+            browser::harness_browser(&env, &args)
+        }
         Some("help") => {
             print_help();
             Ok(())
@@ -216,6 +222,7 @@ fn print_help() {
     println!("{}", crate::brand::render("  8sync harness gateway [apply|key|verify]  deploy/verify omp model-gateway (9router + sonnet-5 thinking fix)"));
     println!("{}", crate::brand::render("  8sync harness add-local-model <path> [name]  serve a local GGUF via mistral.rs (Rust) + register as omp `local/<name>`"));
     println!("{}", crate::brand::render("  8sync harness add-model <provider/model> --url <baseUrl>  register a REMOTE model omp's catalog lacks (custom provider)"));
+    println!("{}", crate::brand::render("  8sync harness browser [fix|status|off]  point omp's browser at system Chromium (ungoogled) — fixes browser control not reaching the internet"));
     println!("{}", crate::brand::render("  8sync harness web [--port N]    local dashboard (axum+Vite): skills/memory/engines/team/submodules"));
     println!("{}", crate::brand::render("  8sync harness toolstats         SQLite tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails"));
     println!("{}", crate::brand::render("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)"));

@@ -39,7 +39,7 @@ pub fn run(_args: Args) -> Result<()> {
     if which::which("omp").is_ok() {
         ui::ok("→ exec: omp --continue");
         let cfg = crate::models::ModelConfig::load();
-        let err = Command::new("omp").args(cfg.resume_flags()).arg("--continue").current_dir(&root).status();
+        let err = Command::new("omp").arg("--cwd").arg(&root).args(cfg.resume_flags()).arg("--continue").current_dir(&root).status();
         match err {
             Ok(s) if s.success() => Ok(()),
             Ok(s) => Err(anyhow::anyhow!("omp exited with {}", s)),

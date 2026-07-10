@@ -5,6 +5,26 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.50.0] — 2026-07-09
+
+### Added — `8sync harness browser`: omp browser control that reaches the internet
+- New `harness browser [fix|status|off]` (`crates/cli/src/verbs/harness/browser.rs`).
+  omp's Puppeteer browser control could render but **fail to reach the internet** on
+  the bundled `chrome-headless-shell`. `fix` (default) ensures **ungoogled-chromium-bin**
+  is installed (`/usr/bin/chromium`) and exports `PUPPETEER_EXECUTABLE_PATH` +
+  `BUN_CHROME_PATH` (the vars omp/Bun honor, with `--no-sandbox`) in zsh/bash/fish so
+  every omp launch — direct or via `8sync .`/`8sync ai` — uses it. Idempotent
+  (sentinel-managed rc block); `off` reverts to the bundled chromium, `status` shows
+  the wiring. Verified: `/usr/bin/chromium` fetches pages headless; interactive
+  bash/zsh resolve the exported path.
+
+### Fixed — omp `/new` no longer lands in the wrong project root
+- omp's `/new` creates a child session that **inherits the launch root** (it does NOT
+  re-detect cwd), so a drifting cwd made `/new` open in the wrong project. `8sync .`
+  and `8sync ai` now pin omp to the detected project root via omp's `--cwd <root>`
+  flag (+ `current_dir`), so the session — and every `/new` child — is correctly
+  scoped. `8sync ai` previously launched omp in the ambient cwd with no root pin.
+
 ## [0.49.1] — 2026-07-09
 
 ### Fixed — `add-model --think` now exposes a model's FULL reasoning range

@@ -4,14 +4,13 @@
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
 ## Current step
-**v0.49.0 — `8sync harness add-model` (remote custom models)**, rebased onto this repo's v0.48.0 bundle. Register a model omp's fetched catalog lacks — or lists with null metadata (e.g. new `xai-oauth/grok-4.5`: `context -`, `max-out -`) — as a full custom provider in `~/.omp/agent/models.yml`, so it shows in `/model` + routes. `Cargo.toml` = **v0.49.0**.
-- **New module** `crates/cli/src/verbs/harness/custom_model.rs` (cloud sibling of `add-local-model`, no mistral.rs/systemd). `harness add-model <provider/model> --url <baseUrl> [--key|--api|--ctx|--max|--vision|--think]` · `list` · `rm`. `add-model` was an undocumented alias of `add-local-model` → repurposed; GGUF stays on `add-local-model`. Adopts the new `brand::NS` path namespace + `brand::render` help convention from v0.48.0.
-- **Grounded on omp 16.3.12:** metadata-only merge is REJECTED (`"baseUrl" is required when defining custom models`) → `--url` mandatory; selector = `<providerKey>/<modelId>`. TSV registry `~/.config/<NS>/custom-models.tsv`; sentinel block **coexists** with local-models + 9router gateway (strip-only-own-block; `gateway apply` re-attaches both). Post-write `omp models --json` re-validation warns on a bad `--think`/`--api` combo.
-- Verified live: add fills grok-4.5 ctx/max (was null) · grouping (2 models/provider) · `--vision`/`--api anthropic`/`--think` valid · `rm` keeps siblings · 3-block coexistence (gateway+local+custom) all load. Config restored to pristine `providers: {}` after test.
-- **Rebased under v0.49.0**: v0.48.0 bundle (`/feature` GSD framework + `8sync feature` verb · single-source CLI name `brand.rs` [`CMD`/`NS`, default `8sync` byte-identical] · dashboard Knowledge/Create-Project · `harness model <strong>+<cheap>` combo) and v0.47.0 cross-platform (macOS/Windows `platform.rs`, release.yml matrix CI, `install.ps1`).
+**v0.50.0 — omp `/new` root fix + `8sync harness browser` (browser reaches internet)**. `Cargo.toml` = **v0.50.0**.
+- **`/new` wrong-root fix**: omp's `/new` = `newSession({parentSession})` — inherits the LAUNCH root, does NOT re-detect cwd. So a drifting cwd made `/new` land in the wrong project. `8sync .` + `8sync ai` now pin omp's `--cwd <detected-root>` (+ `current_dir`); `ai.rs` previously launched omp in ambient cwd unpinned. (`crate::verbs::here::detect_project_root` reused.)
+- **`harness browser [fix|status|off]`** (`crates/cli/src/verbs/harness/browser.rs`): omp Puppeteer browser rendered but couldn't reach the internet on bundled `chrome-headless-shell`. Ensures `ungoogled-chromium-bin` (`/usr/bin/chromium`), exports `PUPPETEER_EXECUTABLE_PATH`+`BUN_CHROME_PATH` (omp/Bun honor, +`--no-sandbox`) in zsh/bash/fish (sentinel rc block, idempotent). Verified: chromium fetches headless; interactive bash+zsh resolve the path; `off` reverts.
+- **Prior shipped**: v0.49.1 (`add-model --think` full reasoning range + mode-by-api) · v0.49.0 (`harness add-model` remote custom models) · v0.48.0 bundle (`/feature` GSD + `brand.rs` + dashboard + `harness model` combo) · v0.47.0 cross-platform (mac/Win + release CI).
 
 ## Next (chưa làm)
-- [ ] **Push tag v0.49.0** → CI release matrix produces the 5 assets. (v0.47.0/v0.48.0 already shipped; a real *runtime* smoke on a mac + Windows box is still the only unverified venue — can't be done from this Linux host.)
+- [ ] **Push tag v0.50.0** → CI release matrix produces the 5 assets. (Real mac/Win *runtime* smoke still unverified — can't from this Linux host.)
 - [ ] Phase 3b — gstack host `omp` (DEFERRED; xem archive + `reference/gstack` docs/ADDING_A_HOST.md).
 - [ ] (tùy) `8sync harness eval --baseline` định kỳ · loại `reference/` khỏi codegraph (deinit).
 

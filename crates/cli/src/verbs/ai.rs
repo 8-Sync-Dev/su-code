@@ -48,7 +48,13 @@ pub fn run(a: Args) -> Result<()> {
     if a.no_advisor {
         cfg.advisor = false;
     }
+    // Pin omp to the project root: `/new` creates a child session that INHERITS
+    // the launch root (it does NOT re-detect cwd), so a drifting cwd would make
+    // `/new` land in the wrong project. Detect the root and pass it explicitly.
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let root = crate::verbs::here::detect_project_root(&cwd).unwrap_or(cwd);
     let mut cmd = Command::new("omp");
+    cmd.current_dir(&root).arg("--cwd").arg(&root);
     let status = if trimmed.is_empty() || trimmed == "continue" || trimmed == "resume" {
         ui::info("omp — continue previous session");
         cmd.args(cfg.resume_flags()).arg("--continue").status()?

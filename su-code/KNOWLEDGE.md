@@ -321,3 +321,18 @@ _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   (what `omp models --json` OUTPUTS) is REJECTED as input, and `mode` is required. Canonical effort tiers
   low→high = `minimal, low, medium, high, xhigh` (picker abbreviates minimal→"min", adds meta inherit/off/auto).
   Full native range for grok-4.5/claude = all 5 tiers; `add-model --think` (bare) now emits the full set.
+
+- **validated (0.50.0 — omp /new root):** omp's `/new` slash-command = `newSession({parentSession})` — the
+  child session INHERITS the launch project root; it does NOT re-detect from cwd. So if omp was launched in
+  the wrong dir, every `/new` perpetuates it. omp has a `--cwd <dir>` flag ("Directory to start in,
+  overrides launch cwd") + scopes sessions per-cwd (`gc.retainNewestPerCwd`, `mnemopi.scoping=per-project-tagged`).
+  Fix: `8sync .` and `8sync ai` now pass `--cwd <detected-root>` (+ current_dir). `8sync ai` used to launch
+  omp in ambient cwd with no root pin — that was the drift source.
+- **validated (0.50.0 — omp browser internet):** omp's Puppeteer browser can render but fail to reach the
+  internet on the bundled `~/.omp/puppeteer/chrome-headless-shell`. omp runs under Bun and honors
+  `PUPPETEER_EXECUTABLE_PATH` + `BUN_CHROME_PATH` (with `--no-sandbox`) to use a real system Chromium.
+  `ungoogled-chromium-bin` (cachyos repo on CachyOS, else AUR) installs `/usr/bin/chromium` which fetches
+  pages headless fine. `8sync harness browser` exports those vars in zsh/bash/fish (interactive shells pick
+  them up — .bashrc's non-interactive `*i*` guard means a `bash -c 'source ~/.bashrc'` test won't show them,
+  use `bash -ic`). Do NOT force the env at launch-time or `browser off` becomes leaky — rc export is the
+  single source of truth.
