@@ -336,3 +336,21 @@ _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   them up — .bashrc's non-interactive `*i*` guard means a `bash -c 'source ~/.bashrc'` test won't show them,
   use `bash -ic`). Do NOT force the env at launch-time or `browser off` becomes leaky — rc export is the
   single source of truth.
+
+- **validated (0.51.0 — feynman↔omp auth bridge):** Feynman (companion-inc/feynman) and omp are BOTH Pi
+  (earendil-works/pi; feynman=base pi-ai 0.3.5, omp=@oh-my-pi/pi-ai fork) → both read `<home>/agent/auth.json`
+  in the SAME schema: `{ "<provider>": {"type":"api_key","key":"..."} }` or `{"type":"oauth","access":"...",
+  ...} }`. Pi keys per provider: anthropic→`anthropic`, zai→`zai`, xai→`xai`, openai→`openai`, google→`google`
+  (see pi docs/providers.md). `key` supports `"!command"` (exec, stdout; auth.json = cached per-process,
+  models.json = per-request) + `"$ENV"`. Resolution order: CLI --api-key > auth.json > env > models.json.
+  omp stores creds in SQLite `~/.omp/agent/agent.db` table `auth_credentials(provider,credential_type,data,
+  disabled_cause,identity_key)`; anthropic oauth data = `{access,refresh,expires,accountId,email}`. `omp token
+  <p> --raw` mints/refreshes the current access token (NOT the full record). VERIFIED: a minimal
+  `{type:oauth, access:<omp token>}` (no refresh, no expires) authenticates feynman fine (25 anthropic models,
+  default claude-opus-4-8). `8sync feynman auth-omp` bridges: oauth→access-only (omit refresh so feynman never
+  rotates omp's token = no dueling refresher, omp sole refresher, re-run on expiry); api_key→`!omp token <p>`.
+  DUELING-REFRESH is the key gotcha: copying the refresh token would let both omp+feynman refresh → Anthropic
+  rotates refresh-token on use → they invalidate each other. Omitting refresh avoids it. omp auth-gateway
+  (forward proxy) is the alternative but REQUIRES a broker (`OMP_AUTH_BROKER_URL`) = 2 daemons, too heavy.
+  feynman `feynman chat` needs `feynman setup` (installs Pi npm packages) — auth resolution works without it
+  (feynman model list / doctor read auth.json directly).

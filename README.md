@@ -136,6 +136,7 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 | `8sync run [dev\|build\|test\|fmt\|lint]` | Project runner via per-stack recipe |
 | `8sync ship "msg"` | `git add -A && commit && push && gh pr create` |
 | `8sync feature [new\|switch\|status\|list] <slug>` | Large multi-phase scopes (GSD): scaffold a planning tree `su-code/planning/<slug>/` with per-phase acceptance-criteria gates + a cross-feature `ACTIVE` switch; then run `/feature plan\|go\|ship` in an omp session (`go` delegates to the `engine_*` verify-gate loop) |
+| `8sync feynman [auth-omp\|status\|off]` | Bridge **Feynman** (companion-inc/feynman, a Pi research agent) to omp's already-authed providers: mirror omp's live creds into `~/.feynman/agent/auth.json` so `feynman model list` shows the **same models** reusing omp's **Claude Pro/Max OAuth** + API keys — no second login, and omp's faster-moving catalog. OAuth copied access-only (no refresh) so omp stays the sole refresher; API keys resolved live via `!omp token`. `off` removes only omp-managed entries |
 
 ### Session management (sub-commands of `.`)
 

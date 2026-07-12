@@ -119,6 +119,9 @@ enum Cmd {
 
     /// Large multi-phase feature scopes: new/switch/status/list (GSD planning tree)
     Feature(verbs::feature::Args),
+
+    /// Bridge Feynman (Pi research agent) to omp's auth: `auth-omp` reuses Claude OAuth + keys
+    Feynman(verbs::feynman::Args),
 }
 
 fn main() -> Result<()> {
@@ -165,6 +168,7 @@ fn main() -> Result<()> {
         Some(Cmd::Find(a))    => verbs::find::run(a),
         Some(Cmd::Note(a))    => verbs::note::run(a),
         Some(Cmd::Feature(a)) => verbs::feature::run(a),
+        Some(Cmd::Feynman(a)) => verbs::feynman::run(a),
     }
 }
 

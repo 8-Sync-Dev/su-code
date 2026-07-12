@@ -4,7 +4,7 @@
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
 ## 🚚 HANDOFF — sang máy khác làm tiếp (2026-07-09)
-**Repo state:** `main` @ `d60e245`, tag **v0.50.0** đã push, CI xanh cả 5 platform + publish, cây làm việc SẠCH (0 uncommitted). Không còn gì để commit về code.
+**Repo state:** `main`, latest tag **v0.51.0** (CI publishes 5 assets/tag). Cây làm việc SẠCH sau mỗi ship. Không còn gì để commit về code.
 
 **Trên máy mới — runbook (theo thứ tự):**
 1. `git clone https://github.com/8-Sync-Dev/su-code.git && cd su-code` (hoặc `git pull` nếu đã có).
@@ -14,6 +14,7 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 5. **Config KHÔNG theo repo (phải làm lại per-máy, nằm trong `~`, không phải trong git):**
    - `8sync harness browser` → ghim omp browser vào system Chromium (cài `ungoogled-chromium-bin` + export env vào rc). Rồi **mở shell mới**. Đây là fix #2 của 0.50.0 — code đi theo repo nhưng việc *áp dụng* lên máy thì phải chạy lệnh này lại.
    - Nếu cần custom model: `8sync harness add-model <provider/model> --url <baseUrl> [--key|--think ...]` (models.yml live local, không commit).
+   - `8sync feynman auth-omp` → nếu dùng Feynman (Pi research agent): sau khi omp đã auth (Claude OAuth/keys), lệnh này bắc cầu creds omp → `~/.feynman/agent/auth.json` (per-máy, không theo repo). `feynman model list` sẽ hiện cùng model omp.
 
 **Đã xong (0.50.0, không cần làm lại):** code cả 2 fix (`/new` `--cwd` root pin + `harness browser`), CHANGELOG, KNOWLEDGE (2 learnings), README row, help/examples. Tag + CI + publish xong.
 
@@ -22,13 +23,13 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - [ ] (tùy) Máy mới: `8sync harness browser status` để confirm wiring sau khi mở shell mới.
 
 ## Current step
-**v0.50.0 — omp `/new` root fix + `8sync harness browser` (browser reaches internet)**. `Cargo.toml` = **v0.50.0**.
-- **`/new` wrong-root fix**: omp's `/new` = `newSession({parentSession})` — inherits the LAUNCH root, does NOT re-detect cwd. So a drifting cwd made `/new` land in the wrong project. `8sync .` + `8sync ai` now pin omp's `--cwd <detected-root>` (+ `current_dir`); `ai.rs` previously launched omp in ambient cwd unpinned. (`crate::verbs::here::detect_project_root` reused.)
-- **`harness browser [fix|status|off]`** (`crates/cli/src/verbs/harness/browser.rs`): omp Puppeteer browser rendered but couldn't reach the internet on bundled `chrome-headless-shell`. Ensures `ungoogled-chromium-bin` (`/usr/bin/chromium`), exports `PUPPETEER_EXECUTABLE_PATH`+`BUN_CHROME_PATH` (omp/Bun honor, +`--no-sandbox`) in zsh/bash/fish (sentinel rc block, idempotent). Verified: chromium fetches headless; interactive bash+zsh resolve the path; `off` reverts.
-- **Prior shipped**: v0.49.1 (`add-model --think` full reasoning range + mode-by-api) · v0.49.0 (`harness add-model` remote custom models) · v0.48.0 bundle (`/feature` GSD + `brand.rs` + dashboard + `harness model` combo) · v0.47.0 cross-platform (mac/Win + release CI).
+**v0.51.0 — `8sync feynman auth-omp` (bridge Feynman to omp's auth)**. `Cargo.toml` = **v0.51.0**.
+- **New top-level verb** `feynman [auth-omp|status|off]` (`crates/cli/src/verbs/feynman.rs`). Feynman (companion-inc/feynman) + omp are both Pi (earendil-works/pi) → same `<home>/agent/auth.json` schema. `auth-omp` mirrors omp's live creds into `~/.feynman/agent/auth.json`: oauth (Claude Pro/Max) = `{type:oauth, access:<omp token>}` **no refresh** (omp sole refresher, no dueling rotation; re-run on expiry); api_key = `{type:api_key, key:"!omp token <p> --raw"}` (live, no secret copied). Sidecar `.8sync-omp.json` → `off` removes only ours. Reads omp SQLite `auth_credentials` for provider+type (via `sqlite3`, never the `data` blob); tokens via `omp token <p> --raw`.
+- **Verified live** (feynman 0.3.5 + omp 16.4.6): `auth-omp` → `feynman model list` shows `anthropic/claude-opus-4-8` + `zai/*` (31 authed) reusing omp Claude OAuth; `status` lists managed; `off` → 0 authed, auth.json `{}`, sidecar gone; re-apply idempotent. (feynman `chat` needs `feynman setup` for Pi npm runtime — auth resolution verified independently.)
+- **Prior shipped**: v0.50.0 (omp `/new` root fix + `harness browser`) · v0.49.1 (`add-model --think`) · v0.49.0 (`harness add-model`) · v0.48.0 (`/feature` GSD + `brand.rs` + dashboard) · v0.47.0 cross-platform.
 
 ## Next (chưa làm)
-- [ ] **Push tag v0.50.0** → CI release matrix produces the 5 assets. (Real mac/Win *runtime* smoke still unverified — can't from this Linux host.)
+- [ ] **Push tag v0.51.0** → CI release matrix produces the 5 assets.
 - [ ] Phase 3b — gstack host `omp` (DEFERRED; xem archive + `reference/gstack` docs/ADDING_A_HOST.md).
 - [ ] (tùy) `8sync harness eval --baseline` định kỳ · loại `reference/` khỏi codegraph (deinit).
 

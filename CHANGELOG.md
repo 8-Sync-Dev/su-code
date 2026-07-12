@@ -5,6 +5,25 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.51.0] — 2026-07-09
+
+### Added — `8sync feynman auth-omp`: reuse omp's auth in Feynman
+- New top-level verb `feynman [auth-omp|status|off]` (`crates/cli/src/verbs/feynman.rs`).
+  Feynman (companion-inc/feynman) is a Pi research agent that expects its own
+  `feynman model login`; omp is a fast-moving Pi fork with a fresh model catalog +
+  a credential vault. Both read `<home>/agent/auth.json` in the SAME schema, so
+  `auth-omp` mirrors omp's LIVE credentials into `~/.feynman/agent/auth.json`:
+  OAuth providers (Claude Pro/Max) as `{type:oauth, access:<omp token>}` **without
+  the refresh token** — omp stays the sole refresher (no dueling token rotation),
+  re-run when it expires; API-key providers as `{type:api_key, key:"!omp token <p>
+  --raw"}` so keys resolve live from omp (no secret copied). A sidecar
+  (`.8sync-omp.json`) records managed providers so `off` removes only those and
+  never touches Feynman's own logins. Verified live (feynman 0.3.5 + omp 16.4.6):
+  after `auth-omp`, `feynman model list` shows `anthropic/claude-opus-4-8` + `zai/*`
+  (31 authed models) reusing omp's Claude OAuth; `off` reverts to 0 authed.
+  Note: Claude Pro/Max OAuth via a third-party harness draws subscription
+  extra-usage (billed per token).
+
 ## [0.50.0] — 2026-07-09
 
 ### Added — `8sync harness browser`: omp browser control that reaches the internet

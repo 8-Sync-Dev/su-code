@@ -41,6 +41,7 @@ pub fn print_cheatsheet() {
         ("8sync note \"<msg>\"",   "append timestamped line to su-code/NOTES.md"),
         ("8sync run dev|build|test|fmt|lint", "project runner via per-stack recipe"),
         ("8sync ship \"<msg>\"",   "git add -A + commit + push + `gh pr create` in one shot"),
+        ("8sync feynman auth-omp", "reuse omp's Claude OAuth + keys in Feynman (Pi research agent)"),
     ]);
     println!("  {}", crate::brand::render("→ each project gets an AGENTS.md (managed) + su-code/ folder (memory) on first `8sync .`").dimmed());
 
