@@ -959,6 +959,14 @@ pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
         ".omp/agent/commands/feature.md",
         ".omp/commands/feature.md",
         "/feature command",
+    )?;
+    deploy_omp_pair(
+        home,
+        root,
+        "commands/push-now.md",
+        ".omp/agent/commands/push-now.md",
+        ".omp/commands/push-now.md",
+        "/push-now command",
     )
 }
 

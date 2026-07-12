@@ -52,6 +52,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `documentation-and-adrs` — `su-code/skills/documentation-and-adrs/SKILL.md`
 - `doubt-driven-development` — `su-code/skills/doubt-driven-development/SKILL.md`
 - `eli5` — `su-code/skills/eli5/SKILL.md`
+- `feature` — `su-code/skills/feature/SKILL.md`
 - `frontend-ui-engineering` — `su-code/skills/frontend-ui-engineering/SKILL.md`
 - `full-flow` — `su-code/skills/full-flow/SKILL.md`
 - `git-workflow-and-versioning` — `su-code/skills/git-workflow-and-versioning/SKILL.md`

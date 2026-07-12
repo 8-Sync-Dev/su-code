@@ -3,6 +3,8 @@
 .codegraph/
 .cache/8sync/
 .gs/
+# Large-scope feature-planning evidence screenshots (regenerable binaries):
+su-code/planning/**/evidence-*.png
 # Secrets — NEVER commit:
 .env
 .env.*

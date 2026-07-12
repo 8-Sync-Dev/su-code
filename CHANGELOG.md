@@ -5,6 +5,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — omp `/push-now` command (cross-machine handoff + commit + push)
+- New embedded command `assets/commands/push-now.md`, deployed by `8sync harness`
+  (`ensure_engine` in `crates/cli/src/verbs/skill/deploy.rs`) to
+  `~/.omp/agent/commands/push-now.md` (global) + `<repo>/.omp/commands/push-now.md`
+  (project), alongside `/auto` and `/feature`. `/push-now [msg]` is the
+  "I'm switching machines right now" verb: it rewrites `su-code/STATE.md` with a
+  cold-resume handoff (branch/HEAD, what changed this session, done/next/blockers,
+  new-machine runbook), updates `CHANGELOG.md`/`KNOWLEDGE.md` if code changed, then
+  `git add -A` + commit (gitleaks-gated, no `--no-verify` past a real secret) +
+  `git push` origin current branch. No PR, no branch switch, no tag bump, no
+  force-push (that's `8sync ship` / a release). Since it's in `assets/`, a fresh
+  machine gets it automatically after `git pull && bash scripts/bootstrap.sh && 8sync harness`.
+
 ## [0.52.0] — 2026-07-09
 
 ### Added — `8sync vpn`: SoftEther VPN Client + VPN Gate (study-through-another-region)

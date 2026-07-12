@@ -3,37 +3,37 @@
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
-## 🚚 HANDOFF — sang máy khác làm tiếp (2026-07-09)
-**Repo state:** `main`, latest tag **v0.51.0** (CI publishes 5 assets/tag). Cây làm việc SẠCH sau mỗi ship. Không còn gì để commit về code.
+## 🚚 HANDOFF — sang máy khác làm tiếp GẤP (2026-07-13)
+**Repo state:** branch `main`. HEAD trước session = `52e0b25` (v0.52.0, đã tag + CI publish). Session này **THÊM 1 commit** (chưa tag — WIP checkpoint): omp command `/push-now` + fix môi trường feynman. Sau khi push, cây SẠCH.
+
+**Đã làm session này (2026-07-13):**
+1. **Fix feynman không mở được** (env, KHÔNG phải repo code): `8sync feynman auth-omp` chạy đúng (bridge OK — `feynman model list`/`doctor` thấy anthropic+zai). Crash thật khi `feynman chat`: feynman gọi `npm install @companion-ai/alpha-hub …` lúc khởi động, mà `npm` trên PATH hỏng. Root cause: `~/.local/bin/{npm,npx}` là **symlink** → pnpm shim `~/.local/share/pnpm/{npm,npx}`; shim tính `basedir=$(dirname "$0")` = `~/.local/bin` → tìm `~/.local/bin/global/5/.pnpm/npm@…/npm-cli.js` (không có; thật ra ở `~/.local/share/pnpm/global/…`) → `MODULE_NOT_FOUND`. **Fix**: thay 2 symlink bằng wrapper `#!/bin/sh` + `exec /home/<u>/.local/share/pnpm/{npm,npx} "$@"`. → feynman mở sạch, alpha-hub cài xong. Chi tiết: `su-code/KNOWLEDGE.md` (validated, cuối file).
+2. **Thêm omp command `/push-now`** (repo code, đi theo git): asset `assets/commands/push-now.md` + wire vào `ensure_engine` (`crates/cli/src/verbs/skill/deploy.rs`, cạnh `/auto` `/feature`). `8sync harness` deploy → `~/.omp/agent/commands/push-now.md` (global) + `.omp/commands/push-now.md` (project). Đã build release clean + harness deploy live trên máy này. `/push-now [msg]` = viết handoff vào STATE + commit + push (no PR/tag/force). CHANGELOG updated.
+
+**⚠ MÁY KHÁC RẤT CÓ THỂ DÍNH CÙNG LỖI npm** (nếu cũng dùng pnpm global): nếu `feynman chat` crash `MODULE_NOT_FOUND …/npm-cli.js`, hoặc `npm --version` lỗi → chạy đúng fix #1 ở trên (thay symlink `~/.local/bin/{npm,npx}` bằng wrapper trỏ đường thật của pnpm). Kiểm tra nhanh: `npm --version` phải in số (12.0.1), không phải stacktrace.
 
 **Trên máy mới — runbook (theo thứ tự):**
-1. `git clone https://github.com/8-Sync-Dev/su-code.git && cd su-code` (hoặc `git pull` nếu đã có).
-2. `bash scripts/bootstrap.sh` (build từ source) **hoặc** cài binary prebuilt: `curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh` (v0.50.0 đã có asset).
-3. `8sync setup` → cài AI core (omp + codegraph + MCP/skills + gh). Cấu hình omp API key.
-4. `8sync harness init` → deploy skills + AGENTS.md + codegraph index + gitleaks hook.
-5. **Config KHÔNG theo repo (phải làm lại per-máy, nằm trong `~`, không phải trong git):**
-   - `8sync harness browser` → ghim omp browser vào system Chromium (cài `ungoogled-chromium-bin` + export env vào rc). Rồi **mở shell mới**. Đây là fix #2 của 0.50.0 — code đi theo repo nhưng việc *áp dụng* lên máy thì phải chạy lệnh này lại.
-   - Nếu cần custom model: `8sync harness add-model <provider/model> --url <baseUrl> [--key|--think ...]` (models.yml live local, không commit).
-   - `8sync feynman auth-omp` → nếu dùng Feynman (Pi research agent): sau khi omp đã auth (Claude OAuth/keys), lệnh này bắc cầu creds omp → `~/.feynman/agent/auth.json` (per-máy, không theo repo). `feynman model list` sẽ hiện cùng model omp.
-   - `8sync vpn install` + `8sync vpn on [CC]` → nếu muốn tunnel qua VPN Gate (SoftEther): cài engine + Wine GUI + dhcpcd, connect + route (per-máy, cài package + đổi route/DNS máy — không theo repo).
-
-**Đã xong (0.50.0, không cần làm lại):** code cả 2 fix (`/new` `--cwd` root pin + `harness browser`), CHANGELOG, KNOWLEDGE (2 learnings), README row, help/examples. Tag + CI + publish xong.
-
-**Việc còn lại / cần quyết:**
-- [ ] **grok-4.5 loose end** (chỉ trên MÁY NÀY, trong `~/.omp/agent/models.yml`): entry `xai/grok-4.5` đang có **placeholder key**. Hoặc `export XAI_API_KEY=... && 8sync harness add-model xai/grok-4.5 --url https://api.x.ai/v1 --ctx 500000 --think` (dùng API key thật), hoặc `8sync harness add-model rm xai/grok-4.5` (bạn vốn dùng grok qua OAuth `xai-oauth`). KHÔNG theo repo — chỉ ảnh hưởng máy này.
-- [ ] (tùy) Máy mới: `8sync harness browser status` để confirm wiring sau khi mở shell mới.
+1. `git pull` (hoặc clone `https://github.com/8-Sync-Dev/su-code.git`).
+2. `bash scripts/bootstrap.sh` (build+install) **hoặc** `curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh`.
+3. `8sync setup` (omp + codegraph + MCP/skills + gh) → cấu hình omp API key.
+4. `8sync harness` → deploy skills + AGENTS.md + codegraph index + **`/push-now` `/auto` `/feature` commands** + gitleaks hook.
+5. **Config per-máy (KHÔNG theo git, nằm trong `~`):**
+   - `npm` fix ở trên (nếu feynman crash).
+   - `8sync feynman auth-omp` → nếu dùng Feynman (sau khi omp auth): bắc cầu creds → `~/.feynman/agent/auth.json`.
+   - `8sync harness browser` → ghim omp browser vào system Chromium, rồi mở shell mới.
+   - custom model: `8sync harness add-model …` (models.yml live local).
+   - `8sync vpn install` + `8sync vpn on [CC]` → nếu cần tunnel VPN Gate.
 
 ## Current step
-**v0.52.0 — `8sync vpn` (SoftEther client + VPN Gate, study-through-region)**. `Cargo.toml` = **v0.52.0**.
-- **New top-level verb** `vpn [install|gui|list|on|off|status]` (`crates/cli/src/verbs/vpn.rs`). Connect through VPN Gate (U. Tsukuba academic public relays) like the Windows client. `install` = native Linux engine `softethervpn` (RTM 4.44, **not** `-git` 5.x) + **Windows VPN Client Manager GUI via Wine** (`softethervpn-client-manager`, region-switch plugin lives there; `--no-gui` skips) + `dhcpcd` + enable client service. `gui` opens the manager.
-- **Grounded (SoftEther docs):** Linux client has **no native GUI** + **can't auto-rewrite the routing table** → the reliable region-switch is the CLI. `list [CC]` ranks the VPN Gate CSV API; `on [CC|ip]` picks best relay, `vpncmd` connect (HUB VPNGATE, user/pass `vpn`), **pins relay route via physical uplink**, DHCPs tap, full-tunnels default, DNS→1.1.1.1, **auto-rollback if egress unchanged** (egress via Cloudflare IP-trace, DNS-swap-safe); `off` restores.
-- **Verified**: build clean; `vpn -h`/status(not-installed)/`list`/`list JP`(live VPN Gate fetch)/`gui`(not-installed)/`off`(idle guard) all OK. NOT run live in-session: `install` (AUR softethervpn + Wine GUI, sudo) + `on` (reroutes the operating shell) — user runs on their box.
-- **Prior shipped**: v0.51.0 (`feynman auth-omp`) · v0.50.0 (omp `/new` fix + `harness browser`) · v0.49.1 (`add-model --think`) · v0.49.0 (`harness add-model`) · v0.48.0 (`/feature` GSD + `brand.rs`) · v0.47.0 cross-platform.
+**omp `/push-now` command (WIP checkpoint trên v0.52.0)**. `Cargo.toml` vẫn = **v0.52.0** (chưa bump — commit này là handoff checkpoint, không phải release).
+- Asset `assets/commands/push-now.md` + wire `ensure_engine` (`crates/cli/src/verbs/skill/deploy.rs`) → deploy cạnh `/auto` `/feature`. Build release clean (18s), harness deploy live OK (global + project).
+- `/push-now [msg]`: ground git+STATE → rewrite HANDOFF cold-resume → CHANGELOG/KNOWLEDGE nếu code đổi → `git add -A` + commit (gitleaks-gate) + push origin current branch. NO PR/tag/branch-switch/force.
+- **Prior shipped**: v0.52.0 (`8sync vpn`) · v0.51.0 (`feynman auth-omp`) · v0.50.0 (omp `/new` fix + `harness browser`) · v0.49.x (`add-model`) · v0.48.0 (`/feature` GSD) · v0.47.0 cross-platform.
 
 ## Next (chưa làm)
-- [ ] **Push tag v0.52.0** → CI release matrix produces the 5 assets.
+- [ ] (tùy) Nếu muốn `/push-now` thành release: bump `Cargo.toml` + CHANGELOG version + push tag → CI 5 assets.
+- [ ] (tùy) Hardening: `8sync feynman auth-omp`/`doctor` detect `npm` hỏng và warn (feynman phụ thuộc npm runtime). Chưa làm — ngoài phạm vi yêu cầu.
 - [ ] Phase 3b — gstack host `omp` (DEFERRED; xem archive + `reference/gstack` docs/ADDING_A_HOST.md).
-- [ ] (tùy) `8sync harness eval --baseline` định kỳ · loại `reference/` khỏi codegraph (deinit).
 
 ## Open questions / blockers
 - Real mac/Windows **runtime** verification needs the actual OSes (or the pushed-tag CI artifacts) — the code path (launchd/schtasks/brew/winget) is written + compiles cross-platform but hasn't executed on a live mac/Win yet.
