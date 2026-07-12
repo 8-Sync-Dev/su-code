@@ -197,6 +197,8 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 
 `8sync sec [on\|off\|toggle\|status]` — enable/disable Cloudflare WARP VPN + ufw firewall together. Subs: `sec warp …`, `sec ufw …`.
 
+`8sync vpn [install\|gui\|list [CC]\|on [CC\|ip]\|off\|status]` — SoftEther VPN Client + **VPN Gate** (University of Tsukuba academic public relays) for "study/learn through another region". `install` pulls the native Linux engine (`softethervpn` — the maintained RTM 4.44 build, not the `-git` 5.x dev edition) + the **Windows VPN Client Manager GUI under Wine** (`softethervpn-client-manager`, `--no-gui` to skip) + `dhcpcd`, and enables the client service. `gui` opens that Windows-style manager (where the region-switch plugin lives). SoftEther has **no native Linux GUI** and its Linux client **can't rewrite the routing table itself** — so the reliable region-switch is the CLI: `on [CC]` picks the best relay (optionally by 2-letter country), connects, pins the relay route to the physical uplink, DHCPs the tap, full-tunnels the default route, swaps DNS to 1.1.1.1, and **auto-rolls-back if egress doesn't change**; `off` restores routes/DNS. VPN Gate relays are volunteer-run and **logged** — a learning tunnel, never for anything sensitive.
+
 ### Machine (desktop / housekeeping)
 
 | Command | Description |

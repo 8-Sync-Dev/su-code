@@ -5,6 +5,26 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.52.0] — 2026-07-09
+
+### Added — `8sync vpn`: SoftEther VPN Client + VPN Gate (study-through-another-region)
+- New top-level verb `vpn [install|gui|list|on|off|status]` (`crates/cli/src/verbs/vpn.rs`).
+  Connect through **VPN Gate** (University of Tsukuba academic public relays) the
+  way the Windows client does. `install` pulls the native Linux engine
+  `softethervpn` (the maintained RTM 4.44 build — **not** the `-git` 5.x dev
+  edition) + the **Windows VPN Client Manager GUI under Wine**
+  (`softethervpn-client-manager`, where the Windows-style region-switch plugin
+  lives; `--no-gui` skips it) + `dhcpcd`, and enables the client service.
+  `gui` opens that manager. SoftEther has **no native Linux GUI** and its Linux
+  client **can't rewrite the routing table itself**, so the reliable region-switch
+  is the CLI: `list [CC]` ranks relays from the VPN Gate CSV API (optional
+  2-letter country); `on [CC|ip]` picks the best relay, connects via `vpncmd`
+  (HUB `VPNGATE`, user/pass `vpn`), **pins the relay route to the physical uplink**,
+  DHCPs the tap, full-tunnels the default route, swaps DNS to 1.1.1.1, and
+  **auto-rolls-back if egress doesn't change** (egress checked via Cloudflare's
+  IP-addressed trace so it survives the DNS swap); `off` restores routes/DNS.
+  VPN Gate relays are volunteer-run and **logged** — a learning tunnel only.
+
 ## [0.51.0] — 2026-07-09
 
 ### Added — `8sync feynman auth-omp`: reuse omp's auth in Feynman

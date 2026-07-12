@@ -24,3 +24,4 @@ pub mod note;
 pub mod locate;
 pub mod feature;
 pub mod feynman;
+pub mod vpn;

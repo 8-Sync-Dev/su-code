@@ -354,3 +354,18 @@ _(consolidated 26 dòng cũ → su-code/archive/KNOWLEDGE-1783322297.md)_
   (forward proxy) is the alternative but REQUIRES a broker (`OMP_AUTH_BROKER_URL`) = 2 daemons, too heavy.
   feynman `feynman chat` needs `feynman setup` (installs Pi npm packages) — auth resolution works without it
   (feynman model list / doctor read auth.json directly).
+
+- **validated (0.52.0 — 8sync vpn / SoftEther + VPN Gate):** SoftEther on Linux, grounded in official docs:
+  (1) native Linux VPN Client has **NO GUI** ("cannot be operated using a GUI") — only the Windows VPN
+  Client Manager exists; on Arch the AUR `softethervpn-client-manager` packages that Windows `vpncmgr.exe`
+  to run under **Wine** (+ `.desktop`), which is where the Windows-style VPN Gate region-switch plugin lives.
+  (2) The Linux client **does not auto-rewrite the routing table** — you must manually pin a static route to
+  the VPN server via the physical uplink, then set the tap as default. So the reliable region-switch on Linux
+  is the CLI, not the GUI. Package: `softethervpn` = maintained RTM **4.44** (vpnclient+vpncmd+client service);
+  `softethervpn-git` = unstable 5.x dev — use 4.44. Client mgmt is non-interactive via
+  `vpncmd localhost /CLIENT /CMD <cmd>` (NicCreate se → tap `vpn_se`; AccountCreate /SERVER:ip:443 /HUB:VPNGATE
+  /USERNAME:vpn, AccountPasswordSet /PASSWORD:vpn /TYPE:standard, AccountConnect). VPN Gate server list =
+  CSV API `https://www.vpngate.net/api/iphone/` (cols HostName,IP,Score,Ping,Speed,CountryLong,CountryShort,…).
+  This box had **no DHCP client** (NetworkManager only) → `8sync vpn install` also pulls `dhcpcd` for the tap.
+  Egress check uses Cloudflare's IP-addressed trace (`https://1.1.1.1/cdn-cgi/trace`) so it survives the DNS
+  swap to 1.1.1.1; `on` auto-rolls-back (routes+DNS) if egress doesn't change. VPN Gate = academic + LOGGED.

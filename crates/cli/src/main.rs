@@ -76,6 +76,9 @@ enum Cmd {
     /// Bluetooth control + troubleshoot (status/on/off/fix/restart)
     Bt(verbs::bt::Args),
 
+    /// SoftEther VPN Client + VPN Gate academic relays (install/gui/list/on/off/status)
+    Vpn(verbs::vpn::Args),
+
     /// Reclaim disk/RAM, tidy caches, report CPU/GPU (--deep/--ram/--gpu/--watch/--timer)
     Clean(verbs::clean::Args),
 
@@ -156,6 +159,7 @@ fn main() -> Result<()> {
         Some(Cmd::Theme(a)) => verbs::theme::run(a),
         Some(Cmd::Sec(a))     => verbs::sec::run(a),
         Some(Cmd::Bt(a))      => verbs::bt::run(a),
+        Some(Cmd::Vpn(a))     => verbs::vpn::run(a),
         Some(Cmd::Clean(a))   => verbs::clean::run(a),
         Some(Cmd::Skill(a))   => verbs::skill::run(a),
         Some(Cmd::Harness(a)) => verbs::harness::run(a),
