@@ -18,6 +18,18 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   force-push (that's `8sync ship` / a release). Since it's in `assets/`, a fresh
   machine gets it automatically after `git pull && bash scripts/bootstrap.sh && 8sync harness`.
 
+### Added — omp `/pull-now` command (cold-resume: pull + orient + prepare)
+- New embedded command `assets/commands/pull-now.md`, deployed by `8sync harness`
+  the same way (`ensure_engine`) to `~/.omp/agent/commands/pull-now.md` +
+  `<repo>/.omp/commands/pull-now.md`. `/pull-now [go]` is the **receiving end of
+  `/push-now`**: safe `git pull` (ff-only → rebase on divergence; stop on conflict
+  or dirty tree), then read `su-code/STATE.md` HANDOFF + recent `KNOWLEDGE.md`
+  learnings + `CHANGELOG.md`/`git log` to understand exactly where the project is,
+  prepare the workspace (rebuild + `8sync harness` if `crates/`/`assets/` changed,
+  verify the per-machine gotchas the handoff listed, `8sync doctor`), and report
+  current state + the single next concrete action. `go` = start that action;
+  empty = orient + prepare, then STOP for the human. No push, no clobber.
+
 ## [0.52.0] — 2026-07-09
 
 ### Added — `8sync vpn`: SoftEther VPN Client + VPN Gate (study-through-another-region)

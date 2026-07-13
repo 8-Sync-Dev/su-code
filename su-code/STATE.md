@@ -25,9 +25,9 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
    - `8sync vpn install` + `8sync vpn on [CC]` → nếu cần tunnel VPN Gate.
 
 ## Current step
-**omp `/push-now` command (WIP checkpoint trên v0.52.0)**. `Cargo.toml` vẫn = **v0.52.0** (chưa bump — commit này là handoff checkpoint, không phải release).
-- Asset `assets/commands/push-now.md` + wire `ensure_engine` (`crates/cli/src/verbs/skill/deploy.rs`) → deploy cạnh `/auto` `/feature`. Build release clean (18s), harness deploy live OK (global + project).
-- `/push-now [msg]`: ground git+STATE → rewrite HANDOFF cold-resume → CHANGELOG/KNOWLEDGE nếu code đổi → `git add -A` + commit (gitleaks-gate) + push origin current branch. NO PR/tag/branch-switch/force.
+**omp handoff-pair commands `/push-now` + `/pull-now` (WIP checkpoint trên v0.52.0)**. `Cargo.toml` vẫn = **v0.52.0** (chưa bump — checkpoint, không phải release).
+- Assets `assets/commands/{push-now,pull-now}.md` + wire `ensure_engine` (`crates/cli/src/verbs/skill/deploy.rs`) → deploy cạnh `/auto` `/feature`. Build release clean + harness deploy live OK (global + project).
+- `/push-now [msg]` = rời máy: rewrite HANDOFF cold-resume → CHANGELOG/KNOWLEDGE → `git add -A` + commit (gitleaks-gate) + push. **`/pull-now [go]`** = tới máy: `git pull` (ff-only/rebase, stop nếu bẩn/conflict) → đọc STATE HANDOFF + KNOWLEDGE + CHANGELOG/log → prepare (rebuild+harness nếu `crates/`/`assets/` đổi, verify per-machine gotchas, `8sync doctor`) → report state + next action; `go` = làm luôn, rỗng = dừng chờ human. Cả hai: NO PR/tag/branch-switch/force.
 - **Prior shipped**: v0.52.0 (`8sync vpn`) · v0.51.0 (`feynman auth-omp`) · v0.50.0 (omp `/new` fix + `harness browser`) · v0.49.x (`add-model`) · v0.48.0 (`/feature` GSD) · v0.47.0 cross-platform.
 
 ## Next (chưa làm)

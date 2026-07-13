@@ -10,7 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 160 dòng cũ → su-code/archive/KNOWLEDGE-1783900247.md)_
+_(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1783958133.md)_
   harness (engine_* + worktree + MCP). The 2 REAL gaps were in the loop layer, both fixed
   code-enforced in `assets/extensions/8sync-engine.ts`:
   (1) `engine_advance` never checked verification — "code-enforced gate" was prompt-ware; now a
