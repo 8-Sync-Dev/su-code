@@ -212,7 +212,7 @@ pub(crate) fn ensure_codegraph_init(root: &Path) {
 /// Ensure the `codebase-memory-mcp` binary is installed (upstream installer,
 /// binary-only) and registered as an omp MCP server. Mirrors `ensure_codegraph`:
 /// `8sync harness` auto-sets-up code intelligence so the agent gets the graph
-/// tools (search_graph/semantic_query/trace_path/…) with zero manual config.
+/// tools (search_graph/trace_path/get_architecture/…) with zero manual config.
 pub(crate) fn ensure_codebase_memory_mcp(env: &env_detect::Env) -> Result<()> {
     if which::which("codebase-memory-mcp").is_err() {
         ui::step("codebase-memory-mcp (binary missing — upstream installer, binary-only)");
@@ -415,6 +415,65 @@ pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
         ui::ok("compaction@50% + idle enabled (anti-forget)");
     }
     if changed { std::fs::write(&cfg, s)?; }
+    Ok(())
+}
+
+/// Keep the STEP-0 MCP servers' tools ALWAYS VISIBLE via `mcp.discoveryDefaultServers`
+/// in `~/.omp/agent/config.yml`. omp's default `tools.discoveryMode: auto` hides ALL
+/// MCP tools behind a `search_tool_bm25` discovery hop once the registry exceeds 40
+/// tools — measured effect: serena/headroom 0 calls across 29 sessions. Listing the
+/// four harness servers keeps their full catalogs in the active tool set (verified in
+/// omp 16.4.8: the setting filters discoverable MCP tools by `serverName` and merges
+/// them into the session baseline). `tools.essentialOverride` does NOT work for this —
+/// omp filters its entries to BUILT-IN tool names only. Key-presence idempotent:
+/// never overrides a user-set `discoveryDefaultServers`; migrates away the inert
+/// essentialOverride block earlier 8sync builds wrote (exact-match removal only).
+pub(crate) fn ensure_mcp_tools_visible(home: &Path) -> Result<()> {
+    const SERVERS: &[&str] = &["codebase-memory-mcp", "headroom", "serena", "zai-vision"];
+    // The exact block written by the earlier essentialOverride approach. MCP names
+    // in essentialOverride are filtered out by omp (builtins only) AND clobber the
+    // builtin essential defaults — remove it, but ONLY this byte-exact 8sync block.
+    const LEGACY_PIN: &str = "tools:\n  essentialOverride:\n    - mcp__codebase_memory_mcp_search_graph\n    - mcp__codebase_memory_mcp_trace_path\n    - mcp__codebase_memory_mcp_get_architecture\n    - mcp__codebase_memory_mcp_get_code_snippet\n    - mcp__serena_find_symbol\n    - mcp__serena_find_referencing_symbols\n    - mcp__serena_get_symbols_overview\n    - mcp__headroom_compress\n    - mcp__zai_vision_extract_text_from_screenshot\n    - mcp__zai_vision_analyze_image\n";
+    let cfg = home.join(".omp/agent/config.yml");
+    if let Some(p) = cfg.parent() { std::fs::create_dir_all(p)?; }
+    let mut s = std::fs::read_to_string(&cfg).unwrap_or_default();
+    let mut changed = false;
+    if s.contains(LEGACY_PIN) {
+        s = s.replace(LEGACY_PIN, "");
+        changed = true;
+        ui::info("migrated: dropped inert tools.essentialOverride MCP pin (builtins-only setting)");
+    }
+    if s.contains("discoveryDefaultServers") {
+        ui::skip("STEP-0 MCP visibility", "mcp.discoveryDefaultServers already set (user-configured)");
+        if changed { std::fs::write(&cfg, s)?; }
+        return Ok(());
+    }
+    let list: String = SERVERS.iter().map(|t| format!("    - {t}\n")).collect();
+    if s.lines().any(|l| l.starts_with("mcp:")) {
+        // Insert under the existing top-level `mcp:` block (same approach as
+        // compaction::set_threshold).
+        s = s
+            .lines()
+            .map(|l| {
+                if l.starts_with("mcp:") {
+                    format!("{l}\n  discoveryDefaultServers:\n{}", list.trim_end())
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        if !s.ends_with('\n') {
+            s.push('\n');
+        }
+    } else {
+        if !s.is_empty() && !s.ends_with('\n') {
+            s.push('\n');
+        }
+        s.push_str(&format!("\nmcp:\n  discoveryDefaultServers:\n{list}"));
+    }
+    std::fs::write(&cfg, s)?;
+    ui::ok("STEP-0 MCP servers always visible (mcp.discoveryDefaultServers) — serena/cbm/headroom/zai callable, no search_tool_bm25 hop");
     Ok(())
 }
 
@@ -780,7 +839,7 @@ pub(crate) fn ensure_omp_capabilities_snapshot(home: &Path) -> Result<()> {
     }
     out.push_str("\n## Registered MCP servers — EXACT tool catalog\n\n");
     out.push_str(&format!(
-        "`{}` server(s) in `~/.omp/agent/mcp.json`. Use these BEFORE raw grep/read (STEP 0). Tool names are prefixed by the client (e.g. `mcp__<server>_<tool>`); the base name below is what matters.\n\n",
+        "`{}` server(s) in `~/.omp/agent/mcp.json`. Use these BEFORE raw grep/read (STEP 0). Callable names are the REGISTERED forms: `mcp__<server-with-underscores>_<tool>` (e.g. `mcp__codebase_memory_mcp_search_graph`, `mcp__serena_find_symbol`; exception: `mcp__headroom_compress` — omp collapses a duplicated server prefix). The four harness servers are kept ALWAYS VISIBLE by `8sync harness` (`mcp.discoveryDefaultServers`) — call their tools directly; only other/newly-added servers' tools need one `search_tool_bm25` call first.\n\n",
         mcp_names_sorted.len()
     ));
     for name in &mcp_names_sorted {

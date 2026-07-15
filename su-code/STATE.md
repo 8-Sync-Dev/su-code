@@ -3,32 +3,37 @@
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
-## 🚚 HANDOFF — sang máy khác làm tiếp GẤP (2026-07-13)
-**Repo state:** branch `main`. HEAD trước session = `52e0b25` (v0.52.0, đã tag + CI publish). Session này **THÊM 1 commit** (chưa tag — WIP checkpoint): omp command `/push-now` + fix môi trường feynman. Sau khi push, cây SẠCH.
+## 🚚 HANDOFF — sang máy khác làm tiếp GẤP (2026-07-15)
+**Repo state:** branch `main`, tag mới nhất `v0.52.0` (Cargo.toml vẫn 0.52.0 — commit này là WIP checkpoint, KHÔNG release). HEAD trước session = `c402209` (`/pull-now` command). Session này thêm 1 commit (STEP-0 MCP activation fix) → sau push cây SẠCH.
 
-**Đã làm session này (2026-07-13):**
-1. **Fix feynman không mở được** (env, KHÔNG phải repo code): `8sync feynman auth-omp` chạy đúng (bridge OK — `feynman model list`/`doctor` thấy anthropic+zai). Crash thật khi `feynman chat`: feynman gọi `npm install @companion-ai/alpha-hub …` lúc khởi động, mà `npm` trên PATH hỏng. Root cause: `~/.local/bin/{npm,npx}` là **symlink** → pnpm shim `~/.local/share/pnpm/{npm,npx}`; shim tính `basedir=$(dirname "$0")` = `~/.local/bin` → tìm `~/.local/bin/global/5/.pnpm/npm@…/npm-cli.js` (không có; thật ra ở `~/.local/share/pnpm/global/…`) → `MODULE_NOT_FOUND`. **Fix**: thay 2 symlink bằng wrapper `#!/bin/sh` + `exec /home/<u>/.local/share/pnpm/{npm,npx} "$@"`. → feynman mở sạch, alpha-hub cài xong. Chi tiết: `su-code/KNOWLEDGE.md` (validated, cuối file).
-2. **Thêm omp command `/push-now`** (repo code, đi theo git): asset `assets/commands/push-now.md` + wire vào `ensure_engine` (`crates/cli/src/verbs/skill/deploy.rs`, cạnh `/auto` `/feature`). `8sync harness` deploy → `~/.omp/agent/commands/push-now.md` (global) + `.omp/commands/push-now.md` (project). Đã build release clean + harness deploy live trên máy này. `/push-now [msg]` = viết handoff vào STATE + commit + push (no PR/tag/force). CHANGELOG updated.
+**Đã làm session này (2026-07-15) — fix "MCP connected nhưng không bao giờ được gọi":**
+1. **Root cause (đo từ 29 sessions / 13.854 tool calls: serena 0 · headroom 0 · cbm 10 · zai 3):** (a) omp `tools.discoveryMode: auto` ẨN toàn bộ MCP tools sau `search_tool_bm25` khi registry >40 tools (stack này = 48); (b) mọi instruction surface dạy tên BASE (`search_graph`, `find_symbol`) — không gọi được; tên đăng ký thật = `mcp__codebase_memory_mcp_search_graph`, `mcp__serena_find_symbol`, … (ngoại lệ `mcp__headroom_compress`).
+2. **`crates/cli/src/verbs/skill/deploy.rs`** — `ensure_mcp_tools_visible` (thay `ensure_tools_essential_default` trong plan): ghi `mcp.discoveryDefaultServers: [codebase-memory-mcp, headroom, serena, zai-vision]` vào `~/.omp/agent/config.yml`. **QUAN TRỌNG:** `tools.essentialOverride` KHÔNG dùng được cho MCP — omp 16.4.8 lọc entries chỉ nhận BUILT-IN names (đã extract logic từ binary); block pin cũ (inert) được auto-migrate xóa (byte-exact). Idempotent, không đè key user. + header catalog `## Registered MCP servers` dạy tên `mcp__…`.
+3. **Instruction surfaces đồng bộ tên đăng ký:** `assets/configs/omp/APPEND_SYSTEM.md` (RULE #0 viết lại; headroom mandate đổi thành "nén những gì BẠN phát lại"), `assets/skills/00-force-load.md`, `crates/cli/src/verbs/skill/inject.rs` (AGENTS sentinel template), `assets/skills/feature/*` + mirror `su-code/skills/feature/*` (R10 literals), `AGENTS.md`/`CLAUDE.md` (harness regenerate). Xóa tên rác: `semantic_query` (cbm không có), `codegraph search/deps/defs` (verbs thật 1.1.2 = `query/explore/node/callers/callees/impact`).
+4. **`crates/cli/src/verbs/doctor.rs`** — warn khi MCP tools bị ẩn (`discoveryDefaultServers` missing) + check serena registered/runnable (mcp.json + uvx). `toolstats.rs` matcher bỏ tên không tồn tại.
+5. **Verified live:** `omp -p` gọi thẳng `mcp__codebase_memory_mcp_search_graph` + `mcp__serena_find_symbol` → OK (trước fix: MISSING); toolstats lần đầu ghi nhận serena/cbm optimizer calls; harness global re-run idempotent (skip); doctor ✓.
 
-**⚠ MÁY KHÁC RẤT CÓ THỂ DÍNH CÙNG LỖI npm** (nếu cũng dùng pnpm global): nếu `feynman chat` crash `MODULE_NOT_FOUND …/npm-cli.js`, hoặc `npm --version` lỗi → chạy đúng fix #1 ở trên (thay symlink `~/.local/bin/{npm,npx}` bằng wrapper trỏ đường thật của pnpm). Kiểm tra nhanh: `npm --version` phải in số (12.0.1), không phải stacktrace.
+**Next ▸ (cụ thể):**
+- [ ] Máy mới: chạy `8sync harness` (bắt buộc — để ghi `mcp.discoveryDefaultServers` vào `~/.omp/agent/config.yml` máy đó; fix là per-machine config + code).
+- [ ] Theo dõi adoption: `8sync harness toolstats` sau vài session — kỳ vọng optimizer % tăng từ 24%.
+- [ ] (tùy, ngoài scope) Friction còn lại: serena cần `activate_project` mỗi session; cbm cần đúng project slug (`list_projects` trước). Nếu muốn 0-friction: cân nhắc auto-activate trong recall hook (`~/.omp/hooks/pre/8sync-recall.ts`).
+
+**⚠ Per-machine gotchas (KHÔNG theo git):**
+- `~/.omp/agent/config.yml` là per-machine — fix MCP visibility chỉ có hiệu lực sau khi chạy `8sync harness` trên máy đó.
+- npm/pnpm shim hỏng → feynman crash `MODULE_NOT_FOUND …/npm-cli.js`: thay symlink `~/.local/bin/{npm,npx}` bằng wrapper `exec ~/.local/share/pnpm/{npm,npx} "$@"` (chi tiết: `su-code/KNOWLEDGE.md`, entry feynman).
+- zai-vision key nằm trong `~/.omp/agent/mcp.json` (per-machine, không theo git).
 
 **Trên máy mới — runbook (theo thứ tự):**
 1. `git pull` (hoặc clone `https://github.com/8-Sync-Dev/su-code.git`).
 2. `bash scripts/bootstrap.sh` (build+install) **hoặc** `curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh`.
 3. `8sync setup` (omp + codegraph + MCP/skills + gh) → cấu hình omp API key.
-4. `8sync harness` → deploy skills + AGENTS.md + codegraph index + **`/push-now` `/auto` `/feature` commands** + gitleaks hook.
-5. **Config per-máy (KHÔNG theo git, nằm trong `~`):**
-   - `npm` fix ở trên (nếu feynman crash).
-   - `8sync feynman auth-omp` → nếu dùng Feynman (sau khi omp auth): bắc cầu creds → `~/.feynman/agent/auth.json`.
-   - `8sync harness browser` → ghim omp browser vào system Chromium, rồi mở shell mới.
-   - custom model: `8sync harness add-model …` (models.yml live local).
-   - `8sync vpn install` + `8sync vpn on [CC]` → nếu cần tunnel VPN Gate.
+4. `8sync harness` → deploy skills + AGENTS.md + codegraph index + commands + gitleaks hook + **MCP always-visible config**.
+5. `8sync doctor` → phải thấy `✓ STEP-0 MCP servers always visible (mcp.discoveryDefaultServers)`.
+6. Per-máy nếu cần: npm fix ở trên · `8sync feynman auth-omp` · `8sync harness browser` · `8sync vpn install`.
 
 ## Current step
-**omp handoff-pair commands `/push-now` + `/pull-now` (WIP checkpoint trên v0.52.0)**. `Cargo.toml` vẫn = **v0.52.0** (chưa bump — checkpoint, không phải release).
-- Assets `assets/commands/{push-now,pull-now}.md` + wire `ensure_engine` (`crates/cli/src/verbs/skill/deploy.rs`) → deploy cạnh `/auto` `/feature`. Build release clean + harness deploy live OK (global + project).
-- `/push-now [msg]` = rời máy: rewrite HANDOFF cold-resume → CHANGELOG/KNOWLEDGE → `git add -A` + commit (gitleaks-gate) + push. **`/pull-now [go]`** = tới máy: `git pull` (ff-only/rebase, stop nếu bẩn/conflict) → đọc STATE HANDOFF + KNOWLEDGE + CHANGELOG/log → prepare (rebuild+harness nếu `crates/`/`assets/` đổi, verify per-machine gotchas, `8sync doctor`) → report state + next action; `go` = làm luôn, rỗng = dừng chờ human. Cả hai: NO PR/tag/branch-switch/force.
-- **Prior shipped**: v0.52.0 (`8sync vpn`) · v0.51.0 (`feynman auth-omp`) · v0.50.0 (omp `/new` fix + `harness browser`) · v0.49.x (`add-model`) · v0.48.0 (`/feature` GSD) · v0.47.0 cross-platform.
+**STEP-0 MCP activation fix (WIP checkpoint trên v0.52.0)** — done + verified live trên máy này; commit này chính là nó. Plan gốc: `local://mcp-step0-activation-plan.md` (12/12 tasks done; cơ chế đổi essentialOverride → `mcp.discoveryDefaultServers` theo contingency B, có evidence trong KNOWLEDGE).
+- **Prior shipped**: `/push-now` + `/pull-now` commands (c402209, 6bb38ae) · v0.52.0 (`8sync vpn`) · v0.51.0 (`feynman auth-omp`) · v0.50.0 (omp `/new` fix + `harness browser`) · v0.49.x (`add-model`) · v0.48.0 (`/feature` GSD) · v0.47.0 cross-platform.
 
 ## Next (chưa làm)
 - [ ] (tùy) Nếu muốn `/push-now` thành release: bump `Cargo.toml` + CHANGELOG version + push tag → CI 5 assets.

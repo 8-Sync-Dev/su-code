@@ -5,6 +5,34 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Fixed — STEP-0 MCP tools were connected but NEVER called (0.09% usage) → always visible
+- Root cause (measured over 29 omp sessions / 13,854 tool calls: serena 0 · headroom 0 ·
+  cbm 10 · zai 3 calls; `search_tool_bm25` taken 2×): omp's default
+  `tools.discoveryMode: auto` hides ALL MCP tools behind a `search_tool_bm25` discovery
+  hop once the registry exceeds 40 tools (this stack registers 48), and every instruction
+  surface taught BASE tool names (`search_graph`, `find_symbol`) that are not callable —
+  the registered forms are `mcp__codebase_memory_mcp_search_graph`, `mcp__serena_find_symbol`, ….
+- Fix: `8sync harness`/`harness global` now writes `mcp.discoveryDefaultServers:
+  [codebase-memory-mcp, headroom, serena, zai-vision]` into `~/.omp/agent/config.yml`
+  (`ensure_mcp_tools_visible` in `crates/cli/src/verbs/skill/deploy.rs`) — the four
+  harness servers' full catalogs stay in the active tool set, zero discovery hops.
+  Key-presence idempotent; never overrides a user-set value. NOTE:
+  `tools.essentialOverride` does NOT work for MCP (omp filters entries to built-in
+  tool names only — verified in omp 16.4.8 bundle); an inert pin block from that
+  approach is auto-migrated away (byte-exact match only).
+- Instruction surfaces now teach the REGISTERED `mcp__…` names + the
+  `search_tool_bm25` escape hatch for other/new servers: `APPEND_SYSTEM.md` RULE #0,
+  `00-force-load.md`, the AGENTS.md STEP-0 sentinel template (`inject.rs`), the
+  capabilities catalog header, and the feature-skill R10 literals (assets + su-code
+  mirror). Stale names dropped everywhere: `semantic_query` (never existed on cbm),
+  `codegraph search/deps/defs` (real 1.1.2 verbs: `query/explore/node/callers/callees/impact`).
+  Unfollowable headroom mandate ("compress before it enters context") rewritten to the
+  followable form: compress what YOU re-emit (`mcp__headroom_compress`).
+- `8sync doctor` now flags hidden MCP tools (`discoveryDefaultServers` missing) and a
+  dead serena (mcp.json + uvx check). Live probe verified: `omp -p` calls
+  `mcp__codebase_memory_mcp_search_graph` and `mcp__serena_find_symbol` directly — both OK,
+  no discovery hop; toolstats records serena/cbm optimizer calls for the first time.
+
 ### Added — omp `/push-now` command (cross-machine handoff + commit + push)
 - New embedded command `assets/commands/push-now.md`, deployed by `8sync harness`
   (`ensure_engine` in `crates/cli/src/verbs/skill/deploy.rs`) to

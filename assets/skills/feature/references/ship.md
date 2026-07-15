@@ -18,13 +18,13 @@ Gate: review/test FAIL → fix → re-run. KHÔNG ship khi fail.
 
 Spawn ĐỒNG THỜI `task` subagent `agent: reviewer`. Số agent = số phần tử `config.workflow.review_dimensions`; nhúng **tên dimension thật** vào prompt mỗi agent (vd "dimension: security"), KHÔNG ghi chữ `config.workflow.review_dimensions` vào prompt. Dimension mặc định (`["security","correctness","convention"]`):
 - **security**: injection (query tham số hoá?), XSS/escape output, CSRF/permission check, type cast, secret leak.
-- **correctness**: symbol/method tồn tại (serena `find_symbol`), logic, runtime, config key/DB column đúng.
+- **correctness**: symbol/method tồn tại (serena `mcp__serena_find_symbol`), logic, runtime, config key/DB column đúng.
 - **convention**: `AGENTS.md` + `su-code/DECISIONS.md`/`PREFERENCES.md`, naming, tách file, error-handling.
 
 Scope = file phase này đụng (từ PLAN). Barrier → gộp findings.
 Có lỗi → fix (main thread hoặc spawn) → re-review tới sạch. Phase nhỏ → 1 reviewer tổng hợp cũng được.
 
-**Nhúng UC + AC vào prompt reviewer:** mỗi prompt kèm Requirement scope + bảng AC literal (từ Step 0) + yêu cầu: "Ngoài lens <dimension>, soát code có thỏa đúng UC/AC thuộc lens này không (vd security lens ↔ AC nào về permission/inject); báo UC/AC nào code KHÔNG thỏa kèm `file:line`." Reviewer trả findings gắn UC-ID/AC-NN khi liên quan. Nhúng R10 literal (dùng code-intel định vị, `headroom_compress` output dài).
+**Nhúng UC + AC vào prompt reviewer:** mỗi prompt kèm Requirement scope + bảng AC literal (từ Step 0) + yêu cầu: "Ngoài lens <dimension>, soát code có thỏa đúng UC/AC thuộc lens này không (vd security lens ↔ AC nào về permission/inject); báo UC/AC nào code KHÔNG thỏa kèm `file:line`." Reviewer trả findings gắn UC-ID/AC-NN khi liên quan. Nhúng R10 literal (dùng code-intel định vị, `mcp__headroom_compress` cho output dài trước khi vào báo cáo).
 
 ## Step 2 — Test (theo tier, fan-out per-component nếu nhiều)
 

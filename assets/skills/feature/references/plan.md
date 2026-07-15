@@ -45,7 +45,7 @@ Nếu phase cần khảo nhiều mặt codebase (và `config.workflow.paralleliz
   - "tìm pattern <X> trong codebase"
   - "schema/migration module tương tự"
   - "module tham khảo đã làm <Y>"
-- **Prompt mỗi subagent nhúng chỉ thị R10 literal**: dùng `codegraph query/callers/impact "<query>"` (CLI) hoặc codebase-memory-mcp (`search_graph`/`trace_path`/`get_architecture`) / serena (`find_symbol`) để tìm/hiểu code TRƯỚC grep/Read thô; chỉ Read khi cần xem chi tiết 1 file cụ thể đã định vị; kết quả dài (>50 dòng) → `headroom_compress` trước khi đưa vào báo cáo cuối.
+- **Prompt mỗi subagent nhúng chỉ thị R10 literal**: dùng `codegraph query/callers/impact "<query>"` (CLI) hoặc codebase-memory-mcp (`mcp__codebase_memory_mcp_search_graph`/`_trace_path`/`_get_architecture`) / serena (`mcp__serena_find_symbol`) để tìm/hiểu code TRƯỚC grep/Read thô; chỉ Read khi cần xem chi tiết 1 file cụ thể đã định vị; kết quả dài (>50 dòng) sắp đưa vào báo cáo cuối → `mcp__headroom_compress` trước, không dump thô.
 - Barrier → tổng hợp ở main thread.
 - Phase nhỏ/pattern đã rõ, hoặc `parallelization === false` → skip, không spawn (chạy tuần tự main thread).
 

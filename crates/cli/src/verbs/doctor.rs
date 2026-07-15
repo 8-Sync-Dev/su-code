@@ -241,6 +241,16 @@ fn check_ai_engines(home: &std::path::Path) {
     } else {
         ui::warn("  mnemopi memory OFF — `8sync harness` enables deep project recall (API-only)");
     }
+    if cfg.contains("discoveryDefaultServers") {
+        ui::ok("  STEP-0 MCP servers always visible (mcp.discoveryDefaultServers)");
+    } else {
+        ui::warn("  MCP tools HIDDEN behind search_tool_bm25 (0-friction fix: run `8sync harness`) — this is why serena/cbm never get called");
+    }
+    if mcp.contains("\"serena\"") && which::which("uvx").is_ok() {
+        ui::ok("  serena registered + runnable via uvx — LSP symbol intel (mcp__serena_find_symbol/…)");
+    } else {
+        ui::warn("  serena NOT registered/runnable (uvx + mcp.json) — run `8sync harness`");
+    }
     let hook = home.join(".omp/hooks/pre").join(crate::brand::ns_file("recall.ts")).exists();
     if hook && cfg.contains("thresholdPercent: 50") {
         ui::ok("  anti-forget: recall hook + compaction@50% ON");

@@ -4,11 +4,12 @@
 
 Before any other tool call, answer codebase questions with a code-intelligence engine — NOT grep/find/Read. Both are ~99% cheaper than file-by-file exploration:
 
-- **codegraph** (local pre-indexed graph): `codegraph init -i` once per repo (if `.codegraph/` missing), then `codegraph search/deps/callers/defs`. Skill: `~/.omp/skills/codegraph/SKILL.md`.
-- **codebase-memory-mcp** (MCP server — auto-set-up by `8sync harness`; 158 languages, sub-ms, auto-indexes on connect): `search_graph`, `semantic_query`, `trace_path`, `get_architecture`, `detect_changes`, `query_graph`, `get_code_snippet`, `manage_adr`.
+- **codegraph** (local pre-indexed graph): `codegraph index .` once per repo (if `.codegraph/` missing), then `codegraph query/explore/node/callers/callees/impact`. Skill: `~/.omp/skills/codegraph/SKILL.md`.
+- **codebase-memory-mcp** (MCP, always in the tool list — call the REGISTERED names): `mcp__codebase_memory_mcp_search_graph` · `_trace_path` · `_get_architecture` · `_get_code_snippet`; full catalog visible (`query_graph`, `detect_changes`, `manage_adr`, …).
 - **serena** (MCP — symbol-level code intel via LSP; auto-set-up by `8sync harness`): precise symbol find/replace + references; prefer over blind whole-file reads/rewrites.
+- Serena always in the tool list: `mcp__serena_find_symbol` · `mcp__serena_find_referencing_symbols` · `mcp__serena_get_symbols_overview`; edit/rename tools cũng có sẵn. Server khác/mới thêm → 1 lệnh `search_tool_bm25`.
 - **Default to these** for "how does X work / where is X / who calls X / what depends on X", impact analysis, route→handler, dead code, architecture.
-- **BẮT BUỘC nén output lớn:** mọi output > ~50 dòng (logs / diffs / test / tool dumps) phải qua `headroom` MCP (`headroom_compress`) TRƯỚC khi vào context — 60–95% ít token (auto-set-up bởi `8sync harness`). Dump nguyên khối lớn = vi phạm.
+- **Nén những gì BẠN phát lại:** báo cáo/prompt subagent/nội dung dài sắp re-emit → `mcp__headroom_compress` (60–95% ít token; `headroom_retrieve` giải nén theo hash). omp tự spill tool-output quá dài ra artifact — KHÔNG paste lại blob đã spill.
 - Only `Read` a raw file when you're about to edit it (read-before-edit). Falling back to `rg`/`fd`/`Read` for exploration first is a **violation**.
 
 ## ⛔ READING ORDER — 2 tầng (progressive disclosure, giữ prefix gọn cho KV-cache)

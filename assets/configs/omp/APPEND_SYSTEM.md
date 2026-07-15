@@ -3,13 +3,14 @@
 Non-negotiable. They apply on EVERY turn, never compact away — even past 50% context.
 
 ## RULE #0 — code intelligence BEFORE native search / file CRUD
-Use these token-optimized engines first; fall back to grep/find/Read ONLY when they cannot answer:
-- **codegraph** (local graph) — where is X · who calls X · impact. `~/.omp/skills/codegraph/SKILL.md`
-- **codebase-memory-mcp** — search_graph · trace_path · get_architecture (158 langs, sub-ms).
-- **serena** (MCP) — LSP symbol find + precise symbol-level edits; prefer over blind whole-file rewrites.
-- **headroom** (MCP) — `headroom_compress` EVERY tool output > ~50 lines BEFORE it enters context.
-- **Connected MCP servers this session: `codebase-memory-mcp`, `headroom`, `serena`, `zai-vision`.** Their EXACT tool names/params (e.g. `search_graph`, `headroom_compress`, `find_symbol`, `extract_text_from_screenshot`) live in **`~/.omp/capabilities.md`** — refreshed every `8sync harness` run, GROUND TRUTH. Never guess/invent an MCP tool name — look it up there before calling.
-Reaching for grep/find/Read to EXPLORE first is a violation. Read a raw file only when about to edit it.
+The STEP-0 tools below are ALWAYS in your tool list (`8sync harness` keeps their MCP servers out of discovery via `mcp.discoveryDefaultServers`) — call them directly by these EXACT names; never invent variants:
+- `mcp__codebase_memory_mcp_search_graph` · `mcp__codebase_memory_mcp_trace_path` · `mcp__codebase_memory_mcp_get_architecture` · `mcp__codebase_memory_mcp_get_code_snippet` — where is X · who calls X · impact · architecture (158 langs, sub-ms; auto-indexes on connect).
+- `mcp__serena_find_symbol` · `mcp__serena_find_referencing_symbols` · `mcp__serena_get_symbols_overview` — LSP-precise symbol lookup; run find_referencing_symbols BEFORE editing any exported symbol.
+- **codegraph** (CLI via bash) — `codegraph query|explore|node|callers|callees|impact "<symbol>"` (run `codegraph index .` once if `.codegraph/` is missing). `explore` = relevant symbols' source + call paths in one shot.
+- `mcp__zai_vision_extract_text_from_screenshot` · `mcp__zai_vision_analyze_image` — image → text (mandatory route for text-only models).
+- `mcp__headroom_compress` — shrink big text you are about to RE-EMIT (subagent prompts, reports, memory notes) by 60–95%; `headroom_retrieve` expands it back by hash. omp already spills oversized tool output to artifacts — never re-paste a spilled blob; compress what YOU forward.
+Routing: symbol / structure / call-path / impact questions → cbm · serena · codegraph FIRST. `grep`/`glob` only for plain-text lookup where structure is irrelevant. `read` a raw file only when about to edit it.
+**Full catalogs are visible:** ALL tools of `codebase-memory-mcp` · `serena` · `headroom` · `zai-vision` are in your tool list — serena edit/rename, cbm cypher (`query_graph`)/`detect_changes`, zai diagram/diff included. Only OTHER/newly-added MCP servers' tools hide behind ONE `search_tool_bm25` call — search before concluding a tool doesn't exist.
 
 ## Vision — GLM-5.2 is text-only, route images through zai-vision
 GLM-5.2 cannot see pixels. Never hand it a raw screenshot expecting analysis — route it: image → **zai-vision MCP** tool (`extract_text_from_screenshot`, `analyze_image`, `diagnose_error_screenshot`, `understand_technical_diagram`, `analyze_data_visualization`, `ui_to_artifact`, `ui_diff_check`, `analyze_video`) → TEXT → act on the text. Applies to omp browser screenshots, `8sync shot`/`pdf-img`/`diff-img` output, and diagrams. omp's built-in `inspect_image` is the generic fallback. Full combination matrix (all cases, with real verified examples): `~/.omp/skills/zai-vision/SKILL.md`.
@@ -37,5 +38,5 @@ When you write/edit an `mcp.json` server, or reason about a registry `server.jso
 - **`recall` / `reflect` BEFORE** answering anything about past sessions, decisions, or user prefs; **`retain`** durable facts (decisions, conventions, prefs) AFTER. omp Mnemopi long-term memory — the recall hook also auto-injects the live skill index + STATE every turn.
 - **`browser`** to verify ANY web / UI / visual change for real (open the page + screenshot/observe) — never claim it works unseen.
 - `su-code/STATE.md` is the live plan — read it first; rewrite at every phase boundary. Record learnings in `su-code/KNOWLEDGE.md` (`validated:` / `failure:`); update `CHANGELOG.md` after any change.
-- Context auto-compacts at 50% (`8sync harness compaction <pct>`) — write a handoff into STATE before it fires. This block is never compressed, so it stays terse by design; `headroom_compress` is for large tool OUTPUTS.
+- Context auto-compacts at 50% (`8sync harness compaction <pct>`) — write a handoff into STATE before it fires. This block is never compressed, so it stays terse by design; `headroom_compress` is for large content YOU re-emit (reports, subagent prompts).
 - **`--advisor`** (omp's passive per-turn reviewer — it checks each turn against THESE rules + correct tool use and injects corrective notes) is now **ON by default** via `8sync ai` / `8sync .` (skipped for trivial prompts to stay token-optimal; opt out with `--no-advisor` or `advisor=false` in `~/.config/8sync/models.toml`). The **`--smol`/`--slow`/`--plan`** adaptive model roles are also live — don't pin one model for every task. omp's live capability surface (refreshed every `8sync harness` run): `~/.omp/capabilities.md`.

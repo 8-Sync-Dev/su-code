@@ -163,7 +163,7 @@ fn categorize(name: &str, cmd: &str) -> (&'static str, String) {
         "safe_delete_symbol",
     ];
     const CBM: &[&str] = &[
-        "search_graph", "semantic_query", "trace_path", "get_architecture", "query_graph",
+        "search_graph", "trace_path", "get_architecture", "query_graph",
         "get_code_snippet", "detect_changes", "manage_adr",
     ];
     const SEARCH: &[&str] = &["grep", "glob", "search", "find"];

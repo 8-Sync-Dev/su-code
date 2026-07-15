@@ -10,26 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1783958133.md)_
-  harness (engine_* + worktree + MCP). The 2 REAL gaps were in the loop layer, both fixed
-  code-enforced in `assets/extensions/8sync-engine.ts`:
-  (1) `engine_advance` never checked verification — "code-enforced gate" was prompt-ware; now a
-  per-task `verified` flag makes advance REFUSE unverified tasks (agent say-so ≠ stop signal).
-  (2) no-progress detector: FNV-1a fingerprint of verify-failure output; identical ×2 warns,
-  ×3 blocks early below maxRetries — doom-loop guard. Old state.json loads via zod defaults.
-  Testing recipe: Bun.Transpiler + stub `pi` {zod, registerTool} + chdir to tmp → call
-  tools[name].execute directly; zod lives at ~/.bun/install/global/node_modules/zod.
-  Remember: assets are rust-embed'd — REBUILD the binary before `8sync harness` deploys them.
-- validated: `--sweep` detection = omp project ⇔ repo has `su-code/` dir OR AGENTS.md/CLAUDE.md
-  (`global.rs::is_omp_project`) — sweep never injects into non-omp repos (skip + report).
-  Live run 2026-07-05: 8/8 omp projects under ~/Projects stamped, 0 failed, 0 foreign repos touched.
-- validated: no-overwrite contract audited end-to-end (2026-07-05) — user-owned files
-  (su-code/*.md seed-if-missing memory.rs:129 · CHANGELOG once :146 · skills mirror additive
-  deploy.rs:105 · AGENTS.md sentinel-only · hook only-if-absent :239 · config key-detect) are
-  NEVER clobbered by default; proven live: custom edits to su-code/skills/*/SKILL.md + STATE.md
-  survive a sweep re-run. Overwrite = explicit `--force` only. Managed layer (~/.omp bundled
-  skills, 00-force-load, APPEND_SYSTEM, extensions) refreshes byte-compare on binary update —
-  customize the PROJECT copy, not ~/.omp. Policy now printed in `harness help` + AGENTS.md §8.
+_(consolidated 20 dòng cũ → su-code/archive/KNOWLEDGE-1784072460.md)_
 - failure: omp `Schema error: providers: must be an object (was null)` = 8sync wrote
   `~/.omp/agent/models.yml` with a bare `providers:` key (empty local-model registry after
   `add-local-model rm`). YAML: key with no children parses as null, NOT {}. Fix: single choke
@@ -211,3 +192,22 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1783958133.md)_
   Egress check uses Cloudflare's IP-addressed trace (`https://1.1.1.1/cdn-cgi/trace`) so it survives the DNS
   swap to 1.1.1.1; `on` auto-rolls-back (routes+DNS) if egress doesn't change. VPN Gate = academic + LOGGED.
 - **validated: `8sync feynman auth-omp` succeeds but `feynman` REPL crashes = broken pnpm `npm` shim, NOT the bridge.** feynman shells out `npm install @companion-ai/alpha-hub --prefix ~/.feynman/agent/npm --legacy-peer-deps` on interactive launch (`feynman chat`). If `npm` on PATH is a pnpm shim reached via a **symlink from another dir** (`~/.local/bin/npm -> ~/.local/share/pnpm/npm`), the shim's `basedir=$(dirname "$0")` resolves to the symlink's dir (`~/.local/bin`) and it looks for `~/.local/bin/global/5/.pnpm/npm@…/npm-cli.js` → `MODULE_NOT_FOUND` (real tree lives under `~/.local/share/pnpm/global/…`). Running the shim by its real path works. Fix = replace the `npm`+`npx` symlinks in `~/.local/bin` with wrapper scripts `exec /home/<u>/.local/share/pnpm/{npm,npx} "$@"` so `$0` inside the shim points at the real install dir. Diagnose: bridge is fine if `feynman model list`/`feynman doctor` show the omp-authed providers (anthropic+zai); the crash is purely the npm subprocess. `pi_key` passes unknown omp ids through harmlessly (`xai-oauth`, `llama.cpp` bridged but not counted authenticated).
+- failure: STEP-0 MCP stack (serena/cbm/headroom/zai) was connected but NEVER called — 13 of
+  13,854 tool calls across 29 sessions (serena 0, headroom 0). Two causes, both verified:
+  (1) omp `tools.discoveryMode: auto` hides ALL MCP tools behind `search_tool_bm25` once the
+  registry exceeds 40 tools (this stack registers 48) — the discovery hop was taken 2× ever;
+  (2) every instruction surface taught BASE names (`search_graph`, `find_symbol`) that are NOT
+  callable — registered forms are `mcp__<server_underscored>_<tool>`
+  (`mcp__codebase_memory_mcp_search_graph`, `mcp__serena_find_symbol`; exception
+  `mcp__headroom_compress` — omp collapses a duplicated server prefix). Rules that name
+  uncallable tools or demand the impossible ("compress output BEFORE it enters context")
+  produce 0 usage AND teach the model to discount the whole rule block.
+- validated: the fix knob is `mcp.discoveryDefaultServers` (array of SERVER names) — keeps those
+  servers' full catalogs in the active tool set under discovery. `tools.essentialOverride` does
+  NOT work for MCP: omp 16.4.8 filters its entries to BUILT-IN tool names (`k in BUILTIN_TOOLS`)
+  and a non-empty list of only-MCP names CLOBBERS the builtin essential defaults to []. Written
+  by `ensure_mcp_tools_visible` (deploy.rs), migrated the inert pin block away. Live-probed:
+  `omp -p` calls `mcp__codebase_memory_mcp_search_graph` + `mcp__serena_find_symbol` directly →
+  OK, no discovery hop; toolstats logged serena/cbm optimizer calls for the first time. Residual
+  friction (out of scope, guided by tool errors): serena needs `activate_project` per session;
+  cbm wants its own project slug (`list_projects` first).
