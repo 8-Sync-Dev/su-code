@@ -3,37 +3,48 @@
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
-## 🚚 HANDOFF — sang máy khác làm tiếp GẤP (2026-07-15)
-**Repo state:** branch `main`, tag mới nhất `v0.52.0` (Cargo.toml vẫn 0.52.0 — commit này là WIP checkpoint, KHÔNG release). HEAD trước session = `c402209` (`/pull-now` command). Session này thêm 1 commit (STEP-0 MCP activation fix) → sau push cây SẠCH.
+## 🚚 HANDOFF — sang máy khác làm tiếp GẤP (2026-07-22)
+**Repo state:** branch `main`, HEAD trước session = `64bd650` (STEP-0 MCP fix, omp-16-era), tag mới nhất `v0.52.0` (Cargo.toml = 0.52.0 — commit này là WIP checkpoint, KHÔNG release). Session này thêm 1 commit → sau push cây **tracked SẠCH** (còn stray untracked local-only: root `STATE.md` foreign + `outputs/*` research — KHÔNG push, chỉ có trên máy này).
 
-**Đã làm session này (2026-07-15) — fix "MCP connected nhưng không bao giờ được gọi":**
-1. **Root cause (đo từ 29 sessions / 13.854 tool calls: serena 0 · headroom 0 · cbm 10 · zai 3):** (a) omp `tools.discoveryMode: auto` ẨN toàn bộ MCP tools sau `search_tool_bm25` khi registry >40 tools (stack này = 48); (b) mọi instruction surface dạy tên BASE (`search_graph`, `find_symbol`) — không gọi được; tên đăng ký thật = `mcp__codebase_memory_mcp_search_graph`, `mcp__serena_find_symbol`, … (ngoại lệ `mcp__headroom_compress`).
-2. **`crates/cli/src/verbs/skill/deploy.rs`** — `ensure_mcp_tools_visible` (thay `ensure_tools_essential_default` trong plan): ghi `mcp.discoveryDefaultServers: [codebase-memory-mcp, headroom, serena, zai-vision]` vào `~/.omp/agent/config.yml`. **QUAN TRỌNG:** `tools.essentialOverride` KHÔNG dùng được cho MCP — omp 16.4.8 lọc entries chỉ nhận BUILT-IN names (đã extract logic từ binary); block pin cũ (inert) được auto-migrate xóa (byte-exact). Idempotent, không đè key user. + header catalog `## Registered MCP servers` dạy tên `mcp__…`.
-3. **Instruction surfaces đồng bộ tên đăng ký:** `assets/configs/omp/APPEND_SYSTEM.md` (RULE #0 viết lại; headroom mandate đổi thành "nén những gì BẠN phát lại"), `assets/skills/00-force-load.md`, `crates/cli/src/verbs/skill/inject.rs` (AGENTS sentinel template), `assets/skills/feature/*` + mirror `su-code/skills/feature/*` (R10 literals), `AGENTS.md`/`CLAUDE.md` (harness regenerate). Xóa tên rác: `semantic_query` (cbm không có), `codegraph search/deps/defs` (verbs thật 1.1.2 = `query/explore/node/callers/callees/impact`).
-4. **`crates/cli/src/verbs/doctor.rs`** — warn khi MCP tools bị ẩn (`discoveryDefaultServers` missing) + check serena registered/runnable (mcp.json + uvx). `toolstats.rs` matcher bỏ tên không tồn tại.
-5. **Verified live:** `omp -p` gọi thẳng `mcp__codebase_memory_mcp_search_graph` + `mcp__serena_find_symbol` → OK (trước fix: MISSING); toolstats lần đầu ghi nhận serena/cbm optimizer calls; harness global re-run idempotent (skip); doctor ✓.
+**Đã làm session này (2026-07-22) — 2 việc:**
+
+**A. Fix omp-17 MCP "HIDDEN" phantom (bug thật, sửa tận gốc):**
+- **Phát hiện:** omp 17.x ĐÃ BỎ hẳn cơ chế bm25 discovery — không còn `search_tool_bm25`, không còn `mcp.discoveryDefaultServers` (biến mất khỏi settings schema). Thay bằng `tools.xdev` (default ON): MCP tools mount thành `xd://mcp__…` device URLs, callable qua read/write, không ship schema mỗi request. → Fix `64bd650` (ghi `discoveryDefaultServers`) là **NO-OP trên omp 17** và là **nguồn churn**: omp self-upgrade reset `~/.omp/agent/config.yml` → doctor check `cfg.contains("discoveryDefaultServers")` la làng "HIDDEN" dù tools vẫn gọi được. "MCP cứ regress sau mỗi omp upgrade" = PHANTOM.
+- `crates/cli/src/env_detect.rs` — thêm `omp_major()` parse `omp/17.0.6` → 17.
+- `crates/cli/src/verbs/skill/deploy.rs` — `ensure_mcp_tools_visible`: omp ≥17 → early-return, skip ghi key chết (báo xd:// mount); <17 giữ logic cũ.
+- `crates/cli/src/verbs/doctor.rs` — MCP check omp-version-aware: omp ≥17 báo `✓ xd:// devices callable`, hết "HIDDEN" giả.
+- `crates/cli/src/verbs/harness/global.rs` — summary bullet khớp cơ chế mới.
+- **Verified:** build xanh; `8sync doctor` → `✓ STEP-0 MCP tools mounted as xd:// devices (omp ≥17 tools.xdev)`; harness không ghi key chết; MCP callable live cả session qua `xd://mcp__…`.
+
+**B. Lark → profile auto-download (KHÔNG nhúng binary vào git):**
+- `assets/profiles/apps-personal.toml` — thêm `aur = ["larksuite-bin"]` (v7.66.11, larksuite.com) cạnh Bitwarden + `requires.aur_helper = true`. AUR bin tự tải .deb official lúc build, pacman-tracked, KHÔNG commit 437MB binary. Bản TQ (Feishu) = `feishu-bin`. Opt-in; bundle `alexdev` cố ý KHÔNG include apps-personal.
+- **Verified:** rebuild + `8sync setup profile show apps-personal` liệt kê `larksuite-bin`; dry-run `would paru install: larksuite-bin`.
+
+**Docs:** CHANGELOG (2 entries Unreleased: omp-17 fix + Lark), KNOWLEDGE (validated: omp-17 dropped bm25 — SUPERSEDES entry `discoveryDefaultServers` cũ + gotcha omp auto-upgrade reset config.yml). AGENTS.md/CLAUDE.md = harness regen churn.
 
 **Next ▸ (cụ thể):**
-- [ ] Máy mới: chạy `8sync harness` (bắt buộc — để ghi `mcp.discoveryDefaultServers` vào `~/.omp/agent/config.yml` máy đó; fix là per-machine config + code).
-- [ ] Theo dõi adoption: `8sync harness toolstats` sau vài session — kỳ vọng optimizer % tăng từ 24%.
-- [ ] (tùy, ngoài scope) Friction còn lại: serena cần `activate_project` mỗi session; cbm cần đúng project slug (`list_projects` trước). Nếu muốn 0-friction: cân nhắc auto-activate trong recall hook (`~/.omp/hooks/pre/8sync-recall.ts`).
+- [ ] Máy mới: `8sync harness`. Trên omp ≥17 KHÔNG cần config MCP nữa (tools.xdev tự mount) — doctor confirm.
+- [ ] (tùy) Cài Lark: `8sync setup --profile apps-personal` (cần paru/yay).
+- [ ] (tùy) Dọn bản Lark cài tay session trước: `~/.local/opt/lark` + `~/.local/bin/bytedance-lark-stable` + `~/.local/share/applications/bytedance-lark.desktop` nếu chuyển sang bản AUR pacman-tracked.
+- [ ] (tùy) `8sync harness toolstats` sau vài session — kỳ vọng optimizer % tăng (tools callable trực tiếp).
 
 **⚠ Per-machine gotchas (KHÔNG theo git):**
-- `~/.omp/agent/config.yml` là per-machine — fix MCP visibility chỉ có hiệu lực sau khi chạy `8sync harness` trên máy đó.
-- npm/pnpm shim hỏng → feynman crash `MODULE_NOT_FOUND …/npm-cli.js`: thay symlink `~/.local/bin/{npm,npx}` bằng wrapper `exec ~/.local/share/pnpm/{npm,npx} "$@"` (chi tiết: `su-code/KNOWLEDGE.md`, entry feynman).
-- zai-vision key nằm trong `~/.omp/agent/mcp.json` (per-machine, không theo git).
+- omp AUTO-UPGRADE mạnh (16.5.2→17.0.6 qua ~3 session), MỖI upgrade rewrite `~/.omp/agent/config.yml` về default tối thiểu (mất mnemopi/compaction/modelRoles của 8sync). Fix: chạy lại `8sync harness global` (idempotent re-apply). Chỉ config.yml bị ảnh hưởng; mcp.json/skills/hooks/APPEND_SYSTEM sống sót.
+- omp ≥17: MCP tools = `xd://mcp__…` devices (tools.xdev default), gọi trực tiếp. Không còn `discoveryDefaultServers`.
+- npm/pnpm shim hỏng → feynman crash `MODULE_NOT_FOUND …/npm-cli.js`: thay symlink `~/.local/bin/{npm,npx}` bằng wrapper `exec ~/.local/share/pnpm/{npm,npx} "$@"` (chi tiết KNOWLEDGE).
+- zai-vision key trong `~/.omp/agent/mcp.json` (per-machine).
 
 **Trên máy mới — runbook (theo thứ tự):**
 1. `git pull` (hoặc clone `https://github.com/8-Sync-Dev/su-code.git`).
-2. `bash scripts/bootstrap.sh` (build+install) **hoặc** `curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh`.
-3. `8sync setup` (omp + codegraph + MCP/skills + gh) → cấu hình omp API key.
-4. `8sync harness` → deploy skills + AGENTS.md + codegraph index + commands + gitleaks hook + **MCP always-visible config**.
-5. `8sync doctor` → phải thấy `✓ STEP-0 MCP servers always visible (mcp.discoveryDefaultServers)`.
-6. Per-máy nếu cần: npm fix ở trên · `8sync feynman auth-omp` · `8sync harness browser` · `8sync vpn install`.
+2. `bash scripts/bootstrap.sh` (build+install) hoặc `curl -fsSL .../install.sh | sh`.
+3. `8sync setup` → cấu hình omp API key.
+4. `8sync harness` → skills + AGENTS + codegraph index + commands + gitleaks hook (+ config MCP nếu omp <17).
+5. `8sync doctor` → omp ≥17 phải thấy `✓ STEP-0 MCP tools mounted as xd:// devices (omp ≥17 tools.xdev)`.
+6. Per-máy nếu cần: npm fix · `8sync feynman auth-omp` · `8sync harness browser` · `8sync setup --profile apps-personal` (Lark).
 
 ## Current step
-**STEP-0 MCP activation fix (WIP checkpoint trên v0.52.0)** — done + verified live trên máy này; commit này chính là nó. Plan gốc: `local://mcp-step0-activation-plan.md` (12/12 tasks done; cơ chế đổi essentialOverride → `mcp.discoveryDefaultServers` theo contingency B, có evidence trong KNOWLEDGE).
-- **Prior shipped**: `/push-now` + `/pull-now` commands (c402209, 6bb38ae) · v0.52.0 (`8sync vpn`) · v0.51.0 (`feynman auth-omp`) · v0.50.0 (omp `/new` fix + `harness browser`) · v0.49.x (`add-model`) · v0.48.0 (`/feature` GSD) · v0.47.0 cross-platform.
+**omp-17 MCP fix + Lark profile (WIP checkpoint trên v0.52.0)** — done + verified máy này; commit này là nó. KHÔNG release (không bump tag).
+- **Prior shipped**: STEP-0 MCP fix omp-16 (64bd650, nay được omp-17-aware hóa) · `/push-now`+`/pull-now` (c402209, 6bb38ae) · v0.52.0 (`8sync vpn`) · v0.51.0 (`feynman auth-omp`) · v0.50.0 · v0.48.0 (`/feature` GSD) · v0.47.0 cross-platform.
 
 ## Next (chưa làm)
 - [ ] (tùy) Nếu muốn `/push-now` thành release: bump `Cargo.toml` + CHANGELOG version + push tag → CI 5 assets.

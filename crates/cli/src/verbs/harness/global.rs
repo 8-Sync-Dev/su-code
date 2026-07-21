@@ -124,7 +124,7 @@ pub(crate) fn harness_global(
     ui::ok("omp rules are now GLOBAL — every omp session in every project gets:");
     ui::info("  • ~/.omp/agent/APPEND_SYSTEM.md appended to EVERY system prompt (code-intel-first, never compacted)");
     ui::info("  • skills @ ~/.omp/skills + 00-force-load.md · MCP: codebase-memory · headroom · serena · zai-vision");
-    ui::info("  • STEP-0 MCP servers always visible (mcp.discoveryDefaultServers) — serena/cbm/headroom/zai callable without discovery");
+    ui::info("  • STEP-0 MCP tools always in the tool set (omp ≥17: xd:// devices via tools.xdev) — serena/cbm/headroom/zai callable");
     ui::info("  • token optimizer: headroom compress >50-line outputs · compaction 50% · stable prefix → Anthropic prompt-cache hits");
     if sweep.is_none() {
         ui::info("stamp the per-project layer everywhere: `8sync harness global --sweep` (default ~/Projects)");

@@ -1,10 +1,16 @@
 name = "apps-personal"
-description = "Personal apps (Bitwarden)"
+description = "Personal apps (Bitwarden + Lark)"
 visibility = "personal"
 
 [packages]
 pacman = ["bitwarden"]
-aur = []
+# Lark (larksuite quốc tế) — AUR bin package tự tải .deb official từ larksuite.com
+# lúc build (pacman-tracked, KHÔNG nhúng 437MB binary vào repo/GitHub).
+# Bản Trung Quốc (Feishu) là gói khác: `feishu-bin`.
+aur = ["larksuite-bin"]
+
+[requires]
+aur_helper = true
 
 [services]
 system_enable = []
@@ -12,4 +18,4 @@ user_enable = []
 
 [post_install]
 commands = []
-hint = ""
+hint = "Lark cần AUR helper (paru/yay). Bản Feishu (TQ) dùng `feishu-bin`."

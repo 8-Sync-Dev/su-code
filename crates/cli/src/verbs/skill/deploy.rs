@@ -429,6 +429,15 @@ pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
 /// never overrides a user-set `discoveryDefaultServers`; migrates away the inert
 /// essentialOverride block earlier 8sync builds wrote (exact-match removal only).
 pub(crate) fn ensure_mcp_tools_visible(home: &Path) -> Result<()> {
+    // omp ≥17 replaced the pre-17 bm25 discovery hop (+ `mcp.discoveryDefaultServers`)
+    // with `tools.xdev` (default on): MCP tools mount as `xd://` device URLs, callable
+    // via read/write without shipping schemas every request. The old key is obsolete
+    // (absent from omp's schema) — writing it is dead weight omp strips on rewrite,
+    // which is exactly the churn that made STEP-0 look like it kept "regressing".
+    if env_detect::omp_major().is_some_and(|m| m >= 17) {
+        ui::ok("STEP-0 MCP tools mounted as xd:// devices (omp ≥17 tools.xdev) — serena/cbm/headroom/zai callable, no config key needed");
+        return Ok(());
+    }
     const SERVERS: &[&str] = &["codebase-memory-mcp", "headroom", "serena", "zai-vision"];
     // The exact block written by the earlier essentialOverride approach. MCP names
     // in essentialOverride are filtered out by omp (builtins only) AND clobber the

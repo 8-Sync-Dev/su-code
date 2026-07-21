@@ -10,7 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 20 dòng cũ → su-code/archive/KNOWLEDGE-1784072460.md)_
+_(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
 - failure: omp `Schema error: providers: must be an object (was null)` = 8sync wrote
   `~/.omp/agent/models.yml` with a bare `providers:` key (empty local-model registry after
   `add-local-model rm`). YAML: key with no children parses as null, NOT {}. Fix: single choke
@@ -211,3 +211,19 @@ _(consolidated 20 dòng cũ → su-code/archive/KNOWLEDGE-1784072460.md)_
   OK, no discovery hop; toolstats logged serena/cbm optimizer calls for the first time. Residual
   friction (out of scope, guided by tool errors): serena needs `activate_project` per session;
   cbm wants its own project slug (`list_projects` first).
+- validated (SUPERSEDES the entry above on omp ≥17): omp 17.x DROPPED the bm25 discovery
+  model entirely — no `search_tool_bm25`, no `mcp.discoveryDefaultServers` (absent from the
+  settings schema). Replaced by `tools.xdev` (default on): MCP tools mount as `xd://mcp__…`
+  device URLs, driven via read/write, schemas not shipped every request. So on omp ≥17 the
+  STEP-0 tools are callable with ZERO config (proven live: called `xd://mcp__codebase_memory_mcp_*`
+  all session with config.yml at 2 lines). The "MCP keeps regressing after every omp upgrade"
+  saga was a PHANTOM: omp self-upgrade resets `~/.omp/agent/config.yml` (omp OWNS it — even
+  modelRoles combo gets wiped to a default), doctor's `cfg.contains("discoveryDefaultServers")`
+  string-check then screamed HIDDEN though tools were fine. Fix: `env_detect::omp_major()` gates
+  both `ensure_mcp_tools_visible` (skip the dead key on ≥17) and doctor (report xd:// mount, not
+  HIDDEN). **Lesson: a doctor check that proxies a vendor-internal key silently rots when the
+  vendor changes mechanism — verify the ACTUAL capability (can I call the tool?), not a config string.**
+- gotcha: omp auto-updates aggressively (16.5.2→17.0.1→17.0.6 across ~3 sessions) and each
+  upgrade rewrites `~/.omp/agent/config.yml` to a minimal default, dropping 8sync's mnemopi/
+  compaction/modelRoles additions. `8sync harness global` re-applies them (idempotent). Only
+  the config.yml layer is affected; mcp.json, skills, hooks, APPEND_SYSTEM survive.

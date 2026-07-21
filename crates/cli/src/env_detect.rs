@@ -41,6 +41,19 @@ pub fn cmd_version(name: &str, args: &[&str]) -> Option<String> {
     Some(first)
 }
 
+/// omp's major version (e.g. `17` from `omp/17.0.6`), or None if omp isn't on PATH.
+/// omp ≥17 mounts MCP tools as `xd://` device URLs (`tools.xdev`, default on) and
+/// dropped the pre-17 bm25 discovery hop + `mcp.discoveryDefaultServers` key.
+pub fn omp_major() -> Option<u32> {
+    let v = cmd_version("omp", &["--version"])?; // "omp/17.0.6" (or "omp 17.0.6")
+    let digits: String = v
+        .chars()
+        .skip_while(|c| !c.is_ascii_digit())
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    digits.parse().ok()
+}
+
 /// Detect HyDE-Project setup (hyprland + wallbash theme engine).
 pub fn is_hyde() -> bool {
     let home = match dirs::home_dir() { Some(h) => h, None => return false };

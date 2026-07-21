@@ -37,14 +37,18 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
+- `academic-paper` — `su-code/skills/academic-paper/SKILL.md`
 - `alpha-research` — `su-code/skills/alpha-research/SKILL.md`
 - `api-and-interface-design` — `su-code/skills/api-and-interface-design/SKILL.md`
 - `autoresearch` — `su-code/skills/autoresearch/SKILL.md`
+- `browser-profile-control` — `su-code/skills/browser-profile-control/SKILL.md`
 - `browser-testing-with-devtools` — `su-code/skills/browser-testing-with-devtools/SKILL.md`
+- `business-brief` — `su-code/skills/business-brief/SKILL.md`
 - `ci-cd-and-automation` — `su-code/skills/ci-cd-and-automation/SKILL.md`
 - `code-review-and-quality` — `su-code/skills/code-review-and-quality/SKILL.md`
 - `code-simplification` — `su-code/skills/code-simplification/SKILL.md`
 - `context-engineering` — `su-code/skills/context-engineering/SKILL.md`
+- `contributing` — `su-code/skills/contributing/SKILL.md`
 - `debugging-and-error-recovery` — `su-code/skills/debugging-and-error-recovery/SKILL.md`
 - `deep-research` — `su-code/skills/deep-research/SKILL.md`
 - `deprecation-and-migration` — `su-code/skills/deprecation-and-migration/SKILL.md`
@@ -52,6 +56,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `documentation-and-adrs` — `su-code/skills/documentation-and-adrs/SKILL.md`
 - `doubt-driven-development` — `su-code/skills/doubt-driven-development/SKILL.md`
 - `eli5` — `su-code/skills/eli5/SKILL.md`
+- `fb-group-growth` — `su-code/skills/fb-group-growth/SKILL.md`
 - `feature` — `su-code/skills/feature/SKILL.md`
 - `frontend-ui-engineering` — `su-code/skills/frontend-ui-engineering/SKILL.md`
 - `full-flow` — `su-code/skills/full-flow/SKILL.md`
@@ -61,20 +66,23 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `interview-me` — `su-code/skills/interview-me/SKILL.md`
 - `jobs` — `su-code/skills/jobs/SKILL.md`
 - `last30days` — `su-code/skills/last30days/SKILL.md`
+- `linkedin-cv-sync` — `su-code/skills/linkedin-cv-sync/SKILL.md`
 - `literature-review` — `su-code/skills/literature-review/SKILL.md`
 - `ml-training-recipe` — `su-code/skills/ml-training-recipe/SKILL.md`
 - `modal-compute` — `su-code/skills/modal-compute/SKILL.md`
 - `observability-and-instrumentation` — `su-code/skills/observability-and-instrumentation/SKILL.md`
+- `org-social-ops` — `su-code/skills/org-social-ops/SKILL.md`
 - `paper-code-audit` — `su-code/skills/paper-code-audit/SKILL.md`
 - `paper-writing` — `su-code/skills/paper-writing/SKILL.md`
+- `peer-review` — `su-code/skills/peer-review/SKILL.md`
 - `performance-optimization` — `su-code/skills/performance-optimization/SKILL.md`
 - `planning-and-task-breakdown` — `su-code/skills/planning-and-task-breakdown/SKILL.md`
 - `ponytail-audit` — `su-code/skills/ponytail-audit/SKILL.md`
 - `ponytail-debt` — `su-code/skills/ponytail-debt/SKILL.md`
-- `ponytail-gain` — `su-code/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `su-code/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `su-code/skills/ponytail-review/SKILL.md`
 - `preview` — `su-code/skills/preview/SKILL.md`
+- `remote-job-scan` — `su-code/skills/remote-job-scan/SKILL.md`
 - `replication` — `su-code/skills/replication/SKILL.md`
 - `research-review` — `su-code/skills/research-review/SKILL.md`
 - `runpod-compute` — `su-code/skills/runpod-compute/SKILL.md`
@@ -91,6 +99,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `test-driven-development` — `su-code/skills/test-driven-development/SKILL.md`
 - `token-bench` — `su-code/skills/token-bench/SKILL.md`
 - `using-agent-skills` — `su-code/skills/using-agent-skills/SKILL.md`
+- `vn-contract-docs` — `su-code/skills/vn-contract-docs/SKILL.md`
 - `watch` — `su-code/skills/watch/SKILL.md`
 - `zai-vision` — `su-code/skills/zai-vision/SKILL.md`
 

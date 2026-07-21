@@ -241,10 +241,12 @@ fn check_ai_engines(home: &std::path::Path) {
     } else {
         ui::warn("  mnemopi memory OFF — `8sync harness` enables deep project recall (API-only)");
     }
-    if cfg.contains("discoveryDefaultServers") {
+    if env_detect::omp_major().is_some_and(|m| m >= 17) {
+        ui::ok("  STEP-0 MCP tools mounted as xd:// devices (omp ≥17 tools.xdev) — serena/cbm/headroom/zai callable");
+    } else if cfg.contains("discoveryDefaultServers") {
         ui::ok("  STEP-0 MCP servers always visible (mcp.discoveryDefaultServers)");
     } else {
-        ui::warn("  MCP tools HIDDEN behind search_tool_bm25 (0-friction fix: run `8sync harness`) — this is why serena/cbm never get called");
+        ui::warn("  MCP tools HIDDEN behind search_tool_bm25 (fix: run `8sync harness global`) — serena/cbm never get called");
     }
     if mcp.contains("\"serena\"") && which::which("uvx").is_ok() {
         ui::ok("  serena registered + runnable via uvx — LSP symbol intel (mcp__serena_find_symbol/…)");
