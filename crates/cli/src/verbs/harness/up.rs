@@ -57,8 +57,9 @@ fn refresh_once(env: &env_detect::Env, pull: bool, commit: bool) -> Result<()> {
     let _ = crate::verbs::skill::deploy::ensure_mcp_spec(&env.home);
     let _ = crate::verbs::skill::deploy::ensure_recall_hook(&env.home);
     let _ = crate::verbs::skill::deploy::ensure_serena_mcp(env);
-    let _ = crate::verbs::skill::deploy::ensure_engine(&env.home, Some(&root));
-    let _ = crate::verbs::skill::deploy::cleanup_legacy_gs(&env.home, Some(&root));
+    if crate::verbs::skill::deploy::ensure_gs(&env.home, Some(&root)).is_ok() {
+        crate::verbs::skill::deploy::cleanup_legacy_auto(&env.home, Some(&root));
+    }
     let _ = crate::verbs::skill::deploy::ensure_workflow_extension(&env.home, Some(&root));
     seed_harness_memory(&root)?;
     let _ = consolidate_learnings(&root);

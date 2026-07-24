@@ -45,15 +45,178 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     Ok(())
 }
 
-/// Clean cutover for machines that installed an earlier 8sync: remove the retired
-/// `/gs` command + skill (global + project). Idempotent no-op when absent — `/auto`
-/// is the single automation entry now.
-pub(crate) fn cleanup_legacy_gs(home: &Path, root: Option<&Path>) {
-    let _ = std::fs::remove_file(home.join(".omp/agent/commands/gs.md"));
-    let _ = std::fs::remove_dir_all(home.join(".omp/skills/gs"));
+/// Sentinel markers that tag a deployed file as 8sync-managed. A file carrying
+/// one is provably ours and safe to retire regardless of exact content. The
+/// released `/auto` + `8sync-engine.ts` predate these markers, so they are
+/// provenance-matched by content instead (see [`RetiredAsset`]).
+const MANAGED_SENTINELS: &[&str] = &["<!-- 8sync-managed -->", "// 8sync-managed"];
+
+/// A retired managed artifact retained read-only under `assets/retired/` so a
+/// managed-provenance deletion can PROVE an on-disk file is ours before removing
+/// it. `rendered` flags prose assets that were brand-rendered on deploy (`.md`)
+/// so the match also accepts the rendered form; `.ts`/binary assets deploy raw.
+struct RetiredAsset {
+    asset: &'static str,
+    rendered: bool,
+}
+
+/// Retired `/auto` command (released v0.28–0.45 managed surface this cutover
+/// replaces) — prose, brand-rendered on deploy.
+const RETIRED_AUTO_MD: RetiredAsset = RetiredAsset { asset: "retired/auto.md", rendered: true };
+/// Retired `8sync-engine.ts` extension — `.ts`, deployed raw (never rendered).
+const RETIRED_ENGINE_TS: RetiredAsset =
+    RetiredAsset { asset: "retired/8sync-engine.ts", rendered: false };
+/// Rebrand-only: stale old-`8sync-`-named copies of assets this binary still
+/// ships (now deployed under `<NS>-`). Matched against current asset content so a
+/// user file by the same name is never destroyed on a rebrand.
+const STALE_RECALL_TS: RetiredAsset = RetiredAsset { asset: "hooks/8sync-recall.ts", rendered: false };
+const STALE_WORKFLOW_TS: RetiredAsset =
+    RetiredAsset { asset: "extensions/8sync-workflow.ts", rendered: false };
+
+/// True iff `path` is provably an 8sync-managed artifact safe to delete: it
+/// carries a managed sentinel, OR byte-matches a known retired managed asset
+/// (raw, and for prose also the brand-rendered form). An unknown / user-edited
+/// file never matches — it survives with a diagnostic instead.
+fn is_managed_artifact(path: &Path, retired: &RetiredAsset) -> bool {
+    let Ok(bytes) = std::fs::read(path) else { return false };
+    if has_managed_sentinel(&bytes) {
+        return true;
+    }
+    let Some(managed) = assets::read_bytes(retired.asset) else { return false };
+    if bytes == managed {
+        return true;
+    }
+    if retired.rendered {
+        if let (Ok(disk), Ok(raw)) = (std::str::from_utf8(&bytes), std::str::from_utf8(&managed)) {
+            let rendered = crate::brand::render(raw);
+            return &*rendered == disk;
+        }
+    }
+    false
+}
+
+/// True iff `bytes` decode as UTF-8 and contain a known 8sync-managed sentinel.
+fn has_managed_sentinel(bytes: &[u8]) -> bool {
+    let Ok(s) = std::str::from_utf8(bytes) else { return false };
+    MANAGED_SENTINELS.iter().any(|m| s.contains(m))
+}
+
+/// Remove `path` ONLY if it is provably 8sync-managed (sentinel or retired
+/// byte-match). A user-owned / unknown file by the same name SURVIVES and emits a
+/// diagnostic so the user can act. Best-effort: never bails.
+fn remove_managed_file(path: &Path, retired: &RetiredAsset, label: &str) {
+    if !path.exists() {
+        return;
+    }
+    if is_managed_artifact(path, retired) {
+        if std::fs::remove_file(path).is_ok() {
+            ui::ok(&format!("removed retired managed {} → {}", label, path.display()));
+        }
+    } else {
+        ui::warn(&format!(
+            "kept user-owned `{}` — not a known 8sync-managed asset: {} (remove manually if intended)",
+            label,
+            path.display(),
+        ));
+    }
+}
+
+/// Remove a legacy single file for which we hold NO retired fingerprint (e.g. the
+/// pre-engine `/gs` command) — deleted ONLY if it carries a managed sentinel;
+/// otherwise preserved with a diagnostic. Never destroys an unknown file.
+fn remove_legacy_file_if_managed(path: &Path, label: &str) {
+    if !path.exists() {
+        return;
+    }
+    let Ok(bytes) = std::fs::read(path) else { return };
+    if has_managed_sentinel(&bytes) {
+        if std::fs::remove_file(path).is_ok() {
+            ui::ok(&format!("removed managed {} → {}", label, path.display()));
+        }
+    } else {
+        ui::warn(&format!(
+            "kept user-owned `{}` — not provenance-matched: {} (remove manually if intended)",
+            label,
+            path.display(),
+        ));
+    }
+}
+
+/// Remove a legacy directory for which we hold NO fingerprint (e.g. the
+/// pre-engine `skills/gs` dir) — deleted ONLY when empty or every member carries
+/// a managed sentinel; a directory holding unknown content SURVIVES with a
+/// diagnostic. Never recursively destroys unknown user files.
+fn remove_legacy_dir_if_managed(path: &Path, label: &str) {
+    if !path.exists() {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(path) else { return };
+    let members: Vec<_> = entries.flatten().collect();
+    if members.is_empty() {
+        let _ = std::fs::remove_dir(path);
+        return;
+    }
+    let all_managed = members.iter().all(|e| {
+        if e.path().is_dir() {
+            return false;
+        }
+        std::fs::read(e.path())
+            .map(|b| has_managed_sentinel(&b))
+            .unwrap_or(false)
+    });
+    if all_managed {
+        if std::fs::remove_dir_all(path).is_ok() {
+            ui::ok(&format!("removed managed {} → {}", label, path.display()));
+        }
+    } else {
+        ui::warn(&format!(
+            "kept user-owned `{}` — contains unknown files: {} (remove manually if intended)",
+            label,
+            path.display(),
+        ));
+    }
+}
+
+/// Managed-provenance clean cutover: retire the `/auto` command +
+/// `8sync-engine.ts` extension (global + project) and any even-older `/gs`
+/// command/skill remnants. Called ONLY after [`ensure_gs`] succeeds, so a failed
+/// GS install never strands the user with no automation surface.
+///
+/// A file/dir is removed ONLY if we can PROVE 8sync authored it — it byte-matches
+/// a known retired managed asset (see `assets/retired/`) or carries an explicit
+/// 8sync-managed sentinel. An unknown or user-owned file by the same name
+/// SURVIVES with a diagnostic; nothing is destroyed without managed provenance.
+/// For the pre-engine `/gs` command + `skills/gs` dir we hold no retired
+/// fingerprint, so those are removed only when sentinel-tagged or empty.
+pub(crate) fn cleanup_legacy_auto(home: &Path, root: Option<&Path>) {
+    // Retired /auto engine (this cutover) — provenance-matched, never blind.
+    remove_managed_file(
+        &home.join(".omp/agent/commands/auto.md"),
+        &RETIRED_AUTO_MD,
+        "/auto command",
+    );
+    remove_managed_file(
+        &home.join(".omp/agent/extensions/8sync-engine.ts"),
+        &RETIRED_ENGINE_TS,
+        "8sync-engine extension",
+    );
+    // Even older /gs command + skill remnants (pre-engine era): we hold no
+    // retired fingerprint, so these are NEVER blindly deleted.
+    remove_legacy_file_if_managed(&home.join(".omp/agent/commands/gs.md"), "/gs command (legacy)");
+    remove_legacy_dir_if_managed(&home.join(".omp/skills/gs"), "/gs skill (legacy)");
     if let Some(r) = root {
-        let _ = std::fs::remove_file(r.join(".omp/commands/gs.md"));
-        let _ = std::fs::remove_dir_all(r.join("su-code/skills/gs"));
+        remove_managed_file(
+            &r.join(".omp/commands/auto.md"),
+            &RETIRED_AUTO_MD,
+            "/auto command (project)",
+        );
+        remove_managed_file(
+            &r.join(".omp/extensions/8sync-engine.ts"),
+            &RETIRED_ENGINE_TS,
+            "8sync-engine extension (project)",
+        );
+        remove_legacy_file_if_managed(&r.join(".omp/commands/gs.md"), "/gs command (project, legacy)");
+        remove_legacy_dir_if_managed(&r.join("su-code/skills/gs"), "/gs skill (project, legacy)");
     }
 }
 
@@ -998,28 +1161,40 @@ fn deploy_omp_pair(
     Ok(())
 }
 
-/// Deploy the gsd-pi-style automation engine — the `8sync-engine` omp extension
-/// (durable slice/task state machine + code-enforced verify-retry gate + git
-/// worktree tools) and its `/auto` orchestration command. 100% on omp core (config
-/// dirs only, never patches omp) so updates stay safe. Mirrors the workflow ext.
-pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
-    let eng = crate::brand::ns_file("engine.ts");
-    deploy_omp_pair(
-        home,
-        root,
-        "extensions/8sync-engine.ts",
-        &format!(".omp/agent/extensions/{eng}"),
-        &format!(".omp/extensions/{eng}"),
-        "8sync-engine extension",
-    )?;
-    deploy_omp_pair(
-        home,
-        root,
-        "commands/auto.md",
-        ".omp/agent/commands/auto.md",
-        ".omp/commands/auto.md",
-        "/auto command",
-    )?;
+/// Deploy the native `/gs` agent-team engine — the `8sync-gs` omp extension
+/// (directory: durable stage machine + gates + model routing + eight gs_* tools),
+/// the seven `gs-*` task agents, and the seed `gs.json` config. 100% on omp core
+/// (config dirs only, never patches omp). Also deploys the `/feature`, `/push-now`,
+/// and `/pull-now` commands. NOT `/auto` — that surface is retired (see
+/// `cleanup_legacy_auto`). Install-new-BEFORE-clean-old: a failed install here
+/// leaves the old surface intact because cleanup runs only after this returns Ok.
+pub(crate) fn ensure_gs(home: &Path, root: Option<&Path>) -> Result<()> {
+    // 1. GS extension tree — global (auto-loaded) + project mirror.
+    let global_ext = home.join(".omp/agent/extensions/8sync-gs");
+    std::fs::create_dir_all(&global_ext)?;
+    let (w, _) = assets::install_tree("extensions/8sync-gs", &global_ext)?;
+    if w > 0 {
+        ui::ok(&format!("8sync-gs extension ({} file(s)) → {}", w, global_ext.display()));
+    }
+    // 2. The seven gs-* task agents — user root `~/.omp/agent/agents/`.
+    let global_agents = home.join(".omp/agent/agents");
+    std::fs::create_dir_all(&global_agents)?;
+    let (wa, _) = assets::install_tree("agents", &global_agents)?;
+    if wa > 0 {
+        ui::ok(&format!("gs agents ({} file(s)) → {}", wa, global_agents.display()));
+    }
+    // 3. Seed ~/.config/8sync/gs.json (never clobber a user-owned config).
+    seed_gs_config()?;
+    // 4. Project mirror: extension + agents.
+    if let Some(r) = root {
+        let proj_ext = r.join(".omp/extensions/8sync-gs");
+        std::fs::create_dir_all(&proj_ext)?;
+        let _ = assets::install_tree("extensions/8sync-gs", &proj_ext)?;
+        let proj_agents = r.join(".omp/agents");
+        std::fs::create_dir_all(&proj_agents)?;
+        let _ = assets::install_tree("agents", &proj_agents)?;
+    }
+    // 5. Commands that ride alongside GS (NOT /auto).
     deploy_omp_pair(
         home,
         root,
@@ -1044,6 +1219,26 @@ pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
         ".omp/commands/pull-now.md",
         "/pull-now command",
     )
+}
+
+/// Seed `~/.config/8sync/gs.json` from the bundled default only when absent.
+fn seed_gs_config() -> Result<()> {
+    let Some(body) = assets::read("configs/8sync/gs.json") else {
+        return Ok(());
+    };
+    let Some(cfg_dir) = dirs::config_dir() else {
+        return Ok(());
+    };
+    let target = cfg_dir.join("8sync").join("gs.json");
+    if target.exists() {
+        return Ok(());
+    }
+    if let Some(p) = target.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    std::fs::write(&target, body)?;
+    ui::ok(&format!("seeded gs config → {}", target.display()));
+    Ok(())
 }
 
 /// One-time rebrand migration: when the binary is rebranded (`brand::NS` differs
@@ -1075,14 +1270,25 @@ pub(crate) fn migrate_namespace(home: &Path) {
             let _ = std::fs::remove_file(unit_dir.join("8sync-harness-up.timer"));
         }
     }
-    // 2. Stale global deployed artifacts under the old `8sync-` names.
-    for stale in [
-        home.join(".omp/hooks/pre/8sync-recall.ts"),
-        home.join(".omp/agent/extensions/8sync-engine.ts"),
-        home.join(".omp/agent/extensions/8sync-workflow.ts"),
-    ] {
-        let _ = std::fs::remove_file(&stale);
-    }
+    // 2. Stale global deployed artifacts under the old `8sync-` names (the new
+    //    <NS>-named copies deploy above). Provenance-matched against the asset
+    //    content this binary ships (or the retired engine) so a user file by the
+    //    same name is never destroyed on a rebrand — only provably-managed copies.
+    remove_managed_file(
+        &home.join(".omp/hooks/pre/8sync-recall.ts"),
+        &STALE_RECALL_TS,
+        "old-namespace recall hook",
+    );
+    remove_managed_file(
+        &home.join(".omp/agent/extensions/8sync-engine.ts"),
+        &RETIRED_ENGINE_TS,
+        "old-namespace engine",
+    );
+    remove_managed_file(
+        &home.join(".omp/agent/extensions/8sync-workflow.ts"),
+        &STALE_WORKFLOW_TS,
+        "old-namespace workflow",
+    );
 }
 
 /// `rename(old → new)` only when the old path exists and the new one does not —
@@ -1090,5 +1296,172 @@ pub(crate) fn migrate_namespace(home: &Path) {
 fn rename_if_new_absent(old: &Path, new: &Path) {
     if old.exists() && !new.exists() {
         let _ = std::fs::rename(old, new);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    /// Unique scratch dir under the system temp dir; removed when dropped so tests
+    /// never touch the real `~/.omp` or `~/.config`.
+    struct Scratch(PathBuf);
+    impl Scratch {
+        fn new(label: &str) -> Self {
+            static SEQ: AtomicU64 = AtomicU64::new(0);
+            let n = SEQ.fetch_add(1, Ordering::SeqCst);
+            let p = std::env::temp_dir().join(format!(
+                "8sync-deploy-test-{}-{}-{}",
+                std::process::id(),
+                n,
+                label
+            ));
+            std::fs::create_dir_all(&p).unwrap();
+            Scratch(p)
+        }
+        fn path(&self) -> &Path { &self.0 }
+        fn join(&self, rel: &str) -> PathBuf { self.0.join(rel) }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+    }
+
+    fn write(path: &Path, bytes: &[u8]) {
+        if let Some(p) = path.parent() { std::fs::create_dir_all(p).unwrap(); }
+        std::fs::write(path, bytes).unwrap();
+    }
+
+    /// Unknown / user-owned files at the retired paths must survive cleanup — no
+    /// blind deletion, no data loss.
+    #[test]
+    fn user_owned_legacy_files_survive() {
+        let home = Scratch::new("user-survive");
+        write(&home.join(".omp/agent/commands/auto.md"), b"# my own auto command\n");
+        write(&home.join(".omp/agent/extensions/8sync-engine.ts"), b"// my custom engine\n");
+        write(&home.join(".omp/agent/commands/gs.md"), b"# my own gs command\n");
+        write(&home.join(".omp/skills/gs/SKILL.md"), b"# my own gs skill\n");
+
+        cleanup_legacy_auto(home.path(), None);
+
+        assert!(home.join(".omp/agent/commands/auto.md").exists(), "user auto.md must survive");
+        assert!(home.join(".omp/agent/extensions/8sync-engine.ts").exists(), "user engine.ts must survive");
+        assert!(home.join(".omp/agent/commands/gs.md").exists(), "user gs.md must survive");
+        assert!(home.join(".omp/skills/gs/SKILL.md").exists(), "user skills/gs must survive");
+    }
+
+    /// Managed retired copies (byte-identical to the released managed asset) ARE
+    /// removed — managed obsolete copies go, provenance-matched.
+    #[test]
+    fn managed_retired_copies_are_removed() {
+        let home = Scratch::new("managed-remove");
+        let auto = assets::read_bytes("retired/auto.md").expect("retired/auto.md embedded");
+        let engine = assets::read_bytes("retired/8sync-engine.ts").expect("retired engine embedded");
+        write(&home.join(".omp/agent/commands/auto.md"), &auto);
+        write(&home.join(".omp/agent/extensions/8sync-engine.ts"), &engine);
+
+        cleanup_legacy_auto(home.path(), None);
+
+        assert!(!home.join(".omp/agent/commands/auto.md").exists(), "managed auto.md must be removed");
+        assert!(!home.join(".omp/agent/extensions/8sync-engine.ts").exists(), "managed engine.ts must be removed");
+    }
+
+    /// Pre-engine `/gs` remnants (no fingerprint held): sentinel-tagged removed,
+    /// empty dir removed, unknown content preserved.
+    #[test]
+    fn legacy_gs_remnants_handled_safely() {
+        // sentinel-tagged gs.md → removed
+        let a = Scratch::new("gs-sentinel");
+        write(&a.join(".omp/agent/commands/gs.md"), b"<!-- 8sync-managed -->\nmanaged gs\n");
+        cleanup_legacy_auto(a.path(), None);
+        assert!(!a.join(".omp/agent/commands/gs.md").exists(), "sentinel gs.md must be removed");
+
+        // empty skills/gs dir → removed
+        let b = Scratch::new("gs-empty");
+        std::fs::create_dir_all(b.join(".omp/skills/gs")).unwrap();
+        cleanup_legacy_auto(b.path(), None);
+        assert!(!b.join(".omp/skills/gs").exists(), "empty skills/gs must be removed");
+
+        // skills/gs holding only a sentinel-tagged file → removed
+        let c = Scratch::new("gs-sentinel-dir");
+        write(&c.join(".omp/skills/gs/SKILL.md"), b"<!-- 8sync-managed -->\nx\n");
+        cleanup_legacy_auto(c.path(), None);
+        assert!(!c.join(".omp/skills/gs").exists(), "sentinel-only skills/gs must be removed");
+
+        // skills/gs holding an unknown file → preserved
+        let d = Scratch::new("gs-unknown-dir");
+        write(&d.join(".omp/skills/gs/SKILL.md"), b"# user skill\n");
+        cleanup_legacy_auto(d.path(), None);
+        assert!(d.join(".omp/skills/gs/SKILL.md").exists(), "unknown skills/gs content must survive");
+    }
+
+    /// The provenance predicate is exact: managed bytes match, a one-byte edit
+    /// does not, a sentinel matches, and a missing path is a safe non-match.
+    #[test]
+    fn provenance_predicate_exactness() {
+        let home = Scratch::new("predicate");
+        let managed = assets::read_bytes("retired/8sync-engine.ts").unwrap();
+
+        let exact = home.join("engine.ts");
+        write(&exact, &managed);
+        assert!(is_managed_artifact(&exact, &RETIRED_ENGINE_TS), "exact managed bytes match");
+
+        let mut edited = managed.clone();
+        edited[0] ^= 0xFF; // flip one byte → no longer the managed asset
+        let edit = home.join("engine-edited.ts");
+        write(&edit, &edited);
+        assert!(!is_managed_artifact(&edit, &RETIRED_ENGINE_TS), "edited bytes must not match");
+
+        let sent = home.join("engine-sent.ts");
+        write(&sent, b"totally custom body\n// 8sync-managed\nmore\n");
+        assert!(is_managed_artifact(&sent, &RETIRED_ENGINE_TS), "sentinel tags managed");
+
+        assert!(!is_managed_artifact(&home.join("missing.ts"), &RETIRED_ENGINE_TS), "missing → not managed");
+    }
+
+    /// First GS deployment on a clean home installs the full surface even though
+    /// legacy cleanup finds nothing, and cleanup never self-clobbers the new tree.
+    /// `XDG_CONFIG_HOME` is redirected so the real user config is untouched.
+    #[test]
+    fn clean_home_install_is_complete() {
+        let home = Scratch::new("clean-install");
+        let xdg = home.join(".config");
+        std::fs::create_dir_all(&xdg).unwrap();
+        let prev_xdg = std::env::var_os("XDG_CONFIG_HOME");
+        std::env::set_var("XDG_CONFIG_HOME", &xdg);
+
+        let res = ensure_gs(home.path(), None);
+        // cleanup runs after a successful install and finds nothing on a clean home.
+        cleanup_legacy_auto(home.path(), None);
+
+        std::env::remove_var("XDG_CONFIG_HOME");
+        if let Some(v) = prev_xdg { std::env::set_var("XDG_CONFIG_HOME", v); }
+
+        assert!(res.is_ok(), "ensure_gs must succeed on a clean home: {:?}", res.err());
+
+        // 1. GS extension tree deployed and non-empty.
+        let ext = home.join(".omp/agent/extensions/8sync-gs");
+        assert!(ext.is_dir(), "8sync-gs extension dir must exist");
+        assert!(ext.join("index.ts").exists(), "extension entrypoint must deploy");
+
+        // 2. gs-* agents deployed; gs-worker carries NO shell/bash (security fix).
+        let worker = home.join(".omp/agent/agents/gs-worker.md");
+        assert!(worker.exists(), "gs-worker.md must deploy");
+        let body = std::fs::read_to_string(&worker).unwrap();
+        let tools_line = body.lines().find(|l| l.starts_with("tools:")).expect("tools: frontmatter");
+        assert!(!tools_line.contains("bash"), "gs-worker must NOT have bash: {tools_line}");
+        assert!(!tools_line.contains("glob"), "gs-worker must NOT have glob: {tools_line}");
+        assert!(home.join(".omp/agent/agents/gs-planner.md").exists(), "gs-planner deploys");
+
+        // 3. Commands ride alongside GS.
+        assert!(home.join(".omp/agent/commands/feature.md").exists(), "/feature must deploy");
+
+        // 4. Seed config lands in the redirected XDG dir, never the real one.
+        assert!(xdg.join("8sync/gs.json").exists(), "gs.json must be seeded under XDG_CONFIG_HOME");
+
+        // 5. Legacy cleanup left the freshly-installed surface intact.
+        assert!(ext.join("index.ts").exists(), "cleanup must not remove GS artifacts");
+        assert!(worker.exists(), "cleanup must not remove GS agents");
     }
 }

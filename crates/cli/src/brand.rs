@@ -43,12 +43,12 @@ pub fn config_dir(home: &Path) -> PathBuf {
 
 // NOTE: the `~/.cache/` namespace intentionally stays literal `8sync` (NOT
 // rebranded): it is derived/gitignored throwaway state, and the verbatim-deployed
-// `8sync-engine.ts` extension hard-codes `.cache/8sync/engine/` (rendering `.ts`
-// code is out of scope). Keeping it literal avoids a split namespace and keeps
-// the engine ⇄ dashboard state coupling intact.
+// `8sync-gs` extension hard-codes `.cache/8sync/gs/` (rendering `.ts` code is out
+// of scope). Keeping it literal avoids a split namespace and keeps the GS engine
+// ⇄ dashboard state coupling intact.
 
-/// A deployed-artifact filename/stem: `<NS>-<suffix>` (e.g. `ns_file("engine.ts")`
-/// → `8sync-engine.ts` by default). One definition so the deploy target and the
+/// A deployed-artifact filename/stem: `<NS>-<suffix>` (e.g. `ns_file("workflow.ts")`
+/// → `8sync-workflow.ts` by default). One definition so the deploy target and the
 /// migration shim that removes the old name agree.
 pub fn ns_file(suffix: &str) -> String {
     format!("{NS}-{suffix}")

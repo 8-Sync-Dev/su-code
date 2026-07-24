@@ -3,13 +3,13 @@
 > Cờ `--auto` biến `/feature` thành chế độ tự lái: chạy **trọn 1 phase** với tối thiểu gián đoạn user.
 > Load file này NGAY khi args chứa `--auto`, trước khi dispatch sang plan/go.
 > `references/feature-rules.md` (luật xuyên suốt, gồm **R10 code-intelligence FIRST**) VẪN áp — auto KHÔNG nới chuẩn code/skill/AC, chỉ thay user-gate bằng tự-quyết.
-> Kỷ luật engine-loop + guardrail lấy từ `/auto` (`assets/commands/auto.md`) — mirror nó, đừng chế lại.
+> Kỷ luật engine-loop + guardrail: mirror the GS engine discipline (native `/gs` extension) — đừng chế lại.
 
 ## 3 luật cốt lõi
 
 1. **Auto-discuss qua subagent** — mọi điểm-quyết-định mà bình thường dùng `ask` → thay bằng **spawn 1 `task` subagent** (`agent: explore` cho "cái gì đang có / nên theo cái nào", `agent: plan` cho trade-off/approach) đóng vai đối tác trao đổi + tự quyết, bám ràng buộc `PROJECT.md` + `REQUIREMENTS.md` + `su-code/KNOWLEDGE.md`/`DECISIONS.md`. KHÔNG hỏi user.
 2. **Block thì không stall** — đánh giá: nếu vẫn code tiếp được → code; nếu không → **SKIP item, ghi NEEDS-CONFIRM**, code nốt phần còn lại. User confirm sau, rồi mới code item bị skip.
-3. **1 lệnh `--auto` = code trọn 1 phase** — `plan` (nếu chưa có PLAN) → `go` (hết wave qua engine) → self-check AC → ghi VERIFICATION nếu có item defer. Dừng ở ranh giới phase kế (KHÔNG tự nhảy phase tiếp trừ khi user nói rõ "code hết các phase").
+3. **1 lệnh `--auto` = code trọn 1 phase** — `plan` (nếu chưa có PLAN) → `go` (hết wave qua GS engine) → self-check AC → ghi VERIFICATION nếu có item defer. Dừng ở ranh giới phase kế (KHÔNG tự nhảy phase tiếp trừ khi user nói rõ "code hết các phase").
 
 ## Phân loại điểm-quyết-định (AI tra được vs phải hỏi)
 
@@ -38,9 +38,9 @@ Khi gặp điểm "cần phán đoán thiết kế":
    - Vẫn viết đủ `M<x>-CONTEXT.md` (Requirement scope + Goal + AC) + `M<x>-NN-PLAN.md` (mỗi task có `[UC:]` + `[AC:]`).
    - **Step 3.5 plan-review VẪN chạy** theo `config.workflow.plan_review` (auto KHÔNG nới chất lượng — review PLAN là tự-soát, không phải hỏi user). NEEDS-FIX → sửa PLAN/CONTEXT rồi tiếp, ghi `(auto-decided)`.
    - Step 4 user-gate → **bỏ qua**, tự set `status: planned` (plan-review thay vai gate chất lượng).
-3. **Chạy `references/execute.md`** — feed PLAN vào `engine_plan`, loop `engine_next → engine_verify → engine_advance {commit:true}` hết wave. KHÔNG yield giữa các task (autonomous). Commit atomic mỗi task (verify-gate của engine đã enforce).
+3. **Chạy `references/execute.md`** — nếu chưa có run thì tạo bằng `/gs --auto <Goal phase>`, rồi `gs_define` → research nếu cần → `gs_plan`. Sau đó obey từng exact lease từ `gs_next`: spawn đúng GS agent/model/task IDs, worker evidence trước `gs_verify`, và chỉ gọi parameterless `gs_advance` khi gate hiện tại sẵn sàng. KHÔNG yield giữa task. Commit chỉ sau closeout gates + gitleaks.
    - Task block (dữ liệu/môi trường) → SKIP + ghi NEEDS-CONFIRM, làm task khác.
-   - `engine_verify` fail 3 lần giống nhau → engine BLOCK task (doom-loop guard); ghi `failure:` vào `su-code/KNOWLEDGE.md`, chuyển task unblocked kế.
+   - `gs_verify` fail 3 lần giống nhau → GS BLOCK task (doom-loop guard); ghi `failure:` vào `su-code/KNOWLEDGE.md`, chuyển task unblocked kế.
 4. Self-check UC/AC. UC/AC nào code-done → đánh dấu; UC/AC block → NEEDS-CONFIRM.
 5. Nếu có item defer → ghi `M<x>-VERIFICATION.md` (matrix UC/AC PASS / NEEDS-CONFIRM) ngay (không chờ ship).
 6. STATE: `status: executing`, `next_action`: `ship-phase` (nếu mọi AC code-done) hoặc giữ `execute-phase` + ghi list NEEDS-CONFIRM.
@@ -61,5 +61,5 @@ Khi gặp điểm "cần phán đoán thiết kế":
 | Điểm mơ hồ thiết kế | `ask` | Spawn `task` subagent discuss → tự quyết |
 | Gate 2 (plan) / gate cuối (go) | Chờ user duyệt | Plan-review tự-soát thay gate 2; tự duyệt chạy tiếp |
 | Block 1 item | Có thể dừng hỏi | Skip + NEEDS-CONFIRM + code nốt |
-| Phạm vi 1 lệnh | 1 bước (plan HOẶC go) | Trọn phase (plan→go) qua engine |
+| Phạm vi 1 lệnh | 1 bước (plan HOẶC go) | Trọn phase (plan→go) qua GS engine |
 | Dữ liệu môi trường thật | hỏi user | defer NEEDS-CONFIRM (không hỏi giữa chừng) |

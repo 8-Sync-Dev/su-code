@@ -1,48 +1,30 @@
 # /feature ship
 
-> Đã load `references/feature-rules.md` (R1 config-resolve, R5 AC nghiệm thu, **R10 code-intelligence FIRST — áp dụng cả reviewer/tester subagent**) ở Dispatch chưa? Nếu chưa → load trước.
+> Đã load `references/feature-rules.md` (R1 config-resolve, R5 AC nghiệm thu, **R10 code-intelligence FIRST**) ở Dispatch chưa? Nếu chưa → load trước.
 
-Verify (review + test) → close phase → archive khi hết feature → cập nhật bản đồ. = GSD Verify + Ship.
-Gate: review/test FAIL → fix → re-run. KHÔNG ship khi fail.
+Project the completed GS run evidence into the feature's AC matrix, close the phase, and archive when the feature ends. `/feature ship` does not create a second review/test loop.
+Gate: GS is not `done`, any required AC lacks PASS evidence, or UAT is absent → reopen/continue `/gs`; never paper over the failed gate here.
 
-## Step 0 — Load hợp đồng nghiệm thu (BẮT BUỘC trước review/test)
+## Step 0 — Load hợp đồng nghiệm thu (BẮT BUỘC trước khi import evidence)
 
 Đọc `M<x>-CONTEXT.md` → **📌 Requirement scope (UC từ REQUIREMENTS.md) + 🎯 Goal + bảng ✅ Acceptance Criteria (AC-NN)**. Chuẩn nghiệm thu phase.
-- Requirement scope + AC là **nguồn chân lý** cho cả Step 1 (review) lẫn Step 2 (test): mọi reviewer/tester nhận **UC literal + bảng AC literal** trong prompt + verify ĐÚNG từng UC/AC liên quan. Subagent KHÔNG tự đặt tiêu chí ngoài AC; cũng KHÔNG đòi hỏi vượt Goal (ranh giới phase).
+- Requirement scope + AC là **nguồn chân lý** để map GS evidence. Không tự đặt tiêu chí ngoài AC hoặc đòi vượt Goal (ranh giới phase).
 - CONTEXT thiếu Goal/AC → DỪNG, quay lại `/feature plan` bổ sung (không nghiệm thu mò).
 - Đầu ra cuối: `M<x>-VERIFICATION.md` (dùng `templates/M-VERIFICATION.md`) có **bảng AC → verdict** (mỗi AC: PASS/FAIL + bằng chứng cụ thể). Phase done ⇔ MỌI AC PASS.
 
-## Step 1 — Review (FAN-OUT multi-lens song song)
+## Step 1 — import the GS evidence (single source of execution truth)
 
-**Gate:** `config.workflow.code_review === false` → BỎ Step 1, ghi STATE Log "review skipped per config" + cảnh báo user "review tắt theo config — chất lượng tự chịu". Ngược lại (`true`/thiếu) → chạy review:
+Read `.cache/8sync/gs/state.json` for the phase. Require:
+- run status/stage is `done`;
+- goal/plan hash corresponds to this phase's CONTEXT/PLAN;
+- every required AC has objective evidence;
+- verifier, independent review/security (when risk requires it), and user UAT gates passed.
 
-Spawn ĐỒNG THỜI `task` subagent `agent: reviewer`. Số agent = số phần tử `config.workflow.review_dimensions`; nhúng **tên dimension thật** vào prompt mỗi agent (vd "dimension: security"), KHÔNG ghi chữ `config.workflow.review_dimensions` vào prompt. Dimension mặc định (`["security","correctness","convention"]`):
-- **security**: injection (query tham số hoá?), XSS/escape output, CSRF/permission check, type cast, secret leak.
-- **correctness**: symbol/method tồn tại (serena `mcp__serena_find_symbol`), logic, runtime, config key/DB column đúng.
-- **convention**: `AGENTS.md` + `su-code/DECISIONS.md`/`PREFERENCES.md`, naming, tách file, error-handling.
+Map each `state.acceptance[]` entry to the matching UC/AC in `M<x>-CONTEXT.md`. Preserve the concrete command hash, review verdict, browser/smoke/API proof, and timestamp. Do not synthesize PASS from task status or prose.
 
-Scope = file phase này đụng (từ PLAN). Barrier → gộp findings.
-Có lỗi → fix (main thread hoặc spawn) → re-review tới sạch. Phase nhỏ → 1 reviewer tổng hợp cũng được.
+If evidence is missing or stale, **do not spawn an ad-hoc reviewer/Tester from the feature layer**. Resume/reopen the native engine (`/gs continue` or `/gs reject <stage> <reason>`) so its lease, model-independence, verification, retry, and UAT policies remain enforced. Then import the new evidence after GS reaches `done`.
 
-**Nhúng UC + AC vào prompt reviewer:** mỗi prompt kèm Requirement scope + bảng AC literal (từ Step 0) + yêu cầu: "Ngoài lens <dimension>, soát code có thỏa đúng UC/AC thuộc lens này không (vd security lens ↔ AC nào về permission/inject); báo UC/AC nào code KHÔNG thỏa kèm `file:line`." Reviewer trả findings gắn UC-ID/AC-NN khi liên quan. Nhúng R10 literal (dùng code-intel định vị, `mcp__headroom_compress` cho output dài trước khi vào báo cáo).
-
-## Step 2 — Test (theo tier, fan-out per-component nếu nhiều)
-
-**Gate:** `config.workflow.verifier === false` → bỏ tầng verify/test sâu, chỉ chạy lint/build của dự án + cảnh báo "verifier tắt theo config". Ngược lại → chạy đủ theo tier.
-
-**Tester agent là nguồn viết test authoritative** — spawn `task` subagent `agent: Tester` (NEVER tự viết test). Theo tier:
-
-| Tier | Áp dụng | Làm |
-|------|---------|-----|
-| must-test | logic/handler/model/helper cốt lõi | `Tester` agent → unit + edge/security theo AC. KHÔNG mock cái đang test. |
-| verify-sql | report/migration/SELECT | chạy SQL/script trên môi trường thật + build/lint |
-| verify-only | config/DDL/asset tĩnh | lint/build của dự án + review đủ |
-
-Nhiều component độc lập → spawn `Tester` song song (1 component/agent). Barrier.
-
-**Test BÁM UC/AC, không test mò:** mỗi `Tester` nhận Requirement scope + bảng AC literal + chỉ thị "viết test chứng minh ĐÚNG các UC/AC được giao (dùng cột 'Cách verify' của AC làm kịch bản; Given/When/Then làm assertion). Mỗi AC must-test/verify-sql → ≥1 test thực thi, trả PASS/FAIL kèm output thật." Test bổ sung ngoài AC (edge/security) vẫn khuyến khích, nhưng KHÔNG được thiếu UC/AC nào.
-
-> Test lint/build đã chạy như GATE của từng task trong `/feature go` (engine `verify`); Step 2 là tầng nghiệm thu AC end-to-end, bổ sung chứ không thay verify-gate của engine.
+Optional supplemental analysis may discover a gap, but it cannot approve an AC. Record the finding, reopen the corresponding GS stage, fix through the GS loop, and let GS produce canonical evidence.
 
 ### Ghi `M<x>-VERIFICATION.md` — bắt buộc dạng AC-matrix
 ```markdown
@@ -56,11 +38,11 @@ Nhiều component độc lập → spawn `Tester` song song (1 component/agent).
 ## Review findings (per dimension) — đã fix / còn lại
 ## Kết luận: <N/M AC PASS>. Phase done? YES/NO
 ```
-**Gate cứng:** còn ≥1 UC/AC FAIL hoặc UC trong Requirement scope chưa có AC verdict → phase CHƯA done. Fix → re-verify UC/AC đó → mới sang Step 3. KHÔNG ship khi matrix còn FAIL.
+**Gate cứng:** còn ≥1 UC/AC FAIL, thiếu evidence, hoặc UC trong Requirement scope chưa có AC verdict → phase CHƯA done. Reopen/continue GS → re-verify → import lại; KHÔNG ship khi matrix còn FAIL.
 
-## Step 3 — Ship (đóng phase)
+## Step 2 — Ship (đóng phase)
 
-1. **Commit**: code đã commit atomic per-task trong `/feature go` (qua `engine_advance`) rồi — KHÔNG commit gộp lại. Ship chỉ:
+1. **Commit**: code do GS engine commit (verify-gated ở closeout) rồi — KHÔNG commit gộp lại. Ship chỉ:
    - Commit nốt phần phụ của phase chưa thuộc task nào (`M<x>-VERIFICATION.md`/STATE/ROADMAP đổi): `docs: M<x> close phase <tên>` (Conventional Commits, tiếng Anh, milestone ở đầu — xem `execute.md` §Commit).
    - Verify **AC matrix trong M<x>-VERIFICATION.md MỌI AC = PASS** (Step 0+1+2) TRƯỚC khi tính phase done. Còn FAIL → KHÔNG đóng phase.
    - **KHÔNG `git push` / mở PR** — chỉ push khi user yêu cầu rõ.
@@ -71,7 +53,7 @@ Nhiều component độc lập → spawn `Tester` song song (1 component/agent).
    - `next_action` → `plan-phase` cho phase sau, hoặc `done`.
    - `## Session Continuity`: ghi vừa ship phase nào.
 
-## Step 4 — Nếu là phase CUỐI: chống drift + archive
+## Step 3 — Nếu là phase CUỐI: chống drift + archive
 
 BẮT BUỘC khi feature hoàn tất:
 - [ ] `su-code/KNOWLEDGE.md` — append nghiệp vụ/gotcha mới học (`validated:`/`failure:`). Lớn → spawn `task` (`agent: task`).

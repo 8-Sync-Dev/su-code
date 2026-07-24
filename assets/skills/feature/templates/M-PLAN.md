@@ -1,7 +1,7 @@
 # Mx-NN-PLAN — <phase name>
 
 > Batch task của phase Mx. Mỗi task truy được về ≥1 AC + ≥1 UC (từ Mx-CONTEXT.md).
-> **Engine mapping:** mỗi task ↔ 1 engine task; mỗi wave ↔ 1 engine slice; `verify` của task = lint/test/build THẬT (cột "Cách verify" của AC). `/feature go` feed bảng này vào `engine_plan`.
+> **GS mapping:** mỗi task ↔ 1 GS task; mỗi wave ↔ 1 GS slice; `verify` của task = lint/test/build THẬT (cột "Cách verify" của AC). `/feature go` feeds bảng này vào `gs_plan`.
 
 ## Wave 1 (song song — độc lập, khác file)
 
@@ -15,7 +15,7 @@
 ## Checkpoints / Gates
 
 - **Review dimensions:** [từ config.workflow.review_dimensions, vd security, correctness, convention]
-- **Verify (engine gate):** mỗi task chạy lệnh lint/test/build thật của dự án qua `engine_verify`; `engine_advance` từ chối task chưa pass.
+- **Verify (GS gate):** mỗi task chạy lệnh lint/test/build thật của dự án qua `gs_verify`; `gs_advance` refuses to leave a stage whose gate is unmet.
 - **Acceptance:** phase done ⇔ mọi AC trong Mx-CONTEXT PASS (verify ở `/feature ship` → Mx-VERIFICATION.md). KHÔNG dùng DoD mơ hồ — dùng AC.
 
 ## Kiểm tra phủ (trước khi trình gate 2)

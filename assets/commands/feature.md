@@ -1,7 +1,7 @@
 ---
 name: feature
 argument-hint: '[new <slug> | plan | go | ship | status | switch <slug> | list] [--auto]'
-description: Large multi-phase feature scopes (GSD). Drives the `feature` skill — scaffold a planning tree (su-code/planning/<slug>/), plan a phase (Goal+AC), execute it via the engine_* loop, and verify against the AC matrix. Cross-session, switchable. Small/single-concern work → /auto.
+description: Large multi-phase feature scopes (GSD). Drives the `feature` skill — scaffold a planning tree (su-code/planning/<slug>/), plan a phase (Goal+AC), execute it by feeding the phase into a GS run (gs_* tools), and verify against the AC matrix. Cross-session, switchable. Small/single-concern work → /gs.
 ---
 
 # /feature — large-scope GSD framework
@@ -9,9 +9,9 @@ description: Large multi-phase feature scopes (GSD). Drives the `feature` skill 
 `$ARGUMENTS` first word selects the subcommand; `--auto` anywhere = autonomous full-phase.
 
 Use this for **large, multi-phase features** (>10 files, multiple milestones, spanning
-sessions). Small/single-concern work → **`/auto`** (drive the engine directly). This layer
+sessions). Small/single-concern work → **`/gs`** (drive the GS engine directly). This layer
 owns the multi-feature ROADMAP + per-phase Acceptance-Criteria contract *above* the
-`engine_*` loop.
+`gs_*` loop.
 
 ## 0. Load the skill + ground (do this first, every subcommand)
 Read the bundled skill and its rules BEFORE acting:
@@ -30,25 +30,25 @@ Then ground on state (except for `new`, which creates it):
 |------|----|
 | `new <slug>` | `references/new.md` — the deterministic scaffold is also `8sync feature new <slug>`; then fill PROJECT/REQUIREMENTS/ROADMAP with the user, cut phases by dependency. Gate 1: user approves the architecture. |
 | `plan` | `references/plan.md` — discuss + write `M<x>-CONTEXT.md` (📌 Requirement scope + 🎯 Goal + ✅ AC table) + `M<x>-NN-PLAN.md` (tasks ↔ UC ↔ AC, waves). Plan-review per `config.workflow.plan_review`. Gate 2: user approves the AC + plan. |
-| `go` | `references/execute.md` — **delegate execution to the engine**: `engine_plan` (goal = phase Goal, slices/tasks = the PLAN, each task `verify` = the project's real lint/test/build), then loop `engine_next → engine_verify → engine_advance {commit:true}` (verify-gate + doom-loop guard are code-enforced). Tick STATE.Log + PLAN checkbox per task. |
-| `ship` | `references/ship.md` — review (multi-lens via `task` reviewers) + test (`task` Tester) against the AC → write `M<x>-VERIFICATION.md` AC-matrix. Phase done ⇔ every AC PASS. Archive on the final phase. |
+| `go` | `references/execute.md` — **start/resume a GS run first** (`/gs <phase goal>` or `/gs --auto <phase goal>`), then `gs_define` (UC/AC), traverse to plan, `gs_plan`, and obey each exact `gs_next` lease. Workers return evidence; `gs_verify` gates each task; parameterless `gs_advance` crosses stages through verifier → independent review/security → user UAT → closeout. |
+| `ship` | `references/ship.md` — import the completed native GS run's canonical AC evidence into `M<x>-VERIFICATION.md`, tick ROADMAP, and archive on the final phase. Missing/stale evidence reopens GS; the feature layer never creates a second review/test loop. |
 | `status` | print the active STATE position (same as `8sync feature status`). |
 | `switch <slug>` | flip ACTIVE (same as `8sync feature switch <slug>`), then re-ground. |
 | `list` | list features + archived (same as `8sync feature list`). |
 | _(empty)_ | read STATE → suggest the next action from `next_action`. |
 
 ## 2. `--auto` (autonomous full-phase)
-If `$ARGUMENTS` contains `--auto`, load `references/auto.md` FIRST, then run the phase
-autonomously: replace user gates with a `task` discuss-agent + plan-review; run `go` via the
-engine to DONE; a hard blocker (credential / real external data) → SKIP the item, record
-NEEDS-CONFIRM in VERIFICATION/STATE, and finish the rest of the phase. Stop at the next phase
-boundary (never auto-advance phases). This mirrors `/auto`'s engine discipline, scoped to one
-phase.
+If `$ARGUMENTS` contains `--auto`, load `auto.md` in `references/` FIRST, then run the phase
+autonomously: the GS run uses auto-mode gates (independent critic replaces the user plan
+gate); a hard blocker (credential / real external data) → SKIP the item, record NEEDS-CONFIRM
+in VERIFICATION/STATE, and finish the rest of the phase. Stop at the next phase boundary
+(never auto-advance phases). This mirrors `/gs --auto` discipline, scoped to one phase.
+GS still requires `/gs approve uat`; each destructive/outward action needs one-shot consent bound to the exact command hash.
 
 ## Guardrails
 Work must belong to the `active_phase` (stop + ask if it drifts; `--auto` → SKIP+NEEDS-CONFIRM).
-Verify-gate before every commit (`engine_verify` enforces it; `engine_advance` refuses
-unverified tasks). Scope edits to the change + `su-code/` memory. NO `git push` / PR unless
+Verify-gate before every commit (`gs_verify` enforces it; `gs_advance` refuses to leave a stage
+whose gate is unmet). Scope edits to the change + `su-code/` memory. NO `git push` / PR unless
 asked. Every AC maps to ≥1 UC in REQUIREMENTS; every task maps to ≥1 AC — no orphan work.
 
 ## Model + context budget

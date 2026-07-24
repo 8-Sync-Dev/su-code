@@ -4,9 +4,9 @@
 
 Execute phase hiện tại theo PLAN.
 
-## Nguyên lý: feed engine có sẵn — KHÔNG dựng engine mới
+## Nguyên lý: feed GS engine có sẵn — KHÔNG dựng engine mới
 
-**Feature layer KHÔNG tự viết vòng lặp thực thi/swarm.** Nó FEED chính `engine_*` mà `/auto` lái (durable state ở `.cache/8sync/engine/state.json`, verify-gate + doom-loop guard + worktree đã enforce trong CODE). Feature layer chỉ sở hữu phần ENGINE KHÔNG quản: hợp đồng ROADMAP nhiều phase + AC + bookkeeping STATE/PLAN. Đọc `assets/commands/auto.md` (`/auto`) để lấy đúng kỷ luật engine-loop + guardrail cần mirror.
+**Feature layer KHÔNG tự viết vòng lặp thực thi/swarm.** Nó FEED chính GS engine mà `/gs` lái (native omp extension ở `~/.omp/agent/extensions/8sync-gs/`, durable state ở `.cache/8sync/gs/state.json`, verify-gate + doom-loop guard + worktree đã enforce trong CODE). Feature layer chỉ sở hữu phần GS engine KHÔNG quản: hợp đồng ROADMAP nhiều phase + AC + bookkeeping STATE/PLAN. Mirror đúng kỷ luật GS engine (native extension) + guardrail: clarify → plan → plan_review → implement → verify → review → uat → closeout.
 
 ## Trước khi code
 
@@ -17,63 +17,54 @@ Execute phase hiện tại theo PLAN.
 
 > **Orchestrator giữ CONTEXT trong đầu suốt phase.** Mỗi task code phải tôn trọng Decisions + nhắm AC nó gánh. Lệch Decision → DỪNG (như lệch ROADMAP, R6).
 
-## Bước 1 — `engine_plan`: nạp phase vào engine
+## Bước 1 — khởi tạo GS run rồi nạp phase
 
-Gọi **`engine_plan`** một lần cho phase:
-- `goal` = literal 🎯 **Goal** của phase (từ CONTEXT).
-- `slices` = các **Wave** trong PLAN (mỗi wave = 1 slice; đặt title = tên wave).
-- Mỗi slice `tasks` = các task `T<n>` của wave, `title` = mô tả task literal.
-- Mỗi task `verify` = **lệnh lint/test/build THẬT của dự án** (cột "Cách verify" của AC mà task gánh; vd `cargo test <mod>`, `npm test`, `<lint> <file>`). Đây là GATE — engine chạy đúng các lệnh này, `engine_advance` từ chối task chưa verify pass.
-- Smallest-first (wave độc lập trước, wave phụ thuộc sau — khớp `depends:` trong PLAN).
+GS tools từ chối mutation nếu chưa có active run. Vì vậy:
+1. Nếu `gs_status` chưa có run, gọi slash command **`/gs <Goal phase>`** (assisted) hoặc **`/gs --auto <Goal phase>`** (auto) để tạo run và route coordinator.
+2. Ở stage `clarify`, gọi **`gs_define`** với requirements + AC literal từ CONTEXT/REQUIREMENTS.md. `gs_define` không nhận `goal`; goal đã được khóa khi tạo run.
+3. Đi qua research (nếu risk yêu cầu) tới stage `plan`, rồi gọi **`gs_plan`** đúng một lần:
+   - `slices` = các **Wave** trong PLAN (mỗi wave = 1 slice).
+   - Mỗi `task` = task `T<n>` literal, có ownership, dependencies, skills và AC IDs.
+   - Mỗi `verify` = lệnh lint/test/build THẬT dạng direct argv (`program` + `args`), không shell string.
 
-> `engine_plan` ghi plan vào durable state; nếu phase đã có plan engine (resume) → dùng `engine_status` xem còn task nào pending thay vì plan lại từ đầu.
+> Nếu GS đã có run cho phase này, dùng `gs_status`/`gs_next` để resume; không tạo hoặc plan lại làm mất lease/evidence hiện tại.
 
-## Bước 2 — Loop `engine_next → engine_verify → engine_advance` mỗi task
+## Bước 2 — chạy state machine `gs_next → task → gs_verify → gs_advance`
 
-Lặp tới khi `engine_next` báo done (mọi task done/blocked):
+Lặp tới `done`/`blocked`; mỗi bước obey instruction literal từ `gs_next`:
 
-1. **`engine_next`** → task kế + context scoped. Hiểu TRƯỚC khi sửa (R10: `codegraph callers/impact` + `git log/blame` + `su-code/DECISIONS.md`).
-2. **Code task ở đúng size:**
-   - **Wave ≥ `config.workflow.min_parallel_tasks` task độc lập + khác file + `parallelization === true`** → spawn `task` subagent ĐỒNG THỜI (1 message, nhiều tool-call), `agent: task` (executor). Mỗi agent **1 file/folder RIÊNG**. Prompt mỗi agent BẮT BUỘC nhúng (subagent KHÔNG đọc được CONTEXT/config/skill):
-     1. Task cụ thể + file được phép sửa + "chỉ làm task này".
-     2. **UC literal** task phục vụ (copy mô tả UC + phạm vi "trong phase này làm gì").
-     3. **AC literal** task gánh (copy nguyên văn Given/When/Then từ CONTEXT → đích đo được).
-     4. **Decisions liên quan** từ CONTEXT (chỉ cái chạm task, copy literal — KHÔNG ghi "theo D4").
-     5. **Skill (cột `[skill:]`) — 2 lớp:** (a) nhúng literal luật cốt lõi + anti-pattern skill; (b) ra lệnh agent Read `su-code/skills/<skill>/SKILL.md` (hoặc `~/.omp/skills/<skill>/SKILL.md`) TRƯỚC khi code.
-     6. Convention: `AGENTS.md` + `su-code/DECISIONS.md`/`PREFERENCES.md` liên quan.
-     7. Ground-truth cần thiết (schema/symbol thật từ research) nếu task đụng DB/code có sẵn.
-     8. **R10 literal**: "Trước khi sửa file, dùng `codegraph query/callers/impact \"<symbol|file>\"` (CLI) hoặc codebase-memory-mcp (`mcp__codebase_memory_mcp_search_graph`/`_trace_path`) / serena (`mcp__serena_find_symbol`) xem source + call path + blast radius — KHÔNG grep/Read tràn lan. Chỉ Read khi sắp sửa. Output dài (>50 dòng) sắp đưa vào báo cáo cuối → `mcp__headroom_compress` trước, không dump thô."
-   - **Wave nhỏ (< ngưỡng) / task phụ thuộc / `parallelization === false`** → code thẳng ở main thread, tuần tự. Ưu tiên serena `replace_symbol_body` symbol-level (activate qua `search_tool_bm25` nếu chưa có trong tool list) thay vì rewrite cả file.
-3. **`engine_verify {taskId}`** — gate chạy đúng `verify` của task. FAILED → sửa NGUYÊN NHÂN rồi verify lại với 1 fix KHÁC (2 fail giống nhau = warn, 3 = engine BLOCK task sớm — doom-loop guard). BLOCKED → ghi `failure:` vào `su-code/KNOWLEDGE.md`, chuyển task unblocked kế hoặc escalate.
-4. **`engine_advance {taskId, commit:true}`** — engine từ chối nếu `engine_verify` chưa pass (self-report "xong" KHÔNG phải tín hiệu dừng); gitleaks clean. Message Conventional Commits (R8): `<type>: M<x> - T<n> <English desc>`, no AI ref. KHÔNG `git push`.
-5. **Bookkeeping skill-side (engine KHÔNG quản):**
-   - Append `su-code/planning/<slug>/STATE.md` `## Log`: `- DATE M<x> T<n> ✓ <việc> [file] (<hash ngắn>)`.
-   - Tick checkbox task trong `M<x>-NN-PLAN.md` (`[ ]` → `[x]`).
-   - Cập nhật STATE `Current Position` + `next_action` = task kế.
-6. **Guardrail R6**: việc đang làm phải thuộc `active_phase`. Lệch ROADMAP/Decision → DỪNG, hỏi user (auto: SKIP + NEEDS-CONFIRM).
+1. **`gs_next`** cấp lease chính xác: agent, model và task IDs. Ở implement, spawn đúng `gs-worker` cho từng task trong lease, cùng một batch, không thêm helper agent. Mỗi prompt ghi đúng task ID, ownership, AC IDs, skills, UC/Decisions và ground truth liên quan.
+2. Worker chỉ sửa file thuộc ownership và trả `task_id` + `changed_files` + observed behavior. Worker không commit và không tự đánh dấu pass.
+3. Sau khi matching worker evidence đã được engine ghi nhận, gọi **`gs_verify {taskId}`** cho từng task. Engine chỉ chạy direct argv đã plan, trong project; shell/destructive/outward/cwd escape bị từ chối. FAILED → sửa nguyên nhân rồi verify lại; 3 fail giống nhau hoặc quá retry limit → BLOCK.
+4. Khi toàn bộ task của wave/phase đã verify pass, gọi **`gs_advance`** (không có `taskId`) để sang verifier → independent review/security → user UAT → closeout. Ở mỗi agent stage, lại gọi `gs_next` và spawn đúng lease trước khi advance.
+5. **Bookkeeping feature-side:**
+   - Append `su-code/planning/<slug>/STATE.md` `## Log`: `- DATE M<x> T<n> ✓ <việc> [file]`.
+   - Tick task trong `M<x>-NN-PLAN.md` sau verify PASS.
+   - Cập nhật STATE `Current Position` + `next_action`.
+6. **Guardrail R6**: việc phải thuộc `active_phase`; lệch ROADMAP/Decision → dừng (auto: SKIP + NEEDS-CONFIRM).
 
-> **Isolate slice rủi ro/lớn** bằng **`engine_worktree`** (open → work → merge squash → remove) — tránh nửa chừng làm bẩn nhánh chính.
+> **Isolate slice rủi ro/lớn** bằng **`gs_worktree`** (open → work → merge squash → remove) — tránh nửa chừng làm bẩn nhánh chính.
 
-## Commit per-task (R8) — qua engine
+## Commit — qua GS engine (verify-gated, ở closeout)
 
-Commit atomic **mỗi task xong** bằng `engine_advance {commit:true}` (không gom, không `/commit` thủ công). Luật:
-- **Verify-gate trước commit**: engine chỉ commit sau khi `engine_verify` pass — enforce trong code.
+GS engine commit **một lần ở closeout** sau khi MỌI gate pass (verify + review + UAT) và gitleaks clean — **KHÔNG commit per-task**, không param commit trên `gs_advance`, không `/commit` thủ công. Trong lúc implement, hook của GS chặn `git commit` khi còn task chưa verify. Luật:
+- **Verify-gate trước commit**: GS chỉ commit ở closeout sau khi mọi task verify pass — enforce trong code.
 - **Branch**: mặc định nhánh hiện tại (commit local checkpoint). Nếu user chọn feature branch → verify `git branch --show-current` khớp `STATE.branch` trước khi commit; lệch → DỪNG.
-- **Message tiếng Anh**, milestone/task ở đầu: `feat: M2 - T1 sync group-info onto the group record`. `type` ∈ feat/fix/docs/refactor. KHÔNG `[<Category>]` prefix, no AI ref.
+- **Message tiếng Anh** (Conventional Commits), milestone ở đầu: `<type>: M<x> - <desc>` (vd `feat: M2 - sync group-info onto the group record`). `type` ∈ feat/fix/docs/refactor. KHÔNG `[<Category>]` prefix, no AI ref.
 - **KHÔNG `git push` / PR** trừ khi user yêu cầu. Ghi commit hash vào STATE.Log để `ship`/revert truy ngược.
-- Task hỏng giữa chừng: KHÔNG commit task dở. `engine_verify` fail → không advance; sửa xong mới advance, hoặc revert file task đó.
+- Task hỏng giữa chừng: KHÔNG advance task dở. `gs_verify` fail → không advance; sửa xong mới advance.
 
-## `--auto` (autonomous) — cùng loop, không user-gate
+## `--auto` (autonomous) — GS auto-mode, không user-gate giữa task
 
-`/feature go --auto` = đúng loop trên chạy tự động (mirror kỷ luật `/auto` trong `assets/commands/auto.md`), **scoped 1 phase**, dừng ở ranh giới phase kế:
-- Không yield giữa các task; chạy hết `engine_next/verify/advance` của phase.
+`/feature go --auto` = đúng loop trên chạy ở **GS auto-mode** (independent critic thay gate requirements/plan), **scoped 1 phase**, dừng ở ranh giới phase kế:
+- Không yield giữa các task; chạy hết `gs_next/gs_verify/gs_advance` của phase.
 - Task block (dữ liệu/môi trường subagent+repo+DB bó tay) → SKIP + ghi NEEDS-CONFIRM vào VERIFICATION/STATE, làm task khác. Không stall cả phase.
-- Ranh giới an toàn: KHÔNG push/merge ra ngoài, KHÔNG xoá data, KHÔNG gọi API production gửi tin thật — trừ khi user đã duyệt ở plan. Chi tiết: `references/auto.md`.
+- Ranh giới an toàn không được bypass: UAT vẫn cần `/gs approve uat`; destructive/outward action cần consent một lần gắn với đúng command hash mà engine báo. Không dùng plan/UAT approval làm giấy phép chung.
 
 ## Khi hết task của phase
 
 - STATE: `status: executing` → sẵn sàng verify. `next_action: ship-phase`.
-- **Self-check nhanh**: mọi UC trong Requirement scope có code/task phủ; mọi AC trong CONTEXT đã có code thỏa (chưa cần test sâu — đó là việc ship). UC/AC nào chưa task nào chạm → thiếu code, làm nốt trước khi ship.
-- KHÔNG tự review/test sâu ở đây — đó là việc `/feature ship` (verify từng AC → VERIFICATION matrix).
+- **Self-check nhanh**: mọi UC/AC trong CONTEXT map sang canonical GS acceptance evidence; thiếu evidence thì run chưa thật sự complete — reopen/continue GS.
+- KHÔNG tự review/test lần hai ở feature layer. `/feature ship` chỉ project GS evidence vào VERIFICATION matrix và đóng phase.
 
 Next: `/feature ship`.

@@ -686,27 +686,27 @@ function EnginesPage() {
   );
 }
 
-// ── Live /auto engine run (real .cache/8sync/engine/state.json, not demo) ──
+// ── Live /gs engine run (real .cache/8sync/gs/state.json, not demo) ──
 function EngineRunBoard() {
   const { data } = useQuery({ queryKey: ["engine-run"], queryFn: api.engine, refetchInterval: 4000 });
   if (!data) return null;
   if (!data.active) {
     return (
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="tile-head"><strong>/auto engine</strong><span className="tag warn">idle</span></div>
-        <p className="tile-hint">No active run. Start one in omp with <code>/auto &lt;goal&gt;</code> — this board mirrors the real <code>.cache/8sync/engine/state.json</code>.</p>
+        <div className="tile-head"><strong>/gs engine</strong><span className="tag warn">idle</span></div>
+        <p className="tile-hint">No active run. Start one in omp with <code>/gs &lt;goal&gt;</code> — this board mirrors the real <code>.cache/8sync/gs/state.json</code>.</p>
       </div>
     );
   }
-  const total = data.total ?? 0, done = data.done ?? 0, blocked = data.blocked ?? 0;
+  const total = data.total ?? 0, done = data.done ?? 0, skipped = data.skipped ?? 0, blocked = data.blocked ?? 0;
   const pct = total > 0 ? Math.round((done * 100) / total) : 0;
-  const icon = (s: string) => (s === "done" ? "✓" : s === "in_progress" ? "▸" : s === "blocked" ? "✗" : "○");
-  const cls = (s: string) => (s === "done" ? "ok" : s === "blocked" ? "warn" : "");
+  const icon = (s: string) => (s === "done" ? "✓" : s === "skipped" ? "–" : s === "in_progress" ? "▸" : s === "blocked" ? "✗" : "○");
+  const cls = (s: string) => (s === "done" ? "ok" : s === "skipped" ? "muted" : s === "blocked" ? "warn" : "");
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="tile-head">
-        <strong>/auto engine — live run</strong>
-        <span className="tag ok">{done}/{total} done{blocked ? ` · ${blocked} blocked` : ""}</span>
+        <strong>/gs engine — live run</strong>
+        <span className="tag ok">{done}/{total} done{skipped ? ` · ${skipped} skipped` : ""}{blocked ? ` · ${blocked} blocked` : ""}</span>
       </div>
       {data.goal && <p className="tile-hint" style={{ marginTop: 0 }}>{data.goal}</p>}
       <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,.08)", overflow: "hidden", margin: "8px 0" }}>

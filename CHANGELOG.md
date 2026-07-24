@@ -5,6 +5,31 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — native `/gs` deterministic engineering-team engine
+- Replaced the legacy prompt-driven `/auto` loop with `assets/extensions/8sync-gs/`: a
+  persisted, code-enforced state machine for clarify → research → plan → implement →
+  verify → independent review/security → UAT → closeout. Seven scoped `gs-*` agents,
+  machine defaults in `assets/configs/8sync/gs.json`, and native `/gs` actions deploy
+  globally and per project from one `8sync harness` run.
+- Every implementation task is bound to one lease, worker/model family, owned files,
+  plan hash, revision, tool-call evidence, acceptance criteria, and direct-argv verify
+  commands. Stale, mixed, cross-worker, out-of-stage, or unverified results fail closed;
+  failed review/security gates reopen a bounded fix loop instead of stranding the run.
+- Destructive/outward commands require a one-shot `/gs approve action <hash>` consent
+  for the exact canonical command. Project config may strengthen but cannot weaken the
+  global safety policy; shell/cwd/worktree paths are containment-checked.
+- State persistence now validates the complete nested run before every load/write,
+  uses symlink-safe atomic replacement with backup recovery, and records a managed
+  status block in `su-code/STATE.md`. Legacy imports are normalized and revalidated.
+- Deployment retires `assets/commands/auto.md` and `assets/extensions/8sync-engine.ts`
+  without deleting unknown user files: cleanup only removes byte-identical retired
+  assets or files carrying an explicit 8sync-managed sentinel. Re-running a clean-home
+  install is byte-stable.
+- `/feature` remains the multi-phase planning layer but feeds one approved phase at a
+  time into native GS; completed GS evidence is imported into the feature AC matrix.
+  The dashboard Engines page now mirrors the real `.cache/8sync/gs/state.json`, including
+  distinct done, skipped, running, and blocked states.
+
 ### Added — Lark (larksuite) to the `apps-personal` profile
 - `assets/profiles/apps-personal.toml` now installs Lark via AUR `larksuite-bin`
   (v7.66.11, URL larksuite.com) alongside Bitwarden. AUR bin package auto-fetches the

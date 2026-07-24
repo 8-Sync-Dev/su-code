@@ -159,7 +159,22 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 | `8sync harness eval [--baseline]` | Run the quality task-suite through omp; `--baseline` saves the reference |
 | `8sync harness toolstats` | SQLite tracker: optimizer rate (codegraph/cbm/serena) vs fallback (grep/read) + failures per tool |
 | `8sync harness compaction [pct]` | View/set the omp auto-compaction threshold (anti-forget; default 50%) |
-| `8sync harness model [k v]` | View/edit `~/.config/8sync/models.toml` (routing for `/auto` + `8sync ai`) |
+| `8sync harness model [k v]` | View/edit `~/.config/8sync/models.toml` (general omp role routing). Native `/gs` stage models, limits, and safety live in `~/.config/8sync/gs.json`, with a project override at `.omp/gs.json` |
+
+### Native `/gs` engineering loop
+
+Run one command inside omp:
+
+```text
+/gs <goal>          # assisted requirements/plan gates
+/gs --auto <goal>   # independent critic gates; still stops for user UAT and dangerous actions
+```
+
+`/gs` owns the complete clarify → research → plan → implement → verify → independent review/security → UAT → closeout state machine. Its model-callable `gs_*` tools persist the run in `.cache/8sync/gs/state.json`; the dashboard mirrors that file read-only. Continue after a restart with `/gs` or `/gs continue`.
+
+The engine routes thinking stages through the configured plan/slow model and implementation through the task/default model. Configure role selectors in `~/.config/8sync/gs.json`; project overrides belong in `.omp/gs.json`. Every task needs matching worker evidence and direct-argv verification before it can pass. `/gs approve uat` closes the human acceptance gate. Destructive or outward commands require `/gs approve action <hash>` for the exact command and consume that approval once.
+
+`/feature` remains the multi-phase planning layer. It stores ROADMAP/AC artifacts under `su-code/planning/<slug>/`, then feeds one phase at a time into this same `/gs` engine; it does not implement a second execution loop.
 
 ### Skill system
 

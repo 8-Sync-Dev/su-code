@@ -40,14 +40,14 @@ Mỗi phase có 🎯 Goal + ✅ Acceptance Criteria (AC-NN, đo được) trong 
 
 ## R8 — Commit model riêng của feature
 
-Commit **atomic mỗi task xong** trong `go`, qua `engine_advance {commit:true}` (engine chỉ commit sau khi `engine_verify` pass — verify-gate enforce trong code; self-report "xong" KHÔNG phải tín hiệu dừng). Message theo Conventional Commits, **tiếng Anh**, milestone/task ở ĐẦU: `<type>: M<x> - T<n> <English description>` (`type` ∈ feat/fix/docs/refactor; KHÔNG `[<Category>]` prefix), no AI ref.
+Commit **verify-gated, do GS engine lo ở stage `closeout`** — KHÔNG commit thủ công mỗi task (KHÔNG có `{commit:true}` trên `gs_advance`). `gs_verify` gate commit (verify-gate enforce trong code; self-report "xong" KHÔNG phải tín hiệu dừng), và `gs_advance` KHÔNG rời một stage khi gate của nó chưa thoả. Message theo Conventional Commits, **tiếng Anh**, milestone/task ở ĐẦU: `<type>: M<x> - T<n> <English description>` (`type` ∈ feat/fix/docs/refactor; KHÔNG `[<Category>]` prefix), no AI ref.
 - **Feature branch + ticket là TUỲ CHỌN** (`STATE.branch`/`STATE.ticket` có thể trống — KHÔNG ép tạo nhánh/ticket ở `new`). Nếu user muốn 1 feature branch lớn → verify `git branch --show-current` khớp `STATE.branch` trước khi commit.
 - **KHÔNG `git push` / mở PR** trừ khi user yêu cầu rõ (convention su-code). Commit local làm checkpoint.
 - Ghi commit hash vào STATE.Log dòng task để `ship`/revert truy ngược.
 
 ## R10 — Code-intelligence FIRST (mọi lookup code, ÁP DỤNG CẢ SUBAGENT — bắt buộc, không tuỳ chọn)
 
-Mọi thao tác TÌM/HIỂU/ĐỊNH VỊ code (không phải sắp EDIT ngay) → dùng code-intelligence engine TRƯỚC grep/Read thô, theo đúng RULE #0 (`~/.omp/agent/APPEND_SYSTEM.md`). Áp dụng cho **CẢ main thread LẪN MỌI subagent** (`explore` ở `plan.md` Step 2, `task` executor ở `execute.md`, `reviewer`/`Tester` ở `ship.md`, discuss subagent ở `auto.md`). Ưu tiên:
+Mọi thao tác TÌM/HIỂU/ĐỊNH VỊ code (không phải sắp EDIT ngay) → dùng code-intelligence engine TRƯỚC grep/Read thô, theo đúng RULE #0 (`~/.omp/agent/APPEND_SYSTEM.md`). Áp dụng cho **CẢ main thread LẪN MỌI subagent** (`explore` ở `plan.md` Step 2, `task` executor ở `execute.md`, `reviewer`/`Tester` ở `ship.md`, clarify/research subagent của GS engine). Ưu tiên:
 
 1. **codegraph** (local graph, CLI) — `codegraph query/explore/node/callers/callees/impact "<symbol|query>"`: source + call path + blast radius. Skill: `~/.omp/skills/codegraph/SKILL.md`.
 2. **codebase-memory-mcp** (MCP, LUÔN có trong tool list — gọi đúng tên đăng ký): `mcp__codebase_memory_mcp_search_graph`, `_trace_path`, `_get_architecture`, `_get_code_snippet`; full catalog visible (`query_graph`, `detect_changes`, …). Server chưa connected → dùng codegraph, KHÔNG loay hoay grep.

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "models": {
+    "coordinator": ["@plan", "@slow"],
+    "research": ["@slow", "@plan"],
+    "plan": ["@plan", "@slow"],
+    "implement": ["@task", "@default"],
+    "critic": ["@plan", "@slow"],
+    "verify": ["@plan", "@slow"],
+    "review": ["@plan", "@slow"],
+    "security": ["@plan", "@slow"]
+  },
+  "thinking": {
+    "clarify": "high",
+    "research": "high",
+    "plan": "xhigh",
+    "plan_review": "xhigh",
+    "implement": "high",
+    "verify": "high",
+    "review": "xhigh",
+    "uat": "high"
+  },
+  "limits": {
+    "maxPlanReviewLoops": 2,
+    "maxVerifyFailures": 3,
+    "maxReviewLoops": 2,
+    "maxParallelWorkers": 6,
+    "commandTimeoutSeconds": 900
+  },
+  "safety": {
+    "requireUserForDestructive": true,
+    "requireUserForExternalEffects": true,
+    "requireFinalUat": true
+  }
+}

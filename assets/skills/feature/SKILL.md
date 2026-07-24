@@ -1,22 +1,22 @@
 ---
 name: feature
 disable-model-invocation: true
-description: "Quản lý feature LỚN nhiều phase, nhiều ngày, xuyên session (>10 file, nhiều milestone) theo nguyên lý GSD. State sống ở su-code/planning/<slug>/ (PROJECT/REQUIREMENTS/ROADMAP/STATE) + ACTIVE switch giữa nhiều feature. Việc nhỏ/bug/1-concern (≤10 file, 1 pass) dùng /auto (lái engine trực tiếp)."
+description: "Quản lý feature LỚN nhiều phase, nhiều ngày, xuyên session (>10 file, nhiều milestone) theo nguyên lý GSD. State sống ở su-code/planning/<slug>/ (PROJECT/REQUIREMENTS/ROADMAP/STATE) + ACTIVE switch giữa nhiều feature. Việc nhỏ/bug/1-concern (≤10 file, 1 pass) dùng /gs (lái GS engine trực tiếp)."
 ---
 
 # Feature Skill — GSD cho feature lớn
 
 > Chống "đi 1 nẻo": tổng thể + vị trí lưu ở FILE (`su-code/planning/<slug>/`), không ở context tạm.
 > Mỗi feature lớn = 1 folder. Loop phase: Discuss → Plan → Execute → Verify → Ship.
-> Execute KHÔNG tự dựng engine riêng — nó FEED engine `engine_*` có sẵn của su-code (verify-gate, doom-loop guard, worktree đã enforce trong code).
+> Execute KHÔNG tự dựng engine riêng — nó FEED GS engine (`gs_*`) có sẵn của su-code (verify-gate, doom-loop guard, worktree đã enforce trong code).
 
 ## Usage
 
 ```
 /feature new <slug>     -> Scaffold su-code/planning/<slug>/ + 4 file + set ACTIVE. Điền → user duyệt.
 /feature plan           -> Discuss + Plan phase hiện tại (fan-out research) -> M<x>-CONTEXT + M<x>-NN-PLAN.md
-/feature go             -> Execute phase: feed PLAN vào engine_plan → loop engine_next/verify/advance
-/feature ship           -> Verify (review multi-lens + test) BÁM AC -> M<x>-VERIFICATION + tick ROADMAP + archive
+/feature go             -> Start/resume GS run → define → plan → exact gs_next leases → verify/review/UAT/closeout
+/feature ship           -> Import GS evidence → AC matrix → tick ROADMAP + archive
 /feature status         -> In STATE.md hiện tại
 /feature switch <slug>  -> Đổi feature active (ghi ACTIVE.md + config.active_feature)
 
@@ -50,23 +50,23 @@ Nếu user gõ `/feature` không subcommand → đọc STATE → đề xuất ne
 
 ### ⚡ Cờ `--auto` (autonomous mode) — check NGAY khi parse lệnh
 
-Nếu args chứa `--auto` (dù có/không subcommand) → **BẮT BUỘC load `references/auto.md` TRƯỚC** rồi mới dispatch. Auto-mode đổi hành vi của `plan` + `go`:
+Nếu args chứa `--auto` (dù có/không subcommand) → **BẮT BUỘC load `auto.md` trong `references/` TRƯỚC** rồi mới dispatch. Auto-mode đổi hành vi của `plan` + `go`:
 - **KHÔNG dùng `ask`** cho điểm-quyết-định triển khai → thay bằng spawn `task` subagent (`agent: explore` / `agent: plan` / `agent: task`) đóng vai discuss + tự quyết theo ràng buộc PROJECT/REQUIREMENTS. Tự tra repo/DB trước khi coi là "phải hỏi".
 - **KHÔNG dừng ở user-gate** (gate 2 plan, gate cuối go) → tự duyệt (plan-review thay vai gate chất lượng) rồi chạy tiếp.
 - **Block** (thiếu credential/môi trường/dữ liệu thật subagent không tra được) → SKIP item đó, ghi NEEDS-CONFIRM vào VERIFICATION/STATE, **code nốt phần còn lại của phase**. Không stall cả phase vì 1 item.
-- **1 lệnh `--auto` = chạy TRỌN 1 phase**: `plan` (nếu chưa có PLAN) → `go` (code hết wave qua engine) → self-check AC. Dừng ở ranh giới phase kế (không tự nhảy phase sau trừ khi user nói "code hết các phase").
+- **1 lệnh `--auto` = chạy TRỌN 1 phase**: `plan` (nếu chưa có PLAN) → `go` (code hết wave qua GS engine) → self-check AC. Dừng ở ranh giới phase kế (không tự nhảy phase sau trừ khi user nói "code hết các phase").
 - Chỉ escalate user thật sự khi: hành động không đảo được/outward-facing (push, xoá data, gọi API production).
 
-Chi tiết luật + cách spawn subagent discuss: `references/auto.md`.
+Chi tiết luật + cách spawn subagent discuss: `auto.md` trong `references/`.
 
-## Phân biệt với `/auto` (QUAN TRỌNG)
+## Phân biệt với `/gs` (QUAN TRỌNG)
 
 | Loại việc | Dùng | State ở |
 |-----------|------|---------|
-| Nhỏ/bug/1-concern (≤10 file, 1 pass, đường đi rõ) | **`/auto`** (lái `engine_*` trực tiếp) | `su-code/STATE.md` (spine session) |
+| Nhỏ/bug/1-concern (≤10 file, 1 pass, đường đi rõ) | **`/gs`** (lái GS engine `gs_*` trực tiếp) | `su-code/STATE.md` (spine session) |
 | **Feature LỚN** (nhiều domain, nhiều phase, nhiều ngày, xuyên session) | **`/feature`** (skill này) | `su-code/planning/<slug>/` + ACTIVE switch |
 
-> `/feature` KHÔNG thay `/auto` — nó ngồi TRÊN engine: quản ROADMAP nhiều phase + hợp đồng AC + switch giữa nhiều feature; khi `go`, mỗi phase được FEED vào chính engine mà `/auto` lái.
+> `/feature` KHÔNG thay `/gs` — nó ngồi TRÊN GS engine: quản ROADMAP nhiều phase + hợp đồng AC + switch giữa nhiều feature; khi `go`, mỗi phase được FEED vào chính GS engine.
 
 ## Quy ước cốt lõi
 
@@ -75,7 +75,7 @@ Chi tiết luật + cách spawn subagent discuss: `references/auto.md`.
 - **STATE.md < 100 dòng** — digest, không archive. Frontmatter ràng buộc: `---` đầu file · không comment trong `progress:` · `next_phases` single-line.
 - **Cập nhật:** task xong → STATE.Log + next_action · phase xong → ROADMAP tick + STATE.progress · feature xong → `su-code/KNOWLEDGE.md` + `su-code/DECISIONS.md`.
 - **Parallel:** `config.workflow.parallelization === false` → TẮT mọi swarm, chạy tuần tự main thread (debug/máy yếu). Khi `true`: việc độc lập + khác file + ≥`config.workflow.min_parallel_tasks` → spawn `task` subagent đồng thời; dưới ngưỡng → main thread.
-- **Commit:** commit **atomic mỗi task xong** qua `engine_advance {commit:true}` trong `go` (verify-gate enforce trước). Conventional Commits, tiếng Anh, `<type>: M<x> - T<n> <desc>`, no AI ref. Feature branch + ticket là **TUỲ CHỌN** (STATE `branch`/`ticket` có thể trống). **KHÔNG `git push`/PR trừ khi user yêu cầu**. Chi tiết: `references/execute.md` §Commit + R8.
+- **Commit:** commit **verify-gate, do GS engine xử ở stage `closeout`** — KHÔNG commit mỗi task; tool_call hook chặn `git commit` khi còn task chưa verify; commit đơn ở closeout (gitleaks-clean). Conventional Commits, tiếng Anh, `<type>: M<x> - <desc>`, no AI ref. Feature branch + ticket là **TUỲ CHỌN** (STATE `branch`/`ticket` có thể trống). **KHÔNG `git push`/PR trừ khi user yêu cầu**. Chi tiết: `references/execute.md` §Commit + R8.
 - **Model:** su-code sở hữu chọn model qua `~/.config/8sync/models.toml` (xem/sửa: `8sync harness model`) + role của `task` subagent. Skill NEVER hardcode tên model; chỉ chọn `agent: <role>` (explore/plan/reviewer/Tester/task) đúng vai.
 
 ## Neo vào codebase (brownfield) — R7
@@ -91,11 +91,11 @@ Chi tiết luật + cách spawn subagent discuss: `references/auto.md`.
 /feature new zalo-group    -> điền 4 file (neo AGENTS.md + su-code/) -> USER DUYỆT (gate 1)
 mỗi phase:
   /feature plan            -> Discuss + Goal/AC (UAT) + Plan (task↔AC) -> USER DUYỆT plan (gate 2)
-  /feature go              -> feed PLAN → engine_plan/next/verify/advance -> append STATE mỗi task
-  /feature ship            -> review+test BÁM AC -> M<x>-VERIFICATION (AC matrix) -> tick ROADMAP
+  /feature go              -> /gs <phase goal> → gs_define → gs_plan → exact gs_next leases/gs_verify/gs_advance tới closeout
+  /feature ship            -> import GS evidence → M<x>-VERIFICATION AC matrix → tick ROADMAP
 lặp tới phase cuối -> ship (phase cuối) -> update su-code/KNOWLEDGE.md + DECISIONS.md + archive
 ```
 
-> **Mỗi phase BẮT BUỘC có Requirement scope + Goal + Acceptance Criteria (AC-NN, đo được) trong `M<x>-CONTEXT.md`.** Requirement scope map từ `REQUIREMENTS.md` UC; AC = hợp đồng nghiệm thu: `plan` viết, `go` code bám (verify của mỗi engine task = lint/test/build thật), `ship` review+test verify từng UC/AC → `M<x>-VERIFICATION.md`. Phase done ⇔ mọi UC/AC PASS. KHÔNG dùng "DoD" mơ hồ.
+> **Mỗi phase BẮT BUỘC có Requirement scope + Goal + Acceptance Criteria (AC-NN, đo được) trong `M<x>-CONTEXT.md`.** Requirement scope map từ `REQUIREMENTS.md` UC; AC = hợp đồng nghiệm thu: `plan` viết, `go` code bám (verify của mỗi GS task = lint/test/build thật), `ship` review+test verify từng UC/AC → `M<x>-VERIFICATION.md`. Phase done ⇔ mọi UC/AC PASS. KHÔNG dùng "DoD" mơ hồ.
 
 Đọc `references/<subcommand>.md` để biết chi tiết từng bước.

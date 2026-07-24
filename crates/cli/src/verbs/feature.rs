@@ -31,9 +31,9 @@ const PLANNING_REL: &str = "su-code/planning";
           8sync feature status           show the active feature's STATE position
           8sync feature                  (no arg) same as status
 
-        Large multi-phase scopes only. Small/single-concern work → `/auto`.
+        Large multi-phase scopes only. Small/single-concern work → `/gs`.
         The reasoning steps run in an omp session:
-          /feature plan | go | ship      discuss + plan + execute (via the engine) + verify
+          /feature plan | go | ship      discuss + plan + execute (via the GS engine) + verify
     "}
 )]
 pub struct Args {
@@ -280,7 +280,7 @@ fn active_slug(planning: &Path) -> Option<String> {
 }
 
 /// Best-effort: keep a one-line pointer at the top of the project's session
-/// `su-code/STATE.md` so `/auto` + the recall hook see which feature is active.
+/// `su-code/STATE.md` so `/gs` + the recall hook see which feature is active.
 /// No-op when STATE.md is absent (only seeded projects have it); never clobbers
 /// other content — replaces its own marker line idempotently.
 fn write_active_pointer(root: &Path, slug: &str) {

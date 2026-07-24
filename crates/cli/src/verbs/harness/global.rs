@@ -67,8 +67,9 @@ pub(crate) fn harness_global(
     ui::step("global rules → ~/.omp (skills · APPEND_SYSTEM · MCP · hooks)");
     global_pass(env)?;
     let _ = deploy::ensure_workflow_extension(&env.home, None);
-    let _ = deploy::ensure_engine(&env.home, None);
-    let _ = deploy::cleanup_legacy_gs(&env.home, None);
+    if deploy::ensure_gs(&env.home, None).is_ok() {
+        deploy::cleanup_legacy_auto(&env.home, None);
+    }
 
     // 2. Anthropic token-optimizer defaults (never override a user setting).
     ui::step("token-optimizer defaults (Anthropic)");
@@ -197,9 +198,10 @@ fn stamp_project(env: &env_detect::Env, root: &Path, force: bool) -> Result<usiz
     inject_agents_md(&env.home, root)?;
     seed_harness_memory(root)?;
     seed_gitleaks_hook(root);
-    // Redeploy the /auto command + engine to the project so a swept repo's
-    // `.omp/commands/auto.md` (precedence over global) points at su-code/, not
-    // a stale agents/ copy from an older binary.
-    deploy::ensure_engine(&env.home, Some(root))?;
+    // Redeploy the GS extension + agents to the project so a swept repo's
+    // `.omp/extensions/8sync-gs` (precedence over global) tracks su-code/, not
+    // a stale copy from an older binary.
+    deploy::ensure_gs(&env.home, Some(root))?;
+    deploy::cleanup_legacy_auto(&env.home, Some(root));
     Ok(mirrored)
 }

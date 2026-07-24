@@ -29,7 +29,7 @@ _đang làm gì_
 _bước kế tiếp_
 
 ## Assumptions (auto-decided — user can correct)
-_none — trong `/auto`: thay vì hỏi, research → quyết → ghi giả định ở đây (cái gì + vì sao)._
+_none — trong `/gs` auto mode: thay vì hỏi, research → quyết → ghi giả định ở đây (cái gì + vì sao)._
 
 ## Open questions / blockers
 _none_

@@ -9,13 +9,13 @@ Discuss + Plan cho phase hiện tại (`active_phase` trong STATE). Output: `M<x
 - Đọc PROJECT.md (ràng buộc) + ROADMAP.md (contract phase này) + REQUIREMENTS.md (UC của phase).
 - Trích **Requirement scope** cho phase: liệt kê UC-ID + mô tả từ REQUIREMENTS.md mà phase này chịu trách nhiệm; nếu ROADMAP và REQUIREMENTS lệch phase/UC → sửa/hỏi trước khi plan.
 - Đọc knowledge liên quan: `su-code/KNOWLEDGE.md` + (R10) `codegraph`/codebase-memory-mcp `get_architecture` cho module sẽ đụng.
-- Chốt quyết định triển khai mơ hồ (API nào, schema, pattern). Mơ hồ → dùng `ask` (tương tác). Auto-mode: thay `ask` bằng spawn `task` discuss (xem `auto.md`).
+- Chốt quyết định triển khai mơ hồ (API nào, schema, pattern). Mơ hồ → dùng `ask` (tương tác). Auto-mode: thay `ask` bằng spawn `task` discuss (theo kỷ luật GS engine).
 - Ghi `su-code/planning/<slug>/phases/M<x>-<name>/M<x>-CONTEXT.md`: quyết định riêng phase + Requirement scope (dùng `templates/M-CONTEXT.md`).
 - Append quyết định lớn vào STATE.Decisions + PROJECT Key Decisions table.
 
 ### ★ BẮT BUỘC: Goal + Acceptance Criteria (UAT) trong CONTEXT — KHÔNG được bỏ
 
-Mỗi `M<x>-CONTEXT.md` PHẢI có 3 mục dưới TRƯỚC khi plan. Đây là **hợp đồng nghiệm thu** mà `/feature go` và `/feature ship` đọc làm chuẩn — thiếu thì subagent code/review/test không biết đang phục vụ phần nào của REQUIREMENTS.
+Mỗi `M<x>-CONTEXT.md` PHẢI có 3 mục dưới TRƯỚC khi plan. Đây là **hợp đồng nghiệm thu** mà `/feature go` feeds vào GS và `/feature ship` dùng để map canonical GS evidence — thiếu thì engine không biết đang phục vụ phần nào của REQUIREMENTS.
 
 1. **📌 Requirement scope** — bảng UC-ID từ `REQUIREMENTS.md` mà phase này làm, mỗi dòng:
    - **UC**: id đúng như REQUIREMENTS.md (vd UC-15).
@@ -53,7 +53,7 @@ Nếu phase cần khảo nhiều mặt codebase (và `config.workflow.paralleliz
 
 Tạo `M<x>-NN-PLAN.md` (NN bắt đầu 01, dùng `templates/M-PLAN.md`). BẮT BUỘC mỗi task có:
 - **file ownership**: đụng file/folder nào (để biết parallel an toàn).
-- **wave**: nhóm độc lập (song song được) vs nhóm phụ thuộc (chờ). → sẽ map thành slices/tasks của `engine_plan` ở `go`.
+- **wave**: nhóm độc lập (song song được) vs nhóm phụ thuộc (chờ). → sẽ map thành slices/tasks của `gs_plan` ở `go`.
 - **test tier**: must-test / verify-sql / verify-only.
 - **skill**: skill repo nào chi phối task (`su-code/skills/<name>` hoặc `~/.omp/skills/<name>`). BẮT BUỘC — subagent KHÔNG tự biết skill nào áp dụng; cột này là nguồn để `go` resolve. Task không rõ skill → ghi `—` nhưng tự hỏi đã đúng chưa (đa số task code có ≥1 skill chi phối). Sai/thiếu skill = nguồn lỗi "code đúng task nhưng sai convention".
 - **UC phục vụ**: task này phục vụ UC-ID nào trong `REQUIREMENTS.md`/Requirement scope (vd UC-15).
@@ -70,7 +70,7 @@ Template PLAN:
 ## Checkpoints / Gates
 - review dimensions: <từ config.workflow.review_dimensions>
 - **Acceptance**: phase done ⇔ mọi AC trong M<x>-CONTEXT PASS (verify ở /feature ship → M<x>-VERIFICATION.md). KHÔNG dùng DoD mơ hồ — dùng AC.
-- engine mapping: mỗi task ↔ 1 engine task; `verify` = lint/test/build THẬT (cột "Cách verify" của AC).
+- GS mapping: mỗi task ↔ 1 GS task; `verify` = lint/test/build THẬT (cột "Cách verify" của AC).
 ```
 
 Quy tắc parallel: chỉ đánh cùng wave khi **độc lập + khác file**. Vi phạm → race/sai. <`min_parallel_tasks` task độc lập → 1 wave tuần tự cũng được.
@@ -96,7 +96,7 @@ Khi chạy: spawn 1 `task` subagent `agent: reviewer` review **bản PLAN + bả
 
 Có NEEDS-FIX → sửa PLAN/CONTEXT (main thread) → ghi tóm tắt vào `M<x>-CONTEXT.md` (mục Plan-review notes) → tiếp Step 4. Không loop vô hạn: tối đa 2 vòng, còn lỗi thì nêu ở gate 2 cho user quyết.
 
-> Auto-mode: plan-review chạy **THAY** gate 2 (xem `auto.md`) — verdict READY thì tự duyệt; NEEDS-FIX thì sửa rồi tự duyệt, ghi `(auto-decided)`.
+> Auto-mode: plan-review chạy **THAY** gate 2 (theo kỷ luật GS engine) — verdict READY thì tự duyệt; NEEDS-FIX thì sửa rồi tự duyệt, ghi `(auto-decided)`.
 
 ## Step 4 — USER DUYỆT plan (gate 2)
 

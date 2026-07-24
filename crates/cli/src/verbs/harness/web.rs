@@ -263,17 +263,17 @@ async fn api_engines(State(ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
     }))
 }
 
-/// Live `/auto` engine run — the REAL gsd-pi state machine the engine drives at
-/// `<root>/.cache/8sync/engine/state.json` (NOT demo data). Read-only mirror of
-/// the terminal board: goal · progress · slice/task tree · current task. Returns
-/// `{active:false}` when no run exists. The engine (driven by `/auto` in omp) is
-/// the source of truth; the dashboard displays it, never bypasses its verify gate.
+/// Live `/gs` run — the REAL native GS state machine at
+/// `<root>/.cache/8sync/gs/state.json` (NOT demo data). Read-only mirror of the
+/// terminal board: goal · stage · progress · slice/task tree · current task.
+/// Returns `{active:false}` when no run exists. The GS engine (driven by `/gs`
+/// in omp) is the source of truth; the dashboard displays it, never bypasses a gate.
 async fn api_engine(State(_ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
     let root = match detect_current_project_root() {
         Some(r) => r,
         None => return Json(serde_json::json!({ "active": false })),
     };
-    let raw = match std::fs::read_to_string(root.join(".cache/8sync/engine/state.json")) {
+    let raw = match std::fs::read_to_string(root.join(".cache/8sync/gs/state.json")) {
         Ok(s) => s,
         Err(_) => return Json(serde_json::json!({ "active": false })),
     };
@@ -281,38 +281,66 @@ async fn api_engine(State(_ctx): State<Arc<Ctx>>) -> Json<serde_json::Value> {
         Ok(v) => v,
         Err(_) => return Json(serde_json::json!({ "active": false })),
     };
-    // Mirror 8sync-engine.ts counts()/findNext() over slices[].tasks[].
-    let (mut total, mut done, mut blocked) = (0u64, 0u64, 0u64);
+    // Preserve skipped as a distinct terminal state: skipped work is not done.
+    let norm = |s: Option<&str>| -> &'static str {
+        match s {
+            Some("passed") => "done",
+            Some("skipped") => "skipped",
+            Some("running") => "in_progress",
+            Some("blocked") => "blocked",
+            _ => "pending",
+        }
+    };
+    let (mut total, mut done, mut skipped, mut blocked) = (0u64, 0u64, 0u64, 0u64);
     let mut current = serde_json::Value::Null;
-    if let Some(slices) = state.get("slices").and_then(|v| v.as_array()) {
+    let mut board_slices: Vec<serde_json::Value> = Vec::new();
+    if let Some(slices) = state.pointer("/plan/slices").and_then(|v| v.as_array()) {
         for s in slices {
-            let Some(tasks) = s.get("tasks").and_then(|v| v.as_array()) else { continue };
-            for t in tasks {
-                total += 1;
-                match t.get("status").and_then(|v| v.as_str()) {
-                    Some("done") => done += 1,
-                    Some("blocked") => blocked += 1,
-                    Some("pending") | Some("in_progress") if current.is_null() => {
-                        current = serde_json::json!({
-                            "slice": s.get("title").cloned().unwrap_or(serde_json::Value::Null),
-                            "task": t.get("title").cloned().unwrap_or(serde_json::Value::Null),
-                            "status": t.get("status").cloned().unwrap_or(serde_json::Value::Null),
-                        });
+            let mut board_tasks: Vec<serde_json::Value> = Vec::new();
+            if let Some(tasks) = s.get("tasks").and_then(|v| v.as_array()) {
+                for t in tasks {
+                    total += 1;
+                    let status = norm(t.get("status").and_then(|v| v.as_str()));
+                    match status {
+                        "done" => done += 1,
+                        "skipped" => skipped += 1,
+                        "blocked" => blocked += 1,
+                        _ if current.is_null() => {
+                            current = serde_json::json!({
+                                "slice": s.get("title").cloned().unwrap_or(serde_json::Value::Null),
+                                "task": t.get("title").cloned().unwrap_or(serde_json::Value::Null),
+                                "status": status,
+                            });
+                        }
+                        _ => {}
                     }
-                    _ => {}
+                    board_tasks.push(serde_json::json!({
+                        "id": t.get("id").cloned().unwrap_or(serde_json::Value::Null),
+                        "title": t.get("title").cloned().unwrap_or(serde_json::Value::Null),
+                        "status": status,
+                        "retries": t.get("attempts").cloned().unwrap_or(serde_json::Value::Null),
+                    }));
                 }
             }
+            board_slices.push(serde_json::json!({
+                "id": s.get("id").cloned().unwrap_or(serde_json::Value::Null),
+                "title": s.get("title").cloned().unwrap_or(serde_json::Value::Null),
+                "tasks": board_tasks,
+            }));
         }
     }
     Json(serde_json::json!({
         "active": true,
         "goal": state.get("goal").cloned().unwrap_or(serde_json::Value::Null),
+        "stage": state.get("stage").cloned().unwrap_or(serde_json::Value::Null),
+        "statusText": state.get("status").cloned().unwrap_or(serde_json::Value::Null),
         "updatedAt": state.get("updatedAt").cloned().unwrap_or(serde_json::Value::Null),
         "total": total,
         "done": done,
+        "skipped": skipped,
         "blocked": blocked,
         "current": current,
-        "slices": state.get("slices").cloned().unwrap_or(serde_json::json!([])),
+        "slices": board_slices,
     }))
 }
 

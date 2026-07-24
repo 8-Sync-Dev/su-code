@@ -126,15 +126,18 @@ export type CgSearchResponse = { total: number; has_more: boolean; results: CgSe
 export type CgTraceNode = { name: string; qualified_name: string; hop: number };
 export type CgTrace = { function: string; direction: string; callers: CgTraceNode[]; callees: CgTraceNode[] };
 
-// Live `/auto` engine run — the real gsd-pi state.json the engine drives.
-export type EngineTaskView = { id?: string; title: string; status: "pending" | "in_progress" | "done" | "blocked"; retries?: number };
+// Live `/gs` engine run — the real GS state.json the engine drives.
+export type EngineTaskView = { id?: string; title: string; status: "pending" | "in_progress" | "done" | "skipped" | "blocked"; retries?: number };
 export type EngineSliceView = { id?: string; title: string; tasks: EngineTaskView[] };
 export type EngineRun = {
   active: boolean;
   goal?: string;
+  stage?: string;
+  statusText?: string;
   updatedAt?: string;
   total?: number;
   done?: number;
+  skipped?: number;
   blocked?: number;
   current?: { slice: string; task: string; status: string } | null;
   slices?: EngineSliceView[];

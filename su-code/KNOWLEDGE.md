@@ -227,3 +227,18 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   upgrade rewrites `~/.omp/agent/config.yml` to a minimal default, dropping 8sync's mnemopi/
   compaction/modelRoles additions. `8sync harness global` re-applies them (idempotent). Only
   the config.yml layer is affected; mcp.json, skills, hooks, APPEND_SYSTEM survive.
+- **validated (native GS migration):** autonomous-agent output is untrusted input, even when
+  it came from a named worker. Correctness requires the engine to bind every result to the
+  current plan hash + revision + exact pending lease + task/tool-call/worker/model identity,
+  enforce owned-file sets, and accept verification only in the legal stage. Review/security
+  failure must reopen a bounded fix stage; stale gate records must never close a run.
+- **validated (one-shot action consent):** approving “bash” or a command class is equivalent
+  to approving arbitrary execution. Consent must hash the exact canonical direct-argv
+  command, be consumed once, and be checked again immediately before execution. Project
+  config may strengthen global safety but must never turn mandatory protections off.
+- **validated (safe legacy cleanup):** migration code must treat unknown files as user-owned.
+  Delete an obsolete deployed file only when it byte-matches a bundled retired asset or has
+  an explicit managed sentinel; otherwise warn and preserve it. Fresh isolated-home smoke:
+  global + project GS extensions and all 7 agents deployed, retired `/auto`/engine copies
+  absent, second install byte-identical. Verification: 192 GS tests, 23 Rust tests, release
+  build, and browser QA of idle + active GS boards (done/skipped/running/blocked).

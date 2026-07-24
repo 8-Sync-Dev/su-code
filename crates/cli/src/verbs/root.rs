@@ -7,18 +7,18 @@ pub fn print_cheatsheet() {
     );
     println!("{}", "Single Rust binary. Embeds configs, profiles, skills. Every verb is idempotent.".dimmed());
     println!("{}\n", "Run any verb with `-h` for detailed help and examples.".dimmed());
-    println!("{}", "AI TEAM — START HERE (the harness + the /auto engine)".bold().green());
+    println!("{}", "AI TEAM — START HERE (the harness + the /gs engine)".bold().green());
     rows(&[
-        ("8sync harness",                  "ONE command: skills + memory loop + /auto + MCP (codegraph/cbm/headroom). Run in any project."),
+        ("8sync harness",                  "ONE command: skills + memory loop + /gs + MCP (codegraph/cbm/headroom). Run in any project."),
         ("8sync harness up --timer 30m",   "run the team loop in the background (periodic refresh + work)"),
         ("8sync harness audit|bench|eval", "doc-hygiene · token budget · loop-quality probe"),
         ("8sync harness web",              "local dashboard (axum+Vite): skills/memory/engines/readiness/team"),
     ]);
     println!("  {}", crate::brand::render("Inside omp (after `8sync .`) — drive the autonomous engine:").dimmed());
     rows(&[
-        ("/auto <goal>",  "research → plan → slices → tasks → verify each → QA/closeout → done"),
-        ("/auto status",  "report progress from the saved plan"),
-        ("/auto resume",  "continue the saved plan, unattended to Definition-of-Done"),
+        ("/gs <goal>",      "clarify → plan → plan-review → implement → verify → review → UAT → closeout"),
+        ("/gs status",      "report progress from the saved run"),
+        ("/gs continue",    "continue the saved run to its next acceptance gate"),
     ]);
     println!();
 

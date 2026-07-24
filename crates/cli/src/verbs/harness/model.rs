@@ -2,7 +2,7 @@
 //!
 //! Two layers, one command:
 //!   • `~/.config/8sync/models.toml` — 8sync's own per-task routing (which model
-//!     `8sync ai`/`8sync .`/`/auto` steer omp toward).
+//!     `8sync ai`/`8sync .`/`/gs` steer omp toward).
 //!   • `~/.omp/agent/config.yml` `modelRoles` — omp's OWN role routing (the
 //!     `/model` picker: default·smol·slow·vision·plan·designer·commit·tiny·task·
 //!     advisor + `task.agentModelOverrides.reviewer`). This is what actually
@@ -42,7 +42,7 @@ pub(crate) fn harness_model(env: &env_detect::Env, args: &[String]) -> Result<()
         let section = if ROLE_KEYS.contains(&key.as_str()) { "roles" } else { "tasks" };
         set_model_toml(&path, section, &key, &val)?;
         ui::ok(&format!("set [{}].{} = \"{}\" → {}", section, key, val, path.display()));
-        ui::info("re-run `8sync harness model` to view; takes effect on the next `8sync ai`/`8sync .`/`/auto`.");
+        ui::info("re-run `8sync harness model` to view; takes effect on the next `8sync ai`/`8sync .`/`/gs`.");
         return Ok(());
     }
 

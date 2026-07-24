@@ -29,7 +29,7 @@ Follow the handoff's new-machine runbook + per-machine section. Concretely:
 
 ## 4. Report — orient the human, then decide
 Print a tight status: **current state** (branch/HEAD, what's done vs in-progress from the handoff), **blockers**, **the single next concrete action** (exact file/command), and any per-machine step still pending.
-- `$ARGUMENTS` = `go` → immediately start that next action (right-size per ponytail; use `/auto` for a real multi-slice goal). Stop only on a true blocker.
+- `$ARGUMENTS` = `go` → immediately start that next action (right-size per ponytail; use `/gs` for a real multi-slice goal). Stop only on a true blocker.
 - empty → **STOP here** and wait for the human's go — pulling + orienting is the deliverable, not committing to new work blindly.
 
 ## Guardrails
