@@ -242,3 +242,12 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   global + project GS extensions and all 7 agents deployed, retired `/auto`/engine copies
   absent, second install byte-identical. Verification: 192 GS tests, 23 Rust tests, release
   build, and browser QA of idle + active GS boards (done/skipped/running/blocked).
+- **validated (tool-adherence design):** repeating tool preferences in prompts is not an
+  enforcement mechanism. For measurable code-intelligence-first behavior, combine concise
+  tool contracts with a pre-execution steering hook and telemetry, then compare
+  `8sync harness toolstats` before/after. Prefer “steer and let the agent self-correct”
+  over a blanket block because plain-text grep/read still has legitimate uses. Research
+  and claim provenance live in `outputs/raising-tool-adherence-research{,.provenance}.md`.
+- **gotcha (state-file ambiguity):** a root `STATE.md` can be mistaken for the managed
+  `su-code/STATE.md` by basename-based tools. Keep the live spine only under `su-code/`;
+  archive unrelated completed state with a descriptive filename under `outputs/`.

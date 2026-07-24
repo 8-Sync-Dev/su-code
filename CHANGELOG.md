@@ -5,6 +5,13 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — project tooling and research handoff
+- Added project-local Serena configuration in `.serena/project.yml`; generated caches,
+  language-server state, local overrides, and Serena memories remain ignored.
+- Preserved the source-backed tool-adherence research and provenance under `outputs/`.
+  Archived an unrelated completed root `STATE.md` beside those outputs so the only live
+  project spine remains `su-code/STATE.md`.
+
 ### Added — native `/gs` deterministic engineering-team engine
 - Replaced the legacy prompt-driven `/auto` loop with `assets/extensions/8sync-gs/`: a
   persisted, code-enforced state machine for clarify → research → plan → implement →
