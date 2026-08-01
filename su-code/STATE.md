@@ -1,4 +1,5 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
+> **Active feature:** `su-code/planning/lean-binary/STATE.md` — `8sync feature status`
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
@@ -43,9 +44,16 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 6. Per-máy nếu cần: npm fix · `8sync feynman auth-omp` · `8sync harness browser` · `8sync setup --profile apps-personal` (Lark).
 
 ## Current step
-**omp-17 MCP fix + Lark profile (WIP checkpoint trên v0.52.0)** — done + verified máy này; commit này là nó. KHÔNG release (không bump tag).
-- **Prior shipped**: STEP-0 MCP fix omp-16 (64bd650, nay được omp-17-aware hóa) · `/push-now`+`/pull-now` (c402209, 6bb38ae) · v0.52.0 (`8sync vpn`) · v0.51.0 (`feynman auth-omp`) · v0.50.0 · v0.48.0 (`/feature` GSD) · v0.47.0 cross-platform.
-
+**`branch-sync` skill + `/sync-pr` slash command + `8sync omp update` verb (WIP uncommitted trên `589807e`)** — done + verified live trên máy này.
+- **Session này (2026-07-22):**
+  1. Thêm verb `crates/cli/src/verbs/omp.rs` (`8sync omp update` [`--force`]): tự động auto-repair khi `omp update` dính lỗi `npm EEXIST` hoặc bun `Fail extracting tarball`.
+  2. Tạo skill `assets/skills/branch-sync/SKILL.md` + script `assets/skills/branch-sync/scripts/branch_sync.py`: audit, deep preview (commit breakdown + `git merge-tree`), merge vào `main` và zero-conflict multi-branch sync.
+  3. Deploy slash command `/sync-pr` (`assets/commands/sync-pr.md`): deploy toàn cục (`~/.omp/agent/commands/sync-pr.md`) và per-project (`.omp/commands/sync-pr.md`) — nạp `branch-sync` skill và chạy sync cho mọi dự án `omp`.
+  4. Nâng cấp `8sync harness global`: tự động nhận diện và stamp `su-code/` / `AGENTS.md` project ở CWD (skills mirror, AGENTS/CLAUDE inject, memory, engine, codegraph init).
+  5. Đào sâu `assets/skills/deep-research/SKILL.md`: tích hợp state-machine loop engineering, STEP-0 code intelligence (`codegraph`/`cbm`/`serena`), multi-agent wave execution (`tasks[]`), headroom nén output và ponytail YAGNI.
+- **Verified live:** Rebuild binary 8sync 0.52.0; `8sync harness global` deploy `/sync-pr` + 74 skills; `branch_sync.py --action audit` xanh; `8sync omp update` normal + `--force` xanh.
+- **WIP chưa commit:** `assets/skills/branch-sync/` · `assets/commands/sync-pr.md` · `crates/cli/src/verbs/omp.rs` · `main.rs` · `verbs/mod.rs` · `up.rs` · `global.rs` · `deploy.rs` · `CHANGELOG.md` · `su-code/KNOWLEDGE.md` · `su-code/STATE.md`. Muốn ship → `/push-now`.
+- **Prior shipped**: omp-17 MCP fix + Lark (589807e) · STEP-0 MCP fix omp-16 (64bd650) · `/push-now`+`/pull-now` (c402209, 6bb38ae) · v0.52.0 (`8sync vpn`).
 ## Next (chưa làm)
 - [ ] (tùy) Nếu muốn `/push-now` thành release: bump `Cargo.toml` + CHANGELOG version + push tag → CI 5 assets.
 - [ ] (tùy) Hardening: `8sync feynman auth-omp`/`doctor` detect `npm` hỏng và warn (feynman phụ thuộc npm runtime). Chưa làm — ngoài phạm vi yêu cầu.

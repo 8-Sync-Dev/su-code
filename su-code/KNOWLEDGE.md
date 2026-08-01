@@ -227,3 +227,81 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   upgrade rewrites `~/.omp/agent/config.yml` to a minimal default, dropping 8sync's mnemopi/
   compaction/modelRoles additions. `8sync harness global` re-applies them (idempotent). Only
   the config.yml layer is affected; mcp.json, skills, hooks, APPEND_SYSTEM survive.
+- validated (`8sync omp update` verb — auto-fix `omp update` EEXIST): omp gets installed as a
+  standalone binary — a real 173 MB file at `~/.local/bin/omp` (`readlink -f` = itself, NOT a
+  symlink; nothing in `~/.local/lib/node_modules`). `omp update` shells out to npm/bun
+  `install -g @oh-my-pi/pi-coding-agent`, which wants a bin SYMLINK at that path → `npm error
+  EEXIST` (or bun `Fail extracting tarball`). Fix (native Rust, `crates/cli/src/verbs/omp.rs`,
+  verified live BOTH paths): run `omp update`; on a block, back up the bin → `rm` the squatter →
+  `npm install -g @oh-my-pi/pi-coding-agent@latest` (path now free → creates the symlink) →
+  re-resolve + report. `--force` skips straight to reinstall. Shipped as the `8sync omp`
+  verb, NOT an omp `/command`: it runs from the SHELL so it works even when omp itself is
+  broken (exactly when you need it); `8sync up` stays decoupled (8sync binary only) and now
+  points at `8sync omp update`. Gotchas: (a) two installs coexist — bun global `~/.bun/bin/omp`
+  + npm `~/.local/bin/omp`, `~/.bun/bin` is FIRST on PATH so `command -v omp` is what runs;
+  `rm`-ing the PATH-first bin makes resolution fall to the npm one (still healthy). (b) 8sync is
+  NOT omp, so removing omp's file mid-run is safe (no in-memory-process worry the old
+  `/omp-update` slash-command had). (c) `npm config get prefix` = `~/.local`; bun's updater threw
+  `Fail extracting tarball` even on partial success — npm direct install is the reliable path.
+- validated (omp 17.0.1 plan-mode "Enter không ăn" — diagnosed, upstream bug, NOT keyboard):
+  plan-review dialog key handling is CORRECT — verified live with all Enter encodings (legacy
+  `\r`, kitty CSI-u `\x1b[13u`, numpad `\x1b[57414u`) in bare PTY AND real kitty: every variant
+  picks. Freeze mode (bundle decompile): `handlePlanApproval` keeps the overlay MOUNTED while
+  awaiting the whole approval flow (`#eA`: clear/compact = full model call over the entire
+  context + `session.prompt`), and the pick resolver is single-shot (`if (O) return`) — after the
+  FIRST Enter, arrows still move ❯ but Enter/esc are dead until the async flow finishes; a stalled
+  provider call (no timeout) freezes it indefinitely. "Approve and compact context" on a ~229k
+  session = minutes of frozen-looking dialog. Recovery: plan file survives at
+  `local://<slug>-plan.md` — Ctrl+C / restart omp, resume, approve again (prefer "Approve and
+  execute" on huge contexts). Upstream fix = hide overlay (or busy state) right after pick, before
+  `#eA`. Report to can1357/oh-my-pi (blocked this session: gh keyring auth broken).
+- failure: omp hub daemon launcher breaks under fish as $SHELL — generated wrapper uses
+  `printf '%s' "$$"` which fish rejects (`$$ is not the pid`) → every `hub start` exits 127
+  before exec; SHELL env override on the start call does NOT change the wrapper shell (broker
+  resolves shell at its own start). Workaround: drive PTYs via python `pty` module or
+  `kitty --listen-on unix:... @ send-key/get-text`. Also upstream-reportable.
+- validated (`branch-sync` skill & `8sync harness global` auto-detection): (a) `assets/skills/branch-sync/SKILL.md` + `scripts/branch_sync.py` provides automated multi-branch audit, deep preview (commit breakdown + `git merge-tree` conflict check), safe merge to main, and zero-conflict sync across all branches. (b) `8sync harness global` now auto-detects `su-code/` projects in cwd and automatically updates their local harness (skills mirror, AGENTS/CLAUDE injection, memory, commands, gitleaks hook, codegraph init) without requiring explicit `--sweep`. (c) `deep-research` skill enhanced with loop engineering state machines, STEP-0 code intelligence (`codegraph`/`codebase-memory-mcp`/`serena`), multi-agent wave execution, headroom compression, and ponytail YAGNI discipline.
+- validated (binary-size audit 2026-08-02, brief: `outputs/native-tooling-zig-rust.md`): `8sync`
+  stripped = **6 406 696 B (6.11 MiB)** vs the `AGENTS.md` §8 budget "< 4 MB" → ~1.5–1.6× over.
+  Sections: `.text` 2 854 517 · `.rodata` 2 188 928 (embedded assets) · `.eh_frame` 482 684 ·
+  `.rela.dyn` 419 856. `cargo bloat --crates`: `[Unknown]` C 780 KiB · std 571 · **our code only
+  405 (14.5 %)** · axum 217 · clap_builder 122 · scraper 104 · zstd_sys 58 · tokio 46 ·
+  libsqlite3_sys 40. Raw blobs pre-GC: `libsqlite3.a` 2.1 MB; embedded `assets/` 3.0 MB
+  (impeccable 2.1 MB, its `scripts/` 1.6 MB) + `web/dist` 1.9 MB. Root cause is NOT the language
+  or the flags: `crates/cli/Cargo.toml` has **no `[features]` section**, so `harness web`
+  (axum/tokio/hyper/tower), marketplace scraping (scraper/html5ever) and `harness toolstats`
+  (bundled SQLite) link into every build. Fix order: feature-gate → un-embed `web/dist` +
+  `impeccable/scripts` → re-evaluate `rust-embed`'s `compression`.
+- failure (release-profile knobs are EXHAUSTED — stop re-litigating them; all A/B'd with an
+  explicit `--target x86_64-unknown-linux-gnu` so RUSTFLAGS skip host proc-macros):
+  (a) `-C force-unwind-tables=no` under `panic="abort"` saves **704 bytes**; `.eh_frame` stays
+  482 KB (std + the C blobs still emit tables). (b) `opt-level="s"` is **307 392 B BIGGER** than
+  `"z"` → keep `"z"`. (c) `-C relocation-model=static` without an explicit `--target` **breaks the
+  build** — proc-macros (`indoc`) must be PIC. Lesson: demand an A/B byte count before accepting
+  any new size flag.
+- gotcha: `rust-embed`'s `compression` feature pulls `include-flate` → `include-flate-compress`,
+  which is shared by the build-time proc-macro AND the runtime crate — so the **compressor** half
+  of both `libflate` and `zstd` links into a binary that only ever decompresses (`zstd_sys` =
+  58.4 KiB `.text` surviving fat LTO). Verify with `cargo tree -i zstd-sys`.
+- validated (Zig's real role for this repo): use it as **build tooling, never as a language** —
+  there is no compute hot path (`8sync --version` ≈ 11.6 ms incl. fork+exec; `help` 10 ms).
+  `cargo-zigbuild` can replace the `cross`/Docker leg for `aarch64-unknown-linux-musl` in
+  `.github/workflows/release.yml` and collapse the two macOS assets via `universal2-apple-darwin`
+  (5 legs → 4). Hard caveat from the upstream README: *"Currently only Linux and macOS targets
+  are supported"* → the Windows MSVC leg is untouched; and `-C target-feature=+crt-static`
+  against glibc is unsupported (musl-static unaffected). glibc-pinned triples are irrelevant here
+  because CI already ships musl-static Linux builds. Also keep the 9 `curl` shell-outs: 0 bytes,
+  `AGENTS.md` §8 bans the heavy HTTP dep, and a TLS stack would ADD ~1 MB to fix a non-problem.
+- failure (`engine_advance {commit:true}` CANNOT make atomic commits): the extension runs a bare
+  **`git add -A`** before committing (`.omp/extensions/8sync-engine.ts:287`), so it sweeps the
+  ENTIRE working tree regardless of what you staged — a per-task message then lies about a
+  whole-tree commit. Hit live in M0 of `lean-binary`: "T1 add omp verb" captured 29 files.
+  Rule: when splitting a dirty tree into deliverable-shaped commits, `git add <paths>` +
+  `git commit` by hand and call `engine_advance {commit:false}` — the engine still enforces the
+  verify-gate, which is the part that matters. `commit:true` is only safe when the tree contains
+  exactly one task's work (the greenfield task-by-task case it was written for).
+- gotcha (verify-gate scope): `engine_verify` runs its commands against the **working tree**, not
+  against the staged index or the resulting commit. Splitting one dirty tree into N commits
+  therefore proves only that the final tree builds. To make "every commit compiles" a real claim,
+  replay the range in a throwaway worktree (`git worktree add`, `git checkout <sha>`,
+  `cargo build`) instead of trusting N green `engine_verify` calls.

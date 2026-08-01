@@ -5,6 +5,36 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — `lean-binary` feature scope (GSD planning tree), M0 landed
+- `su-code/planning/lean-binary/` — 4-phase roadmap to bring the binary back under the `AGENTS.md` §8 "< 4 MB" budget **without dropping a user-visible feature**: M0 land pending WIP · M1 feature gating + per-gate byte attribution · M2 eliminate rather than gate · M3 CI (`cargo-zigbuild` `aarch64-musl`, macOS `universal2`) + budget truth.
+- **M0 PASS.** Baseline recorded at **6 407 848 B** vs the 4 194 304 B budget (overshoot 2 213 544 B). Every commit in the range was replayed in a throwaway `git worktree` and built from scratch — 4/4 green — because `engine_verify` only ever sees the working tree.
+
+### Added — `deep-research` §5 "Native & Binary-Weight Audits" + a measured audit of `8sync` itself
+- `assets/skills/deep-research/SKILL.md` gains a 7-step protocol for native/binary-weight research: ground with `size -A`, attribute with `cargo bloat --crates` (and chase its `[Unknown]` C row through `build/*/out/*.a`), A/B every proposed flag into a scratch `--target-dir` with an explicit `--target`, record falsified knobs as `failure:` entries, trace surprise deps with `cargo tree -i`, prefer `[features]` gating over rewrites, and reach for Zig only as build tooling.
+- Applied it to this repo — brief at `outputs/native-tooling-zig-rust.md` (+ plan/drafts/provenance). Headline: the binary is **6 406 696 B (6.11 MiB)** against the `AGENTS.md` §8 "< 4 MB" budget, and the cause is that `crates/cli/Cargo.toml` has **no `[features]` section** — `harness web` (axum/tokio/hyper), marketplace scraping (scraper/html5ever) and `harness toolstats` (bundled SQLite, 2.1 MB `.a`) link into every build, alongside 4.9 MB of embedded assets (`web/dist` 1.9 MB, `impeccable/scripts` 1.6 MB).
+- Release-profile knobs proven exhausted by A/B: `opt-level="s"` is **+307 392 B** vs `"z"`; `-C force-unwind-tables=no` saves **704 B**; `-C relocation-model=static` breaks proc-macro builds. No profile change made.
+
+### Added — `branch-sync` skill & automated script for zero-conflict multi-branch sync
+- **`/sync-pr` slash command**: Deployed globally (`~/.omp/agent/commands/sync-pr.md`) and per-project (`.omp/commands/sync-pr.md`). Invoking `/sync-pr [<branch>]` in any omp session automatically loads the `branch-sync` skill, audits all local/remote branches, deep-previews and safely merges specified feature branches to `main`, and synchronizes all active branches to match latest `main` with zero conflicts.
+- New skill `assets/skills/branch-sync/SKILL.md` + helper script `assets/skills/branch-sync/scripts/branch_sync.py`: provides complete audit, deep-preview (`git diff main...<branch>`, commit breakdown, conflict dry-run), safe merge to `main`, and zero-conflict multi-branch synchronization across all active local/remote branches without risk of merge conflict leaks or data loss.
+
+### Enhanced — `8sync harness global` auto-detection for `su-code/` projects
+- `8sync harness global` now automatically detects if the current working directory is an `omp` project (containing `su-code/` or `AGENTS.md`) and stamps its per-project harness layer (vendors global skills into `su-code/skills/`, injects `AGENTS.md`/`CLAUDE.md`, seeds memory, installs pre-commit hook, and initializes `codegraph`) without requiring manual `--sweep`.
+
+### Enhanced — `deep-research` skill with AI Agent loop engineering & design patterns
+- Deepened `assets/skills/deep-research/SKILL.md`: incorporates state-machine loop engineering (Plan → Execute → Verify → Advance), STEP-0 code intelligence (`codegraph`, `codebase-memory-mcp`, `serena`), multi-agent wave execution (`tasks[]`), headroom output compression, modality-fit vision routing, and ponytail YAGNI discipline for large real-world codebases.
+
+### Added — `8sync omp update` verb (update omp + auto-repair a blocked install)
+- New verb `crates/cli/src/verbs/omp.rs` (`8sync omp update`, `--force`): runs `omp update`
+  and, when it fails with `npm error EEXIST … ~/.local/bin/omp` or bun `Fail extracting
+  tarball`, auto-repairs — backs up the current binary, clears the standalone file squatting
+  the symlink path, `npm install -g @oh-my-pi/pi-coding-agent@latest`, then re-resolves and
+  reports `CURRENT → NEW`. Runs from the SHELL (not an omp `/command`) so it works even when
+  omp is broken; native Rust, no `sudo`/system-pkg/git. `8sync up` note now points here.
+- Verified live both paths: normal ("Already up to date" @ 17.0.7) and `--force` (backup → rm
+  → npm reinstall → `~/.local/bin/omp` healthy `node_modules` symlink). Root cause: omp ships
+  as a standalone binary that squats the bin path where the package manager wants a symlink.
+
 ### Added — Lark (larksuite) to the `apps-personal` profile
 - `assets/profiles/apps-personal.toml` now installs Lark via AUR `larksuite-bin`
   (v7.66.11, URL larksuite.com) alongside Bitwarden. AUR bin package auto-fetches the
