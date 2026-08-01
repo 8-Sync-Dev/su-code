@@ -74,13 +74,24 @@ pub(crate) fn harness_global(
     ui::step("token-optimizer defaults (Anthropic)");
     let _ = compaction::ensure_threshold_default(&env.home, 50);
 
-    // 3. Optional: re-pull registered skills from their sources (network).
+    // 3. Auto-stamp current project root if inside an omp project (su-code/ or AGENTS.md).
+    if let Some(cwd_root) = discover::detect_current_project_root() {
+        if is_omp_project(&cwd_root) {
+            ui::step(&format!("auto-stamp active project: {}", cwd_root.display()));
+            match stamp_project(env, &cwd_root, force) {
+                Ok(m) => ui::ok(&format!("active project harness updated ({} skill(s) synced)", m)),
+                Err(e) => ui::warn(&format!("active project update warning: {}", e)),
+            }
+        }
+    }
+
+    // 4. Optional: re-pull registered skills from their sources (network).
     if pull {
         ui::step("re-pull registered skills (network)");
         let _ = update::update_skills(env, &env.xdg_config.join("8sync/skills.toml"), None);
     }
 
-    // 4. Optional: stamp the per-project layer into every git repo under DIR.
+    // 5. Optional: stamp the per-project layer into every git repo under DIR.
     if let Some(dir) = sweep {
         let root = sweep_root(env, dir);
         ui::step(&format!("sweep projects under {}", root.display()));
@@ -189,17 +200,18 @@ fn find_git_repos(root: &Path, max_depth: usize) -> Vec<PathBuf> {
 /// Per-project layer for one repo (the light, additive subset of bare
 /// `8sync harness`): mirror skills, inject force-load into AGENTS.md/CLAUDE.md,
 /// seed su-code/ memory, install the gitleaks hook. Returns mirrored-skill count.
-fn stamp_project(env: &env_detect::Env, root: &Path, force: bool) -> Result<usize> {
-    let mirrored = deploy::mirror_global_to_local(&env.home, root, force)?;
-    for d in discover::list_installed_skill_dirs(&root.join("su-code/skills")).unwrap_or_default() {
-        deploy::ensure_skill_layout(&d);
-    }
-    inject_agents_md(&env.home, root)?;
-    seed_harness_memory(root)?;
-    seed_gitleaks_hook(root);
-    // Redeploy the /auto command + engine to the project so a swept repo's
-    // `.omp/commands/auto.md` (precedence over global) points at su-code/, not
-    // a stale agents/ copy from an older binary.
-    deploy::ensure_engine(&env.home, Some(root))?;
-    Ok(mirrored)
-}
+ fn stamp_project(env: &env_detect::Env, root: &Path, force: bool) -> Result<usize> {
+     let mirrored = deploy::mirror_global_to_local(&env.home, root, force)?;
+     for d in discover::list_installed_skill_dirs(&root.join("su-code/skills")).unwrap_or_default() {
+         deploy::ensure_skill_layout(&d);
+     }
+     inject_agents_md(&env.home, root)?;
+     seed_harness_memory(root)?;
+     seed_gitleaks_hook(root);
+     // Redeploy the /auto command + engine to the project so a swept repo's
+     // `.omp/commands/auto.md` (precedence over global) points at su-code/, not
+     // a stale agents/ copy from an older binary.
+     deploy::ensure_engine(&env.home, Some(root))?;
+     deploy::ensure_codegraph_init(root);
+     Ok(mirrored)
+ }
