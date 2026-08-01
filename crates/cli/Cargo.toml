@@ -11,6 +11,17 @@ description = "8sync — vibe coding harness for CachyOS + Kitty + Helix"
 name = "8sync"
 path = "src/main.rs"
 
+# Optional subsystems. `default` keeps the released binary complete — the gates
+# exist so each subsystem's weight is MEASURABLE (scripts/size-report.sh) and so
+# a minimal build is possible on machines that only want the vibe loop.
+# `marketplace` is deliberately NOT its own feature: `verbs/harness/marketplace.rs`
+# has exactly one caller (`web.rs` → /api/marketplace), so `scraper` is
+# dashboard-only and lives inside `web`.
+[features]
+default = ["web", "toolstats"]
+web = ["dep:axum", "dep:tokio", "dep:tower-http", "dep:scraper"]
+toolstats = ["dep:rusqlite"]
+
 [dependencies]
 clap = { version = "4.5", features = ["derive", "wrap_help"] }
 anyhow = "1.0"
@@ -27,14 +38,14 @@ rust-embed = { version = "8.5", features = ["debug-embed", "compression"] }
 serde_json = "1.0"
 urlencoding = "2.1"
 # `8sync harness web` dashboard (axum + tokio) — intentional override of the
-# "avoid tokio" rule in AGENTS.md §8; gated behind the `web` harness subcommand.
-axum = { version = "0.7", default-features = false, features = ["http1", "json", "tokio", "query"] }
-tokio = { version = "1", features = ["rt-multi-thread", "net", "signal", "macros"] }
-tower-http = { version = "0.5", features = ["cors"] }
+# "avoid tokio" rule in AGENTS.md §8; gated behind the `web` feature.
+axum = { version = "0.7", default-features = false, features = ["http1", "json", "tokio", "query"], optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "signal", "macros"], optional = true }
+tower-http = { version = "0.5", features = ["cors"], optional = true }
 # `8sync harness toolstats` — SQLite tracker of omp tool-call usage (optimizer vs
 # fallback ratio + failures). Bundled sqlite = self-contained, no system dep.
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 # `8sync harness web` marketplace — Rust-first HTML scraping (pure Rust,
 # html5ever + CSS selectors) for aggregator sites without a JSON API (mcp.so).
 # HTTP still shells out to `curl` (no reqwest); scraper only parses the DOM.
-scraper = "0.20"
+scraper = { version = "0.20", optional = true }
