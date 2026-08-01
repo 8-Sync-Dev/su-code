@@ -14,7 +14,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
     // (asset prefix, target subdir name). always-on first (read order), then
     // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
-    let bundled: [(&str, &str); 18] = [
+    let bundled: [(&str, &str); 20] = [
         ("skills/codegraph",               "codegraph"),
         ("skills/karpathy",                "karpathy-guidelines"),
         ("skills/ponytail",                "ponytail"),
@@ -33,6 +33,8 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
         ("skills/last30days",              "last30days"),
         ("skills/token-bench",             "token-bench"),
         ("skills/feature",                 "feature"),
+        ("skills/branch-sync",             "branch-sync"),
+        ("skills/deep-research",           "deep-research"),
     ];
     for (asset_prefix, name) in bundled {
         let target_dir = skills_dir.join(name);
@@ -1043,6 +1045,14 @@ pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
         ".omp/agent/commands/pull-now.md",
         ".omp/commands/pull-now.md",
         "/pull-now command",
+    )?;
+    deploy_omp_pair(
+        home,
+        root,
+        "commands/sync-pr.md",
+        ".omp/agent/commands/sync-pr.md",
+        ".omp/commands/sync-pr.md",
+        "/sync-pr command",
     )
 }
 
