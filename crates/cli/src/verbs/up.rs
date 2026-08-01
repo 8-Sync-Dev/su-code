@@ -35,6 +35,6 @@ pub fn run(a: Args) -> Result<()> {
     if updated {
         ui::info("done — re-run any 8sync command to pick up the new binary");
     }
-    ui::info("note: `8sync up` only updates 8sync. For omp run `omp update`; for system pkgs run `paru -Syu`.");
+    ui::info("note: `8sync up` only updates 8sync. For omp run `8sync omp update`; for system pkgs run `paru -Syu`.");
     Ok(())
 }

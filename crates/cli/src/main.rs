@@ -54,6 +54,9 @@ enum Cmd {
     #[command(alias = "update")]
     Up(verbs::up::Args),
 
+    /// Update omp + auto-repair a blocked install (EEXIST/tarball): `8sync omp update`
+    Omp(verbs::omp::Args),
+
     /// Health-check; report what's installed and what's missing
     Doctor,
 
@@ -150,6 +153,7 @@ fn main() -> Result<()> {
         }
         Some(Cmd::Setup(a))   => verbs::setup::run(a),
         Some(Cmd::Up(a))      => verbs::up::run(a),
+        Some(Cmd::Omp(a))     => verbs::omp::run(a),
         Some(Cmd::Doctor)     => verbs::doctor::run(),
         Some(Cmd::Here(a))    => verbs::here::run(a),
         Some(Cmd::Ai(a))      => verbs::ai::run(a),
