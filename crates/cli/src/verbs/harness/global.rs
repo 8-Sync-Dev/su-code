@@ -144,12 +144,12 @@ pub(crate) fn harness_global(
 }
 
 /// An omp project = a repo already carrying the agent-memory layer: an `su-code/`
-/// dir or an `AGENTS.md`/`CLAUDE.md` at the root. The sweep only stamps these —
-/// it never injects into repos that don't use omp (onboard those by running
-/// `8sync harness` inside them once).
-fn is_omp_project(repo: &Path) -> bool {
-    repo.join("su-code").is_dir() || repo.join("AGENTS.md").is_file() || repo.join("CLAUDE.md").is_file()
-}
+/// dir holding real memory, or an `AGENTS.md`/`CLAUDE.md` at the root. The sweep
+/// only stamps these — it never injects into repos that don't use omp (onboard
+/// those by running `8sync harness` inside them once). Shares the memory-tree
+/// test with `discover`, so a directory that merely *shares the name* `su-code`
+/// can never make its parent look like a project.
+use discover::is_omp_project;
 
 /// Resolve the sweep root: explicit DIR > `~/Projects` (if present) > cwd.
 fn sweep_root(env: &env_detect::Env, dir: &str) -> PathBuf {
