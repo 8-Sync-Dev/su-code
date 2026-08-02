@@ -34,7 +34,6 @@ mod marketplace;
 // MCP knowledge catalog — only the dashboard's /api/knowledge routes consume it.
 #[cfg(feature = "web")]
 pub(crate) mod knowledge;
-#[cfg(feature = "toolstats")]
 mod toolstats;
 
 #[derive(ClapArgs, Debug)]
@@ -160,7 +159,7 @@ pub fn run(a: Args) -> Result<()> {
         Some("eval") if a.project => eval::harness_eval_project(&env),
         Some("eval") => eval::harness_eval(&env, a.baseline),
         Some("web") => dispatch_web(&env, &a),
-        Some("toolstats") | Some("tools") => dispatch_toolstats(&env),
+        Some("toolstats") | Some("tools") => toolstats::harness_toolstats(&env),
         Some("compaction") => compaction::harness_compaction(&env.home, v1.as_deref()),
         Some("model") => {
             let args: Vec<String> = [v1.clone(), a.value2.clone()].into_iter().flatten().collect();
@@ -219,16 +218,6 @@ fn dispatch_web(_env: &env_detect::Env, _a: &Args) -> Result<()> {
     anyhow::bail!("`harness web` is not built into this binary — rebuild with `--features web`")
 }
 
-#[cfg(feature = "toolstats")]
-fn dispatch_toolstats(env: &env_detect::Env) -> Result<()> {
-    toolstats::harness_toolstats(env)
-}
-
-#[cfg(not(feature = "toolstats"))]
-fn dispatch_toolstats(_env: &env_detect::Env) -> Result<()> {
-    anyhow::bail!("`harness toolstats` is not built into this binary — rebuild with `--features toolstats`")
-}
-
 /// `8sync harness help` — one-screen cheatsheet: harness/skill commands, skill
 /// tiers, the commit-vs-ignore file taxonomy, and the new-machine runbook.
 fn print_help() {
@@ -256,8 +245,7 @@ fn print_help() {
     println!("{}", crate::brand::render("  8sync harness browser [fix|status|off]  point omp's browser at system Chromium (ungoogled) — fixes browser control not reaching the internet"));
     #[cfg(feature = "web")]
     println!("{}", crate::brand::render("  8sync harness web [--port N]    local dashboard (axum+Vite): skills/memory/engines/team/submodules"));
-    #[cfg(feature = "toolstats")]
-    println!("{}", crate::brand::render("  8sync harness toolstats         SQLite tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails"));
+    println!("{}", crate::brand::render("  8sync harness toolstats         omp tool-call tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails"));
     println!("{}", crate::brand::render("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)"));
     println!("{}", crate::brand::render("  8sync feature [new|switch|status|list]  large multi-phase GSD scope (planning tree + ACTIVE switch); /feature plan|go|ship in omp"));
 
