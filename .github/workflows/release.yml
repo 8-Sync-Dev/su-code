@@ -31,31 +31,39 @@ jobs:
             target: x86_64-unknown-linux-musl
             label: linux-x86_64
             ext: ""
-            cross: false
+            zig: false
+          # aarch64 cross-compiles with cargo-zigbuild (zig as linker) rather
+          # than `cross`: `cross` runs the build inside a Docker image with no JS
+          # toolchain, so build.rs could not build the Vite dashboard and silently
+          # embedded the stub page into this asset. zigbuild runs on the runner,
+          # where npm exists, so the asset gets the real dashboard — and the
+          # Docker leg disappears. Locally: 31.9 s → static aarch64 ELF.
           - runner: ubuntu-latest
             target: aarch64-unknown-linux-musl
             label: linux-aarch64
             ext: ""
-            cross: true
+            zig: true
           # macOS — both slices on Apple-Silicon runners (macos-13 Intel is
           # deprecated / scarce). arm64 builds native; x86_64 cross-compiles via
           # the rustup target (Apple clang handles the C deps for both arches).
+          # Deliberately NOT `universal2`: a fat binary would make every Mac user
+          # download both slices, which is the opposite of this repo's size goal.
           - runner: macos-14
             target: x86_64-apple-darwin
             label: darwin-x86_64
             ext: ""
-            cross: false
+            zig: false
           - runner: macos-14
             target: aarch64-apple-darwin
             label: darwin-arm64
             ext: ""
-            cross: false
+            zig: false
           # Windows — native MSVC build.
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             label: windows-x86_64
             ext: ".exe"
-            cross: false
+            zig: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,19 +84,28 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: Install cross
-        if: ${{ matrix.cross }}
+      # zig is the LINKER for the aarch64-musl leg. Version pinned to the one
+      # this was verified against locally (zig 0.16.0 + cargo-zigbuild 0.23.0
+      # produced a 4 151 328 B static aarch64 ELF in 31.9 s).
+      - name: Install zig
+        if: ${{ matrix.zig }}
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - name: Install cargo-zigbuild
+        if: ${{ matrix.zig }}
         uses: taiki-e/install-action@v2
         with:
-          tool: cross
+          tool: cargo-zigbuild
 
       - name: Build (native)
-        if: ${{ !matrix.cross }}
+        if: ${{ !matrix.zig }}
         run: cargo build --release --locked --target ${{ matrix.target }}
 
-      - name: Build (cross)
-        if: ${{ matrix.cross }}
-        run: cross build --release --locked --target ${{ matrix.target }}
+      - name: Build (zig cross)
+        if: ${{ matrix.zig }}
+        run: cargo zigbuild --release --locked --target ${{ matrix.target }}
 
       - name: Compute asset name
         shell: bash
@@ -105,6 +122,10 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         shell: bash
         run: cp "target/${{ matrix.target }}/release/8sync.exe" "$ASSET"
+
+      - name: Size gate
+        shell: bash
+        run: bash scripts/size-gate.sh "$ASSET"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
