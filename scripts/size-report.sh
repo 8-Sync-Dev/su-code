@@ -26,10 +26,8 @@ BUDGET=4194304   # AGENTS.md §8: "< 4 MB stripped"
 
 # name : cargo feature flags
 COMBOS=(
-  "full            :"
-  "web-only        :--no-default-features --features web"
-  "toolstats-only  :--no-default-features --features toolstats"
-  "minimal         :--no-default-features"
+  "full     :"
+  "minimal  :--no-default-features"
 )
 
 say() { printf "\033[1;36m[size-report]\033[0m %s\n" "$*"; }
@@ -60,9 +58,7 @@ for entry in "${COMBOS[@]}"; do
 done
 
 printf '\n%s\n' "gate cost (full minus the build without it):"
-printf '  %-12s %+d bytes\n' "web"       "$(( ${SIZE[full]} - ${SIZE[toolstats-only]} ))"
-printf '  %-12s %+d bytes\n' "toolstats" "$(( ${SIZE[full]} - ${SIZE[web-only]} ))"
-printf '  %-12s %+d bytes\n' "both"      "$(( ${SIZE[full]} - ${SIZE[minimal]} ))"
+printf '  %-12s %+d bytes\n' "web" "$(( ${SIZE[full]} - ${SIZE[minimal]} ))"
 printf '\nbudget (AGENTS.md §8): %d bytes\n' "$BUDGET"
 
 [ -n "${KEEP:-}" ] || { rm -rf "$SCRATCH"; say "scratch removed (KEEP=1 to retain)"; }

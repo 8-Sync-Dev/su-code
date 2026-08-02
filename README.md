@@ -157,7 +157,7 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 | `8sync harness bench` | Measure the loop's context budget (upfront vs deferred tokens + KV-cache gate). Prints the upfront breakdown — prefix / CORE / memory-spine — and a spine advisory when the memory spine eats more than 50% of the upfront budget |
 | `8sync harness audit` | Scan docs: stale paths / oversized / junk + churn (doc-hygiene) |
 | `8sync harness eval [--baseline]` | Run the quality task-suite through omp; `--baseline` saves the reference |
-| `8sync harness toolstats` | SQLite tracker: optimizer rate (codegraph/cbm/serena) vs fallback (grep/read) + failures per tool |
+| `8sync harness toolstats` | omp tool-call tracker: optimizer rate (codegraph/cbm/serena) vs fallback (grep/read) + failures per tool. No database — re-scans the session JSONL and folds in memory |
 | `8sync harness compaction [pct]` | View/set the omp auto-compaction threshold (anti-forget; default 50%) |
 | `8sync harness model [k v]` | View/edit `~/.config/8sync/models.toml` (routing for `/auto` + `8sync ai`) |
 
@@ -228,7 +228,7 @@ The sidebar is grouped — every page reads **real data** (no mocks), and most p
 |---|---|---|
 | Session | **State · Context** | Live plan (`su-code/STATE.md`), real session token/compaction stats |
 | Configure | **Models · Skills · Memory · Rules** | Change the model per role/task (writes `models.toml` immediately) · filter + cycle tiers across the 37 skills · edit the 6 memory files (STATE/KNOWLEDGE…) · add/remove rules |
-| Runtime | **Engines · Codegraph · MCP · Submodules** | Engine status (codegraph/cbm/headroom/serena/mnemopi) · **codebase graph**: package call graph (elk) + 12 Leiden clusters + symbol search + caller/callee tracing · MCP servers · git submodules |
+| Runtime | **Engines · Codegraph · MCP · Submodules** | Engine status (codegraph/cbm/headroom/serena/mnemopi) · **codebase graph**: package call graph (dagre layered layout) + 12 Leiden clusters + symbol search + caller/callee tracing · MCP servers · git submodules |
 | Quality | **Bench · Readiness · Team** | Run `harness bench` live — the page auto-loads with upfront breakdown meters (prefix / CORE / memory-spine) + a spine advisory · readiness gate · team roster |
 | Discover | **Marketplace** | Browse + one-click install MCP servers & skills from the official registry, Smithery, Glama, and mcp.so |
 | Projects/Build | **Workspaces · Workflow** | Project switcher · pipeline builder for skills/subagents/tools (exports as an omp extension) |
@@ -278,7 +278,7 @@ Edit `docs/index.html` → push to `main` → Pages rebuilds in ~1 minute.
 
 ## Stack & contribute
 
-Rust workspace, 1 binary (`8sync` ≈ 6.1 MB stripped — bundles the web dashboard FE + 37 skills, heaviest is `impeccable`). Toolchain pinned in `rust-toolchain.toml`. The web dashboard is built from `web/` (Vite/React) via `build.rs` and embedded with rust-embed. The CLI command name + on-disk namespace are single-sourced in `crates/cli/src/brand.rs` — set `SC_CMD`/`SC_NS` at build time to rebrand the whole binary in one place (the default build stays `8sync`, byte-identical).
+Rust workspace, 1 binary (`8sync` ≈ 4.9 MB stripped, or 3.1 MB with `--no-default-features` — the `web` feature adds the dashboard FE + axum/tokio/scraper; 37 skills are always bundled, heaviest is `impeccable`). Measure with `bash scripts/size-report.sh`. Toolchain pinned in `rust-toolchain.toml`. The web dashboard is built from `web/` (Vite/React) via `build.rs` and embedded with rust-embed. The CLI command name + on-disk namespace are single-sourced in `crates/cli/src/brand.rs` — set `SC_CMD`/`SC_NS` at build time to rebrand the whole binary in one place (the default build stays `8sync`, byte-identical).
 
 Source layout:
 

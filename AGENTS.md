@@ -129,7 +129,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - **Helix editor** (`hx` hoặc `helix`)
 - **omp** (oh-my-pi.sh) — AI engine, `~/.bun/bin/omp`
 
-Stack: **Rust** (single workspace, 1 binary `8sync` ≈ 3.8 MB stripped — gồm 15 bundled skill, nặng nhất là `impeccable` ~2 MB scripts/reference).
+Stack: **Rust** (single workspace, 1 binary `8sync` ≈ **4.9 MB stripped**, hoặc **3.1 MB** với `--no-default-features` — feature `web` gánh dashboard FE + axum/tokio/scraper; 37 bundled skill luôn có, nặng nhất là `impeccable` ~2 MB scripts/reference). Đo: `bash scripts/size-report.sh`.
 
 ---
 
@@ -269,7 +269,7 @@ su-code/
 |---|---|
 | `8sync harness [init\|up\|help]` | **bare `8sync harness`** = ONE idempotent command: deploy/update skill + mirror (additive, KHÔNG đè skill đã sửa) + inject + seed memory + consolidate + codegraph index. **init**: full bootstrap (progress UI) + **managed `.gitignore`** (ignore `.codegraph/`/`.cache/`/`.env*`, keep `su-code/`+`su-code/skills/`) + **gitleaks pre-commit hook**; `--force` re-mirror đè hết. **up**: light refresh (`--pull` re-pull skill; `--commit` git-commit memory — gitleaks scan trước, abort nếu rò secret; `--loop`/`--timer` chạy nền; tự consolidate `## Learnings` >200 dòng → `su-code/archive/`). **help**: cheatsheet |
 | `8sync harness global [--sweep [DIR]]` | Apply rule omp **TOÀN CỤC** (mọi project dùng omp, không cần chạy per-project): `~/.omp/skills` + `00-force-load.md` + `APPEND_SYSTEM.md` (append vào MỌI system prompt) + MCP (cbm/headroom/serena/zai-vision) + hooks + capabilities — CWD-independent, không đụng project hiện tại. Kèm token-optimizer default cho Anthropic: compaction 50% (chỉ khi chưa set), headroom compress, APPEND_SYSTEM ghi byte-stable → prompt-cache hit. `--sweep [DIR]` (default `~/Projects`): stamp per-project layer (mirror skills + inject AGENTS.md + seed memory + gitleaks hook) vào MỌI **omp project** dưới DIR — chỉ repo có `su-code/` hoặc `AGENTS.md`/`CLAUDE.md`, repo không dùng omp skip + report (onboard: `cd <repo> && 8sync harness`); codegraph index vẫn per-project. `--pull` re-pull registered skills |
-| `8sync harness toolstats` | SQLite tracker (`.cache/8sync/toolstats.db`, gitignored) đọc omp session JSONL → tỉ lệ **optimizer** (codegraph/cbm/serena/headroom) vs **fallback** (grep/read/search/find/glob) + fail per tool. Nắm bắt lịch sử call, phát hiện STEP-0 không được dùng. Idempotent (re-run chỉ thêm call mới) |
+| `8sync harness toolstats` | Đọc omp session JSONL → tỉ lệ **optimizer** (codegraph/cbm/serena/headroom) vs **fallback** (grep/read/search/find/glob) + fail per tool. Phát hiện STEP-0 không được dùng. **Không DB** — mỗi lần chạy re-scan toàn bộ JSONL rồi fold in-memory (bản SQLite cũ mở đầu bằng `DELETE FROM calls` nên chưa bao giờ lưu gì; xoá `rusqlite` = −1 060 840 B) |
 | `8sync skill [add <spec>\|gen \|list\|update]` | Quản lý skill: `add` clone GitHub (collection-aware) / `builtin:<name>` / **`<url>@<ref>` để pin commit/tag** (ghi `rev` vào `skills.toml` = lockfile, reproducible); `update [name]` re-pull theo `src` (git dedup theo URL, honor `rev` pin); `gen` fuse N skill |
 | `8sync shot <url\|file>` | Render web/file → PNG (cho image-routing) |
 | `8sync diff-img [ref]` | Git diff → PNG |
@@ -362,7 +362,7 @@ Repo chưa theo spec (không có `SKILL.md`)? 8sync fallback: phát hiện `CLAU
 - **Default KHÔNG ĐÈ (invariant cho mọi verb)**: file user-owned (`su-code/*.md`, `CHANGELOG.md`, `su-code/skills/`, `AGENTS.md` ngoài sentinel, hooks, config key user đã set) → chỉ seed-if-missing hoặc update trong sentinel-block; đè thật CHỈ qua flag rõ ràng (`--force`). File managed (bundled `~/.omp/skills`, `00-force-load.md`, `APPEND_SYSTEM.md`, extensions) → refresh byte-compare khi binary update; user custom thì sửa bản project.
 - **Smart-parse args**: 1 verb nhận nhiều dạng input (vd `8sync ai "..."` = prompt · `8sync ai --model glm "..."` = model override · `8sync find -f x` = filename mode · `8sync harness compaction 50` = set). Tránh subcommand sâu.
 - **Verb count target**: giữ ≤ 22 verb flat (hiện ~19; look&feel delegate cho HyDE, kitty glass deploy qua `setup`).
-- **Binary size target**: < 4 MB stripped (tăng từ 2 MB khi bundle `impeccable` — skill frontend nặng ~2 MB). Skill mới chỉ bundle nếu thật sự always-on; còn lại để `8sync skill add`.
+- **Binary size target**: < 4 MB stripped. Đo bằng `bash scripts/size-report.sh` (A/B từng feature, mỗi build 1 `--target-dir` riêng + `--target` tường minh). Hiện tại: **full 4 859 632 B** (+15.86% so budget) · **minimal (`--no-default-features`) 3 109 496 B** (−25.86%, đạt budget). Gate `web` = 1 750 136 B. Số của `cargo bloat` CHỈ để xếp hạng nghi phạm — nó hụt SQLite ~26× (xem `su-code/KNOWLEDGE.md`). Skill mới chỉ bundle nếu thật sự always-on; còn lại để `8sync skill add`.
 - **Help format**: mọi verb có `-h`/`--help` với `EXAMPLES` block (xem `setup.rs:7-15`).
 
 ---
