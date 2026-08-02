@@ -1,19 +1,29 @@
-//! `8sync harness toolstats` — track omp tool-call usage for the current project
-//! in SQLite, exposing the **optimizer** (codegraph / codebase-memory-mcp / serena /
+//! `8sync harness toolstats` — track omp tool-call usage for the current project,
+//! exposing the **optimizer** (codegraph / codebase-memory-mcp / serena /
 //! headroom) vs **fallback** (grep / read / search / find / glob) ratio + per-tool
 //! failures. The source of truth is omp's own session JSONL — what the agent
 //! *actually* called — so you can see whether the token-optimization stack (STEP 0)
 //! is being used, and catch failing tool calls (e.g. a dead MCP server).
 //!
-//! DB: `<repo>/.cache/8sync/toolstats.db` (gitignored). Idempotent: re-ingest
-//! is keyed on (session, seq), so re-running only adds new calls.
+//! No database. Every run re-reads `~/.omp/agent/sessions/<slug>/*.jsonl` in full
+//! and folds the calls in memory. This used to round-trip through a bundled
+//! SQLite (`.cache/8sync/toolstats.db`) that opened its ingest with
+//! `DELETE FROM calls` — so it never carried anything between runs and cost
+//! 1 060 840 B of embedded C to answer `COUNT` and `GROUP BY` over a few
+//! thousand rows the same process had just parsed.
 
 use anyhow::{Context, Result};
-use rusqlite::Connection;
 use std::collections::HashMap;
 use std::path::Path;
 
 use crate::{env_detect, ui, verbs::skill::discover};
+
+/// One tool call as recorded in a session transcript.
+struct Call {
+    category: &'static str,
+    detail: String,
+    ok: bool,
+}
 
 pub(crate) fn harness_toolstats(env: &env_detect::Env) -> Result<()> {
     ui::header("8sync harness toolstats");
@@ -22,13 +32,6 @@ pub(crate) fn harness_toolstats(env: &env_detect::Env) -> Result<()> {
     let slug = session_slug(&env.home, &root);
     let sess_dir = env.home.join(format!(".omp/agent/sessions/{}", slug));
 
-    let db_path = root.join(".cache/8sync/toolstats.db");
-    if let Some(p) = db_path.parent() {
-        std::fs::create_dir_all(p)?;
-    }
-    let conn = Connection::open(&db_path).context("open toolstats.db")?;
-    init_schema(&conn)?;
-
     if !sess_dir.is_dir() {
         ui::warn(&format!(
             "no omp sessions yet for this project ({}). Run omp here, then re-run.",
@@ -36,14 +39,14 @@ pub(crate) fn harness_toolstats(env: &env_detect::Env) -> Result<()> {
         ));
         return Ok(());
     }
-    let (new_calls, n_sessions) = ingest(&conn, &sess_dir)?;
+    let (calls, n_sessions) = ingest(&sess_dir)?;
     ui::ok(&format!(
-        "tracked {} call(s) from {} session(s) → {}",
-        new_calls,
+        "tracked {} call(s) from {} session(s) ← {}",
+        calls.len(),
         n_sessions,
-        db_path.display()
+        sess_dir.display()
     ));
-    report(&conn, &root)
+    report(&calls, &root)
 }
 
 /// `~/.omp/agent/sessions/<slug>` for a project root (mirrors the web dashboard).
@@ -54,40 +57,16 @@ fn session_slug(home: &Path, root: &Path) -> String {
     }
 }
 
-fn init_schema(conn: &Connection) -> Result<()> {
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS calls (
-            session  TEXT    NOT NULL,
-            seq      INTEGER NOT NULL,
-            ts       INTEGER NOT NULL,
-            tool     TEXT    NOT NULL,
-            category TEXT    NOT NULL,  -- optimizer | fallback | edit | other
-            detail   TEXT    NOT NULL,  -- codegraph|serena|cbm|headroom, or the tool name
-            ok       INTEGER NOT NULL,  -- 1 success, 0 error
-            PRIMARY KEY (session, seq)
-        );",
-    )?;
-    Ok(())
-}
-
-/// Parse each `<slug>/*.jsonl` and upsert its tool calls. Returns (new rows, sessions).
-fn ingest(conn: &Connection, sess_dir: &Path) -> Result<(usize, usize)> {
-    let mut new_rows = 0usize;
+/// Parse each `<slug>/*.jsonl` and fold its tool calls. Returns (calls, sessions).
+fn ingest(sess_dir: &Path) -> Result<(Vec<Call>, usize)> {
+    let mut out: Vec<Call> = Vec::new();
     let mut n_sessions = 0usize;
-    conn.execute("DELETE FROM calls", [])?; // rebuild from current sessions (re-categorize)
     let rd = std::fs::read_dir(sess_dir)?;
     for ent in rd.flatten() {
         let path = ent.path();
         if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
             continue;
         }
-        let session = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-        let ts = std::fs::metadata(&path)
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64)
-            .unwrap_or(0);
         let text = std::fs::read_to_string(&path).unwrap_or_default();
         n_sessions += 1;
 
@@ -136,21 +115,17 @@ fn ingest(conn: &Connection, sess_dir: &Path) -> Result<(usize, usize)> {
             }
         }
 
-        // Second pass: categorize + upsert.
-        let tx = conn.unchecked_transaction()?;
-        for (seq, (id, name, cmd)) in calls.iter().enumerate() {
+        // Second pass: categorize.
+        for (id, name, cmd) in &calls {
             let (category, detail) = categorize(name, cmd);
-            let ok = !errors.get(id).copied().unwrap_or(false);
-            let changed = tx.execute(
-                "INSERT OR IGNORE INTO calls (session, seq, ts, tool, category, detail, ok)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                rusqlite::params![session, seq as i64, ts, name, category, detail, ok as i64],
-            )?;
-            new_rows += changed;
+            out.push(Call {
+                category,
+                detail,
+                ok: !errors.get(id).copied().unwrap_or(false),
+            });
         }
-        tx.commit()?;
     }
-    Ok((new_rows, n_sessions))
+    Ok((out, n_sessions))
 }
 
 /// Map a tool call to (category, detail). codegraph runs via `bash`, so its
@@ -192,20 +167,32 @@ fn categorize(name: &str, cmd: &str) -> (&'static str, String) {
     ("other", name.to_string())
 }
 
-fn report(conn: &Connection, root: &Path) -> Result<()> {
-    let total: i64 = conn.query_row("SELECT COUNT(*) FROM calls", [], |r| r.get(0))?;
+fn report(calls: &[Call], root: &Path) -> Result<()> {
+    let total = calls.len();
     if total == 0 {
         ui::info("no tool calls tracked yet.");
         return Ok(());
     }
-    let cat = |c: &str| -> (i64, i64) {
-        conn.query_row(
-            "SELECT COUNT(*), COALESCE(SUM(1-ok),0) FROM calls WHERE category=?1",
-            [c],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )
-        .unwrap_or((0, 0))
-    };
+
+    // One pass produces every number the report needs: per-category
+    // (count, failures), per-detail counts, and per-detail failures.
+    let mut by_cat: HashMap<&str, (i64, i64)> = HashMap::new();
+    let mut by_detail: HashMap<&str, i64> = HashMap::new();
+    let mut by_cat_detail: HashMap<(&str, &str), i64> = HashMap::new();
+    let mut fail_detail: HashMap<&str, i64> = HashMap::new();
+    let mut first_seen: HashMap<&str, usize> = HashMap::new();
+    for (i, c) in calls.iter().enumerate() {
+        let e = by_cat.entry(c.category).or_default();
+        e.0 += 1;
+        e.1 += !c.ok as i64;
+        *by_detail.entry(c.detail.as_str()).or_default() += 1;
+        *by_cat_detail.entry((c.category, c.detail.as_str())).or_default() += 1;
+        first_seen.entry(c.detail.as_str()).or_insert(i);
+        if !c.ok {
+            *fail_detail.entry(c.detail.as_str()).or_default() += 1;
+        }
+    }
+    let cat = |c: &str| -> (i64, i64) { by_cat.get(c).copied().unwrap_or((0, 0)) };
     let (opt, opt_fail) = cat("optimizer");
     let (search, search_fail) = cat("search");
     let (read, _) = cat("read");
@@ -223,14 +210,12 @@ fn report(conn: &Connection, root: &Path) -> Result<()> {
     println!("  CODE-LOOKUP calls (optimizer + raw-search) = {}", lookup);
     println!("  ┌ OPTIMIZER  (codegraph·cbm·serena)   {:>6}   {:>5.1}% of lookups   {} fail", opt, lookup_pct, opt_fail);
     for d in ["codegraph", "cbm", "serena"] {
-        let n: i64 = conn
-            .query_row("SELECT COUNT(*) FROM calls WHERE detail=?1", [d], |r| r.get(0))
-            .unwrap_or(0);
+        let n = by_detail.get(d).copied().unwrap_or(0);
         let flag = if n == 0 { "  ← never called" } else { "" };
         println!("  │    {:<10} {:>6}{}", d, n, flag);
     }
     println!("  └ RAW SEARCH (grep·search·find·glob)  {:>6}   {:>5.1}% of lookups   {} fail", search, 100.0 - lookup_pct, search_fail);
-    for (d, n) in detail_counts(conn, "search")? {
+    for (d, n) in ranked(by_cat_detail.iter().filter(|((c, _), _)| *c == "search").map(|((_, d), n)| (*d, *n)), &first_seen) {
         println!("       {:<10} {:>6}", d, n);
     }
     println!();
@@ -241,15 +226,10 @@ fn report(conn: &Connection, root: &Path) -> Result<()> {
     println!();
 
     // Failing tools (any category) — fix these (e.g. a dead MCP server).
-    let mut fails = conn.prepare(
-        "SELECT detail, COUNT(*) FROM calls WHERE ok=0 GROUP BY detail ORDER BY 2 DESC LIMIT 8",
-    )?;
-    let frows: Vec<(String, i64)> = fails
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
-        .filter_map(|x| x.ok())
-        .collect();
+    let frows = ranked(fail_detail.iter().map(|(d, n)| (*d, *n)), &first_seen);
     if !frows.is_empty() {
-        let list: Vec<String> = frows.iter().map(|(t, n)| format!("{}×{}", t, n)).collect();
+        let list: Vec<String> =
+            frows.iter().take(8).map(|(t, n)| format!("{}×{}", t, n)).collect();
         ui::info(&format!("failing calls: {}", list.join(", ")));
     }
 
@@ -267,13 +247,17 @@ fn report(conn: &Connection, root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn detail_counts(conn: &Connection, category: &str) -> Result<Vec<(String, i64)>> {
-    let mut stmt = conn.prepare(
-        "SELECT detail, COUNT(*) FROM calls WHERE category=?1 GROUP BY detail ORDER BY 2 DESC",
-    )?;
-    let rows = stmt
-        .query_map([category], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?
-        .filter_map(|x| x.ok())
-        .collect();
-    Ok(rows)
+/// Count-descending ranking. SQLite's `ORDER BY 2 DESC` left ties in table-scan
+/// order, i.e. first appearance — reproduced here so the report is byte-stable
+/// across the SQLite removal and deterministic run to run.
+fn ranked<'a>(
+    it: impl Iterator<Item = (&'a str, i64)>,
+    first_seen: &HashMap<&'a str, usize>,
+) -> Vec<(&'a str, i64)> {
+    let mut v: Vec<(&str, i64)> = it.collect();
+    v.sort_by(|a, b| {
+        b.1.cmp(&a.1)
+            .then_with(|| first_seen.get(a.0).cmp(&first_seen.get(b.0)))
+    });
+    v
 }
