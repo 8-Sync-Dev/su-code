@@ -22,7 +22,7 @@ import {
   type Node, type Edge, type Connection, type NodeTypes, type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
+import { layered, type LayoutEdge, type LayoutNode } from "./layout";
 
 type Page =
   | "state" | "context" | "models" | "skills" | "memory" | "rules"
@@ -732,7 +732,7 @@ function EngineRunBoard() {
 
 // ── Codegraph (codebase-memory-mcp bridge) — architecture graph + trace ────
 // The knowledge graph the agent already queries via MCP (search_graph,
-// trace_path, get_architecture), made visible: package call graph (elk
+// trace_path, get_architecture), made visible: package call graph (dagre
 // layout), Leiden clusters (de-facto modules), a BM25 symbol search, and a
 // caller/callee subgraph for the selected result. Read-only — this never
 // writes to the graph, it only shells `codebase-memory-mcp cli` for JSON.
@@ -775,16 +775,11 @@ function CodegraphPage() {
     (async () => {
       const pkgs = data.packages.filter((p) => p.node_count > 0).slice(0, 24);
       const maxN = Math.max(...pkgs.map((p) => p.node_count), 1);
-      const graph: ElkNode = {
-        id: "root",
-        layoutOptions: { "elk.algorithm": "layered", "elk.direction": "RIGHT", "elk.spacing.nodeNode": "28" },
-        children: pkgs.map((p) => ({ id: p.name, width: 150, height: 50 })),
-        edges: data.boundaries
-          .filter((b) => pkgs.some((p) => p.name === b.from) && pkgs.some((p) => p.name === b.to))
-          .map((b, i) => ({ id: `pe${i}`, sources: [b.from], targets: [b.to] })),
-      };
-      const laid = await elk.layout(graph);
-      const pos = new Map((laid.children ?? []).map((c) => [c.id, { x: c.x ?? 0, y: c.y ?? 0 }]));
+      const lnodes: LayoutNode[] = pkgs.map((p) => ({ id: p.name, width: 150, height: 50 }));
+      const ledges: LayoutEdge[] = data.boundaries
+        .filter((b) => pkgs.some((p) => p.name === b.from) && pkgs.some((p) => p.name === b.to))
+        .map((b) => ({ source: b.from, target: b.to }));
+      const pos = layered(lnodes, ledges, "RIGHT", 28);
       setPkgNodes(
         pkgs.map((p) => {
           const weight = p.node_count / maxN;
@@ -1477,7 +1472,6 @@ function WfNodeView({ data }: NodeProps<Node<WfData>>) {
 
 // react-flow's NodeTypes is invariant over the Node generic; cast through unknown.
 const wfNodeTypes = { wf: WfNodeView } as unknown as NodeTypes;
-const elk = new ELK();
 
 // ── Marketplace (discover + install skills / MCP from external registries) ───
 function MarketplacePage() {
@@ -1714,15 +1708,12 @@ function WorkflowPage() {
     setSelId(null);
   };
   const load = async (n: string) => { setName(n); loadGraph(await api.workflowGet(n)); };
-  const autoLayout = async () => {
-    const graph: ElkNode = {
-      id: "root",
-      layoutOptions: { "elk.algorithm": "layered", "elk.direction": "DOWN" },
-      children: nodes.map((n) => ({ id: n.id, width: 184, height: 74 })),
-      edges: edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
-    };
-    const laid = await elk.layout(graph);
-    const pos = new Map((laid.children ?? []).map((c) => [c.id, { x: c.x ?? 0, y: c.y ?? 0 }]));
+  const autoLayout = () => {
+    const pos = layered(
+      nodes.map((n) => ({ id: n.id, width: 184, height: 74 })),
+      edges.map((e) => ({ source: e.source, target: e.target })),
+      "DOWN",
+    );
     setNodes((ns) => ns.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position })));
   };
   const save = () => {
