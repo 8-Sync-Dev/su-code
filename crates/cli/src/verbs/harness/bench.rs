@@ -162,6 +162,8 @@ pub(crate) fn spine_advice(spine_tok: usize, upfront: usize) -> Option<String> {
     ))
 }
 
+// Dashboard-only surface (`/api/bench`) — the CLI path prints instead.
+#[cfg(feature = "web")]
 #[derive(serde::Serialize)]
 pub(crate) struct BenchMetrics {
     pub upfront: usize,
@@ -179,6 +181,7 @@ pub(crate) struct BenchMetrics {
 /// Summary metrics for the web dashboard (`/api/bench`). Same compute as the
 /// CLI `harness_bench` but returns a serializable struct instead of printing.
 /// None if not inside a project.
+#[cfg(feature = "web")]
 pub(crate) fn bench_metrics(home: &std::path::Path) -> Option<BenchMetrics> {
     let root = detect_current_project_root()?;
     let st = build_force_load(home, &root);

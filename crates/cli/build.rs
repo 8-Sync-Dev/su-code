@@ -10,6 +10,16 @@ fn main() {
         .unwrap_or_default();
     println!("cargo:rustc-env=GIT_COMMIT_HASH={}", commit);
 
+    println!("cargo:rerun-if-changed=../../.git/HEAD");
+    println!("cargo:rerun-if-changed=../../.git/refs/heads/main");
+
+    // Everything below serves the `web` feature only. Without it there is no
+    // WebAssets embed (assets.rs), so a lean build needs neither web/dist nor a
+    // JS toolchain — and must not spend a Vite build on bytes it will not ship.
+    if std::env::var_os("CARGO_FEATURE_WEB").is_none() {
+        return;
+    }
+
     // Rebuild the Vite FE when dist is missing OR web/src changed, so edits can never
     // silently ship a stale bundle (build.rs previously built only when dist was
     // absent). rust-embed (assets.rs) then embeds the fresh web/dist.
@@ -32,8 +42,6 @@ fn main() {
     println!("cargo:rerun-if-changed=../../web/index.html");
     println!("cargo:rerun-if-changed=../../web/package.json");
     println!("cargo:rerun-if-changed=../../web/vite.config.ts");
-    println!("cargo:rerun-if-changed=../../.git/HEAD");
-    println!("cargo:rerun-if-changed=../../.git/refs/heads/main");
 }
 
 /// Try bun → pnpm → npm to install deps + build the Vite FE. The first toolchain

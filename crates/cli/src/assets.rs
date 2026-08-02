@@ -8,12 +8,16 @@ pub struct Assets;
 
 // Embedded `8sync harness web` dashboard (Vite build → web/dist/). Built by
 // build.rs; if absent, build.rs writes a stub index.html so this still compiles.
+// Gated with the dashboard itself: without `web` the 1.9 MB dist tree is neither
+// built nor embedded, and no JS toolchain is needed to compile 8sync.
+#[cfg(feature = "web")]
 #[derive(RustEmbed)]
 #[folder = "../../web/dist/"]
 pub struct WebAssets;
 
 /// Binary-safe embedded web file (JS/CSS/html). None only if the path doesn't
 /// exist in the embedded dist tree.
+#[cfg(feature = "web")]
 pub fn web_asset(path: &str) -> Option<Vec<u8>> {
     Some(WebAssets::get(path)?.data.into_owned())
 }

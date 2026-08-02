@@ -57,6 +57,7 @@ pub fn run(_args: Args) -> Result<()> {
 /// dir, `git init` (so sweep + project detection recognize it), then seed the
 /// full 8sync context (AGENTS.md + su-code memory + injected skills block).
 /// Used by the dashboard `POST /api/projects/create`. Idempotent on an existing dir.
+#[cfg(feature = "web")]
 pub(crate) fn scaffold_project(env: &env_detect::Env, root: &Path) -> Result<()> {
     std::fs::create_dir_all(root).with_context(|| format!("create {}", root.display()))?;
     if !root.join(".git").exists() {

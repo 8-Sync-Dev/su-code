@@ -25,9 +25,16 @@ mod custom_model;
 mod browser;
 mod gateway;
 mod up;
+#[cfg(feature = "web")]
 mod web;
+// `marketplace` has exactly one caller — web.rs's /api/marketplace route — so it
+// lives and dies with the dashboard rather than carrying its own feature flag.
+#[cfg(feature = "web")]
 mod marketplace;
+// MCP knowledge catalog — only the dashboard's /api/knowledge routes consume it.
+#[cfg(feature = "web")]
 pub(crate) mod knowledge;
+#[cfg(feature = "toolstats")]
 mod toolstats;
 
 #[derive(ClapArgs, Debug)]
@@ -152,8 +159,8 @@ pub fn run(a: Args) -> Result<()> {
         Some("audit") => audit::harness_audit(&env),
         Some("eval") if a.project => eval::harness_eval_project(&env),
         Some("eval") => eval::harness_eval(&env, a.baseline),
-        Some("web") => web::harness_web(&env.home, a.port.unwrap_or(8731), a.no_open),
-        Some("toolstats") | Some("tools") => toolstats::harness_toolstats(&env),
+        Some("web") => dispatch_web(&env, &a),
+        Some("toolstats") | Some("tools") => dispatch_toolstats(&env),
         Some("compaction") => compaction::harness_compaction(&env.home, v1.as_deref()),
         Some("model") => {
             let args: Vec<String> = [v1.clone(), a.value2.clone()].into_iter().flatten().collect();
@@ -198,6 +205,30 @@ pub fn run(a: Args) -> Result<()> {
     }
 }
 
+// Gated subsystems. A build without the feature keeps the subcommand reachable
+// so it can say WHY it is unavailable — a silent no-op or an "unknown
+// subcommand" would look like a bug rather than a build choice.
+
+#[cfg(feature = "web")]
+fn dispatch_web(env: &env_detect::Env, a: &Args) -> Result<()> {
+    web::harness_web(&env.home, a.port.unwrap_or(8731), a.no_open)
+}
+
+#[cfg(not(feature = "web"))]
+fn dispatch_web(_env: &env_detect::Env, _a: &Args) -> Result<()> {
+    anyhow::bail!("`harness web` is not built into this binary — rebuild with `--features web`")
+}
+
+#[cfg(feature = "toolstats")]
+fn dispatch_toolstats(env: &env_detect::Env) -> Result<()> {
+    toolstats::harness_toolstats(env)
+}
+
+#[cfg(not(feature = "toolstats"))]
+fn dispatch_toolstats(_env: &env_detect::Env) -> Result<()> {
+    anyhow::bail!("`harness toolstats` is not built into this binary — rebuild with `--features toolstats`")
+}
+
 /// `8sync harness help` — one-screen cheatsheet: harness/skill commands, skill
 /// tiers, the commit-vs-ignore file taxonomy, and the new-machine runbook.
 fn print_help() {
@@ -223,7 +254,9 @@ fn print_help() {
     println!("{}", crate::brand::render("  8sync harness add-local-model <path> [name]  serve a local GGUF via mistral.rs (Rust) + register as omp `local/<name>`"));
     println!("{}", crate::brand::render("  8sync harness add-model <provider/model> --url <baseUrl>  register a REMOTE model omp's catalog lacks (custom provider)"));
     println!("{}", crate::brand::render("  8sync harness browser [fix|status|off]  point omp's browser at system Chromium (ungoogled) — fixes browser control not reaching the internet"));
+    #[cfg(feature = "web")]
     println!("{}", crate::brand::render("  8sync harness web [--port N]    local dashboard (axum+Vite): skills/memory/engines/team/submodules"));
+    #[cfg(feature = "toolstats")]
     println!("{}", crate::brand::render("  8sync harness toolstats         SQLite tracker: optimizer (codegraph/cbm/serena) vs fallback (grep/read) call ratio + fails"));
     println!("{}", crate::brand::render("  8sync skill [list|add|gen|update]   manage the library (`skill update [name]` re-pulls from skills.toml)"));
     println!("{}", crate::brand::render("  8sync feature [new|switch|status|list]  large multi-phase GSD scope (planning tree + ACTIVE switch); /feature plan|go|ship in omp"));
