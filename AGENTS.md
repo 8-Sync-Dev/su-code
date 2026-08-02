@@ -362,7 +362,7 @@ Repo chưa theo spec (không có `SKILL.md`)? 8sync fallback: phát hiện `CLAU
 - **Default KHÔNG ĐÈ (invariant cho mọi verb)**: file user-owned (`su-code/*.md`, `CHANGELOG.md`, `su-code/skills/`, `AGENTS.md` ngoài sentinel, hooks, config key user đã set) → chỉ seed-if-missing hoặc update trong sentinel-block; đè thật CHỈ qua flag rõ ràng (`--force`). File managed (bundled `~/.omp/skills`, `00-force-load.md`, `APPEND_SYSTEM.md`, extensions) → refresh byte-compare khi binary update; user custom thì sửa bản project.
 - **Smart-parse args**: 1 verb nhận nhiều dạng input (vd `8sync ai "..."` = prompt · `8sync ai --model glm "..."` = model override · `8sync find -f x` = filename mode · `8sync harness compaction 50` = set). Tránh subcommand sâu.
 - **Verb count target**: giữ ≤ 22 verb flat (hiện ~19; look&feel delegate cho HyDE, kitty glass deploy qua `setup`).
-- **Binary size target**: < 4 MB stripped. Đo bằng `bash scripts/size-report.sh` (A/B từng feature, mỗi build 1 `--target-dir` riêng + `--target` tường minh). Hiện tại: **full 4 859 632 B** (+15.86% so budget) · **minimal (`--no-default-features`) 3 109 496 B** (−25.86%, đạt budget). Gate `web` = 1 750 136 B. Số của `cargo bloat` CHỈ để xếp hạng nghi phạm — nó hụt SQLite ~26× (xem `su-code/KNOWLEDGE.md`). Skill mới chỉ bundle nếu thật sự always-on; còn lại để `8sync skill add`.
+- **Binary size — ceiling 5 MiB (ENFORCED), goal 4 MiB**: `scripts/size-gate.sh` chạy trong `release.yml` cho MỌI asset → build **FAIL** nếu vượt `5 242 880 B`; vượt goal `4 194 304 B` chỉ warn. Ceiling đặt TRÊN size hiện tại có chủ ý — gate đỏ sẵn thì ai cũng phớt lờ; hạ dần mỗi khi có headroom (ratchet). Hiện tại: **x86_64 4 859 696 B** (+15.87% so goal) · **aarch64-musl 4 151 328 B** (−1.02%, đạt goal) · **minimal (`--no-default-features`) 3 109 496 B** (−25.86%). Attribute bằng `bash scripts/size-report.sh` (A/B từng feature, mỗi build 1 `--target-dir` riêng + `--target` tường minh). Số của `cargo bloat` CHỈ để xếp hạng nghi phạm — nó hụt SQLite ~26× (xem `su-code/KNOWLEDGE.md`). Skill mới chỉ bundle nếu thật sự always-on; còn lại để `8sync skill add`.
 - **Help format**: mọi verb có `-h`/`--help` với `EXAMPLES` block (xem `setup.rs:7-15`).
 
 ---
@@ -379,6 +379,7 @@ cargo build --release
 ./target/release/8sync ai --model glm -h            # adaptive model flag present
 ./target/release/8sync . -h                         # sub-action help
 ./target/release/8sync find --no-open --type rs "fn run"
+bash scripts/size-gate.sh target/release/8sync   # size ceiling (same gate CI runs)
 ```
 
 Không có test suite chính thức (phase 1) — verify bằng smoke test trên.

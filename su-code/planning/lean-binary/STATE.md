@@ -3,14 +3,14 @@ gsd_state_version: '1.0'
 feature: lean-binary
 ticket: ""
 branch: ""
-status: in-progress
+status: complete
 active_phase: "M3"
-next_action: plan-phase
-next_phases: ["M1","M2","M3"]
+next_action: archive
+next_phases: []
 progress:
   total_phases: 4
-  completed_phases: 3
-  percent: 75
+  completed_phases: 4
+  percent: 100
 last_updated: "2026-08-02"
 ---
 
@@ -19,54 +19,54 @@ last_updated: "2026-08-02"
 ## Project Reference
 
 See: su-code/planning/lean-binary/PROJECT.md · ROADMAP: su-code/planning/lean-binary/ROADMAP.md
-**Core value:** get `8sync` back under its own 4 MB budget without losing a single user-visible feature.
-**Current focus:** M1 — feature gating + per-gate byte attribution.
+**Core value:** get `8sync` back toward its 4 MB budget without losing a single user-visible feature.
+**Current focus:** none — all four phases closed.
 
 ## Current Position
 
-Phase: M3 of 4 (CI + budget truth)
-Plan: 0 of 0 (M3 not planned yet)
-Status: in-progress
-Vì sao phase này: the binary is 24 % smaller and the remaining 665 392 B has no cheap owner — CI and the documented budget must now state measured reality.
-Last activity: 2026-08-02 — M2 closed 8/8; 6 407 848 → 4 859 696 B with zero feature loss.
+Phase: M3 of 4 (CI + budget truth) — **DONE**
+Plan: 4 of 4 phases complete
+Status: complete
+Vì sao phase này: the budget is now enforced in CI and the docs state measured reality, so the feature's contract is met.
+Last activity: 2026-08-02 — M3 closed; `cargo-zigbuild` replaces the Docker leg, size gate live.
+
+## Outcome
+
+| build | before | after |
+|---|---:|---:|
+| x86_64 default | 6 407 848 | **4 859 696** (−24.2 %) |
+| aarch64-musl | (stub dashboard, unmeasured) | **4 151 328** (under the 4 MiB goal) |
+| `--no-default-features` | n/a (no features existed) | **3 109 496** |
+
+No feature was removed. Two dependencies were deleted (`rusqlite`, `elkjs`), one
+was fixed (`cross` → `cargo-zigbuild`), and the budget became a gate.
 
 ## Accumulated Context
 
 ### Decisions
-- [M0]: commit deliverable-shaped, not file-shaped — `git log` stays a readable history of *what shipped*.
-- [M0]: hand-roll the commits, keep the engine's verify-gate — `engine_advance {commit:true}` does `git add -A` and cannot be trusted to split a dirty tree.
-- [M0]: AC-02 proven by worktree replay, not by N green `engine_verify` on one tree.
-- [M1 pre]: gate, measure, *then* decide what to delete. No dep is removed on `cargo bloat` guesswork alone.
-- [M1]: `marketplace` folds into `web` — one caller (`web.rs:1452`), so it never earned its own flag.
-- [M1]: attribution ships as `scripts/size-report.sh`, not a verb — `AGENTS.md` §8 caps verbs at 22 and a verb would add bytes to the thing being measured.
-- [M2]: delete, don't gate — `rusqlite` and `elkjs` were removed outright; gating only located them.
-- [M2]: a store swap must be proven under FROZEN input (worktree-rebuilt old binary + copied session tree), never by comparing two live runs.
-- [M2]: the dashboard layout swap shipped only after headless browser proof, per D-M2-4.
-- [M1]: `cargo bloat` may RANK suspects; only an A/B build may state a number (it missed SQLite by ~26×).
+- [M0]: commit deliverable-shaped, not file-shaped; hand-roll commits because `engine_advance {commit:true}` does `git add -A`.
+- [M1]: gate to MEASURE, not to diet — `cargo bloat` may rank suspects, only an A/B may state a number (it missed SQLite ~26×).
+- [M2]: delete, don't gate; prove a store swap under frozen input; ship a UI swap only after browser proof.
+- [M3]: a budget must be an enforced gate with a ceiling ABOVE current size (ratchet down), never an aspirational comment.
+- [M3]: `universal2` REJECTED — a fat binary doubles every Mac user's download, reversing the M0 brief.
 
-### Contract — phase sau CẦN BIẾT
-- [M0]: baseline `6 407 848 B` at `97e906d`+docs; budget `4 194 304 B`; overshoot `2 213 544 B`.
-- [M0]: heavy deps are single-module — `axum`/`tokio`/`tower-http` → `verbs/harness/web.rs`; `rusqlite` → `verbs/harness/toolstats.rs`; `scraper` → `verbs/harness/marketplace.rs`. Embeds: `assets::Assets` (`assets/`) and `assets::WebAssets` (`web/dist/`) + `assets::web_asset()`.
-- [M0]: `crates/cli/Cargo.toml` has **no** `[features]` table — M1 creates it.
-- [M1]: features `web` (axum+tokio+tower-http+scraper, `WebAssets`, `build.rs` Vite step) and `toolstats` (rusqlite); `default = ["web","toolstats"]`. Gate helpers `harness::dispatch_web` / `dispatch_toolstats` bail with a `--features` hint when absent.
-- [M1]: sizes — full 6 407 144 · web-only 5 346 304 · toolstats-only 4 144 576 · minimal 3 081 416. **minimal and toolstats-only are already under the 4 MiB budget.**
-- [M1]: dashboard-only symbols now cfg'd: `harness::knowledge` (module), `bench::BenchMetrics`, `bench::bench_metrics`, `here::scaffold_project`, `assets::WebAssets`, `assets::web_asset`.
-- [M2]: `features` = `web` only. `toolstats` is dependency-free and always built. `web/src/layout.ts` exports `layered(nodes, edges, "RIGHT"|"DOWN", nodeSep)`; dagre reports centres, so it subtracts half the node box and filters edges to known ids.
-- [M2]: sizes — default **4 859 696 B**, minimal **3 109 496 B**, `web` gate 1 750 136 B, budget 4 194 304 B → **+665 392 B over**.
+### Contract — what the next session needs
+- `features` = `web` only (axum + tokio + tower-http + scraper + `WebAssets` + the `build.rs` Vite step). `toolstats` is dependency-free and always built.
+- `web/src/layout.ts` → `layered(nodes, edges, "RIGHT"|"DOWN", nodeSep)`; dagre reports centres so it subtracts half the node box and filters edges to known ids.
+- `discover::MEMORY_DIR` = `"su-code"` — **not** `brand::NS` (which is `"8sync"`). `discover::is_omp_project` is the single project test.
+- `scripts/size-report.sh` attributes; `scripts/size-gate.sh` enforces (ceiling 5 242 880, goal 4 194 304) and runs per asset in `release.yml`.
+- Remaining overshoot vs goal: 665 392 B on x86_64, owned by `assets/` (impeccable 2.1 MB) and the dashboard. Un-embedding `impeccable/scripts` with a lazy fetch is REQUIREMENTS v2, not started.
 
 ### Files touched
-- [M0]: `verbs/omp.rs` (new), `main.rs`, `verbs/mod.rs`, `verbs/up.rs` — 532dea9
-- [M0]: `assets/skills/branch-sync/**`, `assets/commands/sync-pr.md`, `.omp/commands/sync-pr.md`, `verbs/skill/deploy.rs` — bc0adc4
-- [M0]: `verbs/harness/global.rs` — 3c8c008
-- [M0]: `assets/skills/deep-research/SKILL.md`, `outputs/native-tooling-zig-rust*` — 97e906d
-- [M0]: CHANGELOG/KNOWLEDGE/STATE/AGENTS/CLAUDE + planning tree — T5
-- [M1]: `crates/cli/Cargo.toml` — fef75ea; `assets.rs`, `build.rs`, `here.rs`, `harness/bench.rs`, `harness/mod.rs` — 95a4a26; `scripts/size-report.sh` — 265c465
+- [M0]: `verbs/omp.rs`, `main.rs`, `verbs/mod.rs`, `verbs/up.rs` — 532dea9 · `assets/skills/branch-sync/**`, `sync-pr.md`, `skill/deploy.rs` — bc0adc4 · `harness/global.rs` — 3c8c008 · `deep-research/SKILL.md`, `outputs/**` — 97e906d · docs — ebeccb8
+- [M1]: `crates/cli/Cargo.toml` — fef75ea · `assets.rs`, `build.rs`, `here.rs`, `harness/bench.rs`, `harness/mod.rs` — 95a4a26 · `scripts/size-report.sh` — 265c465 · docs — 002c095
+- [M2]: `harness/toolstats.rs` — 5c1af33 · `Cargo.toml`+`Cargo.lock`+`harness/mod.rs` — 1bc58a8 · `web/src/layout.ts`+`web/src/App.tsx`+`web/package.json` — 32540a2 · docs — dc74245 · `skill/discover.rs`+`harness/global.rs` — b331832 · docs — faf9b57
+- [M3]: `.github/workflows/release.yml`, `scripts/size-gate.sh` — a83e679 · docs — this commit
 
 ### Blockers/Concerns
-- `8sync doctor`: `! docs: 17 stale path(s) / 2 oversized`. Pre-existing, owned by M3.
-- Open question for M1: does `default = ["web","toolstats","marketplace"]` (CI ships full) actually deliver a *user-visible* win, or only a dev-build win? If gating alone does not shrink the shipped binary, M2's elimination work is the whole payload.
+- `harness audit` still reports 16 stale paths / 2 oversized. All reviewed: historical `CHANGELOG` entries, omp's own docs, and source-layout-relative paths. Not defects — see `M3-VERIFICATION.md`.
 
 ## Session Continuity
 
-Stopped at: M0 closed and verified (`M0-VERIFICATION.md`).
-Next: `/feature plan` for M1 — write `M1-CONTEXT.md` (AC on measured byte deltas) + `M1-01-PLAN.md`.
+Stopped at: feature complete, tree clean, 16 commits on `main`, nothing pushed.
+Next: `/feature ship` to archive, or ratchet the size ceiling down after the v2 asset work.

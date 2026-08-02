@@ -260,7 +260,7 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   before exec; SHELL env override on the start call does NOT change the wrapper shell (broker
   resolves shell at its own start). Workaround: drive PTYs via python `pty` module or
   `kitty --listen-on unix:... @ send-key/get-text`. Also upstream-reportable.
-- validated (`branch-sync` skill & `8sync harness global` auto-detection): (a) `assets/skills/branch-sync/SKILL.md` + `scripts/branch_sync.py` provides automated multi-branch audit, deep preview (commit breakdown + `git merge-tree` conflict check), safe merge to main, and zero-conflict sync across all branches. (b) `8sync harness global` now auto-detects `su-code/` projects in cwd and automatically updates their local harness (skills mirror, AGENTS/CLAUDE injection, memory, commands, gitleaks hook, codegraph init) without requiring explicit `--sweep`. (c) `deep-research` skill enhanced with loop engineering state machines, STEP-0 code intelligence (`codegraph`/`codebase-memory-mcp`/`serena`), multi-agent wave execution, headroom compression, and ponytail YAGNI discipline.
+- validated (`branch-sync` skill & `8sync harness global` auto-detection): (a) `assets/skills/branch-sync/SKILL.md` + `assets/skills/branch-sync/scripts/branch_sync.py` provides automated multi-branch audit, deep preview (commit breakdown + `git merge-tree` conflict check), safe merge to main, and zero-conflict sync across all branches. (b) `8sync harness global` now auto-detects `su-code/` projects in cwd and automatically updates their local harness (skills mirror, AGENTS/CLAUDE injection, memory, commands, gitleaks hook, codegraph init) without requiring explicit `--sweep`. (c) `deep-research` skill enhanced with loop engineering state machines, STEP-0 code intelligence (`codegraph`/`codebase-memory-mcp`/`serena`), multi-agent wave execution, headroom compression, and ponytail YAGNI discipline.
 - validated (binary-size audit 2026-08-02, brief: `outputs/native-tooling-zig-rust.md`): `8sync`
   stripped = **6 406 696 B (6.11 MiB)** vs the `AGENTS.md` §8 budget "< 4 MB" → ~1.5–1.6× over.
   Sections: `.text` 2 854 517 · `.rodata` 2 188 928 (embedded assets) · `.eh_frame` 482 684 ·
@@ -363,7 +363,7 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   `STATE.md`/`KNOWLEDGE.md`/`PLAYBOOKS.md`/… and a 74-entry `skills/` tree. Caught only because
   `git add -A` swept them in and the gitleaks pre-commit hook fired on the `senior-security`
   skill's regex literals. Fix: `is_memory_dir()` requires the dir to actually CONTAIN memory
-  (`skills/` or one of STATE/KNOWLEDGE/PROJECT/PLAYBOOKS/skills.toml); `is_omp_project` moved to
+  (`skills/` or one of `STATE.md`, `KNOWLEDGE.md`, `PROJECT.md`, `PLAYBOOKS.md`, `skills.toml`); `is_omp_project` moved to
   `discover` so both paths share it. Verified 3 ways: bare `su-code/` → untouched · `AGENTS.md`
   repo → stamped · memory tree without `AGENTS.md` → still stamped.
 - gotcha: **`brand::NS` is `"8sync"`, NOT the memory-dir name.** `NS` is the config/artifact
@@ -373,3 +373,33 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   "bad case" test, and silently breaks detection for every real project — it looks for a dir
   named `8sync`. Now a named constant `discover::MEMORY_DIR`. Test the POSITIVE case too; a fix
   that only proves the bug is gone can have deleted the feature.
+- validated (`cargo-zigbuild` replaces `cross` for `aarch64-unknown-linux-musl`): zig 0.16.0 +
+  cargo-zigbuild 0.23.0 → **31.91 s**, `ELF 64-bit LSB executable, ARM aarch64, statically
+  linked, stripped`, **4 151 328 B** (already UNDER the 4 MiB goal; musl-static beats the glibc
+  host build). Local install path when there is no distro zig: `uv tool install ziglang` →
+  `python-zig`, symlinked as `zig` on PATH. CI uses `mlugg/setup-zig@**v2**` (v1 is stale — the
+  README's own example is `@v2`) pinned to `version: 0.16.0`, plus `taiki-e/install-action` for
+  cargo-zigbuild.
+- failure (the `cross` leg shipped a PLACEHOLDER dashboard): `build.rs` builds the Vite FE by
+  shelling out to bun/pnpm/npm and, finding none, **silently writes `FALLBACK_HTML` and keeps
+  going** (`cargo:warning` only). `cross` runs inside a Docker image with no JS toolchain, so the
+  released `linux-aarch64` asset embedded the stub. Moving to `cargo-zigbuild` (runs on the
+  runner, npm present) fixes it. Lesson: a build step that degrades to a stub on missing tooling
+  must be checked on EVERY leg, not just the one you build locally.
+- validated (a budget must be a GATE): `AGENTS.md` §8 carried "< 4 MB stripped" that nothing
+  enforced, and the binary drifted to 6 407 848 B — **52 % over** — unnoticed. `scripts/size-gate.sh`
+  now runs per asset in `release.yml`: hard-fail above the 5 MiB **ceiling**, warn above the
+  4 MiB **goal**. Ceiling deliberately sits ABOVE today's size — a gate that is already red gets
+  ignored; ratchet it down as `size-report.sh` shows headroom. Test both directions
+  (`CEILING=4000000` must exit 1) or you have shipped a gate that cannot fail.
+- gotcha (`8sync harness audit` is heuristic, and chasing it to zero is WRONG): of 18 stale-path
+  findings only 2 were real. The other 16 were `CHANGELOG.md` entries naming paths that were
+  correct when written (`agents/STATE.md` pre-rename, `verbs/skill.rs` pre-directory), omp's own
+  docs (`docs/providers.md`), and source-layout blocks with paths relative to `crates/cli/src/`.
+  Rewriting a changelog to satisfy a path scanner falsifies history. The tool prints
+  *"report-only — illustrative paths can false-positive"*: fix real errors, record the rest as
+  reviewed, and NEVER report a green that required faking.
+- decision (REJECTED `universal2` for macOS, reversing the M0 brief): a fat binary carries both
+  slices, so every Mac user downloads ~2× to save the project one CI leg — backwards for a
+  size-reduction effort — and it renames assets `install.sh` resolves by `${os}-${arch}`. Keep
+  `darwin-x86_64` + `darwin-arm64` separate.
