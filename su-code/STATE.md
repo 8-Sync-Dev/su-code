@@ -4,60 +4,33 @@
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
-## 🚚 HANDOFF — sang máy khác làm tiếp GẤP (2026-07-22)
-**Repo state:** branch `main`, HEAD trước session = `64bd650` (STEP-0 MCP fix, omp-16-era), tag mới nhất `v0.52.0` (Cargo.toml = 0.52.0 — commit này là WIP checkpoint, KHÔNG release). Session này thêm 1 commit → sau push cây **tracked SẠCH** (còn stray untracked local-only: root `STATE.md` foreign + `outputs/*` research — KHÔNG push, chỉ có trên máy này).
+## ✅ SHIPPED — `lean-binary` feature complete (2026-08-02)
+**Repo state:** branch `main`, base `589807e` → HEAD `60561f0`, **17 commits, tracked tree clean, nothing pushed**. `Cargo.toml` still 0.52.0 (WIP checkpoint, not a release).
 
-**Đã làm session này (2026-07-22) — 2 việc:**
+**Result — binary 24 % smaller, zero features removed:**
 
-**A. Fix omp-17 MCP "HIDDEN" phantom (bug thật, sửa tận gốc):**
-- **Phát hiện:** omp 17.x ĐÃ BỎ hẳn cơ chế bm25 discovery — không còn `search_tool_bm25`, không còn `mcp.discoveryDefaultServers` (biến mất khỏi settings schema). Thay bằng `tools.xdev` (default ON): MCP tools mount thành `xd://mcp__…` device URLs, callable qua read/write, không ship schema mỗi request. → Fix `64bd650` (ghi `discoveryDefaultServers`) là **NO-OP trên omp 17** và là **nguồn churn**: omp self-upgrade reset `~/.omp/agent/config.yml` → doctor check `cfg.contains("discoveryDefaultServers")` la làng "HIDDEN" dù tools vẫn gọi được. "MCP cứ regress sau mỗi omp upgrade" = PHANTOM.
-- `crates/cli/src/env_detect.rs` — thêm `omp_major()` parse `omp/17.0.6` → 17.
-- `crates/cli/src/verbs/skill/deploy.rs` — `ensure_mcp_tools_visible`: omp ≥17 → early-return, skip ghi key chết (báo xd:// mount); <17 giữ logic cũ.
-- `crates/cli/src/verbs/doctor.rs` — MCP check omp-version-aware: omp ≥17 báo `✓ xd:// devices callable`, hết "HIDDEN" giả.
-- `crates/cli/src/verbs/harness/global.rs` — summary bullet khớp cơ chế mới.
-- **Verified:** build xanh; `8sync doctor` → `✓ STEP-0 MCP tools mounted as xd:// devices (omp ≥17 tools.xdev)`; harness không ghi key chết; MCP callable live cả session qua `xd://mcp__…`.
+| build | before | after |
+|---|---:|---:|
+| x86_64 default | 6 407 848 | **4 859 696** (−24.2 %) |
+| aarch64-musl | shipped a STUB dashboard | **4 151 328** (under the 4 MiB goal) |
+| `--no-default-features` | did not exist | **3 109 496** |
 
-**B. Lark → profile auto-download (KHÔNG nhúng binary vào git):**
-- `assets/profiles/apps-personal.toml` — thêm `aur = ["larksuite-bin"]` (v7.66.11, larksuite.com) cạnh Bitwarden + `requires.aur_helper = true`. AUR bin tự tải .deb official lúc build, pacman-tracked, KHÔNG commit 437MB binary. Bản TQ (Feishu) = `feishu-bin`. Opt-in; bundle `alexdev` cố ý KHÔNG include apps-personal.
-- **Verified:** rebuild + `8sync setup profile show apps-personal` liệt kê `larksuite-bin`; dry-run `would paru install: larksuite-bin`.
+**How, in order (details: `su-code/planning/lean-binary/M*-VERIFICATION.md`):**
+1. **M0** — landed 5 pending deliverables (`8sync omp update` verb · `branch-sync` skill + `/sync-pr` · `harness global` auto-stamp · `deep-research` §5 native-audit protocol + the binary brief).
+2. **M1** — first-ever `[features]` table; A/B'd every gate with `scripts/size-report.sh`. Gating shipped **0** user bytes by design — its job was to locate the fat. `cargo bloat` under-attributed SQLite **~26×**.
+3. **M2** — deleted what the data pointed at: `rusqlite` (**−1 035 384 B**; the DB stored nothing — ingest opened with `DELETE FROM calls`) and `elkjs` → dagre (**−512 768 B**; 85 % of the FE chunk was a GWT-compiled Java layout engine). Output byte-identical under frozen input; dashboard verified headless.
+4. **M3** — `cross` → `cargo-zigbuild` for aarch64 (the Docker leg had no JS toolchain, so it embedded the **stub dashboard**), plus `scripts/size-gate.sh` enforcing a 5 MiB ceiling / 4 MiB goal per asset. `universal2` rejected — it would double every Mac download.
 
-**Docs:** CHANGELOG (2 entries Unreleased: omp-17 fix + Lark), KNOWLEDGE (validated: omp-17 dropped bm25 — SUPERSEDES entry `discoveryDefaultServers` cũ + gotcha omp auto-upgrade reset config.yml). AGENTS.md/CLAUDE.md = harness regen churn.
+**Bug found and fixed mid-flight (`b331832`):** a directory merely *named* `su-code` made its parent look like an omp project. Since this checkout is `~/Projects/tools/su-code`, an auto-stamp from `~/Projects/tools` wrote a blank memory tree **plus 74 skills into the repo root**. Now `discover::is_omp_project` requires real memory content. Note `discover::MEMORY_DIR` = `"su-code"`, **not** `brand::NS` (= `"8sync"`).
 
-**Next ▸ (cụ thể):**
-- [ ] Máy mới: `8sync harness`. Trên omp ≥17 KHÔNG cần config MCP nữa (tools.xdev tự mount) — doctor confirm.
-- [ ] (tùy) Cài Lark: `8sync setup --profile apps-personal` (cần paru/yay).
-- [ ] (tùy) Dọn bản Lark cài tay session trước: `~/.local/opt/lark` + `~/.local/bin/bytedance-lark-stable` + `~/.local/share/applications/bytedance-lark.desktop` nếu chuyển sang bản AUR pacman-tracked.
-- [ ] (tùy) `8sync harness toolstats` sau vài session — kỳ vọng optimizer % tăng (tools callable trực tiếp).
-
-**⚠ Per-machine gotchas (KHÔNG theo git):**
-- omp AUTO-UPGRADE mạnh (16.5.2→17.0.6 qua ~3 session), MỖI upgrade rewrite `~/.omp/agent/config.yml` về default tối thiểu (mất mnemopi/compaction/modelRoles của 8sync). Fix: chạy lại `8sync harness global` (idempotent re-apply). Chỉ config.yml bị ảnh hưởng; mcp.json/skills/hooks/APPEND_SYSTEM sống sót.
-- omp ≥17: MCP tools = `xd://mcp__…` devices (tools.xdev default), gọi trực tiếp. Không còn `discoveryDefaultServers`.
-- npm/pnpm shim hỏng → feynman crash `MODULE_NOT_FOUND …/npm-cli.js`: thay symlink `~/.local/bin/{npm,npx}` bằng wrapper `exec ~/.local/share/pnpm/{npm,npx} "$@"` (chi tiết KNOWLEDGE).
-- zai-vision key trong `~/.omp/agent/mcp.json` (per-machine).
-
-**Trên máy mới — runbook (theo thứ tự):**
-1. `git pull` (hoặc clone `https://github.com/8-Sync-Dev/su-code.git`).
-2. `bash scripts/bootstrap.sh` (build+install) hoặc `curl -fsSL .../install.sh | sh`.
-3. `8sync setup` → cấu hình omp API key.
-4. `8sync harness` → skills + AGENTS + codegraph index + commands + gitleaks hook (+ config MCP nếu omp <17).
-5. `8sync doctor` → omp ≥17 phải thấy `✓ STEP-0 MCP tools mounted as xd:// devices (omp ≥17 tools.xdev)`.
-6. Per-máy nếu cần: npm fix · `8sync feynman auth-omp` · `8sync harness browser` · `8sync setup --profile apps-personal` (Lark).
-
-## Current step
-**`branch-sync` skill + `/sync-pr` slash command + `8sync omp update` verb (WIP uncommitted trên `589807e`)** — done + verified live trên máy này.
-- **Session này (2026-07-22):**
-  1. Thêm verb `crates/cli/src/verbs/omp.rs` (`8sync omp update` [`--force`]): tự động auto-repair khi `omp update` dính lỗi `npm EEXIST` hoặc bun `Fail extracting tarball`.
-  2. Tạo skill `assets/skills/branch-sync/SKILL.md` + script `assets/skills/branch-sync/scripts/branch_sync.py`: audit, deep preview (commit breakdown + `git merge-tree`), merge vào `main` và zero-conflict multi-branch sync.
-  3. Deploy slash command `/sync-pr` (`assets/commands/sync-pr.md`): deploy toàn cục (`~/.omp/agent/commands/sync-pr.md`) và per-project (`.omp/commands/sync-pr.md`) — nạp `branch-sync` skill và chạy sync cho mọi dự án `omp`.
-  4. Nâng cấp `8sync harness global`: tự động nhận diện và stamp `su-code/` / `AGENTS.md` project ở CWD (skills mirror, AGENTS/CLAUDE inject, memory, engine, codegraph init).
-  5. Đào sâu `assets/skills/deep-research/SKILL.md`: tích hợp state-machine loop engineering, STEP-0 code intelligence (`codegraph`/`cbm`/`serena`), multi-agent wave execution (`tasks[]`), headroom nén output và ponytail YAGNI.
-- **Verified live:** Rebuild binary 8sync 0.52.0; `8sync harness global` deploy `/sync-pr` + 74 skills; `branch_sync.py --action audit` xanh; `8sync omp update` normal + `--force` xanh.
-- **WIP chưa commit:** `assets/skills/branch-sync/` · `assets/commands/sync-pr.md` · `crates/cli/src/verbs/omp.rs` · `main.rs` · `verbs/mod.rs` · `up.rs` · `global.rs` · `deploy.rs` · `CHANGELOG.md` · `su-code/KNOWLEDGE.md` · `su-code/STATE.md`. Muốn ship → `/push-now`.
-- **Prior shipped**: omp-17 MCP fix + Lark (589807e) · STEP-0 MCP fix omp-16 (64bd650) · `/push-now`+`/pull-now` (c402209, 6bb38ae) · v0.52.0 (`8sync vpn`).
-## Next (chưa làm)
-- [ ] (tùy) Nếu muốn `/push-now` thành release: bump `Cargo.toml` + CHANGELOG version + push tag → CI 5 assets.
+## Next
+- [ ] Ratchet the size ceiling down as headroom appears (`bash scripts/size-report.sh` → `scripts/size-gate.sh`).
+- [ ] REQUIREMENTS v2: un-embed `impeccable/scripts` (1.6 MB) behind a lazy fetch — the last big chunk of the 665 392 B still over goal.
+- [ ] Push / release when wanted: `/push-now` or bump `Cargo.toml` + tag.
 - [ ] (tùy) Hardening: `8sync feynman auth-omp`/`doctor` detect `npm` hỏng và warn (feynman phụ thuộc npm runtime). Chưa làm — ngoài phạm vi yêu cầu.
 - [ ] Phase 3b — gstack host `omp` (DEFERRED; xem archive + `reference/gstack` docs/ADDING_A_HOST.md).
+
+**Prior shipped:** omp-17 MCP fix + Lark (589807e) · STEP-0 MCP fix omp-16 (64bd650) · `/push-now`+`/pull-now` (c402209, 6bb38ae) · v0.52.0 (`8sync vpn`).
 
 ## Open questions / blockers
 - Real mac/Windows **runtime** verification needs the actual OSes (or the pushed-tag CI artifacts) — the code path (launchd/schtasks/brew/winget) is written + compiles cross-platform but hasn't executed on a live mac/Win yet.
