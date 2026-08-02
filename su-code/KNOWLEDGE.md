@@ -329,3 +329,47 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   the data: `toolstats` spends 1.01 MiB of bundled SQLite C on an append-only call log answering
   `COUNT`/`GROUP BY` over a few thousand rows — replaceable with a flat file + in-memory
   aggregation at zero feature loss. `web`'s 2.16 MiB is mostly the irreducible `web/dist` embed.
+- validated (M2 `lean-binary` — the elimination that gating only pointed at): default binary
+  **6 407 848 → 4 859 696 B (−1 548 152 B, −24.2 %)** with **zero feature loss**. Two deletions:
+  (a) `rusqlite` −1 035 384 B, (b) `elkjs`→`@dagrejs/dagre` −512 768 B. Minimal build 3 109 496 B
+  (−25.86 % vs budget); `web` gate now 1 750 136 B. Remaining overshoot 665 392 B lives in
+  `assets/` (impeccable 2.1 MB) and the dashboard — no easy owner left.
+- validated (`toolstats` never needed a database): `ingest` opened with `DELETE FROM calls` and
+  re-parsed every session JSONL each run, so nothing ever persisted — the module's own
+  "idempotent, keyed on (session, seq)" comment was FALSE and `INSERT OR IGNORE` was unreachable
+  as a dedupe path. 1 MB of embedded SQLite C answered `COUNT`/`GROUP BY` over rows the same
+  process had just built. Now one pass → four `HashMap`s. **Read what a dependency actually does
+  before assuming its cost is earned.**
+- gotcha (byte-identical output across a store swap): SQLite `ORDER BY <count> DESC` leaves ties
+  in table-scan = insertion order, NOT alphabetical — the report printed `write×2,
+  generate_image×2`. Reproduced by tie-breaking on first-appearance index (`ranked()` in
+  `toolstats.rs`). Verify such a swap under FROZEN input: rebuild the old binary in a detached
+  `git worktree`, copy the session tree to `/tmp/th/.omp/agent/sessions/<slug-for-that-HOME>`,
+  run both with `HOME=/tmp/th`, `diff`. Two live runs differ only because the session grew.
+- validated (`elkjs` = 85 % of the dashboard bundle): `elk.bundled.js` is 1 606 238 B of a
+  1 891 858 B chunk — a GWT-compiled Java layout engine for two `elk.algorithm: layered` calls.
+  `@dagrejs/dagre` covers `rankdir` LR/TB + `nodesep` identically → bundle **478 704 B (−75 %)**.
+  Porting notes: dagre reports node CENTRES (elk = top-left, so subtract half w/h), and dagre
+  INVENTS a node for an unknown edge endpoint (elk ignored those) — filter edges to known ids.
+- failure (splitting a lazy chunk does NOT shrink the binary): `await import("elkjs/…")` makes
+  Vite emit a separate chunk, but `rust-embed` embeds the whole `web/dist` tree, so embedded
+  bytes are unchanged — and top-level `await` breaks the Vite build against its browser targets
+  anyway. Only a SMALLER dependency helps when the whole output directory is embedded.
+- failure (project detection stamped THIS repo's root — found live, fixed same session): a
+  directory merely NAMED `su-code` satisfied the `su-code` marker in
+  `discover::detect_current_project_root` and `global::is_omp_project`, so its PARENT looked like
+  an omp project. This checkout is `~/Projects/tools/su-code`, so any `8sync harness global` run
+  with cwd `~/Projects/tools` stamped `<parent>/su-code/` — i.e. **the repo root** — with a blank
+  `STATE.md`/`KNOWLEDGE.md`/`PLAYBOOKS.md`/… and a 74-entry `skills/` tree. Caught only because
+  `git add -A` swept them in and the gitleaks pre-commit hook fired on the `senior-security`
+  skill's regex literals. Fix: `is_memory_dir()` requires the dir to actually CONTAIN memory
+  (`skills/` or one of STATE/KNOWLEDGE/PROJECT/PLAYBOOKS/skills.toml); `is_omp_project` moved to
+  `discover` so both paths share it. Verified 3 ways: bare `su-code/` → untouched · `AGENTS.md`
+  repo → stamped · memory tree without `AGENTS.md` → still stamped.
+- gotcha: **`brand::NS` is `"8sync"`, NOT the memory-dir name.** `NS` is the config/artifact
+  namespace (`~/.config/8sync`, `8sync-engine.ts`, AGENTS sentinels); the project memory dir is
+  the separate literal `"su-code"` (hardcoded in `deploy::mirror_global_to_local`,
+  `memory::migrate_legacy_layout`). Writing `is_memory_dir(&p, brand::NS)` compiles, passes the
+  "bad case" test, and silently breaks detection for every real project — it looks for a dir
+  named `8sync`. Now a named constant `discover::MEMORY_DIR`. Test the POSITIVE case too; a fix
+  that only proves the bug is gone can have deleted the feature.

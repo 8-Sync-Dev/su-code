@@ -4,13 +4,13 @@ feature: lean-binary
 ticket: ""
 branch: ""
 status: in-progress
-active_phase: "M2"
+active_phase: "M3"
 next_action: plan-phase
 next_phases: ["M1","M2","M3"]
 progress:
   total_phases: 4
-  completed_phases: 2
-  percent: 50
+  completed_phases: 3
+  percent: 75
 last_updated: "2026-08-02"
 ---
 
@@ -24,11 +24,11 @@ See: su-code/planning/lean-binary/PROJECT.md · ROADMAP: su-code/planning/lean-b
 
 ## Current Position
 
-Phase: M2 of 4 (Eliminate, don't just gate)
-Plan: 0 of 0 (M2 not planned yet)
+Phase: M3 of 4 (CI + budget truth)
+Plan: 0 of 0 (M3 not planned yet)
 Status: in-progress
-Vì sao phase này: M1 proved gating ships 0 user-visible bytes — the measurement now points at one target worth deleting.
-Last activity: 2026-08-02 — M1 closed 8/8; per-gate cost measured (`web` 2 262 568 B · `toolstats` 1 060 840 B).
+Vì sao phase này: the binary is 24 % smaller and the remaining 665 392 B has no cheap owner — CI and the documented budget must now state measured reality.
+Last activity: 2026-08-02 — M2 closed 8/8; 6 407 848 → 4 859 696 B with zero feature loss.
 
 ## Accumulated Context
 
@@ -39,6 +39,9 @@ Last activity: 2026-08-02 — M1 closed 8/8; per-gate cost measured (`web` 2 262
 - [M1 pre]: gate, measure, *then* decide what to delete. No dep is removed on `cargo bloat` guesswork alone.
 - [M1]: `marketplace` folds into `web` — one caller (`web.rs:1452`), so it never earned its own flag.
 - [M1]: attribution ships as `scripts/size-report.sh`, not a verb — `AGENTS.md` §8 caps verbs at 22 and a verb would add bytes to the thing being measured.
+- [M2]: delete, don't gate — `rusqlite` and `elkjs` were removed outright; gating only located them.
+- [M2]: a store swap must be proven under FROZEN input (worktree-rebuilt old binary + copied session tree), never by comparing two live runs.
+- [M2]: the dashboard layout swap shipped only after headless browser proof, per D-M2-4.
 - [M1]: `cargo bloat` may RANK suspects; only an A/B build may state a number (it missed SQLite by ~26×).
 
 ### Contract — phase sau CẦN BIẾT
@@ -48,6 +51,8 @@ Last activity: 2026-08-02 — M1 closed 8/8; per-gate cost measured (`web` 2 262
 - [M1]: features `web` (axum+tokio+tower-http+scraper, `WebAssets`, `build.rs` Vite step) and `toolstats` (rusqlite); `default = ["web","toolstats"]`. Gate helpers `harness::dispatch_web` / `dispatch_toolstats` bail with a `--features` hint when absent.
 - [M1]: sizes — full 6 407 144 · web-only 5 346 304 · toolstats-only 4 144 576 · minimal 3 081 416. **minimal and toolstats-only are already under the 4 MiB budget.**
 - [M1]: dashboard-only symbols now cfg'd: `harness::knowledge` (module), `bench::BenchMetrics`, `bench::bench_metrics`, `here::scaffold_project`, `assets::WebAssets`, `assets::web_asset`.
+- [M2]: `features` = `web` only. `toolstats` is dependency-free and always built. `web/src/layout.ts` exports `layered(nodes, edges, "RIGHT"|"DOWN", nodeSep)`; dagre reports centres, so it subtracts half the node box and filters edges to known ids.
+- [M2]: sizes — default **4 859 696 B**, minimal **3 109 496 B**, `web` gate 1 750 136 B, budget 4 194 304 B → **+665 392 B over**.
 
 ### Files touched
 - [M0]: `verbs/omp.rs` (new), `main.rs`, `verbs/mod.rs`, `verbs/up.rs` — 532dea9
