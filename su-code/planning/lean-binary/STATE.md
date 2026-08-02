@@ -4,13 +4,13 @@ feature: lean-binary
 ticket: ""
 branch: ""
 status: in-progress
-active_phase: "M1"
+active_phase: "M2"
 next_action: plan-phase
 next_phases: ["M1","M2","M3"]
 progress:
   total_phases: 4
-  completed_phases: 1
-  percent: 25
+  completed_phases: 2
+  percent: 50
 last_updated: "2026-08-02"
 ---
 
@@ -24,11 +24,11 @@ See: su-code/planning/lean-binary/PROJECT.md · ROADMAP: su-code/planning/lean-b
 
 ## Current Position
 
-Phase: M1 of 4 (Feature gating + attribution)
-Plan: 0 of 0 (M1 not planned yet)
+Phase: M2 of 4 (Eliminate, don't just gate)
+Plan: 0 of 0 (M2 not planned yet)
 Status: in-progress
-Vì sao phase này: you cannot delete a dep before you have measured what it actually costs; gates are the measuring instrument.
-Last activity: 2026-08-02 — M0 closed, 4 commits replayed green, baseline 6 407 848 B recorded.
+Vì sao phase này: M1 proved gating ships 0 user-visible bytes — the measurement now points at one target worth deleting.
+Last activity: 2026-08-02 — M1 closed 8/8; per-gate cost measured (`web` 2 262 568 B · `toolstats` 1 060 840 B).
 
 ## Accumulated Context
 
@@ -37,11 +37,17 @@ Last activity: 2026-08-02 — M0 closed, 4 commits replayed green, baseline 6 40
 - [M0]: hand-roll the commits, keep the engine's verify-gate — `engine_advance {commit:true}` does `git add -A` and cannot be trusted to split a dirty tree.
 - [M0]: AC-02 proven by worktree replay, not by N green `engine_verify` on one tree.
 - [M1 pre]: gate, measure, *then* decide what to delete. No dep is removed on `cargo bloat` guesswork alone.
+- [M1]: `marketplace` folds into `web` — one caller (`web.rs:1452`), so it never earned its own flag.
+- [M1]: attribution ships as `scripts/size-report.sh`, not a verb — `AGENTS.md` §8 caps verbs at 22 and a verb would add bytes to the thing being measured.
+- [M1]: `cargo bloat` may RANK suspects; only an A/B build may state a number (it missed SQLite by ~26×).
 
 ### Contract — phase sau CẦN BIẾT
 - [M0]: baseline `6 407 848 B` at `97e906d`+docs; budget `4 194 304 B`; overshoot `2 213 544 B`.
 - [M0]: heavy deps are single-module — `axum`/`tokio`/`tower-http` → `verbs/harness/web.rs`; `rusqlite` → `verbs/harness/toolstats.rs`; `scraper` → `verbs/harness/marketplace.rs`. Embeds: `assets::Assets` (`assets/`) and `assets::WebAssets` (`web/dist/`) + `assets::web_asset()`.
 - [M0]: `crates/cli/Cargo.toml` has **no** `[features]` table — M1 creates it.
+- [M1]: features `web` (axum+tokio+tower-http+scraper, `WebAssets`, `build.rs` Vite step) and `toolstats` (rusqlite); `default = ["web","toolstats"]`. Gate helpers `harness::dispatch_web` / `dispatch_toolstats` bail with a `--features` hint when absent.
+- [M1]: sizes — full 6 407 144 · web-only 5 346 304 · toolstats-only 4 144 576 · minimal 3 081 416. **minimal and toolstats-only are already under the 4 MiB budget.**
+- [M1]: dashboard-only symbols now cfg'd: `harness::knowledge` (module), `bench::BenchMetrics`, `bench::bench_metrics`, `here::scaffold_project`, `assets::WebAssets`, `assets::web_asset`.
 
 ### Files touched
 - [M0]: `verbs/omp.rs` (new), `main.rs`, `verbs/mod.rs`, `verbs/up.rs` — 532dea9
@@ -49,6 +55,7 @@ Last activity: 2026-08-02 — M0 closed, 4 commits replayed green, baseline 6 40
 - [M0]: `verbs/harness/global.rs` — 3c8c008
 - [M0]: `assets/skills/deep-research/SKILL.md`, `outputs/native-tooling-zig-rust*` — 97e906d
 - [M0]: CHANGELOG/KNOWLEDGE/STATE/AGENTS/CLAUDE + planning tree — T5
+- [M1]: `crates/cli/Cargo.toml` — fef75ea; `assets.rs`, `build.rs`, `here.rs`, `harness/bench.rs`, `harness/mod.rs` — 95a4a26; `scripts/size-report.sh` — 265c465
 
 ### Blockers/Concerns
 - `8sync doctor`: `! docs: 17 stale path(s) / 2 oversized`. Pre-existing, owned by M3.

@@ -305,3 +305,27 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   therefore proves only that the final tree builds. To make "every commit compiles" a real claim,
   replay the range in a throwaway worktree (`git worktree add`, `git checkout <sha>`,
   `cargo build`) instead of trusting N green `engine_verify` calls.
+- validated (M1 `lean-binary` — REAL per-gate cost, supersedes every `cargo bloat` figure for
+  this repo): `bash scripts/size-report.sh` A/B's four builds, each in its own `--target-dir`
+  with an explicit `--target`. full **6 407 144** · web-only 5 346 304 · toolstats-only
+  **4 144 576** · minimal **3 081 416**. Gate cost: **`web` = 2 262 568 B**, **`toolstats` =
+  1 060 840 B**, both = 3 325 728 B. Cross-check `web-only + toolstats-only − minimal` =
+  6 409 464 ≈ full (2 320 B of shared code double-counted) → the numbers are coherent.
+  **A `minimal` build (3.08 MB) is already UNDER the 4 MiB budget, and so is toolstats-only
+  (4.14 MB, −1.19 %).**
+- failure (`cargo bloat` under-attributed SQLite by ~26×): it put `libsqlite3_sys` at **40 KiB**
+  of `.text`; the A/B says the `toolstats` gate really costs **1 060 840 B**. `cargo bloat`
+  attributes `.text` by symbol only — blind to `.rodata`, static tables and the true C-blob
+  footprint — and prints *"numbers are a result of guesswork"*. Rule: `cargo bloat` may only
+  RANK suspects; every load-bearing number MUST come from an A/B build.
+- gotcha: `cargo build --release --no-default-features` WITHOUT `--target-dir` overwrites
+  `target/release/8sync` with the lean binary — trivially installed onto `PATH` by a later
+  `cp target/release/8sync $(command -v 8sync)`. Hit live in M1. Always give a variant build its
+  own `--target-dir` (which `scripts/size-report.sh` does), and re-run the default build before
+  installing.
+- validated (feature gating is a MEASURING INSTRUMENT, not a diet): with `default = ["web",
+  "toolstats"]` the shipped binary is byte-identical, so gating alone delivers **0** user-visible
+  savings. Its payoff is that it makes elimination decisions data-driven. Next target chosen from
+  the data: `toolstats` spends 1.01 MiB of bundled SQLite C on an append-only call log answering
+  `COUNT`/`GROUP BY` over a few thousand rows — replaceable with a flat file + in-memory
+  aggregation at zero feature loss. `web`'s 2.16 MiB is mostly the irreducible `web/dist` embed.
