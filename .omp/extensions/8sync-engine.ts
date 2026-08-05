@@ -143,7 +143,7 @@ export default function (pi: ExtensionAPI) {
         .array(
           z.object({
             title: z.string(),
-            tasks: z.array(z.object({ title: z.string(), verify: z.array(z.string()).default([]) })),
+            tasks: z.array(z.object({ title: z.string(), verify: z.array(z.string()).default(() => []) })),
           }),
         )
         .min(1),
