@@ -403,3 +403,21 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   slices, so every Mac user downloads ~2× to save the project one CI leg — backwards for a
   size-reduction effort — and it renames assets `install.sh` resolves by `${os}-${arch}`. Keep
   `darwin-x86_64` + `darwin-arm64` separate.
+- failure (omp 17 rejects mutable zod defaults — `8sync-engine.ts` ParseError): after `omp update` to
+  17.x, every `omp` load printed `Warning: Failed to load extension … ParseError: A mutable default
+  value must be specified as a factory`. omp's schema validator (`HF0` in cli.js) throws when a zod
+  `.default(value)` has `typeof value === "object"` (array/object literal) and is not a Date — so
+  `.default([])` and `.default({})` are banned; the value MUST be a factory: `.default(() => [])`.
+  Rule: primitive defaults (`false`/`0`/`""`/`3`) are fine; any array/object default must be a thunk.
+  Fix was one site: `assets/extensions/8sync-engine.ts:146` (`verify: z.array(z.string()).default([])`
+  → `.default(() => [])`). `8sync-workflow.ts` had no defaults. The asset is rust-embedded, so the
+  fix needs `cargo build` + `8sync harness` to redeploy; copied directly to the live projects for
+  immediate relief. Verified: `omp -p "ok"` in the failing project loads with ZERO extension warnings.
+- gotcha (a failing extension does NOT explain lost `--continue` history): omp loads each extension
+  in its own try/catch and prints `Warning: Failed to load extension` then CONTINUES — session
+  restore is a later phase. The `8sync-engine` extension only registers tools (no `session_start`
+  handler touching the branch), so its parse failure could not drop chat history. Treat the warning
+  and the history loss as TWO symptoms of the `omp update`; omp's changelog shows `--continue` has
+  its own bug class (resume-into-subagent-transcript, session-resume hang, auto-thinking dropped —
+  all fixed by 17.2.9, so a remaining loss is a fresh regression). Don't claim the factory fix
+  resolves the history loss; ask the user to retest `--continue` now and diagnose separately.
