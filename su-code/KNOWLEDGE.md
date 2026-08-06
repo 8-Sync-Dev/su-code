@@ -10,44 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 230 dòng cũ → su-code/archive/KNOWLEDGE-1786016599.md)_
-  NOT omp, so removing omp's file mid-run is safe (no in-memory-process worry the old
-  `/omp-update` slash-command had). (c) `npm config get prefix` = `~/.local`; bun's updater threw
-  `Fail extracting tarball` even on partial success — npm direct install is the reliable path.
-- validated (omp 17.0.1 plan-mode "Enter không ăn" — diagnosed, upstream bug, NOT keyboard):
-  plan-review dialog key handling is CORRECT — verified live with all Enter encodings (legacy
-  `\r`, kitty CSI-u `\x1b[13u`, numpad `\x1b[57414u`) in bare PTY AND real kitty: every variant
-  picks. Freeze mode (bundle decompile): `handlePlanApproval` keeps the overlay MOUNTED while
-  awaiting the whole approval flow (`#eA`: clear/compact = full model call over the entire
-  context + `session.prompt`), and the pick resolver is single-shot (`if (O) return`) — after the
-  FIRST Enter, arrows still move ❯ but Enter/esc are dead until the async flow finishes; a stalled
-  provider call (no timeout) freezes it indefinitely. "Approve and compact context" on a ~229k
-  session = minutes of frozen-looking dialog. Recovery: plan file survives at
-  `local://<slug>-plan.md` — Ctrl+C / restart omp, resume, approve again (prefer "Approve and
-  execute" on huge contexts). Upstream fix = hide overlay (or busy state) right after pick, before
-  `#eA`. Report to can1357/oh-my-pi (blocked this session: gh keyring auth broken).
-- failure: omp hub daemon launcher breaks under fish as $SHELL — generated wrapper uses
-  `printf '%s' "$$"` which fish rejects (`$$ is not the pid`) → every `hub start` exits 127
-  before exec; SHELL env override on the start call does NOT change the wrapper shell (broker
-  resolves shell at its own start). Workaround: drive PTYs via python `pty` module or
-  `kitty --listen-on unix:... @ send-key/get-text`. Also upstream-reportable.
-- validated (`branch-sync` skill & `8sync harness global` auto-detection): (a) `assets/skills/branch-sync/SKILL.md` + `assets/skills/branch-sync/scripts/branch_sync.py` provides automated multi-branch audit, deep preview (commit breakdown + `git merge-tree` conflict check), safe merge to main, and zero-conflict sync across all branches. (b) `8sync harness global` now auto-detects `su-code/` projects in cwd and automatically updates their local harness (skills mirror, AGENTS/CLAUDE injection, memory, commands, gitleaks hook, codegraph init) without requiring explicit `--sweep`. (c) `deep-research` skill enhanced with loop engineering state machines, STEP-0 code intelligence (`codegraph`/`codebase-memory-mcp`/`serena`), multi-agent wave execution, headroom compression, and ponytail YAGNI discipline.
-- validated (binary-size audit 2026-08-02, brief: `outputs/native-tooling-zig-rust.md`): `8sync`
-  stripped = **6 406 696 B (6.11 MiB)** vs the `AGENTS.md` §8 budget "< 4 MB" → ~1.5–1.6× over.
-  Sections: `.text` 2 854 517 · `.rodata` 2 188 928 (embedded assets) · `.eh_frame` 482 684 ·
-  `.rela.dyn` 419 856. `cargo bloat --crates`: `[Unknown]` C 780 KiB · std 571 · **our code only
-  405 (14.5 %)** · axum 217 · clap_builder 122 · scraper 104 · zstd_sys 58 · tokio 46 ·
-  libsqlite3_sys 40. Raw blobs pre-GC: `libsqlite3.a` 2.1 MB; embedded `assets/` 3.0 MB
-  (impeccable 2.1 MB, its `scripts/` 1.6 MB) + `web/dist` 1.9 MB. Root cause is NOT the language
-  or the flags: `crates/cli/Cargo.toml` has **no `[features]` section**, so `harness web`
-  (axum/tokio/hyper/tower), marketplace scraping (scraper/html5ever) and `harness toolstats`
-  (bundled SQLite) link into every build. Fix order: feature-gate → un-embed `web/dist` +
-  `impeccable/scripts` → re-evaluate `rust-embed`'s `compression`.
-- failure (release-profile knobs are EXHAUSTED — stop re-litigating them; all A/B'd with an
-  explicit `--target x86_64-unknown-linux-gnu` so RUSTFLAGS skip host proc-macros):
-  (a) `-C force-unwind-tables=no` under `panic="abort"` saves **704 bytes**; `.eh_frame` stays
-  482 KB (std + the C blobs still emit tables). (b) `opt-level="s"` is **307 392 B BIGGER** than
-  `"z"` → keep `"z"`. (c) `-C relocation-model=static` without an explicit `--target` **breaks the
+_(consolidated 38 dòng cũ → su-code/archive/KNOWLEDGE-1786019226.md)_
   build** — proc-macros (`indoc`) must be PIC. Lesson: demand an A/B byte count before accepting
   any new size flag.
 - gotcha: `rust-embed`'s `compression` feature pulls `include-flate` → `include-flate-compress`,
@@ -248,3 +211,35 @@ _(consolidated 230 dòng cũ → su-code/archive/KNOWLEDGE-1786016599.md)_
   single omp run — the deploy then mistakes its own stale block for a user-authored one and skips
   forever. Identify an 8sync-owned block by a content SIGNATURE (`STEP-0`) and replace the whole
   block (start of key → next top-level key); skip only when the signature is absent.
+- validated (`--continue` history loss is NOT reproducible — the likely cause was the bricked
+  `--tools` flag): tested end-to-end on omp 17.2.9 — `omp -p "remember BANANA47"` then
+  `omp --continue -p "what codeword?"` returns `BANANA47`, and the `8sync ai` resume path returns
+  it too. So omp's session restore is fine. The reported symptom almost certainly came from
+  STEP-0 v1's invalid `--tools`: `8sync ai` / `8sync .` DIED at launch, the user fell back to a
+  bare `omp`, got a fresh session, and it looked exactly like "--continue lost my history".
+  Lesson: when a wrapper dies at launch, the user experiences it as the wrapped tool misbehaving —
+  always test the wrapper's own exit path before blaming upstream.
+- failure (`codegraph callers` gives FALSE NEGATIVES — do not trust it alone): on a clean, freshly
+  rebuilt full index it reported `No callers found for "ensure_bash_interceptor"` while two real
+  call sites existed (`harness/global.rs:42`, `harness/init.rs:66`). Not staleness — reproduced
+  after a full rebuild. Narrowing: `ensure_recall_hook` is called from BOTH `up.rs::refresh_once`
+  and `global.rs::global_pass`, and codegraph reported only the `up.rs` one, so the misses cluster
+  by CALLER (nothing inside `global_pass` resolves), not by callee. `let _ =` discard bindings are
+  NOT the cause — the plainly-called `ensure_codebase_memory_mcp` is missed too. codegraph is a
+  prebuilt external binary (`~/.local/bin/codegraph`, no local source), so this is upstream.
+  Workaround now in APPEND_SYSTEM: answer "who calls X" with `mcp__serena_find_referencing_symbols`
+  (it found both); treat `codegraph callers` as a second opinion only, never as proof of absence.
+- failure (never `rm -rf .codegraph` to force a rebuild — self-inflicted, cost ~5 min): the
+  directory holds the exclusion config, so deleting it makes the next `codegraph index .` walk the
+  whole tree (16,465 files incl. `target/`) instead of the ~6k it normally indexes; it blew a
+  300 s timeout, got interrupted, and left NO index at all (`codegraph query` returned nothing).
+  Use `codegraph index --force` ("rebuild the full index from scratch") or just `8sync harness`,
+  which re-inits with the right exclusions. Recovery: `8sync harness` in the background.
+- validated (a guard you never fired is theatre — test the NEGATIVE case): `8sync doctor` now
+  probes omp's live validator list and diffs it against `STEP0_TOOLS`. Proving it prints
+  `✓ matches` is NOT enough, since a probe that silently fails to parse also prints nothing bad.
+  Proof required injecting real drift: adding `bogus_tool` made doctor warn
+  `STEP-0 allowlist REJECTED by omp: bogus_tool — every 8sync ai / 8sync . will fail to launch`,
+  then reverting restored `✓ matches`. The probe is free and offline — omp validates `--tools`
+  before contacting any provider, so `omp --tools __8sync_probe__ -p ""` returns the authoritative
+  list instantly.

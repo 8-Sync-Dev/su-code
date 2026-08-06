@@ -248,6 +248,26 @@ fn check_ai_engines(home: &std::path::Path) {
     } else {
         ui::warn("  MCP tools HIDDEN behind search_tool_bm25 (fix: run `8sync harness global`) — serena/cbm never get called");
     }
+    // `--tools` is an allowlist, so it rots silently: a name omp drops bricks
+    // every launch, a name omp ADDS disappears from the agent with no error.
+    // Both have already happened once, so ask omp directly instead of trusting
+    // the constant.
+    match crate::models::step0_tool_drift() {
+        Some((rejected, _)) if !rejected.is_empty() => {
+            ui::warn(&format!(
+                "  STEP-0 allowlist REJECTED by omp: {} — every `8sync ai` / `8sync .` will fail to launch. Fix STEP0_TOOLS in models.rs (or `8sync ai --no-step0` to work around)",
+                rejected.join(", ")
+            ));
+        }
+        Some((_, disabled)) if !disabled.is_empty() => {
+            ui::warn(&format!(
+                "  STEP-0 allowlist is missing omp tool(s): {} — silently disabled for the agent. Add them to STEP0_TOOLS in models.rs",
+                disabled.join(", ")
+            ));
+        }
+        Some(_) => ui::ok("  STEP-0 allowlist matches omp's tool list (grep/glob dropped on purpose)"),
+        None => {}
+    }
     if mcp.contains("\"serena\"") && which::which("uvx").is_ok() {
         ui::ok("  serena registered + runnable via uvx — LSP symbol intel (mcp__serena_find_symbol/…)");
     } else {

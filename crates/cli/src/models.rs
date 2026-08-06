@@ -67,10 +67,69 @@ fn step0_default() -> bool {
 /// `python`/`notebook`, which the validator rejects); the authoritative list is
 /// the one omp prints in that error. Re-check on every omp major upgrade —
 /// `8sync doctor` probes for drift.
-const STEP0_TOOLS: &str = "read,bash,edit,write,lsp,task,todo,web_search,ask,inspect_image,\
+pub(crate) const STEP0_TOOLS: &str = "read,bash,edit,write,lsp,task,todo,web_search,ask,inspect_image,\
                            browser,ast_grep,ast_edit,debug,eval,github,hub,checkpoint,rewind,\
                            security_scan,memory_edit,retain,recall,reflect,learn,manage_skill,\
                            yield,goal";
+
+/// Built-ins STEP-0 drops on purpose: the two redundant searchers, plus
+/// `computer`, which is disabled by default and must stay that way (naming it
+/// in an allowlist would ENABLE it).
+const STEP0_INTENTIONAL_DROPS: &[&str] = &["grep", "glob", "computer"];
+
+/// Ask omp itself which built-in tool names it accepts.
+///
+/// There is no machine-readable listing (`--help`'s "Available Tools" section is
+/// stale — it advertises `python`/`notebook`, which the validator rejects), but
+/// omp enumerates the real set when it refuses an unknown one, and it does so
+/// before contacting any provider, so the probe is free and offline:
+/// `Unknown tools in --tools: …. Valid tools: read, bash, ….`
+fn omp_valid_tools() -> Option<Vec<String>> {
+    let out = std::process::Command::new("omp")
+        .args(["--tools", "__8sync_probe__", "-p", ""])
+        .output()
+        .ok()?;
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let tail = text.split("Valid tools:").nth(1)?;
+    let list = tail.split('.').next()?;
+    let tools: Vec<String> = list
+        .split(',')
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+        .collect();
+    (!tools.is_empty()).then_some(tools)
+}
+
+/// Compare `STEP0_TOOLS` against omp's live validator list.
+///
+/// Returns `(rejected, silently_disabled)`:
+/// - `rejected` — names we send that omp does not know. Non-empty means omp
+///   exits with `Unknown tools in --tools` and EVERY `8sync ai` / `8sync .`
+///   launch is bricked. This is exactly how STEP-0 v1 shipped broken.
+/// - `silently_disabled` — tools omp offers that the allowlist omits (minus the
+///   deliberate drops). These vanish from the agent with no error at all, which
+///   is how an omp upgrade could quietly remove `recall`/`retain` again.
+///
+/// `None` when omp is absent or the probe could not be parsed — report nothing
+/// rather than guess.
+pub(crate) fn step0_tool_drift() -> Option<(Vec<String>, Vec<String>)> {
+    let valid = omp_valid_tools()?;
+    let ours: Vec<&str> = STEP0_TOOLS.split(',').map(str::trim).collect();
+    let rejected: Vec<String> = ours
+        .iter()
+        .filter(|t| !valid.iter().any(|v| v == *t))
+        .map(|t| t.to_string())
+        .collect();
+    let silently_disabled: Vec<String> = valid
+        .into_iter()
+        .filter(|v| !ours.contains(&v.as_str()) && !STEP0_INTENTIONAL_DROPS.contains(&v.as_str()))
+        .collect();
+    Some((rejected, silently_disabled))
+}
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Roles {
