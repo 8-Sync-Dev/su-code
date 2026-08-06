@@ -420,6 +420,41 @@ pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Write STEP-0 `bashInterceptor.patterns` into `~/.omp/agent/config.yml` so the
+/// agent's `bash` shell-escapes (`rg`, recursive `grep`) on code are BLOCKED —
+/// closing the loophole the `--tools` allowlist leaves open (it removes the
+/// `grep`/`glob` TOOLS but not `bash grep`). omp's rule shape is
+/// `{ pattern: <regex>, reason: <string> }` — verified omp 17.2.9: the
+/// `explicitExclusions` schema + runtime reason `Blocked by bash pattern:
+/// ${match}`. Conservative: blocks `rg` (any) and `grep` with a recursive flag
+/// only — single-file / log `grep` stays allowed. Idempotent + non-clobbering:
+/// skips if a `bashInterceptor:` key is already present (user-authored).
+pub(crate) fn ensure_bash_interceptor(home: &Path) -> Result<()> {
+    let cfg = home.join(".omp/agent/config.yml");
+    if let Some(p) = cfg.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    let mut s = std::fs::read_to_string(&cfg).unwrap_or_default();
+    if s.lines().any(|l| l.starts_with("bashInterceptor:")) {
+        ui::skip("bashInterceptor (STEP-0)", "key already present (user-configured)");
+        return Ok(());
+    }
+    s.push_str(
+        r#"
+bashInterceptor:
+  enabled: true
+  patterns:
+    - pattern: '\brg\b'
+      reason: 'STEP-0: code search via `codegraph query/explore` or mcp__codebase_memory_mcp_search_graph, not rg'
+    - pattern: '\bgrep\b.*(-[rR]|--recursive)'
+      reason: 'STEP-0: recursive code search via codegraph/cbm, not grep -r (single-file / log grep is allowed)'
+"#,
+    );
+    std::fs::write(&cfg, s)?;
+    ui::ok("bashInterceptor ON (STEP-0): blocks `rg` + `grep -r` shell escapes → codegraph/cbm");
+    Ok(())
+}
+
 /// Keep the STEP-0 MCP servers' tools ALWAYS VISIBLE via `mcp.discoveryDefaultServers`
 /// in `~/.omp/agent/config.yml`. omp's default `tools.discoveryMode: auto` hides ALL
 /// MCP tools behind a `search_tool_bm25` discovery hop once the registry exceeds 40

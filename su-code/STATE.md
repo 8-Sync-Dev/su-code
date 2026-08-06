@@ -6,35 +6,44 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 
 ## 🚚 HANDOFF — 2026-08-06 (cold resume from here)
 
-**Repo state:** branch `main`, HEAD **`0b535e4`** `chore(extensions): redeploy 8sync-engine.ts with the omp-17 factory fix`. Tag **v0.52.0** (Cargo.toml still 0.52.0 — WIP checkpoint, **not** a release). Tracked tree **clean**. **20 commits ahead of `origin/main`, nothing pushed yet** (this `/push-now` fixes that).
+**Repo state:** branch `main`. `origin/main` = `50462db` (**IN SYNC** — prior `/push-now` pushed all 20 commits incl. the omp-17 ext fix `bf885f7` + the 18-commit lean-binary feature). Tag **v0.52.0** (Cargo.toml still 0.52.0; **not** bumped — WIP checkpoint). This commit adds **STEP-0 tool-routing enforcement** (1 new commit on top of `50462db`). Tracked tree clean after this push.
 
-**What changed THIS session (2 commits on top of the 18-commit lean-binary feature):**
-- `bf885f7` **fix(extensions): omp 17 mutable-default ParseError** — omp 17.2.9 added a schema validator (`HF0` in `cli.js`) that rejects any zod `.default(<array/object literal>)`; it must be a **factory**. One site: `assets/extensions/8sync-engine.ts:146`, `verify: z.array(z.string()).default([])` → `.default(() => [])`. Every other default is a primitive (`false`/`0`/`""`/`3`) — untouched. `8sync-workflow.ts` has no defaults. The asset is rust-embedded, so this needs `cargo build` + `8sync harness` to redeploy; live copies refreshed in 3 projects. **Verified:** `omp -p "ok"` loads the extension with zero warnings.
-- `0b535e4` — `8sync harness` re-stamped the project copy `.omp/extensions/8sync-engine.ts` from the rebuilt embedded asset (byte-identical to source).
-- Cleaned **stray root memory files** (`STATE.md`/`KNOWLEDGE.md`/`skills/`(74)… at repo root): leftovers from a stale *release* binary that still had the detection bug — the PATH binary now has the fix (re-verified both directions). `CHANGELOG.md` + `su-code/KNOWLEDGE.md` updated.
+**What changed THIS session (STEP-0 enforcement — "the rule is now code, not prose"):**
+Measured problem (`8sync harness toolstats`): the STEP-0 MCP stack was connected AND callable (probed live: `xd://mcp__codebase_memory_mcp_list_projects` returned 5 indexed projects, `xd://mcp__headroom_compress` returned a hash) yet **UNUSED** — `cbm 0 · serena 0 · headroom 0` agent calls; every code lookup fell to the built-in `read`/`grep`. Prose directives in `APPEND_SYSTEM.md`/AGENTS.md lost 3×. **Lesson:** a zero-friction built-in always beats an instruction; if a rule keeps losing, DELETE the thing it competes with. So:
+- `crates/cli/src/models.rs` — new `STEP0_TOOLS` allowlist (drops `grep`+`glob`, keeps `lsp`), emitted via the shared `--tools` flag at the `omp_flags()`/`resume_flags()` chokepoint (covers both `8sync ai` + `8sync .`). **Safe because** `--tools` filters BUILT-INS only — verified by capturing a real provider request (`omp -p ""` 400s and logs the full body to `~/.omp/logs/http-400-requests/`): under `--tools=read,bash,todo` the request still carried **48 `mcp__*` tools + `engine_*` + `wf_state_*`**. Dropping grep/glob costs 0 MCP.
+- `crates/cli/src/verbs/skill/deploy.rs` — new `ensure_bash_interceptor()` writes `bashInterceptor.patterns` into `~/.omp/agent/config.yml` (omp shape `{pattern, reason}`; verified against omp's own `explicitExclusions` schema + the runtime `Blocked by bash pattern: ${match}`). Blocks `\brg\b` + recursive `grep`; **single-file / log grep stays allowed**. Closes the shell-escape hatch the `--tools` allowlist leaves open. Idempotent, never clobbers a user `bashInterceptor:` key.
+- `crates/cli/src/verbs/harness/global.rs` + `init.rs` — wired `ensure_bash_interceptor` into both deploy paths (machine-wide global + per-project init).
+- `crates/cli/src/verbs/ai.rs` — `--no-step0` escape flag threaded through to model launch.
+- `assets/configs/omp/APPEND_SYSTEM.md` — RULE #0 rewritten to match reality: states grep/glob are GONE, gives a cheapest-first routing decision tree (cbm→serena→codegraph), and **DROPS the stale omp-16 `mcp.discoveryDefaultServers` claim** (omp ≥17 mounts MCP as `xd://` devices — that key no longer exists).
+- `assets/configs/models.toml` — added `step0 = true` toggle + doc comment (default ON; `--no-step0` for one run, `step0 = false` in file).
+- `AGENTS.md` / `CLAUDE.md` — sentinel-block re-injected by the harness refresh (STEP-0 mandate now carries the routing tree).
+- `CHANGELOG.md` + `su-code/KNOWLEDGE.md` — documented enforcement + the full omp enforcement-surface map (allowlist / bashInterceptor / hooks / advisor) + the reusable "**a rejected request still logs its full tool array**" trick.
 
 **Done ✓**
-- [x] lean-binary feature (18 commits, `589807e`→`b07e2c3`): binary −24 %, zero features removed (x86_64 6 407 848 → **4 859 696**; aarch64-musl stub → **4 151 328**; `--no-default-features` **3 109 496**). Details: `su-code/planning/lean-binary/M*-VERIFICATION.md`.
-- [x] omp-17 extension ParseError fixed + verified (this session).
+- [x] STEP-0 enforcement shipped + deployed + verified (this session): allowlist embedded in binary ✓; omp re-wrote config.yml (accepted bashInterceptor schema) ✓; `omp models --json` loads clean ✓; doctor all green ✓.
+- [x] omp-17 extension ParseError fixed (`bf885f7`, prior session, now on origin).
+- [x] lean-binary feature (18 commits, on origin).
 
 **Next / TODO ▸**
-- [ ] **`--continue` history loss** (user-reported) — NOT caused by the extension (omp loads each ext in its own try/catch and continues; this ext registers tools only, no `session_start`). omp's changelog shows `--continue` has its own bug class (resume-into-subagent-transcript / session-resume-hang / auto-thinking-dropped — all "fixed" by 17.2.9, so a remaining loss is a **fresh regression**). **Action:** ask the user to retest `--continue` now that the ext loads clean; if it persists, diagnose the terminal breadcrumb + which session `--continue` picks vs `~/.omp/agent/sessions/<project-dir>/`.
-- [ ] **Push/release the 20 local commits** so `8sync up` no longer reverts them — see gotcha ⚠ below.
+- [ ] **Verify optimizer ratio shifts (forward-looking):** baseline `toolstats` = 66.7 % optimizer (codegraph 6, cbm/serena 0, grep 3). After a few NEW sessions under enforcement, re-run `8sync harness toolstats`; expect `grep`→0 and cbm/serena>0. **Cannot be measured in the session that created the enforcement.**
+- [ ] **Verify bashInterceptor blocks at runtime (the one unproven link):** I confirmed omp ACCEPTS the schema + rewrites config.yml (proving parse success) but did NOT run a live session that triggers a block. Run `8sync ai "find where foo is used"` in a code project; confirm `rg`/`grep -r` gets blocked with the reason string. If it over-blocks, edit `~/.omp/agent/config.yml` `bashInterceptor.patterns` or delete the key.
+- [ ] **`--continue` history loss** (user-reported, still open) — NOT caused by the ext (loads in its own try/catch). Fresh omp-17 regression. Action: ask user to retest `--continue` now that the ext loads clean; if it persists, inspect the terminal breadcrumb + which session `--continue` picks vs `~/.omp/agent/sessions/<project-dir>/`.
+- [ ] **Tag a release** when ready (stops `8sync up` from reverting — see blocker). `/push-now` does NOT tag.
 - [ ] Ratchet the size ceiling down as headroom appears (`bash scripts/size-report.sh` → `scripts/size-gate.sh`).
 - [ ] REQUIREMENTS v2: un-embed `impeccable/scripts` (1.6 MB) behind a lazy fetch — last big chunk of the 665 392 B still over goal.
-- [ ] Real mac/Windows **runtime** verify needs the actual OSes (code compiles cross-platform; hasn't run on a live mac/Win).
+- [ ] Real mac/Windows **runtime** verify needs the actual OSes.
 
 **Blockers ⚠ (per-machine — NOT in git)**
-- **`8sync up` reverts all local fixes.** It self-installs the latest GitHub release binary (v0.52.0), which **lacks** the detection fix (`b331832`) and the extension fix (`bf885f7`). Running `8sync up` reintroduces BOTH: stray root memory files return + the omp-17 extension breaks again. Until the 20 commits are **pushed + tagged**, do NOT run `8sync up`; the fixed binary is a local build (`cargo build --release`) installed via `cp target/release/8sync ~/.local/bin/8sync`. `which 8sync` → `~/.local/bin/8sync`.
-- The fixed extension must be redeployed on each machine after building (it's rust-embedded): `8sync harness global` + `8sync harness` per project, or copy `assets/extensions/8sync-engine.ts` into `<proj>/.omp/extensions/` + `~/.omp/agent/extensions/`.
+- **`8sync up` still reverts local fixes** until a new tag is cut: it pulls the latest *release* (v0.52.0), which lacks the ext fix (`bf885f7`) AND the STEP-0 enforcement (this commit). Until a new version is tagged + pushed, `8sync up` reintroduces both. Fixed binary = local `cargo build --release` → `cp target/release/8sync ~/.local/bin/8sync`. `which 8sync` → `~/.local/bin/8sync`.
+- **bashInterceptor is per-machine config** (`~/.omp/agent/config.yml`): each machine must re-run `8sync harness global` to write it. omp's own `omp update` also rewrites config.yml to minimal defaults (see KNOWLEDGE gotcha at line ~226), dropping it — re-run `8sync harness global`.
+- **Fixed extension is rust-embedded:** must rebuild + `8sync harness` per machine to redeploy `8sync-engine.ts` (or copy `assets/extensions/8sync-engine.ts` into `<proj>/.omp/extensions/` + `~/.omp/agent/extensions/`).
 
 **New-machine runbook (ordered):**
-1. `git pull` (or `git clone https://github.com/8-Sync-Dev/su-code.git && cd su-code`)
-2. `bash scripts/bootstrap.sh` → builds from source (gets the fixes) + installs `~/.local/bin/8sync`. **Do NOT** then run `8sync up`.
-3. `8sync setup` (new-machine harness: omp + codegraph + MCP/skills + gh + PATH)
-4. `8sync harness` → redeploys the fixed extension from the embedded asset + MCP + skills + memory + inject + codegraph index
-5. `gh auth login` (for `8sync ship` / release)
-6. `8sync doctor` to verify
+1. `git pull`
+2. `bash scripts/bootstrap.sh` → builds from source (gets the ext fix + STEP-0 enforcement) + installs `~/.local/bin/8sync`. **Do NOT** then run `8sync up` (reverts to the v0.52.0 release).
+3. `8sync setup` (omp + codegraph + MCP/skills + gh + PATH)
+4. `8sync harness` → redeploys the fixed extension + MCP + bashInterceptor + skills + memory + inject + codegraph index
+5. `8sync doctor` to verify
 - Decisions + lessons: `su-code/KNOWLEDGE.md` (+ `su-code/archive/`).
 
 ## ✅ SHIPPED — `lean-binary` feature complete (2026-08-02)

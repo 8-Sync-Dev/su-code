@@ -31,6 +31,10 @@ pub struct Args {
     #[arg(long = "no-advisor")]
     pub no_advisor: bool,
 
+    /// Disable STEP-0 tool-routing enforcement for this run (keep omp's `grep`/`glob`).
+    #[arg(long = "no-step0")]
+    pub no_step0: bool,
+
     /// Prompt to send to omp. Empty (or `continue`/`resume`) = resume last session.
     pub rest: Vec<String>,
 }
@@ -47,6 +51,9 @@ pub fn run(a: Args) -> Result<()> {
     let mut cfg = crate::models::ModelConfig::load();
     if a.no_advisor {
         cfg.advisor = false;
+    }
+    if a.no_step0 {
+        cfg.step0 = false;
     }
     // Pin omp to the project root: `/new` creates a child session that INHERITS
     // the launch root (it does NOT re-detect cwd), so a drifting cwd would make

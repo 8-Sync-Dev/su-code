@@ -421,3 +421,22 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1784595938.md)_
   its own bug class (resume-into-subagent-transcript, session-resume hang, auto-thinking dropped —
   all fixed by 17.2.9, so a remaining loss is a fresh regression). Don't claim the factory fix
   resolves the history loss; ask the user to retest `--continue` now and diagnose separately.
+- **validated (STEP-0 enforcement — prose lost 3×, so the fallback was REMOVED):** measured on this
+  machine with `8sync harness toolstats`: STEP-0 was connected and genuinely callable (`xd://mcp__…`
+  probed live: cbm `list_projects` returned 5 indexed projects, headroom `compress` returned a hash)
+  and STILL unused — `cbm 0 · serena 0 · headroom 0` agent calls, every lookup falling to `read`/`grep`.
+  **Lesson: a zero-friction built-in always beats an instruction; if a rule keeps losing, delete the
+  thing it competes with rather than writing the rule louder.** omp's enforcement surface, mapped from
+  the binary: (1) `--tools=<list>` CLI allowlist — **BUILT-INS ONLY**, verified by capturing a real
+  provider request (`omp -p ""` 400s and logs the full body to `~/.omp/logs/http-400-requests/`): under
+  `--tools=read,bash,todo` the request still carried **48 `mcp__*` tools + `engine_*` + `wf_state_*`** —
+  so dropping `grep`/`glob` costs zero MCP. There is NO persistent `tools.enabled` key; only the launch
+  flag. (2) `bashInterceptor.patterns` — user-configurable, shape `{ pattern: <regex>, reason: <string> }`
+  (from omp's own `explicitExclusions` schema + runtime `Blocked by bash pattern: ${match}`); omp itself
+  uses this pattern to redirect raw `git` to its structured git tool, which is exactly the raw→structured
+  redirect we needed. (3) Hooks are **message/session-scoped only** (`before_agent_start`,
+  `session.compacting`, post-hoc `on_tool_execution_success/failed`) — there is **no pre-tool-call guard
+  event**, so "block `read` until codegraph ran" is NOT implementable as a hook; the allowlist is the
+  only pre-execution lever. (4) `--advisor` is passive (notes, never blocks).
+  Trick worth reusing: **a rejected request still logs its full tool array** — the cheapest way to prove
+  what omp actually ships to the model, with no successful model call needed.

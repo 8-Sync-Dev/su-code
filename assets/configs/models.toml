@@ -23,6 +23,14 @@
 # globally, or `8sync ai --no-advisor` for one run.
 advisor = true
 
+# step0 = STEP-0 tool-routing enforcement (default ON). 8sync launches omp with
+# `--tools` DROPping the redundant `grep` + `glob` built-ins, so code lookup MUST
+# use codegraph (CLI) · codebase-memory-mcp · serena (MCP tools are orthogonal to
+# `--tools` and survive it). `bash rg`/`grep -r` shell escapes on source are also
+# blocked by `bashInterceptor.patterns` (deployed by `8sync harness`). Set false
+# to keep `grep`/`glob`, or override one run: `8sync ai --no-step0`.
+step0 = true
+
 [roles]
 default = "glm"     # main working model — code/edit/read/delete (mechanical) → GLM
 plan    = "opus"    # architectural planning → Opus (deep thinking)

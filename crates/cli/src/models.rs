@@ -20,6 +20,16 @@ pub struct ModelConfig {
     /// in models.toml, or `8sync ai --no-advisor` for one run.
     #[serde(default = "advisor_default")]
     pub advisor: bool,
+    /// STEP-0 tool-routing enforcement (default ON). When ON, 8sync launches omp
+    /// with `--tools` DROPping the redundant built-in searchers `grep` + `glob`,
+    /// so code lookup MUST go through codegraph (CLI) · codebase-memory-mcp ·
+    /// serena. MCP/xdev tools are orthogonal to `--tools` and survive it
+    /// (verified omp 17.2.9: 47 MCP tools present under `--tools=read,bash`).
+    /// `bash rg`/`grep -r` shell escapes are additionally blocked by
+    /// `bashInterceptor.patterns` (deployed by `8sync harness`). Opt out:
+    /// `8sync ai --no-step0`, or `step0 = false` in models.toml.
+    #[serde(default = "step0_default")]
+    pub step0: bool,
 }
 
 impl Default for ModelConfig {
@@ -28,6 +38,7 @@ impl Default for ModelConfig {
             roles: Roles::default(),
             tasks: BTreeMap::new(),
             advisor: true,
+            step0: true,
         }
     }
 }
@@ -35,6 +46,19 @@ impl Default for ModelConfig {
 fn advisor_default() -> bool {
     true
 }
+
+fn step0_default() -> bool {
+    true
+}
+
+/// Built-in omp tools KEPT when STEP-0 enforcement is ON. The two redundant
+/// searchers (`grep`, `glob`) are DROPPED so structural/text code lookup must
+/// flow through codegraph (CLI) / codebase-memory-mcp / serena. MCP/xdev tools
+/// are orthogonal to `--tools` and survive it. `lsp` is KEPT (zero-friction;
+/// serena needs `activate_project` per session). Update this list when omp
+/// ships a new default-enabled builtin.
+const STEP0_TOOLS: &str =
+    "read,bash,edit,write,lsp,task,todo,web_search,ask,inspect_image,browser,python,notebook";
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Roles {
@@ -113,6 +137,9 @@ impl ModelConfig {
         if self.advisor && class != TaskClass::Trivial {
             out.push("--advisor".to_string());
         }
+        if self.step0 {
+            push_flag(&mut out, "--tools", STEP0_TOOLS);
+        }
         out
     }
 
@@ -125,6 +152,9 @@ impl ModelConfig {
         // Interactive dev session (`8sync .` / resume): advisor on.
         if self.advisor {
             out.push("--advisor".to_string());
+        }
+        if self.step0 {
+            push_flag(&mut out, "--tools", STEP0_TOOLS);
         }
         out
     }
