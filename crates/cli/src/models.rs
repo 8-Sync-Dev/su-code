@@ -51,14 +51,26 @@ fn step0_default() -> bool {
     true
 }
 
-/// Built-in omp tools KEPT when STEP-0 enforcement is ON. The two redundant
-/// searchers (`grep`, `glob`) are DROPPED so structural/text code lookup must
-/// flow through codegraph (CLI) / codebase-memory-mcp / serena. MCP/xdev tools
-/// are orthogonal to `--tools` and survive it. `lsp` is KEPT (zero-friction;
-/// serena needs `activate_project` per session). Update this list when omp
-/// ships a new default-enabled builtin.
-const STEP0_TOOLS: &str =
-    "read,bash,edit,write,lsp,task,todo,web_search,ask,inspect_image,browser,python,notebook";
+/// Built-in omp tools KEPT when STEP-0 enforcement is ON. `--tools` is an
+/// ALLOWLIST (omp has no deny-list — `tools.blocked` is only a telemetry
+/// counter), so this must name EVERY tool we want to keep: anything omitted is
+/// silently disabled. Only the two redundant searchers `grep` + `glob` are
+/// dropped, so code lookup must flow through codegraph (CLI) /
+/// codebase-memory-mcp / serena. `lsp` is KEPT (zero-friction; serena needs
+/// `activate_project` per session). `computer` is deliberately omitted to
+/// preserve its default-disabled state. MCP/xdev tools are orthogonal to
+/// `--tools` and survive it.
+///
+/// MUST match omp's validator exactly — an unknown name makes omp exit with
+/// `Unknown tools in --tools: …`, which bricks every `8sync ai` / `8sync .`
+/// launch. The `--help` "Available Tools" section is STALE (it still lists
+/// `python`/`notebook`, which the validator rejects); the authoritative list is
+/// the one omp prints in that error. Re-check on every omp major upgrade —
+/// `8sync doctor` probes for drift.
+const STEP0_TOOLS: &str = "read,bash,edit,write,lsp,task,todo,web_search,ask,inspect_image,\
+                           browser,ast_grep,ast_edit,debug,eval,github,hub,checkpoint,rewind,\
+                           security_scan,memory_edit,retain,recall,reflect,learn,manage_skill,\
+                           yield,goal";
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Roles {

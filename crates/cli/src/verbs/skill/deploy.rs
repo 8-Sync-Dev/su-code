@@ -421,37 +421,79 @@ pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
 }
 
 /// Write STEP-0 `bashInterceptor.patterns` into `~/.omp/agent/config.yml` so the
-/// agent's `bash` shell-escapes (`rg`, recursive `grep`) on code are BLOCKED —
-/// closing the loophole the `--tools` allowlist leaves open (it removes the
-/// `grep`/`glob` TOOLS but not `bash grep`). omp's rule shape is
-/// `{ pattern: <regex>, reason: <string> }` — verified omp 17.2.9: the
-/// `explicitExclusions` schema + runtime reason `Blocked by bash pattern:
-/// ${match}`. Conservative: blocks `rg` (any) and `grep` with a recursive flag
-/// only — single-file / log `grep` stays allowed. Idempotent + non-clobbering:
-/// skips if a `bashInterceptor:` key is already present (user-authored).
+/// agent's `bash` shell-escapes (`rg`, recursive `grep`, `find -name`) on code
+/// are BLOCKED — closing the loophole the `--tools` allowlist leaves open (it
+/// removes the `grep`/`glob` TOOLS but not `bash rg`).
+///
+/// omp's real rule shape is `{ pattern, tool, message }` (+ optional `flags`) —
+/// read off omp 17.2.9's own default array and its matcher:
+/// ```js
+/// for (let {rule:p, regex:o} of faf(rules)) {
+///   if (!toolNames.includes(p.tool)) continue;   // rule is SKIPPED
+///   if (o.test(segment)) return { block:true, message:`Blocked: ${p.message}` };
+/// }
+/// ```
+/// Two consequences drive this implementation:
+/// 1. A rule with no `tool` key is skipped unconditionally (`includes(undefined)`
+///    is false). Earlier 8sync builds wrote `{ pattern, reason }`, so the
+///    interceptor silently blocked NOTHING — verified live: `rg main main.rs` ran.
+/// 2. `tool` must name a tool PRESENT in the session. omp's built-in rule for
+///    `grep|rg` points at `tool: "grep"`, which STEP-0 removes from the allowlist
+///    — so the stock rule disables itself exactly when we need it. Every rule
+///    here therefore points at `lsp`: always present, and the honest suggestion
+///    (code intelligence) for someone reaching for `rg`.
+///
+/// Setting this key REPLACES omp's default array, so only the escapes STEP-0
+/// cares about are listed; single-file / log `grep` stays allowed. Idempotent:
+/// migrates the byte-exact broken block earlier builds wrote, and never touches
+/// a `bashInterceptor:` block a user authored themselves.
 pub(crate) fn ensure_bash_interceptor(home: &Path) -> Result<()> {
+    const BLOCK: &str = r#"
+bashInterceptor:
+  enabled: true
+  patterns:
+    - pattern: '^\s*(rg|ripgrep|ag|ack)\s+'
+      tool: lsp
+      message: 'STEP-0: search code with codegraph (`codegraph query/explore`) or mcp__codebase_memory_mcp_search_graph / mcp__serena_find_symbol — not rg.'
+    - pattern: '^\s*grep\s+.*(-[rR]|--recursive)'
+      tool: lsp
+      message: 'STEP-0: recursive code search goes through codegraph / codebase-memory-mcp. Single-file and log `grep` stay allowed.'
+    - pattern: '^\s*(find|fd)\s+.*(-name|-iname|-type|--type|-glob)'
+      tool: lsp
+      message: 'STEP-0: locate files with codegraph / mcp__codebase_memory_mcp_search_graph instead of find/fd.'
+"#;
     let cfg = home.join(".omp/agent/config.yml");
     if let Some(p) = cfg.parent() {
         std::fs::create_dir_all(p)?;
     }
     let mut s = std::fs::read_to_string(&cfg).unwrap_or_default();
-    if s.lines().any(|l| l.starts_with("bashInterceptor:")) {
-        ui::skip("bashInterceptor (STEP-0)", "key already present (user-configured)");
-        return Ok(());
+    // omp rewrites config.yml in its own style (re-quoting, trailing spaces), so a
+    // byte-exact match on what we last wrote does NOT survive a single omp run.
+    // Identify OUR block by its `STEP-0` signature instead and replace it whole;
+    // a bashInterceptor block without that marker is the user's and is left alone.
+    if let Some(start) = s.find("\nbashInterceptor:").map(|i| i + 1).or_else(|| {
+        s.starts_with("bashInterceptor:").then_some(0)
+    }) {
+        let rest = &s[start..];
+        // Block ends at the next top-level key (first column, not a list item).
+        let end = rest
+            .match_indices('\n')
+            .find(|(i, _)| {
+                let line = rest[i + 1..].lines().next().unwrap_or("");
+                !line.is_empty() && line.starts_with(|c: char| c.is_ascii_alphabetic())
+            })
+            .map(|(i, _)| start + i + 1)
+            .unwrap_or(s.len());
+        if s[start..end].contains("STEP-0") {
+            s.replace_range(start..end, "");
+        } else {
+            ui::skip("bashInterceptor (STEP-0)", "key already present (user-configured)");
+            return Ok(());
+        }
     }
-    s.push_str(
-        r#"
-bashInterceptor:
-  enabled: true
-  patterns:
-    - pattern: '\brg\b'
-      reason: 'STEP-0: code search via `codegraph query/explore` or mcp__codebase_memory_mcp_search_graph, not rg'
-    - pattern: '\bgrep\b.*(-[rR]|--recursive)'
-      reason: 'STEP-0: recursive code search via codegraph/cbm, not grep -r (single-file / log grep is allowed)'
-"#,
-    );
+    s.push_str(BLOCK);
     std::fs::write(&cfg, s)?;
-    ui::ok("bashInterceptor ON (STEP-0): blocks `rg` + `grep -r` shell escapes → codegraph/cbm");
+    ui::ok("bashInterceptor ON (STEP-0): blocks `rg` / `grep -r` / `find -name` shell escapes → codegraph/cbm");
     Ok(())
 }
 
