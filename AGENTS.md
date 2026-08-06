@@ -21,35 +21,43 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 
 Nhỏ + dùng cho MỌI task. **Thứ tự = ưu tiên (đọc top-down).** Mở `SKILL.md` ở path dưới rồi mới gọi tool đầu tiên:
 
-  1. `/home/alexng/Projects/tools/su-code/su-code/skills/codegraph/SKILL.md`
-  2. `/home/alexng/Projects/tools/su-code/su-code/skills/karpathy-guidelines/SKILL.md`
-  3. `/home/alexng/Projects/tools/su-code/su-code/skills/ponytail/SKILL.md`
-  4. `/home/alexng/Projects/tools/su-code/su-code/skills/8sync-cli/SKILL.md`
+  1. `/home/alexdev/Projects/tools/su-code/su-code/skills/codegraph/SKILL.md`
+  2. `/home/alexdev/Projects/tools/su-code/su-code/skills/karpathy-guidelines/SKILL.md`
+  3. `/home/alexdev/Projects/tools/su-code/su-code/skills/ponytail/SKILL.md`
+  4. `/home/alexdev/Projects/tools/su-code/su-code/skills/8sync-cli/SKILL.md`
 
 ### 🧩 SPECIALIST always-on — biết khả năng, đọc body KHI task khớp (progressive disclosure)
 
 KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF.
 
-- `assp-skill` — `/home/alexng/Projects/tools/su-code/su-code/skills/assp-skill/SKILL.md`
-- `impeccable` — `/home/alexng/Projects/tools/su-code/su-code/skills/impeccable/SKILL.md`
-- `design-taste-frontend` — `/home/alexng/Projects/tools/su-code/su-code/skills/taste-skill/SKILL.md`
-- `image-routing` — `/home/alexng/Projects/tools/su-code/su-code/skills/image-routing/SKILL.md`
-- `locate-anything` — `/home/alexng/Projects/tools/su-code/su-code/skills/locate-anything/SKILL.md`
+- `assp-skill` — `/home/alexdev/Projects/tools/su-code/su-code/skills/assp-skill/SKILL.md`
+- `impeccable` — `/home/alexdev/Projects/tools/su-code/su-code/skills/impeccable/SKILL.md`
+- `design-taste-frontend` — `/home/alexdev/Projects/tools/su-code/su-code/skills/taste-skill/SKILL.md`
+- `image-routing` — `/home/alexdev/Projects/tools/su-code/su-code/skills/image-routing/SKILL.md`
+- `locate-anything` — `/home/alexdev/Projects/tools/su-code/su-code/skills/locate-anything/SKILL.md`
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
+- `academic-paper` — `su-code/skills/academic-paper/SKILL.md`
+- `alpha-research` — `su-code/skills/alpha-research/SKILL.md`
 - `api-and-interface-design` — `su-code/skills/api-and-interface-design/SKILL.md`
+- `autoresearch` — `su-code/skills/autoresearch/SKILL.md`
 - `branch-sync` — `su-code/skills/branch-sync/SKILL.md`
+- `brand-logo-kit` — `su-code/skills/brand-logo-kit/SKILL.md`
+- `browser-profile-control` — `su-code/skills/browser-profile-control/SKILL.md`
 - `browser-testing-with-devtools` — `su-code/skills/browser-testing-with-devtools/SKILL.md`
 - `ci-cd-and-automation` — `su-code/skills/ci-cd-and-automation/SKILL.md`
 - `code-review-and-quality` — `su-code/skills/code-review-and-quality/SKILL.md`
 - `code-simplification` — `su-code/skills/code-simplification/SKILL.md`
+- `competitor-video-analysis` — `su-code/skills/competitor-video-analysis/SKILL.md`
 - `context-engineering` — `su-code/skills/context-engineering/SKILL.md`
 - `debugging-and-error-recovery` — `su-code/skills/debugging-and-error-recovery/SKILL.md`
 - `deep-research` — `su-code/skills/deep-research/SKILL.md`
 - `deprecation-and-migration` — `su-code/skills/deprecation-and-migration/SKILL.md`
+- `docker` — `su-code/skills/docker/SKILL.md`
 - `documentation-and-adrs` — `su-code/skills/documentation-and-adrs/SKILL.md`
 - `doubt-driven-development` — `su-code/skills/doubt-driven-development/SKILL.md`
+- `eli5` — `su-code/skills/eli5/SKILL.md`
 - `feature` — `su-code/skills/feature/SKILL.md`
 - `frontend-ui-engineering` — `su-code/skills/frontend-ui-engineering/SKILL.md`
 - `full-flow` — `su-code/skills/full-flow/SKILL.md`
@@ -57,8 +65,14 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `idea-refine` — `su-code/skills/idea-refine/SKILL.md`
 - `incremental-implementation` — `su-code/skills/incremental-implementation/SKILL.md`
 - `interview-me` — `su-code/skills/interview-me/SKILL.md`
+- `jobs` — `su-code/skills/jobs/SKILL.md`
 - `last30days` — `su-code/skills/last30days/SKILL.md`
+- `literature-review` — `su-code/skills/literature-review/SKILL.md`
+- `ml-training-recipe` — `su-code/skills/ml-training-recipe/SKILL.md`
+- `modal-compute` — `su-code/skills/modal-compute/SKILL.md`
 - `observability-and-instrumentation` — `su-code/skills/observability-and-instrumentation/SKILL.md`
+- `paper-code-audit` — `su-code/skills/paper-code-audit/SKILL.md`
+- `paper-writing` — `su-code/skills/paper-writing/SKILL.md`
 - `performance-optimization` — `su-code/skills/performance-optimization/SKILL.md`
 - `planning-and-task-breakdown` — `su-code/skills/planning-and-task-breakdown/SKILL.md`
 - `ponytail-audit` — `su-code/skills/ponytail-audit/SKILL.md`
@@ -66,15 +80,26 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `ponytail-gain` — `su-code/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `su-code/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `su-code/skills/ponytail-review/SKILL.md`
+- `preview` — `su-code/skills/preview/SKILL.md`
+- `remote-job-scan` — `su-code/skills/remote-job-scan/SKILL.md`
+- `replication` — `su-code/skills/replication/SKILL.md`
+- `research-review` — `su-code/skills/research-review/SKILL.md`
+- `runpod-compute` — `su-code/skills/runpod-compute/SKILL.md`
 - `security-and-hardening` — `su-code/skills/security-and-hardening/SKILL.md`
 - `senior-frontend` — `su-code/skills/senior-frontend/SKILL.md`
 - `senior-security` — `su-code/skills/senior-security/SKILL.md`
+- `session-log` — `su-code/skills/session-log/SKILL.md`
+- `session-search` — `su-code/skills/session-search/SKILL.md`
 - `shipping-and-launch` — `su-code/skills/shipping-and-launch/SKILL.md`
+- `social-growth` — `su-code/skills/social-growth/SKILL.md`
+- `source-comparison` — `su-code/skills/source-comparison/SKILL.md`
 - `source-driven-development` — `su-code/skills/source-driven-development/SKILL.md`
 - `spec-driven-development` — `su-code/skills/spec-driven-development/SKILL.md`
 - `test-driven-development` — `su-code/skills/test-driven-development/SKILL.md`
 - `token-bench` — `su-code/skills/token-bench/SKILL.md`
 - `using-agent-skills` — `su-code/skills/using-agent-skills/SKILL.md`
+- `vn-contract-docs` — `su-code/skills/vn-contract-docs/SKILL.md`
+- `watch` — `su-code/skills/watch/SKILL.md`
 - `zai-vision` — `su-code/skills/zai-vision/SKILL.md`
 
 ### Quy tắc bất biến
