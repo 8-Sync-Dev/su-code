@@ -444,23 +444,41 @@ pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
 ///    (code intelligence) for someone reaching for `rg`.
 ///
 /// Setting this key REPLACES omp's default array, so only the escapes STEP-0
-/// cares about are listed; single-file / log `grep` stays allowed. Idempotent:
-/// migrates the byte-exact broken block earlier builds wrote, and never touches
-/// a `bashInterceptor:` block a user authored themselves.
+/// cares about are listed; single-file / log `grep` stays allowed. Idempotent.
+/// If the user authored their OWN `bashInterceptor:` block, this bails out
+/// rather than appending: omp parses config.yml with `Bun.YAML.parse`, which
+/// does NOT reject duplicate mapping keys — it takes the LAST one, so appending
+/// would silently void every rule the user wrote.
 pub(crate) fn ensure_bash_interceptor(home: &Path) -> Result<()> {
+    // Each rule matches the tool at a COMMAND POSITION, not just at string start:
+    // `cd src && grep -r foo .` and `cd x && rg TODO` are exactly what an agent
+    // writes, and a bare `^` anchor lets both sail through. The shared prefix
+    // accepts start-of-string or a shell separator (`;` `&&` `||` `|`), an
+    // optional `\` escape, env assignments (`LC_ALL=C …`) and wrapper words
+    // (`sudo`/`time`/`command`/`xargs`/`do`/`then`). `(` is deliberately NOT a
+    // separator and `do`/`then` are only wrappers, so prose inside quotes
+    // (`git commit -m '(rg removal)'`, `echo "do rg later"`) does not trip it.
+    //
+    // Rule 2 finds the recursive flag by walking the OPTION CLUSTER — a run of
+    // shell words that are neither quoted nor containing `;&|` — instead of a
+    // blind `.*`. That keeps a flag-looking string INSIDE the search pattern
+    // (`grep " -r " f.txt`, `grep 'make -r' build.log`) from counting as a flag,
+    // and stops the scan at a command boundary (`grep foo a.txt; ls -r`).
+    // `rg`/`fd`/`git grep` have no single-file mode worth preserving, so rule 1
+    // blocks them outright; only `grep` needs the flag analysis.
     const BLOCK: &str = r#"
 bashInterceptor:
   enabled: true
   patterns:
-    - pattern: '^\s*(rg|ripgrep|ag|ack)\s+'
+    - pattern: '(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*(?:rg|ripgrep|ag|ack|fd|git\s+grep)\s+'
       tool: lsp
-      message: 'STEP-0: search code with codegraph (`codegraph query/explore`) or mcp__codebase_memory_mcp_search_graph / mcp__serena_find_symbol — not rg.'
-    - pattern: '^\s*grep\s+.*(?<![A-Za-z0-9-])(?:-[A-Za-z]*[rR][A-Za-z]*|--dereference-recursive|--recursive)\b'
+      message: 'STEP-0: search code with codegraph (`codegraph query/explore`) or mcp__codebase_memory_mcp_search_graph / mcp__serena_find_symbol — not rg/fd/git grep.'
+    - pattern: '(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*(?:e|f)?grep\s+(?:(?:-(?!-\s)[^\s;&|]+|[^\s;&|''"-][^\s;&|]*)\s+)*(?:-[A-Za-z]*[rR][A-Za-z]*|--recursive|--dereference-recursive)\b'
       tool: lsp
       message: 'STEP-0: recursive code search goes through codegraph / codebase-memory-mcp. Single-file and log `grep` stay allowed.'
-    - pattern: '^\s*(find|fd)\s+.*(?<![A-Za-z0-9-])(?:-name|-iname|-type|--type)\b'
+    - pattern: '(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*find\s+[^;&|]*(?<=\s)(?:-name|-iname|-type|-regex|-path|-wholename)\b'
       tool: lsp
-      message: 'STEP-0: locate files with codegraph / mcp__codebase_memory_mcp_search_graph instead of find/fd.'
+      message: 'STEP-0: locate files with codegraph / mcp__codebase_memory_mcp_search_graph instead of find.'
 "#;
     let cfg = home.join(".omp/agent/config.yml");
     if let Some(p) = cfg.parent() {
@@ -505,17 +523,32 @@ bashInterceptor:
     for (start, end) in owned.into_iter().rev() {
         s.replace_range(start..end, "");
     }
+    // A `bashInterceptor:` still standing here is one the USER wrote. omp parses
+    // config.yml with `Bun.YAML.parse`, which does not reject duplicate mapping
+    // keys — it silently takes the LAST. Appending ours would therefore void
+    // every rule they wrote, with no error anywhere. Bail out instead.
+    if s.match_indices("bashInterceptor:")
+        .any(|(i, _)| i == 0 || s.as_bytes()[i - 1] == b'\n')
+    {
+        std::fs::write(&cfg, s)?;
+        ui::warn(
+            "  bashInterceptor: user-authored block present — left untouched (STEP-0 shell guard NOT installed; merge the rules by hand or remove your block)",
+        );
+        return Ok(());
+    }
     // `BLOCK` starts with a '\n' and removal leaves the preceding newline, so each
     // run would otherwise gain a blank line. Collapse any trailing blanks first.
     while s.ends_with("\n\n") {
         s.pop();
     }
-    if !s.ends_with('\n') {
+    // Only separate from EXISTING content — on a fresh machine the file is empty
+    // and `BLOCK`'s own leading newline is enough.
+    if !s.is_empty() && !s.ends_with('\n') {
         s.push('\n');
     }
     s.push_str(BLOCK);
     std::fs::write(&cfg, s)?;
-    ui::ok("bashInterceptor ON (STEP-0): blocks `rg` / `grep -r` / `find -name` shell escapes → codegraph/cbm");
+    ui::ok("bashInterceptor ON (STEP-0): blocks `rg`/`fd`/`git grep`, `grep -r`, `find -name` → codegraph/cbm");
     Ok(())
 }
 

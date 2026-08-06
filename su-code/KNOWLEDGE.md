@@ -236,3 +236,35 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1786020546.md)_
   exact class the bug affected. An independent reviewer + LIVE two-direction testing (does
   the allowed case still run? does the blocked case still refuse?) is what caught both the
   original defect and my first-fix regression. Cost: ~12 min reviewer. Verdict: earned.
+
+- failure (a `^`-anchored shell interceptor is barely an interceptor): `^\s*grep` only fires when
+  the tool is the FIRST thing in the command string, so `cd src && grep -r foo .` and
+  `cd crates/cli && rg TODO` — the single most natural shape an agent writes — sailed straight
+  through, as did `LC_ALL=C grep -r`, `sudo grep -r`, `time rg`, `cat x | grep -r y`, and
+  `; do grep -r …`. Fix: match at a COMMAND POSITION — `(?:^|[;&|])` plus optional `\` escape,
+  env assignments, and wrapper words (`sudo|time|command|nohup|env|xargs|do|then|else`).
+  Deliberately do NOT put `(` in the separator class and do NOT treat `do`/`then` as separators:
+  that is what made `git commit -m '(rg removal)'` and `echo "do rg later"` get blocked. Quote
+  parity is NOT expressible in a lookbehind (`(?<!["'][^"']*)` wrongly allows `echo "x" && rg y`),
+  so shrinking the separator set beats trying to detect quotes.
+- validated (scan the OPTION CLUSTER, never `.*`, when a regex must find a flag): to decide
+  "is this grep recursive", walking `.*` is wrong twice over — it reads flag-looking text inside
+  the search pattern (`grep " -r " f.txt`, `grep 'make -r' build.log` were blocked, contradicting
+  the rule's own message) and it crosses command boundaries (`grep foo a.txt; ls -r` blocked
+  because it found `ls -r`). Correct shape: after the tool name, consume a run of shell words that
+  are neither quoted nor containing `;&|`
+  (`(?:-(?!-\s)[^\s;&|]+|[^\s;&|'"-][^\s;&|]*)\s+`), then require the flag. Quote-safety then
+  falls out for free — a token starting with `'` or `"` simply cannot be consumed. 48/48 cases.
+- failure (blocking `rg` just moves the habit to `git grep`): an allowlist-style shell guard must
+  enumerate the SUBSTITUTES, not one tool. `git grep -rn TODO` (recursive by default, the obvious
+  fallback once rg is gone), `egrep -r`/`fgrep -r`, bare `fd '\.rs$'` and `fd -t f` (that is fd's
+  normal invocation and it is a full recursive walk), and `find -path`/`-regex` were all open.
+  Tools with no single-file mode worth preserving (`rg`, `fd`, `git grep`) are blocked outright;
+  only `grep` needs flag analysis.
+- failure (`Bun.YAML.parse` does NOT reject duplicate mapping keys — it takes the LAST): the code
+  assumed a duplicate top-level key would make omp fail loudly, so appending an 8sync block next
+  to a user-authored `bashInterceptor:` was thought to be self-announcing. In reality omp
+  (17.2.10, `var {YAML:jQf}=globalThis.Bun`) silently keeps the last key, and 8sync always appends
+  last — so every rule the user wrote was voided on each `8sync harness`, with no error anywhere.
+  Rule: when a managed writer cannot merge, it must DETECT the user's block and BAIL OUT with a
+  warning, never append-and-hope. Never assume a parser is strict; verify what it actually does.

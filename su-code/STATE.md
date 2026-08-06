@@ -6,7 +6,7 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 
 ## 🚚 HANDOFF — 2026-08-06 (cold resume from here)
 
-**Repo state:** branch `main`. `origin/main` = `50462db`. Local HEAD = **`26e8b3e`**, **5 commits ahead, NOT pushed**. Tree clean. Tag **v0.52.0** (Cargo.toml unchanged — WIP, not a release).
+**Repo state:** branch `main`. `origin/main` == local HEAD (pushed). Tree clean. Tag **v0.52.0** (Cargo.toml unchanged — WIP, not a release).
 
 **What happened this session: STEP-0 v1 (`98ac9a4`) shipped BROKEN in both halves, got repaired, hardened with a drift guard, then an independent review pass caught 4 more real defects — all now fixed and verified live.**
 
@@ -25,6 +25,13 @@ The 5 unpushed commits, newest last:
   - config migration no longer swallows `# comment` / `_key:` / `'quoted':` keys — block-end is now "any column-0 non-indented line", and the scan removes ALL `STEP-0`-signed blocks (dedup-safe) leaving user blocks untouched. Proven by replicating the Rust logic in Python.
   - `8sync doctor` reports BOTH `rejected` and `silently_disabled` (were mutually exclusive arms).
   - blank-line accumulation per `harness` run fixed (3 runs → 1 block, stable).
+- [x] **Second review round (independent reviewer, 10m39s) — 6 findings, all fixed + verified:**
+  - **P1:** a user-authored `bashInterceptor:` block was being **silently voided** — `Bun.YAML.parse` (omp's parser) does NOT reject duplicate keys, it takes the LAST, and 8sync always appended last. Now detects the user's block, leaves the file alone, warns. Verified: 1 key, user rule survives.
+  - **Anchor:** `^\s*grep` meant `cd src && grep -r foo .` / `cd x && rg TODO` / `LC_ALL=C` / `sudo` / `time` / pipelines all escaped. Now matches at a command position.
+  - **Substitutes:** `git grep`, `egrep`/`fgrep`, bare `fd`, `fd -t f`, `find -path`/`-regex` were open — now blocked (`git grep TODO` → BLOCKED live).
+  - **Quote-blindness:** `grep " -r " f.txt`, `grep 'make -r' build.log`, `grep -F -- -r f` were over-blocked; option-cluster scan fixes it. `git commit -m '(rg removal)'` → OK live.
+  - **48/48** cases pass against the patterns as written to disk, in omp's own JS engine.
+  - Reviewer confirmed CLEAN: `STEP0_TOOLS` (28 exact vs live omp), `step0_tool_drift` (fails OPEN — no false alarms), doctor block, block-enumeration offsets.
 - [x] **Drift guard:** injecting `bogus_tool` → `REJECTED by omp`; reverting → `✓ matches`. Probe is free + offline.
 - [x] `--continue` history loss **not reproducible** (`BANANA47` survives) — was the bricked launch, not omp.
 - [x] su-code indexed into cbm (5,843 nodes / 16,775 edges).
