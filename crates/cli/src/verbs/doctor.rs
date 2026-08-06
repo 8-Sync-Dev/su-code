@@ -253,19 +253,26 @@ fn check_ai_engines(home: &std::path::Path) {
     // Both have already happened once, so ask omp directly instead of trusting
     // the constant.
     match crate::models::step0_tool_drift() {
-        Some((rejected, _)) if !rejected.is_empty() => {
-            ui::warn(&format!(
-                "  STEP-0 allowlist REJECTED by omp: {} — every `8sync ai` / `8sync .` will fail to launch. Fix STEP0_TOOLS in models.rs (or `8sync ai --no-step0` to work around)",
-                rejected.join(", ")
-            ));
+        Some((rejected, disabled)) => {
+            // Report both: an omp upgrade can rename a tool (rejected) AND add a
+            // new one (silently disabled) at once — surfacing only half makes the
+            // maintainer fix STEP0_TOOLS twice.
+            if !rejected.is_empty() {
+                ui::warn(&format!(
+                    "  STEP-0 allowlist REJECTED by omp: {} — every `8sync ai` / `8sync .` will fail to launch. Fix STEP0_TOOLS in models.rs (or `8sync ai --no-step0` to work around)",
+                    rejected.join(", ")
+                ));
+            }
+            if !disabled.is_empty() {
+                ui::warn(&format!(
+                    "  STEP-0 allowlist is missing omp tool(s): {} — silently disabled for the agent. Add them to STEP0_TOOLS in models.rs",
+                    disabled.join(", ")
+                ));
+            }
+            if rejected.is_empty() && disabled.is_empty() {
+                ui::ok("  STEP-0 allowlist matches omp's tool list (grep/glob dropped on purpose)");
+            }
         }
-        Some((_, disabled)) if !disabled.is_empty() => {
-            ui::warn(&format!(
-                "  STEP-0 allowlist is missing omp tool(s): {} — silently disabled for the agent. Add them to STEP0_TOOLS in models.rs",
-                disabled.join(", ")
-            ));
-        }
-        Some(_) => ui::ok("  STEP-0 allowlist matches omp's tool list (grep/glob dropped on purpose)"),
         None => {}
     }
     if mcp.contains("\"serena\"") && which::which("uvx").is_ok() {

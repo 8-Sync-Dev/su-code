@@ -455,10 +455,10 @@ bashInterceptor:
     - pattern: '^\s*(rg|ripgrep|ag|ack)\s+'
       tool: lsp
       message: 'STEP-0: search code with codegraph (`codegraph query/explore`) or mcp__codebase_memory_mcp_search_graph / mcp__serena_find_symbol — not rg.'
-    - pattern: '^\s*grep\s+.*(-[rR]|--recursive)'
+    - pattern: '^\s*grep\s+.*(?<![A-Za-z0-9-])(?:-[A-Za-z]*[rR][A-Za-z]*|--dereference-recursive|--recursive)\b'
       tool: lsp
       message: 'STEP-0: recursive code search goes through codegraph / codebase-memory-mcp. Single-file and log `grep` stay allowed.'
-    - pattern: '^\s*(find|fd)\s+.*(-name|-iname|-type|--type|-glob)'
+    - pattern: '^\s*(find|fd)\s+.*(?<![A-Za-z0-9-])(?:-name|-iname|-type|--type)\b'
       tool: lsp
       message: 'STEP-0: locate files with codegraph / mcp__codebase_memory_mcp_search_graph instead of find/fd.'
 "#;
@@ -469,27 +469,49 @@ bashInterceptor:
     let mut s = std::fs::read_to_string(&cfg).unwrap_or_default();
     // omp rewrites config.yml in its own style (re-quoting, trailing spaces), so a
     // byte-exact match on what we last wrote does NOT survive a single omp run.
-    // Identify OUR block by its `STEP-0` signature instead and replace it whole;
-    // a bashInterceptor block without that marker is the user's and is left alone.
-    if let Some(start) = s.find("\nbashInterceptor:").map(|i| i + 1).or_else(|| {
-        s.starts_with("bashInterceptor:").then_some(0)
-    }) {
-        let rest = &s[start..];
-        // Block ends at the next top-level key (first column, not a list item).
-        let end = rest
-            .match_indices('\n')
-            .find(|(i, _)| {
-                let line = rest[i + 1..].lines().next().unwrap_or("");
-                !line.is_empty() && line.starts_with(|c: char| c.is_ascii_alphabetic())
+    // Identify OUR block(s) by their `STEP-0` signature and remove them all; any
+    // bashInterceptor block WITHOUT that marker is the user's and is kept.
+    // Removing every owned copy (then appending one fresh) collapses duplicates
+    // regardless of ordering — a leftover second `bashInterceptor:` key makes
+    // omp's YAML loader reject the file as a duplicate mapping.
+    let owned: Vec<(usize, usize)> = {
+        let starts: Vec<usize> = s
+            .match_indices("bashInterceptor:")
+            .map(|(i, _)| i)
+            .filter(|&i| i == 0 || s.as_bytes()[i - 1] == b'\n')
+            .collect();
+        starts
+            .into_iter()
+            .map(|start| {
+                let rest = &s[start..];
+                // Block ends at the next top-level YAML line: anything at column
+                // 0 that is NOT an indented continuation (space/tab) — that
+                // includes `#` comments, `_underscore`, and quoted keys, so they
+                // are not swallowed into the block and deleted on migration.
+                let end = rest
+                    .match_indices('\n')
+                    .find(|(i, _)| {
+                        let line = rest[i + 1..].lines().next().unwrap_or("");
+                        !line.is_empty() && !line.starts_with([' ', '\t'])
+                    })
+                    .map(|(i, _)| start + i + 1)
+                    .unwrap_or(s.len());
+                (start, end)
             })
-            .map(|(i, _)| start + i + 1)
-            .unwrap_or(s.len());
-        if s[start..end].contains("STEP-0") {
-            s.replace_range(start..end, "");
-        } else {
-            ui::skip("bashInterceptor (STEP-0)", "key already present (user-configured)");
-            return Ok(());
-        }
+            .filter(|(start, end)| s[*start..*end].contains("STEP-0"))
+            .collect()
+    };
+    // Remove owned blocks from the end backwards so earlier offsets stay valid.
+    for (start, end) in owned.into_iter().rev() {
+        s.replace_range(start..end, "");
+    }
+    // `BLOCK` starts with a '\n' and removal leaves the preceding newline, so each
+    // run would otherwise gain a blank line. Collapse any trailing blanks first.
+    while s.ends_with("\n\n") {
+        s.pop();
+    }
+    if !s.ends_with('\n') {
+        s.push('\n');
     }
     s.push_str(BLOCK);
     std::fs::write(&cfg, s)?;
