@@ -211,3 +211,28 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1786020546.md)_
   then reverting restored `✓ matches`. The probe is free and offline — omp validates `--tools`
   before contacting any provider, so `omp --tools __8sync_probe__ -p ""` returns the authoritative
   list instantly.
+- validated (an interceptor regex for "block recursive grep" has THREE traps, not two):
+  the first attempt `.*(-[rR])` matched `-r` inside words (`my-report`, `build-Release`),
+  over-blocking the single-file/log grep the rule promises to allow. The second attempt
+  (`\s-`, "require a space before the dash") over-corrected: `grep\s+` ALREADY consumes the
+  space, so a first-token `grep -r` has no remaining `\s-` and the recursive form was ALLOWED
+  through — a regression caught by live testing before commit, not by the unit cases (which
+  used clean inputs). The double-dash long flags (`--color`, `--directories`) contain an `r`
+  and the short-flag matcher naively matched them too. Correct shape: negative lookbehind
+  `(?<![A-Za-z0-9-])` (the dash must NOT be preceded by a word char OR another dash — that
+  also kills matching at the SECOND dash of `--color`), plus a separate literal alt for the
+  real long recursive flags (`--recursive`, `--dereference-recursive`). Verified 19/19 in
+  Python BEFORE touching source. Lesson: a "token boundary" is a lookbehind, not a `\s`
+  requirement — and the `\s` you anchored on has already been eaten by the prefix.
+- validated (config-block migration must be scan-all, not find-first): finding the FIRST
+  `bashInterceptor:` key and acting on it leaves a later copy (e.g. a user block at byte-0
+  shadowing our stale block lower) in place as a duplicate YAML key — omp then rejects the
+  file. The safe shape: enumerate EVERY `bashInterceptor:` block, classify each by the `STEP-0`
+  signature (ours) vs absent (user's), remove ALL owned blocks from the END backwards (so
+  earlier offsets stay valid), then append one fresh. This is invariant to ordering and
+  dedups correctly. A user-authored block is never touched by construction.
+- failure (happy-path self-review has the same blind spot as happy-path tests): the grep
+  over-block shipped because my self-test inputs (`grep main main.rs`) had no hyphens — the
+  exact class the bug affected. An independent reviewer + LIVE two-direction testing (does
+  the allowed case still run? does the blocked case still refuse?) is what caught both the
+  original defect and my first-fix regression. Cost: ~12 min reviewer. Verdict: earned.
