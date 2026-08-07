@@ -268,3 +268,17 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1786020546.md)_
   last — so every rule the user wrote was voided on each `8sync harness`, with no error anywhere.
   Rule: when a managed writer cannot merge, it must DETECT the user's block and BAIL OUT with a
   warning, never append-and-hope. Never assume a parser is strict; verify what it actually does.
+- validated (`8sync up` was Linux-only — hard-coded `-linux-x86_64` asset + extension-less
+  `~/.local/bin/8sync` dest + plain rename): on Windows this downloaded the Linux binary, wrote a
+  file with no `.exe`, and tried to `rename` over a running `.exe` (forbidden). The extension-less
+  file then made Windows pop the "Select an app to open '8sync'" picker. Fix in `selfup.rs`: derive
+  the asset label from `platform::os()`+`std::env::consts::ARCH` (mind macOS arm = `arm64`, not
+  `aarch64`), install to `std::env::current_exe()` (replace 8sync wherever it lives, all OSes), and
+  do a Windows-safe replace (rename the live `.exe` aside to `.8sync.old.<pid>`, then move the new
+  one in). Rule: any self-updater must key the asset name, install path, AND replace strategy off
+  the target OS — a `#[cfg(unix)]`-only path silently ships a broken updater to every other OS.
+
+- validated: **Encore Go apps compile với `go` thuần trong podman — không cần Docker/encore codegen** (2026-08-07, feature ai-router-hub M0). `go mod tidy && go vet ./... && go build ./... && go test ./...` trong `docker.io/library/golang:1.24` (mount source + named volume `/go` cache) PASS trên app có `//encore:api`/`//encore:authhandler` — các directive chỉ là comment với `go` thuần, hàm là Go thường. `encore.dev` resolve qua go mod (v1.57.13). ⇒ verify **Go-level** (compile/type/logic) được ở máy rootless-podman-no-Docker; chỉ `encore run/build/test` mới cần Docker (dựng runtime + codegen). Cách rẻ để verify Encore mà không dựng Docker.
+- failure: **`errs.Code(err)` panic dưới `go test` thuần** (encore.dev/beta/errs builder.go:121 `doPanic` — helper cần Encore runtime). Fix: soi field trực tiếp `err.(*errs.Error).Code == errs.Unauthenticated` (construct + đọc field KHÔNG cần runtime). Rule: test Encore package bằng `go test` thuần chỉ chạm hàm/logic thuần; mọi helper `errs.*`/`rlog.*`/`auth.UserID()` cần runtime → dùng `encore test` (Docker) hoặc né bằng field access.
+- failure: **grep-based endpoint-lister tự match comment của chính nó** (verify-public-endpoints.sh: regex `//encore:api public...path=` quét cả `*.md`/`*.sh` bắt phải path ví dụ `/x` trong comment). Fix: `grep --include='*.go'` — endpoint chỉ định nghĩa trong Go source. Rule: script "liệt kê directive từ source" phải giới hạn theo đuôi file, không quét doc/self.
+- validated: **Encore API type risk — `interface{}`/`any` trong request/response có thể bị Encore schema-parser từ chối** (go build pass nhưng `encore run` fail). Chưa xác nhận (defer Docker box). Nếu envelope dùng `Result interface{}` → sẵn sàng đổi `json.RawMessage`/type cụ thể. Kiểm TRƯỚC khi tin `encore run`.
