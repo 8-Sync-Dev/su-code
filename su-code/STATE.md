@@ -19,11 +19,9 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 - `AGENTS.md`, `CLAUDE.md` (−mỗi cái ~30 net) — re-inject sentinel block (RULE#0 step0 + serena note); managed block, đừng sửa tay ngoài sentinel.
 - `CHANGELOG.md` (+14) — 2 mục `[Unreleased] Fixed`: selfup cross-platform + serena dashboard off. (Đã có sẵn, không cần thêm.)
 
-### Luồng B — sản phẩm `ai-router-hub` M0 (Encore Go control-plane) · TRẠNG THÁI: M0 DONE (Go-level), M1 BLOCKED
-- Planning đầy đủ: `su-code/planning/ai-router-hub/{PROJECT,REQUIREMENTS,ROADMAP,M0-CONTEXT,M0-01-PLAN,M0-VERIFICATION,STATE}.md` (đã commit `036480a`). **Feature STATE (chi tiết B) = `su-code/planning/ai-router-hub/STATE.md`** — đọc file đó để tiếp M1.
-- Code scaffold verified: 13 files (gate service: `GET /health` public, `GET /whoami` auth, authHandler Bearer→`AuthData{MemberID,Role}`, envelope `{success,message,result}`, CI allowlist gate). Go-level PASS trong podman `golang:1.24` (vet/build/test).
-- **`su-code/planning/ai-router-hub/backend-go-snapshot/`** ← bản sao code (13 files) + `_RESTORE.md`. Đây là cách code transfer qua máy mới (canonical `deploy/ai-router-hub/backend-go/` bị gitignore ở monorepo). **Restore theo `_RESTORE.md`.**
-- `su-code/KNOWLEDGE.md`/`PLAYBOOKS.md` — learning: Encore Go apps compile bằng `go` thuần trong podman (không cần Docker/encore codegen); `errs.Code()` panic dưới `go test` thuần (đọc field `*errs.Error.Code` trực tiếp).
+### Luồng B — sản phẩm `ai-router-hub` M0 · ĐÃ DỜI sang monorepo (canonical)
+- `ai-router-hub` là product của cụm `8sync-startup` → toàn bộ memory (planning + code snapshot + _RESTORE + feature STATE) dời về **monorepo** `~/Projects/startup/8sync-startup/su-code/planning/ai-router-hub/` (commit `be18d7e`), cạnh mind0-brain-go / news-admin / zus. Repo `tools/su-code` này chỉ cho binary 8sync — KHÔNG giữ product memory nữa.
+- Trạng thái: **M0 DONE** (Go-level, podman vet/build/test PASS, review READY); **M1 BLOCKED** trên B3 credentials. Tiếp ở monorepo: đọc `8sync-startup/su-code/STATE.md` (khối "Parked: ai-router-hub") → restore theo `backend-go-snapshot/_RESTORE.md`.
 
 **Done ✓**
 - [x] Luồng A: selfup cross-platform (native Linux build clean; nhánh `#[cfg(windows)]` type-check OK), serena dashboard off (no listener :24282), step0/interceptor deploy.
@@ -31,7 +29,7 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 
 **Next / TODO ▸**
 - [ ] **Release tag** (bump `Cargo.toml` 0.52.0→0.53.0 + tag + push) — cho tới lúc đó `8sync up` reinstall v0.52.0 & revert MỌI fix Luồng A. Đây là action giá trị nhất. (LƯU Ý: `/push-now` KHÔNG bump tag — đây là WIP checkpoint.)
-- [ ] **M1 (ai-router-hub)** — cần B3 credentials (xem Blockers). Có creds → restore backend-go-snapshot rồi `/feature plan` M1.
+- [ ] **M1 (ai-router-hub)** — đã dời sang monorepo `8sync-startup`; tiếp ở đó (restore snapshot + `/feature plan` M1). Cần B3 credentials (Postgres + provider account + CLIProxyAPI host).
 - [ ] **Máy có Docker:** `encore run`/`encore test` backend-go + kiểm **Risk #1** (`Response.Result interface{}` — Encore schema parser có thể reject; fix 1 dòng). Xem `M0-VERIFICATION.md`.
 - [ ] `8sync harness toolstats` sau vài session enforcement: kỳ vọng `grep`→0, `cbm`/`serena`>0 (baseline 66.7% optimizer).
 

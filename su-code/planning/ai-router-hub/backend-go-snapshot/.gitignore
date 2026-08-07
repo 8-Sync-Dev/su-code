@@ -1,9 +1,0 @@
-# Encore
-/.encore/
-encore.gen.go
-*.gen.go
-
-# Go
-/bin/
-*.test
-*.out
