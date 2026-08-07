@@ -1,0 +1,40 @@
+# CI skeleton cho ai-router-hub control plane (Encore Go).
+# Kích hoạt khi backend-go promote thành repo riêng (đường path workflow phải ở gốc repo).
+name: backend
+
+on:
+  push:
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - "scripts/**"
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Public-endpoint allowlist gate
+        run: bash scripts/verify-public-endpoints.sh
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Go-level checks
+        run: |
+          go mod download
+          go vet ./...
+          go build ./...
+
+      - name: Install Encore
+        run: curl -fsSL https://encore.dev/install.sh | bash
+
+      - name: Encore compile + wiring check
+        run: |
+          export PATH="$HOME/.encore/bin:$PATH"
+          export ENCORE_DISABLE_TELEMETRY=1
+          encore test ./...

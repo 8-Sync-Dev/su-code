@@ -1,60 +1,53 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** none open. `lean-binary` shipped · omp-17 ext fix shipped · STEP-0 enforcement shipped **and now actually working** (v1 was broken — see below).
+> **Active feature:** `su-code/planning/ai-router-hub/STATE.md` — `8sync feature status`
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
-## 🚚 HANDOFF — 2026-08-06 (cold resume from here)
+## 🚚 HANDOFF — 2026-08-07 (cold resume from here)
 
-**Repo state:** branch `main`. `origin/main` == local HEAD (pushed). Tree clean. Tag **v0.52.0** (Cargo.toml unchanged — WIP, not a release).
+**Repo state (su-code):** branch `main`, tag **v0.52.0** (Cargo.toml chưa bump — WIP checkpoint, không phải release). HEAD = tip của push này (subject: `wip(handoff): 8sync self-update+serena fixes + ai-router-hub M0`). Tree clean sau push. `origin/main` = HEAD sau khi `/push-now` chạy xong.
 
-**What happened this session: STEP-0 v1 (`98ac9a4`) shipped BROKEN in both halves, got repaired, hardened with a drift guard, then an independent review pass caught 4 more real defects — all now fixed and verified live.**
+**Repo state (monorepo `8sync-startup`):** branch `main` @ `ddfff79` — KHÔNG đụng tới session này; code `ai-router-hub` nằm ở `deploy/ai-router-hub/backend-go/` nhưng **gitignored** (`/deploy/*`), nên nó **sống trên disk máy này thôi** → xem "backend-go-snapshot" bên dưới.
 
-The 5 unpushed commits, newest last:
-1. `91df6f7` **fix(step0): unbrick 8sync ai + make interceptor actually block** — `STEP0_TOOLS` (`models.rs`) corrected to omp's real 28-tool validator list (v1 listed `python`/`notebook` from stale `--help`, which omp rejects → every launch died); interceptor rules rewritten to omp's `{pattern, tool, message}` schema with `tool:"lsp"` (v1's `{pattern, reason}` is skipped by omp's matcher; pointing at `grep` self-disables).
-2. `325e7d6` **chore(harness): sentinel re-inject + scripts/ index + archive** — harness re-injects AGENTS.md/CLAUDE.md between sentinels, indexes `scripts/`, archives oversized KNOWLEDGE.
-3. `4a2bc33` **feat(step0): drift guard + demote codegraph callers** — `models::step0_tool_drift()` asks omp itself and diffs `STEP0_TOOLS`; wired into `8sync doctor` (reports REJECTED / missing). `APPEND_SYSTEM.md` routes "who calls X" to serena (codegraph `callers` false-negative confirmed).
-4. `7f371b9` **chore(serena): commit `.serena/project.yml`** so a new machine gets the same project config.
-5. `26e8b3e` **fix(step0): review pass — interceptor over-block + config-migration safety** — see Done below.
+**Session này làm 2 luồng song song — cả hai ở repo `su-code`:**
 
-**Done ✓ (each with live evidence, not claims)**
-- [x] **STEP-0 repaired:** provider request carries 18 tools — `grep`/`glob` **absent**, `recall`/`retain`/`reflect`/`memory_edit`/`hub`/`eval`/`ast_edit`/`lsp` **present**. `8sync ai` returns `ALIVE`.
-- [x] **Interceptor blocks for real:** `rg main main.rs` → `Blocked`; `grep -r main .` → Blocked; plain `grep main main.rs` → **runs** (no over-block).
-- [x] **Review pass (26e8b3e), all 4 findings fixed + verified live:**
-  - grep rule no longer matches `-r` inside words (`grep x-ray my-report.txt` → **OK, 1 match**; `grep bug build-Release.log` → OK). Negative lookbehind `(?<![A-Za-z0-9-])` makes the dash a token boundary; double-dash long flags (`--color`) excluded from the short-flag matcher. **19/19 cases** verified in Python before source edit, then live both directions.
-  - config migration no longer swallows `# comment` / `_key:` / `'quoted':` keys — block-end is now "any column-0 non-indented line", and the scan removes ALL `STEP-0`-signed blocks (dedup-safe) leaving user blocks untouched. Proven by replicating the Rust logic in Python.
-  - `8sync doctor` reports BOTH `rejected` and `silently_disabled` (were mutually exclusive arms).
-  - blank-line accumulation per `harness` run fixed (3 runs → 1 block, stable).
-- [x] **Second review round (independent reviewer, 10m39s) — 6 findings, all fixed + verified:**
-  - **P1:** a user-authored `bashInterceptor:` block was being **silently voided** — `Bun.YAML.parse` (omp's parser) does NOT reject duplicate keys, it takes the LAST, and 8sync always appended last. Now detects the user's block, leaves the file alone, warns. Verified: 1 key, user rule survives.
-  - **Anchor:** `^\s*grep` meant `cd src && grep -r foo .` / `cd x && rg TODO` / `LC_ALL=C` / `sudo` / `time` / pipelines all escaped. Now matches at a command position.
-  - **Substitutes:** `git grep`, `egrep`/`fgrep`, bare `fd`, `fd -t f`, `find -path`/`-regex` were open — now blocked (`git grep TODO` → BLOCKED live).
-  - **Quote-blindness:** `grep " -r " f.txt`, `grep 'make -r' build.log`, `grep -F -- -r f` were over-blocked; option-cluster scan fixes it. `git commit -m '(rg removal)'` → OK live.
-  - **48/48** cases pass against the patterns as written to disk, in omp's own JS engine.
-  - Reviewer confirmed CLEAN: `STEP0_TOOLS` (28 exact vs live omp), `step0_tool_drift` (fails OPEN — no false alarms), doctor block, block-enumeration offsets.
-- [x] **Drift guard:** injecting `bogus_tool` → `REJECTED by omp`; reverting → `✓ matches`. Probe is free + offline.
-- [x] `--continue` history loss **not reproducible** (`BANANA47` survives) — was the bricked launch, not omp.
-- [x] su-code indexed into cbm (5,843 nodes / 16,775 edges).
+### Luồng A — 8sync binary fixes (self-update + serena) · TRẠNG THÁI: xong, chờ release tag
+`git diff --stat` (files touched + WHY, 1 dòng mỗi cái):
+- `crates/cli/src/verbs/selfup.rs` (+158) — `8sync up` từng hard-code `ASSET_SUFFIX="-linux-x86_64"` → trên Windows tải nhầm binary Linux, ghi file không `.exe`, `rename` đè lên `.exe` đang chạy (Windows cấm) → popup "Select an app to open '8sync'". Fix: `asset_label()` map theo `platform::os()`+`ARCH` (macOS arm = `arm64`), install vào `std::env::current_exe()`, Windows-safe replace (rename `.exe` sống → `.8sync.old.<pid>` rồi trượt bản mới vào).
+- `crates/cli/src/verbs/skill/deploy.rs` (+11) — `ensure_serena_mcp` giờ register serena `--enable-web-dashboard False` (serena mặc định mở 1 tab dashboard + bind HTTP mỗi session → 16 proc/878 MB); flag truyền qua **command line** (serena tự rewrite `serena_config.yml` nên sửa file không sống). Kèm step0 tool-routing + bashInterceptor deploy.
+- `AGENTS.md`, `CLAUDE.md` (−mỗi cái ~30 net) — re-inject sentinel block (RULE#0 step0 + serena note); managed block, đừng sửa tay ngoài sentinel.
+- `CHANGELOG.md` (+14) — 2 mục `[Unreleased] Fixed`: selfup cross-platform + serena dashboard off. (Đã có sẵn, không cần thêm.)
+
+### Luồng B — sản phẩm `ai-router-hub` M0 (Encore Go control-plane) · TRẠNG THÁI: M0 DONE (Go-level), M1 BLOCKED
+- Planning đầy đủ: `su-code/planning/ai-router-hub/{PROJECT,REQUIREMENTS,ROADMAP,M0-CONTEXT,M0-01-PLAN,M0-VERIFICATION,STATE}.md` (đã commit `036480a`). **Feature STATE (chi tiết B) = `su-code/planning/ai-router-hub/STATE.md`** — đọc file đó để tiếp M1.
+- Code scaffold verified: 13 files (gate service: `GET /health` public, `GET /whoami` auth, authHandler Bearer→`AuthData{MemberID,Role}`, envelope `{success,message,result}`, CI allowlist gate). Go-level PASS trong podman `golang:1.24` (vet/build/test).
+- **`su-code/planning/ai-router-hub/backend-go-snapshot/`** ← bản sao code (13 files) + `_RESTORE.md`. Đây là cách code transfer qua máy mới (canonical `deploy/ai-router-hub/backend-go/` bị gitignore ở monorepo). **Restore theo `_RESTORE.md`.**
+- `su-code/KNOWLEDGE.md`/`PLAYBOOKS.md` — learning: Encore Go apps compile bằng `go` thuần trong podman (không cần Docker/encore codegen); `errs.Code()` panic dưới `go test` thuần (đọc field `*errs.Error.Code` trực tiếp).
+
+**Done ✓**
+- [x] Luồng A: selfup cross-platform (native Linux build clean; nhánh `#[cfg(windows)]` type-check OK), serena dashboard off (no listener :24282), step0/interceptor deploy.
+- [x] Luồng B: M0 scaffold authored + Go-verified (5/5 engine task), CI gate PASS, independent review = READY, `M0-VERIFICATION.md` ghi.
 
 **Next / TODO ▸**
-- [ ] **Tag a release** (bump Cargo.toml 0.52.0→0.53.0 + tag + push) — until then `8sync up` reinstalls v0.52.0 and reverts EVERY fix above. This is the single highest-value next action.
-- [ ] **Measure the payoff:** after a few NEW sessions under enforcement, `8sync harness toolstats` should show `grep`→0 and `cbm`/`serena`>0. Baseline was 66.7 % optimizer (codegraph 6, cbm/serena 0, grep 3).
-- [ ] Ratchet the size ceiling as headroom appears (`scripts/size-report.sh` → `scripts/size-gate.sh`).
-- [ ] REQUIREMENTS v2: un-embed `impeccable/scripts` (1.6 MB) behind lazy fetch — last big chunk of 665 392 B over goal.
-- [ ] Real mac/Windows **runtime** verify needs the actual OSes.
+- [ ] **Release tag** (bump `Cargo.toml` 0.52.0→0.53.0 + tag + push) — cho tới lúc đó `8sync up` reinstall v0.52.0 & revert MỌI fix Luồng A. Đây là action giá trị nhất. (LƯU Ý: `/push-now` KHÔNG bump tag — đây là WIP checkpoint.)
+- [ ] **M1 (ai-router-hub)** — cần B3 credentials (xem Blockers). Có creds → restore backend-go-snapshot rồi `/feature plan` M1.
+- [ ] **Máy có Docker:** `encore run`/`encore test` backend-go + kiểm **Risk #1** (`Response.Result interface{}` — Encore schema parser có thể reject; fix 1 dòng). Xem `M0-VERIFICATION.md`.
+- [ ] `8sync harness toolstats` sau vài session enforcement: kỳ vọng `grep`→0, `cbm`/`serena`>0 (baseline 66.7% optimizer).
 
-**Blockers ⚠ (per-machine — NOT in git)**
-- **`8sync up` reverts everything** until a tag is cut: installs the latest *release* (v0.52.0). Fixed binary = `cargo build --release` → `install -m755 target/release/8sync ~/.local/bin/8sync`.
-- **bashInterceptor is per-machine** (`~/.omp/agent/config.yml`): each box needs `8sync harness global`. omp's own `omp update` rewrites config.yml and can drop it — re-run.
-- **`codegraph callers` returns FALSE NEGATIVES** (reproduced on clean index; misses by caller, not callee). Use `mcp__serena_find_referencing_symbols`. **Never `rm -rf .codegraph`** (deletes exclusion config → next index walks 16k files); use `codegraph index --force` or `8sync harness`.
-- **Binary already installed on THIS machine** = `26e8b3e` build, 4,860,160 B, has `--no-step0`.
+**Blockers ⚠**
+- **M1 = true blocker (per-machine, NOT in git):** cần (a) Postgres, (b) ≥1 account provider (Claude/Gemini/Codex subscription) để onboard, (c) host chạy CLIProxyAPI binary. Credentials/data ngoài tầm agent → `/auto` dừng đúng luật.
+- **`8sync up` reverts Luồng A** cho tới khi cắt tag. Máy mới: build từ source (`bootstrap.sh`), **đừng** `8sync up`.
+- **bashInterceptor/serena config per-machine** (`~/.omp/agent/config.yml`, `mcp.json`): mỗi máy cần `8sync harness global`; `omp update` có thể rewrite config → re-run.
+- **`codegraph callers` FALSE NEGATIVE** — dùng `mcp__serena_find_referencing_symbols`. **Đừng `rm -rf .codegraph`** → `codegraph index --force` hoặc `8sync harness`.
 
 **New-machine runbook (ordered):**
-1. `git pull`
-2. `bash scripts/bootstrap.sh` → builds from source (gets every fix) + installs `~/.local/bin/8sync`. **Do NOT** run `8sync up`.
+1. `git pull` (repo su-code)
+2. `bash scripts/bootstrap.sh` → build từ source (lấy mọi fix Luồng A) + install `~/.local/bin/8sync`. **KHÔNG** `8sync up`.
 3. `8sync setup` (omp + codegraph + MCP/skills + gh + PATH)
-4. `8sync harness` → redeploys fixed extension + bashInterceptor + skills + memory + inject + codegraph index
-5. `8sync doctor` — must show `✓ STEP-0 allowlist matches omp's tool list`
+4. `8sync harness` → redeploy extension + bashInterceptor + serena(no-dashboard) + skills + memory + inject + codegraph index
+5. `8sync doctor` — phải thấy `✓ STEP-0 allowlist matches omp's tool list`
+6. Tiếp `ai-router-hub`: restore code theo `su-code/planning/ai-router-hub/backend-go-snapshot/_RESTORE.md`, rồi đọc `su-code/planning/ai-router-hub/STATE.md`.
 - Decisions + lessons: `su-code/KNOWLEDGE.md` (+ `su-code/archive/`).
 
 

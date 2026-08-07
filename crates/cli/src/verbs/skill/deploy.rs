@@ -688,6 +688,15 @@ pub(crate) fn ensure_mcp_spec(home: &Path) -> Result<()> {
 /// the agent symbol-level find + precise edits — token-cheaper than blind file
 /// reads/rewrites. Launched via `uvx` (always-latest, no install); bootstraps
 /// `uv` if absent. Skipped (and any stale entry purged) only if uv can't install.
+///
+/// `--enable-web-dashboard False`: serena defaults to `web_dashboard: true` +
+/// `web_dashboard_open_on_launch: true`, so EVERY server start binds an HTTP
+/// dashboard and pops a browser tab. omp spawns one serena per session and does
+/// not reap them, so this compounds — measured on this machine: 16 live serena
+/// processes holding 878 MB, plus a browser tab each. The dashboard is pure
+/// observability; the MCP tools are unaffected. Passing the flag (rather than
+/// editing `~/.serena/serena_config.yml`) makes it authoritative per-launch —
+/// serena owns that file and rewrites it, so a config edit alone does not stick.
 pub(crate) fn ensure_serena_mcp(env: &env_detect::Env) -> Result<()> {
     if which::which("uvx").is_err() && which::which("uv").is_err() {
         ensure_uv();
@@ -704,6 +713,8 @@ pub(crate) fn ensure_serena_mcp(env: &env_detect::Env) -> Result<()> {
                 "start-mcp-server",
                 "--context",
                 "claude-code",
+                "--enable-web-dashboard",
+                "False",
             ],
             &[],
         )
