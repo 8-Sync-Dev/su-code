@@ -112,7 +112,7 @@ Stack: **Rust** (single workspace, 1 binary `8sync` ≈ **4.9 MB stripped**, ho�
 
 ```bash
 # Khuyến nghị — one-liner, binary prebuilt (không cần git/rust/cargo):
-curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
+curl -fsSL https://8-sync-dev.github.io/su-code/install | sh
 
 # Hoặc build từ source (contributor / arch chưa có prebuilt):
 git clone https://github.com/8-Sync-Dev/su-code.git

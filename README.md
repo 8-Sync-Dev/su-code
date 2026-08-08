@@ -22,7 +22,7 @@
 
 ```bash
 # 1. Install — one-liner, prebuilt binary (NO git/rust/cargo required)
-curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
+curl -fsSL https://8-sync-dev.github.io/su-code/install | sh
 8sync setup                       # install the AI core (omp + codegraph + MCP/skills + gh) — y/N per profile
 8sync doctor                      # verify (auto-cleans stale state if any)
 
@@ -49,14 +49,23 @@ cd <project>
 No git, rustup, or cargo needed. `install.sh` resolves the latest release and downloads the matching `8sync-<tag>-<os>-<arch>` prebuilt (Linux `x86_64`/`aarch64`, macOS `x86_64`/`arm64`) from GitHub Releases into `~/.local/bin/8sync` (atomically replacing any previous version). On **Windows**, use `install.ps1` instead (below).
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh
+curl -fsSL https://8-sync-dev.github.io/su-code/install | sh
 ```
 
-On **Windows** (PowerShell), use `install.ps1`:
+On **Windows** (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.ps1 | iex
+irm https://8-sync-dev.github.io/su-code/install.ps1 | iex
 ```
+
+> **How the short URL works.** GitHub Pages serves `install.sh` verbatim at
+> `/su-code/install` (copied from the repo root on every deploy, so it can never drift).
+> A plain file is required rather than a redirect — `curl` does not follow HTML
+> meta-refresh, and Pages cannot emit an HTTP 3xx.
+> **Fallback** (works even if Pages is down, and before the first Pages deploy):
+> `curl -fsSL https://raw.githubusercontent.com/8-Sync-Dev/su-code/main/install.sh | sh`
+> **Want `8sync.sh/install`?** Point a domain's CNAME at `8-sync-dev.github.io`, add a
+> `docs/CNAME` file containing it, and the same path gets shorter with no code change.
 
 - **Upgrade**: run the exact same command again, or `8sync up`.
 - **Pin a version**: `curl -fsSL .../install.sh | SUSYNC_VERSION=v0.48.0 sh` (or `$env:SUSYNC_VERSION` for `install.ps1`)
