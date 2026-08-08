@@ -122,7 +122,7 @@ pub fn save(env: &Env, root: &Path, reg: &Registry) -> Result<()> {
 /// Launch omp for a named session's `--session-dir`. `fresh=true` starts a new
 /// conversation (no `--continue`); otherwise it resumes the latest one there.
 /// Reuses `ModelConfig` so STEP-0 tool-routing + advisor survive every launch.
-fn launch(root: &Path, session_dir: &Path, fresh: bool) -> Result<()> {
+fn launch(cwd: &Path, session_dir: &Path, fresh: bool) -> Result<()> {
     if which::which("omp").is_err() {
         ui::err("omp not installed. Run `8sync setup` first.");
         return Ok(());
@@ -130,9 +130,9 @@ fn launch(root: &Path, session_dir: &Path, fresh: bool) -> Result<()> {
     std::fs::create_dir_all(session_dir)?;
     let cfg = crate::models::ModelConfig::load();
     let mut cmd = Command::new("omp");
-    cmd.current_dir(root)
+    cmd.current_dir(cwd)
         .arg("--cwd")
-        .arg(root)
+        .arg(cwd)
         .arg("--session-dir")
         .arg(session_dir)
         .args(cfg.resume_flags());
@@ -177,6 +177,76 @@ fn ago(secs: u64, now: u64) -> String {
     }
 }
 
+// ── git / worktree ─────────────────────────────────────────────────────────
+
+/// Working dir for a session: its worktree when isolated, else the repo root.
+fn session_cwd<'a>(s: &'a Session, root: &'a Path) -> &'a Path {
+    s.worktree.as_ref().map(|w| w.path.as_path()).unwrap_or(root)
+}
+
+/// Run `git -C <dir> <args>`, returning trimmed stdout; errors on non-zero.
+fn git_out(dir: &Path, args: &[&str]) -> Result<String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .context("run git")?;
+    if !out.status.success() {
+        bail!("git {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// Run `git -C <dir> <args>`, returning only whether it succeeded.
+fn git_ok(dir: &Path, args: &[&str]) -> bool {
+    Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// Current branch name, or the HEAD sha when detached.
+fn current_branch(root: &Path) -> Result<String> {
+    let b = git_out(root, &["rev-parse", "--abbrev-ref", "HEAD"])?;
+    if b == "HEAD" {
+        git_out(root, &["rev-parse", "HEAD"])
+    } else {
+        Ok(b)
+    }
+}
+
+/// True when the working tree at `dir` has uncommitted changes.
+fn is_dirty(dir: &Path) -> bool {
+    git_out(dir, &["status", "--porcelain"]).map(|s| !s.is_empty()).unwrap_or(false)
+}
+
+/// Create a git worktree + branch `8sync/<name>` off the current HEAD.
+fn make_worktree(env: &Env, root: &Path, name: &str) -> Result<Worktree> {
+    if !root.join(".git").exists() {
+        bail!("--worktree needs a git repo (no .git at {})", root.display());
+    }
+    let base_branch = current_branch(root)?;
+    let branch = format!("8sync/{name}");
+    let wt_path = key_dir(env, root).join("worktrees").join(name);
+    if let Some(parent) = wt_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let wt_str = wt_path.to_string_lossy().to_string();
+    let branch_ref = format!("refs/heads/{branch}");
+    if git_ok(root, &["show-ref", "--verify", "--quiet", branch_ref.as_str()]) {
+        // branch already exists — attach a worktree to it
+        git_out(root, &["worktree", "add", wt_str.as_str(), branch.as_str()])?;
+    } else {
+        git_out(root, &["worktree", "add", "-b", branch.as_str(), wt_str.as_str(), "HEAD"])?;
+    }
+    ui::ok(&format!("worktree {} → branch {} (base {})", wt_path.display(), branch, base_branch));
+    Ok(Worktree { path: wt_path, branch, base_branch })
+}
+
 fn touch(env: &Env, root: &Path, reg: &mut Registry, name: &str) -> Result<()> {
     let t = now();
     if let Some(s) = reg.get_mut(name) {
@@ -194,9 +264,10 @@ pub fn resume_latest(env: &Env, root: &Path) -> Result<()> {
     if let Some(name) = reg.last_used.clone() {
         if let Some(s) = reg.get(&name) {
             let dir = s.session_dir.clone();
+            let cwd = session_cwd(s, root).to_path_buf();
             ui::ok(&format!("→ resume session '{name}' (latest)"));
             touch(env, root, &mut reg, &name)?;
-            return launch(root, &dir, false);
+            return launch(&cwd, &dir, false);
         }
     }
     // No named session yet — legacy behavior: omp's default path-scoped store.
@@ -234,21 +305,25 @@ pub fn resume_named(env: &Env, root: &Path, name: &str) -> Result<()> {
     }
     let mut reg = load(env, root);
     if reg.get(name).is_some() {
-        let dir = reg.get(name).unwrap().session_dir.clone();
+        let s = reg.get(name).unwrap();
+        let dir = s.session_dir.clone();
+        let cwd = session_cwd(s, root).to_path_buf();
         ui::ok(&format!("→ resume session '{name}'"));
         touch(env, root, &mut reg, name)?;
-        launch(root, &dir, false)
+        launch(&cwd, &dir, false)
     } else {
         ui::info(&format!("no session '{name}' yet — creating it"));
-        create(env, root, &mut reg, name)?;
-        let dir = reg.get(name).unwrap().session_dir.clone();
+        create(env, root, &mut reg, name, false)?;
+        let s = reg.get(name).unwrap();
+        let dir = s.session_dir.clone();
+        let cwd = session_cwd(s, root).to_path_buf();
         touch(env, root, &mut reg, name)?;
-        launch(root, &dir, true)
+        launch(&cwd, &dir, true)
     }
 }
 
 /// `8sync . new <name>` — create a named session (refuses an existing name).
-pub fn cmd_new(env: &Env, root: &Path, name: &str) -> Result<()> {
+pub fn cmd_new(env: &Env, root: &Path, name: &str, worktree: bool) -> Result<()> {
     if !valid_name(name) {
         bail!("invalid session name '{name}' (use letters, digits, '-', '_', '.'; ≤64 chars)");
     }
@@ -256,21 +331,24 @@ pub fn cmd_new(env: &Env, root: &Path, name: &str) -> Result<()> {
     if reg.get(name).is_some() {
         bail!("session '{name}' already exists — resume with `8sync . {name}`");
     }
-    create(env, root, &mut reg, name)?;
-    let dir = reg.get(name).unwrap().session_dir.clone();
+    create(env, root, &mut reg, name, worktree)?;
+    let s = reg.get(name).unwrap();
+    let dir = s.session_dir.clone();
+    let cwd = session_cwd(s, root).to_path_buf();
     ui::ok(&format!("created session '{name}'"));
     touch(env, root, &mut reg, name)?;
-    launch(root, &dir, true)
+    launch(&cwd, &dir, true)
 }
 
-fn create(env: &Env, root: &Path, reg: &mut Registry, name: &str) -> Result<()> {
+fn create(env: &Env, root: &Path, reg: &mut Registry, name: &str, worktree: bool) -> Result<()> {
     let dir = key_dir(env, root).join(name);
     std::fs::create_dir_all(&dir)?;
+    let wt = if worktree { Some(make_worktree(env, root, name)?) } else { None };
     let t = now();
     reg.sessions.push(Session {
         name: name.to_string(),
         session_dir: dir,
-        worktree: None,
+        worktree: wt,
         created: t,
         last_active: t,
     });
@@ -289,9 +367,13 @@ pub fn cmd_ls(env: &Env, root: &Path) -> Result<()> {
     for s in &reg.sessions {
         let star = if reg.last_used.as_deref() == Some(s.name.as_str()) { "★" } else { " " };
         let title = session_title(&s.session_dir).unwrap_or_else(|| "(no messages yet)".to_string());
-        println!("  {star} {:<20} {:<12} {}", s.name, ago(s.last_active, now), title);
+        let loc = match &s.worktree {
+            Some(w) => format!("{}{}", w.branch, if is_dirty(&w.path) { " *dirty" } else { "" }),
+            None => "-".to_string(),
+        };
+        println!("  {star} {:<18} {:<11} {:<24} {}", s.name, ago(s.last_active, now), loc, title);
     }
-    println!("\n  resume: 8sync . <name>   ·   new: 8sync . new <name>   ·   remove: 8sync . rm <name>");
+    println!("\n  resume: 8sync . <name>   ·   new: 8sync . new <name> [--worktree]   ·   remove: 8sync . rm <name>");
     Ok(())
 }
 
@@ -303,6 +385,33 @@ pub fn cmd_rm(env: &Env, root: &Path, name: &str, force: bool) -> Result<()> {
         bail!("no session '{name}' in this repo");
     };
     let s = reg.sessions[pos].clone();
+
+    // Worktree teardown (guard dirty unless --force).
+    if let Some(w) = &s.worktree {
+        if is_dirty(&w.path) && !force {
+            bail!(
+                "session '{name}' worktree has uncommitted changes at {} — commit/merge it first, or `rm --force`",
+                w.path.display()
+            );
+        }
+        let wt_str = w.path.to_string_lossy().to_string();
+        let mut wt_args = vec!["worktree", "remove", wt_str.as_str()];
+        if force {
+            wt_args.push("--force");
+        }
+        if git_ok(root, &wt_args) {
+            ui::ok(&format!("removed worktree {}", w.path.display()));
+        } else {
+            ui::warn(&format!("could not remove worktree {} (unregistering anyway)", w.path.display()));
+        }
+        let del = if force { "-D" } else { "-d" };
+        if git_ok(root, &["branch", del, w.branch.as_str()]) {
+            ui::ok(&format!("deleted branch {}", w.branch));
+        } else {
+            ui::warn(&format!("branch {} kept (unmerged?) — `git branch -D {}` to force", w.branch, w.branch));
+        }
+    }
+
     if !force {
         ui::warn(&format!(
             "unregistering '{name}' but KEEPING its transcript at {} — use `--force` to delete it too",
@@ -330,15 +439,35 @@ pub fn cmd_mv(env: &Env, root: &Path, old: &str, new: &str) -> Result<()> {
     if reg.get(new).is_some() {
         bail!("session '{new}' already exists");
     }
-    let Some(s) = reg.get_mut(old) else {
+    let Some(idx) = reg.sessions.iter().position(|s| s.name == old) else {
         bail!("no session '{old}' in this repo");
     };
     let new_dir = key_dir(env, root).join(new);
-    if s.session_dir.exists() {
-        std::fs::rename(&s.session_dir, &new_dir).context("rename session dir")?;
+    {
+        let s = &mut reg.sessions[idx];
+        if s.session_dir.exists() {
+            std::fs::rename(&s.session_dir, &new_dir).context("rename session dir")?;
+        }
+        s.name = new.to_string();
+        s.session_dir = new_dir;
+        // Worktree: move its dir + rename its branch to keep the 8sync/<name> slug.
+        if let Some(w) = s.worktree.clone() {
+            let new_branch = format!("8sync/{new}");
+            let new_wt = key_dir(env, root).join("worktrees").join(new);
+            let old_wt = w.path.to_string_lossy().to_string();
+            let new_wt_s = new_wt.to_string_lossy().to_string();
+            if git_ok(root, &["worktree", "move", old_wt.as_str(), new_wt_s.as_str()]) {
+                s.worktree.as_mut().unwrap().path = new_wt;
+            } else {
+                ui::warn(&format!("could not move worktree {} → {}", w.path.display(), new_wt.display()));
+            }
+            if git_ok(root, &["branch", "-m", w.branch.as_str(), new_branch.as_str()]) {
+                s.worktree.as_mut().unwrap().branch = new_branch;
+            } else {
+                ui::warn(&format!("could not rename branch {} → 8sync/{}", w.branch, new));
+            }
+        }
     }
-    s.name = new.to_string();
-    s.session_dir = new_dir;
     if reg.last_used.as_deref() == Some(old) {
         reg.last_used = Some(new.to_string());
     }

@@ -35,9 +35,13 @@ pub struct Args {
     #[arg(long)]
     pub list: bool,
 
-    /// With `rm`: also delete the session's omp transcript store.
+    /// With `rm`: also delete the session's omp transcript store (and force-remove its worktree).
     #[arg(long)]
     pub force: bool,
+
+    /// With `new`: give the session its own git worktree + branch `8sync/<name>`.
+    #[arg(long)]
+    pub worktree: bool,
 }
 
 pub fn run(a: Args) -> Result<()> {
@@ -80,8 +84,8 @@ pub fn run(a: Args) -> Result<()> {
 
     match verb {
         "new" => {
-            let name = rest.first().context("usage: 8sync . new <name>")?;
-            session::cmd_new(&env, &root, name)
+            let name = rest.first().context("usage: 8sync . new <name> [--worktree]")?;
+            session::cmd_new(&env, &root, name, a.worktree)
         }
         "" => session::resume_latest(&env, &root),
         name => session::resume_named(&env, &root, name),
