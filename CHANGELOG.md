@@ -5,6 +5,8 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.53.0] — 2026-08-08
+
 ### Added — `8sync .` named per-project sessions (run many features at once)
 - `8sync .` grew a session layer so you can keep several concurrent lines of work in one repo,
   each an isolated omp conversation. Surface (namespaced under `.`, no new top-level verbs):
