@@ -1,9 +1,21 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "warp"
 description = "Cloudflare WARP VPN + DoH + MASQUE + malware DNS filter"
 
 [packages]
 pacman = []
 aur = ["cloudflare-warp-bin"]
+
+# Deliberately NO [packages.fedora]. `cloudflare-warp` does exist as an rpm,
+# but only in Cloudflare's own yum repo (pkg.cloudflareclient.com), and this
+# schema can declare COPR repos only — there is no reputable COPR mirror. Add
+# the repo by hand and `sudo dnf install cloudflare-warp`; the post_install
+# warp-cli steps below then apply verbatim. Until then 8sync skips this
+# profile on Fedora with a reason rather than failing mid-apply.
 
 [requires]
 aur_helper = true

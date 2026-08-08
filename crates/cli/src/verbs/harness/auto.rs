@@ -48,6 +48,7 @@ pub(crate) fn harness_auto(env: &env_detect::Env, force: bool) -> Result<()> {
     inject_subfolder_indexes(&root)?;
     let _ = deploy::ensure_workflow_extension(&env.home, Some(&root));
     let _ = deploy::ensure_engine(&env.home, Some(&root));
+    let _ = deploy::ensure_rules(&env.home, Some(&root));
     let _ = deploy::cleanup_legacy_gs(&env.home, Some(&root));
     let _ = consolidate_learnings(&root);
 

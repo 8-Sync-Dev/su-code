@@ -1,5 +1,5 @@
 {
-  "active_feature": "multi-session",
+  "active_feature": "fedora-harness",
   "paths": {
     "archive": "su-code/planning/_archive",
     "planning_root": "su-code/planning"

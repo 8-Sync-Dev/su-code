@@ -80,6 +80,54 @@ function Get-LatestVersion {
     return $null
 }
 
+# Detect the machine architecture and map it onto the release asset labels
+# (.github/workflows/release.yml names assets 8sync-<tag>-<os>-<arch>[.exe]).
+#
+# PROCESSOR_ARCHITEW6432 is set only inside a 32-bit process on a 64-bit OS,
+# where PROCESSOR_ARCHITECTURE describes the *process* ('x86') rather than the
+# machine -- precisely the case that would otherwise mis-target an ARM64 box.
+function Get-TargetArch {
+    $raw = $env:PROCESSOR_ARCHITEW6432
+    if (-not $raw) { $raw = $env:PROCESSOR_ARCHITECTURE }
+    if (-not $raw) {
+        try { $raw = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() } catch {}
+    }
+    if (-not $raw) { return 'unknown' }
+    switch -Regex ($raw) {
+        '^(AMD64|x64)$' { return 'x86_64' }
+        '^ARM64$'       { return 'aarch64' }
+        default         { return "$raw".ToLowerInvariant() }
+    }
+}
+
+# Does this release actually publish the asset? A definite 404 means "no build
+# for this target". Anything else (proxy, offline, HEAD refused) is
+# inconclusive and must not block -- the download reports the real error then.
+function Test-AssetExists($uri) {
+    try {
+        Invoke-WebRequest -Uri $uri -Method Head -UseBasicParsing -ErrorAction Stop | Out-Null
+        return $true
+    } catch {
+        $code = $null
+        try { $code = [int]$_.Exception.Response.StatusCode } catch {}
+        if ($code -eq 404) { return $false }
+        return $true
+    }
+}
+
+# Best-effort SHA-256 from the release API's per-asset `digest` ("sha256:<hex>").
+# The unauthenticated API is rate-limited to 60 req/hour, so a miss is expected
+# and must never fail the install; a *mismatch* is fatal.
+function Get-PublishedSha256($assetName) {
+    try {
+        $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$version" `
+            -UseBasicParsing -Headers @{ 'User-Agent' = '8sync-installer' } -ErrorAction Stop
+        $a = $rel.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
+        if ($a -and $a.digest -match '^sha256:([0-9a-fA-F]{64})$') { return $matches[1] }
+    } catch {}
+    return $null
+}
+
 # --- uninstall -------------------------------------------------------------
 
 if ($Uninstall) {
@@ -112,25 +160,59 @@ if ($version -notlike 'v*') { $version = "v$version" }
 
 # --- download + install ----------------------------------------------------
 
-$asset = "8sync-$version-windows-x86_64.exe"
+$arch = Get-TargetArch
+$target = "windows-$arch"
+$asset = "8sync-$version-$target.exe"
 $url = "https://github.com/$Repo/releases/download/$version/$asset"
-Write-Host "Installing 8sync $version (windows-x86_64)..."
+
+# An ARM64 machine must not silently receive the x64 build. If this release
+# publishes no asset for the detected target, name the missing target instead
+# of installing the wrong binary.
+if (-not (Test-AssetExists $url)) {
+    throw "8sync: no prebuilt binary for $target in release $version (missing asset: $asset).`nBuild from source instead: https://github.com/$Repo (cargo build --release)."
+}
+
+Write-Host "Installing 8sync $version ($target)..."
 
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 
-$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("8sync-" + [System.Guid]::NewGuid().ToString('N') + ".exe")
+# The temp file is a *sibling* of the destination, not %TEMP%: a move across
+# volumes is a copy rather than a rename, which would make a half-written
+# binary observable at $BinPath. Mirrors download_and_replace() in
+# crates/cli/src/verbs/selfup.rs.
+# The leading dot matches selfup.rs's naming, but it makes the file "hidden"
+# to the PowerShell provider on Unix-hosted pwsh, so every probe of $tmp needs
+# -Force. (On Windows a leading dot sets no hidden attribute; -Force is a
+# harmless no-op there.)
+$tmp = Join-Path $BinDir (".8sync.new." + $PID)
 try {
     Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
 } catch {
     if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
     throw "8sync: download failed: $url`n$($_.Exception.Message)"
 }
-if (-not (Test-Path -LiteralPath $tmp) -or (Get-Item -LiteralPath $tmp).Length -eq 0) {
+if (-not (Test-Path -LiteralPath $tmp) -or (Get-Item -LiteralPath $tmp -Force).Length -eq 0) {
     if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
     throw "8sync: downloaded an empty file from $url"
 }
 
-# Atomically replace any existing binary (upgrade path).
+if (-not (Get-Command Get-FileHash -ErrorAction SilentlyContinue)) {
+    Write-Host "  checksum: skipped (Get-FileHash unavailable on this PowerShell)"
+} else {
+    $wantHash = Get-PublishedSha256 $asset
+    if ($wantHash) {
+        $gotHash = (Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash
+        if ($gotHash -ne $wantHash) {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+            throw "8sync: checksum mismatch for $asset - refusing to install.`n  expected sha256:$($wantHash.ToLowerInvariant())`n  actual   sha256:$($gotHash.ToLowerInvariant())"
+        }
+        Write-Host "  checksum: ok (sha256:$($wantHash.ToLowerInvariant()))"
+    } else {
+        Write-Host "  checksum: skipped (no sha256 digest available for $asset)"
+    }
+}
+
+# Same-directory rename: atomic replace of any existing binary (upgrade path).
 Move-Item -LiteralPath $tmp -Destination $BinPath -Force
 
 Write-Host "Installed -> $BinPath"

@@ -20,20 +20,20 @@ Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatt
 
 Nhỏ + dùng cho MỌI task. **Thứ tự = ưu tiên (đọc top-down).** Mở `SKILL.md` ở path dưới rồi mới gọi tool đầu tiên:
 
-  1. `/home/alexng/Projects/tools/su-code/su-code/skills/codegraph/SKILL.md`
-  2. `/home/alexng/Projects/tools/su-code/su-code/skills/karpathy-guidelines/SKILL.md`
-  3. `/home/alexng/Projects/tools/su-code/su-code/skills/ponytail/SKILL.md`
-  4. `/home/alexng/Projects/tools/su-code/su-code/skills/8sync-cli/SKILL.md`
+  1. `su-code/skills/codegraph/SKILL.md`
+  2. `su-code/skills/karpathy-guidelines/SKILL.md`
+  3. `su-code/skills/ponytail/SKILL.md`
+  4. `su-code/skills/8sync-cli/SKILL.md`
 
 ### 🧩 SPECIALIST always-on — biết khả năng, đọc body KHI task khớp (progressive disclosure)
 
 KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF.
 
-- `assp-skill` — `/home/alexng/Projects/tools/su-code/su-code/skills/assp-skill/SKILL.md`
-- `impeccable` — `/home/alexng/Projects/tools/su-code/su-code/skills/impeccable/SKILL.md`
-- `design-taste-frontend` — `/home/alexng/Projects/tools/su-code/su-code/skills/taste-skill/SKILL.md`
-- `image-routing` — `/home/alexng/Projects/tools/su-code/su-code/skills/image-routing/SKILL.md`
-- `locate-anything` — `/home/alexng/Projects/tools/su-code/su-code/skills/locate-anything/SKILL.md`
+- `assp-skill` — `su-code/skills/assp-skill/SKILL.md`
+- `impeccable` — `su-code/skills/impeccable/SKILL.md`
+- `design-taste-frontend` — `su-code/skills/taste-skill/SKILL.md`
+- `image-routing` — `su-code/skills/image-routing/SKILL.md`
+- `locate-anything` — `su-code/skills/locate-anything/SKILL.md`
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 

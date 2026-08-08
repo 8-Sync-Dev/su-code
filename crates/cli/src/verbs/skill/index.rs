@@ -99,26 +99,27 @@ fn subfolder_index_block(root: &Path) -> String {
     } else {
         names.join(" → ")
     };
-    let root_agents = root.join("AGENTS.md");
+    // Every path here is repo-relative or `~/`-anchored: this block is written
+    // into sub-folders of a repo that gets cloned to a different absolute path on
+    // every machine, so an absolute `<root>/AGENTS.md` would point at nothing.
     let block = format!(
         "{BEGIN}\n\
 ## 🚨 8sync harness — sub-folder index\n\
 \n\
 Bạn đang ở **sub-folder**. Rule + skill force-load đầy đủ KHÔNG lặp ở đây — đọc ROOT trước:\n\
 \n\
-- **Root rules + skill list:** `{root}`\n\
+- **Root rules + skill list:** `AGENTS.md` ở REPO ROOT (không phải file này)\n\
 - **Master skills (omp đọc đầu tiên):** `~/.omp/skills/00-force-load.md`\n\
 \n\
 **Always-on (đọc trước tool call đầu tiên, ĐÚNG thứ tự):** {chain}.\n\
-SKILL.md ở `<root>/su-code/skills/<name>/` hoặc `~/.omp/skills/<name>/`.\n\
+SKILL.md ở `su-code/skills/<name>/` (repo-relative) hoặc `~/.omp/skills/<name>/`.\n\
 \n\
 **Cách tận dụng (bắt buộc):** `codegraph` cho mọi explore code (query/callers/callees — KHÔNG grep) · \
 `karpathy` + `ponytail` = YAGNI, làm ít nhất, xoá > thêm · `assp` cho copy/offer hướng người dùng · \
 **`impeccable` = design system CHUẨN, BẮT BUỘC cho mọi UI/design/redesign/audit (kèm `references/house/*`)** + `taste` chống slop.\n\
 \n\
 **Quy tắc:** cite `path:line` · ưu tiên verb `8sync` hơn shell · sau mỗi thay đổi cập nhật `CHANGELOG.md` + `su-code/KNOWLEDGE.md`.\n\
-{END}",
-        root = root_agents.display(),
+{END}"
     );
     crate::brand::render(&block).into_owned()
 }

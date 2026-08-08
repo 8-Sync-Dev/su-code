@@ -1,3 +1,8 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "nvidia"
 description = "NVIDIA — auto-detect driver (Blackwell/Ada/Ampere/Turing → open-dkms; Maxwell/Pascal → proprietary dkms) + DRM modeset + kernel params. Skips entirely if CachyOS `chwd` already configured a driver."
 
@@ -13,6 +18,25 @@ pacman = [
 ]
 aur = []
 
+# RPM Fusion nonfree ships `akmod-nvidia`, which rebuilds the module on every
+# kernel update and installs its own modeset drop-in — so none of the
+# mkinitcpio/GRUB plumbing in post_install applies. Step 0 below detects the
+# absence of `pacman` and short-circuits every later step.
+[packages.fedora]
+rpmfusion = true
+dnf = [
+  "akmod-nvidia",
+  "xorg-x11-drv-nvidia-cuda",
+  "xorg-x11-drv-nvidia-power",
+  "xorg-x11-drv-nvidia-libs.i686",
+  "libva-nvidia-driver",
+  "vulkan-loader",
+  "vulkan-loader.i686",
+  "mesa-vulkan-drivers",
+  "egl-wayland",
+  "kernel-devel",
+]
+
 [services]
 system_enable = []
 user_enable = []
@@ -25,7 +49,10 @@ commands = [
   #    Steps 1–5 check the sentinel and short-circuit. Remove it manually +
   #    re-run if you really want this profile to take over a chwd setup.
   """bash -c 'rm -f /tmp/8sync-nvidia-skip; \
-if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -q >/dev/null 2>&1; then \
+if ! command -v pacman >/dev/null 2>&1; then \
+  echo "[nvidia] non-Arch system — akmod-nvidia rebuilds the module itself; skipping mkinitcpio/GRUB steps"; \
+  touch /tmp/8sync-nvidia-skip; \
+elif command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -q >/dev/null 2>&1; then \
   VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1); \
   PKG=$(pacman -Qq 2>/dev/null | grep -E "^nvidia(-open)?(-dkms|-lts)?$" | paste -sd, -); \
   echo "[nvidia] driver already active (likely CachyOS chwd) — version ${VER:-unknown}, package(s): ${PKG:-unknown}"; \

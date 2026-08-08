@@ -64,6 +64,7 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     deploy::ensure_headroom_mcp(env)?;
     let _ = deploy::ensure_omp_memory_config(&env.home);
     let _ = deploy::ensure_bash_interceptor(&env.home);
+    let _ = deploy::ensure_rules(&env.home, None);
     let _ = deploy::ensure_recall_hook(&env.home);
     let _ = deploy::ensure_append_system(&env.home);
     let _ = deploy::ensure_mcp_spec(&env.home);

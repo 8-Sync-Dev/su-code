@@ -1,3 +1,8 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "apps-personal"
 description = "Personal apps (Bitwarden + Lark)"
 visibility = "personal"
@@ -8,6 +13,12 @@ pacman = ["bitwarden"]
 # lúc build (pacman-tracked, KHÔNG nhúng 437MB binary vào repo/GitHub).
 # Bản Trung Quốc (Feishu) là gói khác: `feishu-bin`.
 aur = ["larksuite-bin"]
+
+# Deliberately NO [packages.fedora]: neither app has an rpm in Fedora, RPM
+# Fusion or a reputable COPR. Bitwarden is a Flatpak there
+# (`flatpak install flathub com.bitwarden.desktop`) and Lark/Feishu is a direct
+# download from larksuite.com. Guessing a package name would silently install
+# the wrong thing, so this profile is skipped with a reason on Fedora.
 
 [requires]
 aur_helper = true

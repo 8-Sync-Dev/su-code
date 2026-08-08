@@ -40,6 +40,7 @@ pub(crate) fn global_pass(env: &env_detect::Env) -> Result<()> {
     deploy::ensure_headroom_mcp(env)?;
     let _ = deploy::ensure_omp_memory_config(&env.home);
     let _ = deploy::ensure_bash_interceptor(&env.home);
+    let _ = deploy::ensure_rules(&env.home, None);
     let _ = deploy::ensure_mcp_tools_visible(&env.home);
     let _ = deploy::ensure_recall_hook(&env.home);
     let _ = deploy::ensure_append_system(&env.home);
@@ -135,6 +136,7 @@ pub(crate) fn harness_global(
     // 5. Summary — what now applies to every omp session on this machine.
     ui::ok("omp rules are now GLOBAL — every omp session in every project gets:");
     ui::info("  • ~/.omp/agent/APPEND_SYSTEM.md appended to EVERY system prompt (code-intel-first, never compacted)");
+    ui::info("  • ~/.omp/agent/rules/*.md TTSR rules — omp aborts a grep/glob on code STRUCTURE mid-stream and re-routes it to codegraph/serena/cbm (zero prompt cost, never compacted; auto-withheld when none of those is installed)");
     ui::info("  • skills @ ~/.omp/skills + 00-force-load.md · MCP: codebase-memory · headroom · serena · zai-vision");
     ui::info("  • STEP-0 MCP tools always in the tool set (omp ≥17: xd:// devices via tools.xdev) — serena/cbm/headroom/zai callable");
     ui::info("  • token optimizer: headroom compress >50-line outputs · compaction 50% · stable prefix → Anthropic prompt-cache hits");

@@ -1,21 +1,31 @@
 use anyhow::Result;
-use crate::{env_detect, ui, verbs::{profile, sec, bt}};
+use crate::{env_detect, pkg, ui, verbs::{profile, sec, bt}};
 
 pub fn run() -> Result<()> {
     ui::header("8sync doctor");
     let env = env_detect::Env::detect()?;
     crate::verbs::skill::deploy::migrate_namespace(&env.home);
 
-    // OS / desktop stack
-    check("OS", &env.os_id);
+    // Distro + resolved package backend. Deliberately a raw `println!`, not a
+    // `ui::*` call: this line is the machine-checkable contract
+    // `^distro: <id> \(<backend>\)$` that acceptance checks grep for, and every
+    // ui:: helper prefixes a glyph that would break the anchor.
+    println!(
+        "distro: {} ({})",
+        env.os_id,
+        pkg::backend().map(|b| b.name()).unwrap_or("none")
+    );
     if env_detect::is_hyde() {
         ui::ok("HyDE detected (Hyprland + wallbash theme engine)");
     }
 
-    // AUR helper
-    match env_detect::aur_helper() {
-        Some(h) => ui::ok(&format!("AUR helper: {}", h)),
-        None    => ui::info("AUR helper: none (paru or yay needed for AUR profiles: hardware-lianli, warp, ...)"),
+    // AUR helper — an Arch-family concept, and pure noise everywhere else:
+    // "AUR helper: none" on Fedora reads like a defect the user should fix.
+    if env.family() == env_detect::Family::Arch {
+        match env_detect::aur_helper() {
+            Some(h) => ui::ok(&format!("AUR helper: {}", h)),
+            None    => ui::info("AUR helper: none (paru or yay needed for AUR profiles: hardware-lianli, warp, ...)"),
+        }
     }
 
     // Core harness
@@ -104,6 +114,16 @@ pub fn run() -> Result<()> {
                 ));
             }
         }
+        // Profiles whose package set has nothing installable on this distro
+        // family are silent no-ops at apply time — surface them here instead.
+        let fam_label = match env.family() {
+            env_detect::Family::Fedora => "Fedora",
+            env_detect::Family::Arch => "Arch",
+            env_detect::Family::Other => "supported",
+        };
+        for name in profile::unsupported_on_family(&all, env.family()) {
+            ui::warn(&format!("profile {} skipped: no {} packages", name, fam_label));
+        }
     }
     let st = profile::load_state();
     if st.applied.is_empty() {
@@ -113,10 +133,6 @@ pub fn run() -> Result<()> {
     }
 
     Ok(())
-}
-
-fn check(label: &str, value: &str) {
-    ui::ok(&format!("{}: {}", label, value));
 }
 
 fn check_cmd(name: &str, args: &[&str]) {

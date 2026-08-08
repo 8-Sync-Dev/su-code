@@ -4,9 +4,10 @@
 //! some setups renders but fails to load pages / reach the network.
 //!
 //! omp runs under Bun and honors `PUPPETEER_EXECUTABLE_PATH` / `BUN_CHROME_PATH`
-//! for the browser binary (with `--no-sandbox`). `fix` (default) ensures
-//! `ungoogled-chromium-bin` is installed and exports those vars in zsh/bash/fish
-//! so EVERY omp launch — direct or via `8sync .`/`8sync ai` — uses it. Idempotent;
+//! for the browser binary (with `--no-sandbox`). `fix` (default) ensures a
+//! system Chromium is installed (`ungoogled-chromium-bin` on Arch, `chromium`
+//! on Fedora) and exports those vars in zsh/bash/fish so EVERY omp launch —
+//! direct or via `8sync .`/`8sync ai` — uses it. Idempotent;
 //! `off` reverts to omp's bundled chromium, `status` shows the current wiring.
 use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
@@ -28,7 +29,8 @@ pub(crate) fn harness_browser(env: &env_detect::Env, args: &[String]) -> Result<
     }
 }
 
-/// Preferred system Chromium on PATH (ungoogled-chromium-bin installs `chromium`).
+/// Preferred system Chromium on PATH (both `ungoogled-chromium-bin` on Arch and
+/// Fedora's `chromium` install the `chromium` binary).
 fn find_chromium() -> Option<PathBuf> {
     for c in ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome", "brave"] {
         if let Ok(p) = which::which(c) {
@@ -38,31 +40,52 @@ fn find_chromium() -> Option<PathBuf> {
     None
 }
 
+/// Install a system Chromium using whatever this distro actually ships:
+/// `ungoogled-chromium-bin` on the Arch family (CachyOS repo, else AUR), plain
+/// `chromium` from the official repo on Fedora. Any other distro gets an
+/// actionable skip instead of a `pacman` that does not exist there.
+fn install_chromium(env: &env_detect::Env) -> Result<()> {
+    match env.family() {
+        env_detect::Family::Arch => {
+            ui::step("install ungoogled-chromium-bin");
+            // cachyos ships it in-repo (pacman); plain Arch has it in the AUR.
+            if pkg::install("ungoogled-chromium-bin", &["ungoogled-chromium-bin"], true).is_err() {
+                match env_detect::aur_helper() {
+                    Some(h) => {
+                        let _ = pkg::aur_install_safe(h, &["ungoogled-chromium-bin"], true);
+                    }
+                    None => ui::warn("no AUR helper (paru/yay) — install ungoogled-chromium-bin manually"),
+                }
+            }
+        }
+        // Fedora has no ungoogled build, but `chromium` in the official repo is
+        // the same engine — all Puppeteer needs is a real Chromium binary.
+        env_detect::Family::Fedora => {
+            ui::step("install chromium (Fedora repo)");
+            pkg::install("chromium", &["chromium"], true)?;
+        }
+        env_detect::Family::Other => ui::warn(&format!(
+            "no supported package manager on `{}` — install a Chromium (e.g. `chromium`) with your package manager, then re-run",
+            env.os_id
+        )),
+    }
+    Ok(())
+}
+
 fn fix(env: &env_detect::Env) -> Result<()> {
     ui::header("8sync harness browser — point omp at system Chromium");
 
-    // 1. Ensure a system Chromium exists (install ungoogled-chromium-bin if none).
+    // 1. Ensure a system Chromium exists (install the distro's build if none).
     let path = match find_chromium() {
         Some(p) => {
             ui::skip("chromium", &format!("present → {}", p.display()));
             p
         }
         None => {
-            if env.is_cachyos_or_arch() {
-                ui::step("install ungoogled-chromium-bin");
-                // cachyos ships it in-repo (pacman); plain Arch has it in the AUR.
-                if pkg::pacman_install_safe(&["ungoogled-chromium-bin"], true).is_err() {
-                    match env_detect::aur_helper() {
-                        Some(h) => {
-                            let _ = pkg::aur_install_safe(h, &["ungoogled-chromium-bin"], true);
-                        }
-                        None => ui::warn("no AUR helper (paru/yay) — install ungoogled-chromium-bin manually"),
-                    }
-                }
-            } else {
-                ui::warn("non-Arch host: install a Chromium (e.g. `chromium`) via your package manager, then re-run");
-            }
-            find_chromium().ok_or_else(|| anyhow!("Chromium still not found after install"))?
+            install_chromium(env)?;
+            find_chromium().ok_or_else(|| {
+                anyhow!("still no Chromium on PATH — install one (chromium / ungoogled-chromium / google-chrome), then re-run `8sync harness browser fix`")
+            })?
         }
     };
 

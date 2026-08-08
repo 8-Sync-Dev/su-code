@@ -30,6 +30,14 @@ pub struct ModelConfig {
     /// `8sync ai --no-step0`, or `step0 = false` in models.toml.
     #[serde(default = "step0_default")]
     pub step0: bool,
+    /// STEP-0 shell guard: the omp `bashInterceptor` rules `8sync harness` renders
+    /// into `~/.omp/agent/config.yml`. Sourced from config rather than hardcoded so
+    /// the pattern set is tunable per machine without a rebuild. When the key is
+    /// absent — every `models.toml` written before this section existed — the
+    /// embedded default asset supplies it, so upgrading keeps the guard instead of
+    /// silently dropping it. Consumed by `deploy::ensure_bash_interceptor`.
+    #[serde(rename = "bashInterceptor", default = "embedded_bash_interceptor")]
+    pub bash_interceptor: BashInterceptor,
 }
 
 impl Default for ModelConfig {
@@ -39,6 +47,7 @@ impl Default for ModelConfig {
             tasks: BTreeMap::new(),
             advisor: true,
             step0: true,
+            bash_interceptor: embedded_bash_interceptor(),
         }
     }
 }
@@ -49,6 +58,59 @@ fn advisor_default() -> bool {
 
 fn step0_default() -> bool {
     true
+}
+
+fn enabled_default() -> bool {
+    true
+}
+
+/// omp's `bashInterceptor` config. A matching `bash` command returns a tool ERROR
+/// naming the replacement, which is what closes the `bash rg` escape the `--tools`
+/// allowlist leaves open (it removes the `grep`/`glob` TOOLS, not the shell).
+///
+/// `enabled = false` or an empty `patterns` list means "no guard": `8sync harness`
+/// then REMOVES the block it previously wrote instead of leaving a stale one.
+#[derive(Debug, Deserialize)]
+pub struct BashInterceptor {
+    #[serde(default = "enabled_default")]
+    pub enabled: bool,
+    /// The COMPLETE rule set for this layer — setting the key makes omp replace its
+    /// own default array, so this is the whole guard, not an addition to omp's.
+    #[serde(default)]
+    pub patterns: Vec<InterceptRule>,
+}
+
+impl Default for BashInterceptor {
+    fn default() -> Self {
+        Self { enabled: true, patterns: Vec::new() }
+    }
+}
+
+/// One interceptor rule in omp's own shape. `tool` is the availability GATE, not
+/// the suggestion: omp's matcher skips any rule whose `tool` is missing from the
+/// session, so it must name a tool that is always there (`lsp`) while `message`
+/// names the real replacement (codegraph / serena / codebase-memory).
+#[derive(Debug, Deserialize)]
+pub struct InterceptRule {
+    pub pattern: String,
+    pub tool: String,
+    pub message: String,
+}
+
+/// The `[bashInterceptor]` section of the EMBEDDED `assets/configs/models.toml`.
+/// Parsed through a local struct instead of `ModelConfig` so this serde default
+/// can never recurse into itself. Unparseable/absent ⇒ empty ⇒ no guard written
+/// (fail-open: a broken config must not dead-end the shell).
+fn embedded_bash_interceptor() -> BashInterceptor {
+    #[derive(Deserialize)]
+    struct Section {
+        #[serde(rename = "bashInterceptor")]
+        bash_interceptor: BashInterceptor,
+    }
+    crate::assets::read("configs/models.toml")
+        .and_then(|s| toml::from_str::<Section>(&s).ok())
+        .map(|s| s.bash_interceptor)
+        .unwrap_or_default()
 }
 
 /// Built-in omp tools KEPT when STEP-0 enforcement is ON. `--tools` is an

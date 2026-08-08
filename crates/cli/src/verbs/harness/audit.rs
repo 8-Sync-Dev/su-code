@@ -24,7 +24,19 @@ fn looks_like_path(tok: &str) -> bool {
     tok.contains('/') && EXTS.iter().any(|e| tok.ends_with(e))
 }
 
-/// External / non-repo references we never treat as stale (URLs, home paths).
+/// Absolute prefixes that only ever resolve on the machine that generated them:
+/// a doc pointing at `/home/<user>/…` is dead for every other user, clone and
+/// box — the agent is told to read a file that is not there and silently skips
+/// it. Exactly the rot this audit exists to catch, so these are FLAGGED.
+const MACHINE_PREFIXES: &[&str] = &["/home/", "/Users/", "/root/"];
+
+/// True for an absolute path baked to one machine's `$HOME` layout.
+fn is_machine_specific(tok: &str) -> bool {
+    MACHINE_PREFIXES.iter().any(|p| tok.starts_with(p))
+}
+
+/// External / non-repo references we never treat as stale (URLs, and
+/// `~`-anchored home paths, which are portable by construction).
 fn is_external(tok: &str) -> bool {
     tok.starts_with("http")
         || tok.starts_with('~')
@@ -49,10 +61,13 @@ fn path_candidates(body: &str) -> BTreeSet<String> {
         if tok.is_empty() || !looks_like_path(tok) {
             continue;
         }
-        // Only flag REPO-RELATIVE paths. Absolute (`/home/…`, machine-generated
-        // by the harness) and `~`/`<placeholder>`-derived `/…` fragments carry
-        // no authored-doc-rot signal — skip them.
-        if tok.starts_with('/') {
+        // Absolute paths split two ways. Generic system paths (`/etc/…`,
+        // `/usr/…`, `/tmp/…`, `/opt/…`) are environment facts, not authored repo
+        // references, so they carry no doc-rot signal → keep skipping them. The
+        // same goes for `~`/`<placeholder>`-derived `/…` fragments. Machine-
+        // specific home prefixes are the opposite: they resolve only on the box
+        // that generated them, so they must be reported.
+        if tok.starts_with('/') && !is_machine_specific(tok) {
             continue;
         }
         let first = tok.split('/').next().unwrap_or("");
@@ -62,6 +77,13 @@ fn path_candidates(body: &str) -> BTreeSet<String> {
         out.insert(tok.to_string());
     }
     out
+}
+
+/// A path candidate is doc-rot when it does not resolve under the repo root —
+/// or when it is machine-specific, which is stale even while it happens to
+/// exist locally, because it breaks on every other machine.
+fn is_stale_ref(root: &Path, cand: &str) -> bool {
+    is_machine_specific(cand) || !root.join(cand).exists()
 }
 
 /// Collect the docs to audit: fixed top-level docs, every `*.md` at the repo
@@ -142,7 +164,7 @@ pub(crate) fn stale_summary(root: &Path) -> (usize, usize) {
     for doc in &docs {
         let body = std::fs::read_to_string(root.join(doc)).unwrap_or_default();
         for cand in path_candidates(&body) {
-            if !root.join(&cand).exists() {
+            if is_stale_ref(root, &cand) {
                 stale += 1;
             }
         }
@@ -179,7 +201,7 @@ pub(crate) fn harness_audit(_env: &env_detect::Env) -> Result<()> {
     for doc in &docs {
         let body = std::fs::read_to_string(root.join(doc)).unwrap_or_default();
         for cand in path_candidates(&body) {
-            if !root.join(&cand).exists() {
+            if is_stale_ref(&root, &cand) {
                 stale.push((doc.clone(), cand));
             }
         }
@@ -242,4 +264,48 @@ pub(crate) fn harness_audit(_env: &env_detect::Env) -> Result<()> {
     }
     ui::info("report-only — never auto-deletes; verify each finding (illustrative paths can false-positive)");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The dead-skill-path bug: a doc carrying ANOTHER machine's `$HOME` layout
+    /// must be reported, while generic system paths stay invisible to the audit
+    /// (they are environment facts, not authored repo references).
+    #[test]
+    fn flags_machine_specific_absolutes_only() {
+        let cands = path_candidates(
+            "core: /home/alexng/x/SKILL.md · /Users/bob/y/SKILL.md · /root/z/SKILL.md — \
+             env: /etc/os-release, /etc/profile.d/init.sh, /usr/share/doc/readme.md, \
+             /tmp/scratch/note.md, /opt/tool/setup.sh — repo: su-code/STATE.md",
+        );
+        assert!(cands.contains("/home/alexng/x/SKILL.md"));
+        assert!(cands.contains("/Users/bob/y/SKILL.md"));
+        assert!(cands.contains("/root/z/SKILL.md"));
+        for generic in [
+            "/etc/os-release",
+            "/etc/profile.d/init.sh",
+            "/usr/share/doc/readme.md",
+            "/tmp/scratch/note.md",
+            "/opt/tool/setup.sh",
+        ] {
+            assert!(!cands.contains(generic), "generic absolute must stay skipped: {generic}");
+        }
+        assert!(cands.contains("su-code/STATE.md"), "repo-relative refs still audited");
+    }
+
+    /// A machine-specific path is stale even when it currently resolves — it
+    /// breaks on every other machine. A real repo-relative file is not stale.
+    #[test]
+    fn stale_ref_ignores_existence_for_machine_paths() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        assert!(is_stale_ref(root, "/home/alexng/x/SKILL.md"));
+        assert!(!is_stale_ref(root, "src/main.rs"));
+        let here = root.join("src/main.rs");
+        let here = here.to_string_lossy();
+        if is_machine_specific(&here) {
+            assert!(is_stale_ref(root, &here), "existing absolute home path is still rot");
+        }
+    }
 }

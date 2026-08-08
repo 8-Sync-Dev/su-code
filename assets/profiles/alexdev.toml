@@ -1,3 +1,8 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "alexdev"
 description = "alexdev bundle — kitty terminal + fan/LED control (CoolerControl/OpenRGB/Lian Li) + Cloudflare WARP + Vietnamese Unikey + AFFiNE (OSS knowledge base)"
 visibility = "personal"
@@ -15,6 +20,12 @@ pacman = ["kitty"]
 # free, self-hostable, no cloud lock-in). The from-source `affine` AUR pkg fails
 # to build upstream (electron-packager zip step), so use the official prebuilt.
 aur = ["affine-bin"]
+
+# AFFiNE has no Fedora rpm — upstream ships AppImage/Docker only — so the
+# Fedora set is kitty alone. `warp` (extended above) is likewise unported, and
+# `8sync` prints which extended profiles it dropped when applying this bundle.
+[packages.fedora]
+dnf = ["kitty"]
 
 [services]
 system_enable = []

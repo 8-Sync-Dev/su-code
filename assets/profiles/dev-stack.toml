@@ -1,3 +1,8 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "dev-stack"
 description = "Dev runtime cho Next.js 16 + Encore TS: Docker + Node/Bun/pnpm + Encore CLI + native build deps"
 
@@ -20,6 +25,31 @@ pacman = [
   "typescript-language-server",
 ]
 aur = []
+
+# Fedora equivalents. Node is versioned there (`nodejs22` + `nodejs22-npm`)
+# and `base-devel` has no single package, so the node-gyp build chain is
+# spelled out. NOT packaged in Fedora 44: `bun` and
+# `typescript-language-server` — install those two via their own installers
+# (`curl -fsSL https://bun.sh/install | bash`, `npm i -g …`).
+[packages.fedora]
+dnf = [
+  # Container runtime — moby-engine ships /usr/lib/systemd/system/docker.service
+  # and creates the `docker` group, so [services] and post_install both apply.
+  "moby-engine",
+  "docker-compose",
+  "docker-buildx",
+  # JS runtimes / package managers
+  "nodejs22",
+  "nodejs22-npm",
+  "pnpm",
+  # Native module build chain (node-gyp, argon2, sharp fallback, ...)
+  "git",
+  "gcc",
+  "gcc-c++",
+  "make",
+  "python3",
+  "python3-devel",
+]
 
 [services]
 system_enable = ["docker.service"]

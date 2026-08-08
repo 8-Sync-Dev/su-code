@@ -1,3 +1,8 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "vietnamese"
 description = "Vietnamese input method (fcitx5 + Unikey)"
 visibility = "personal"
@@ -5,6 +10,10 @@ visibility = "personal"
 [packages]
 pacman = ["fcitx5", "fcitx5-configtool", "fcitx5-gtk", "fcitx5-qt", "fcitx5-unikey"]
 aur = []
+
+# fcitx5 and every split module keep the same names on Fedora.
+[packages.fedora]
+dnf = ["fcitx5", "fcitx5-configtool", "fcitx5-gtk", "fcitx5-qt", "fcitx5-unikey"]
 
 [services]
 system_enable = []

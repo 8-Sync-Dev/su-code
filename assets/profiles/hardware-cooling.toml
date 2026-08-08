@@ -1,3 +1,8 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "hardware-cooling"
 description = "Cooler & RGB control (CoolerControl, OpenRGB, liquidctl)"
 visibility = "personal"
@@ -5,6 +10,13 @@ visibility = "personal"
 [packages]
 pacman = ["coolercontrol", "openrgb", "liquidctl"]
 aur = []
+
+# Arch's single `coolercontrol` package is split three ways on Fedora: the GUI,
+# `coolercontrold` (which owns coolercontrold.service, enabled below) and
+# `coolercontrol-liqctld`. openrgb and liquidctl are in the Fedora repos.
+[packages.fedora]
+dnf = ["coolercontrol", "coolercontrold", "coolercontrol-liqctld", "openrgb", "liquidctl"]
+copr = ["codifryed/CoolerControl"]
 
 [services]
 system_enable = ["coolercontrold.service"]

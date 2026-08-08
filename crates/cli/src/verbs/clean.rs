@@ -6,8 +6,8 @@
 // we do NOT kill processes, and "free RAM" is opt-in + honest (the kernel
 // reclaims pagecache on demand; dropping it is mostly cosmetic).
 //
-//   8sync clean              safe reclaim: pacman/AUR cache, journal, tmpfiles,
-//                            thumbnails  + CPU/GPU/RAM report
+//   8sync clean              safe reclaim: native package cache, journal,
+//                            tmpfiles, thumbnails  + CPU/GPU/RAM report
 //   8sync clean --deep       + orphan pkgs, regenerable dev caches, tighter journal
 //   8sync clean --ram        + drop pagecache (light, cosmetic) + report
 //   8sync clean --gpu        + NVIDIA persistence mode on + GPU report
@@ -20,7 +20,7 @@ use anyhow::Result;
 use clap::Args as ClapArgs;
 use std::process::Command;
 
-use crate::{platform, ui};
+use crate::{pkg, platform, ui};
 
 #[derive(ClapArgs, Debug)]
 #[command(
@@ -80,7 +80,10 @@ pub fn run(a: Args) -> Result<()> {
         // no-op on this OS). Only the reclaim body below is Linux-only.
         return manage_timer(spec);
     }
-    if !platform::require_linux("clean", "it reclaims pacman/journal/tmpfiles + reports NVIDIA/amd-pstate") {
+    if !platform::require_linux(
+        "clean",
+        "it reclaims package-manager/journal/tmpfiles + reports NVIDIA/amd-pstate",
+    ) {
         return Ok(());
     }
     if let Some(secs) = a.watch {
@@ -104,23 +107,10 @@ fn clean_once(a: &Args) {
     let ram0 = mem_available_mb();
     let disk0 = root_avail_mb();
 
-    // ── disk: pacman package cache ──────────────────────────────────
-    ui::step("pacman package cache");
-    if which::which("paccache").is_ok() {
-        sudo_run(dry, &["paccache", "-rk2"]); // keep 2 newest of installed pkgs
-        sudo_run(dry, &["paccache", "-ruk0"]); // drop ALL cached uninstalled pkgs
-    } else {
-        ui::skip("paccache", "pacman-contrib not installed");
-    }
-
-    // ── disk: AUR helper build/clone cache ──────────────────────────
-    if which::which("paru").is_ok() {
-        ui::step("paru cache");
-        run_cmd(dry, &["paru", "-Sc", "--noconfirm"]);
-    } else if which::which("yay").is_ok() {
-        ui::step("yay cache");
-        run_cmd(dry, &["yay", "-Sc", "--noconfirm"]);
-    }
+    // ── disk: native package manager caches ─────────────────────────
+    // Family-gated inside `pkg`: pacman/paccache/paru on Arch, `dnf clean all`
+    // on Fedora, a printed skip on anything else.
+    pkg::clean_cache(dry);
 
     // ── disk: journal ───────────────────────────────────────────────
     ui::step("systemd journal vacuum");
@@ -150,7 +140,7 @@ fn clean_once(a: &Args) {
     // ── disk: orphan packages (deep only) ───────────────────────────
     if a.deep {
         ui::step("orphan packages");
-        remove_orphans(dry);
+        pkg::remove_orphans(dry);
     }
 
     // ── RAM (opt-in, honest) ────────────────────────────────────────
@@ -258,37 +248,6 @@ fn report_caches() {
     }
 }
 
-fn remove_orphans(dry: bool) {
-    let out = Command::new("pacman").args(["-Qtdq"]).output();
-    let orphans: Vec<String> = match out {
-        Ok(o) => String::from_utf8_lossy(&o.stdout)
-            .lines()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
-        Err(_) => Vec::new(),
-    };
-    if orphans.is_empty() {
-        ui::skip("orphans", "none");
-        return;
-    }
-    ui::info(&format!("orphans ({}): {}", orphans.len(), orphans.join(" ")));
-    if dry {
-        ui::info("would: sudo pacman -Rns <orphans>");
-        return;
-    }
-    // Interactive confirm — pacman -Rns is removal; let pacman prompt.
-    let mut args = vec!["pacman", "-Rns"];
-    for o in &orphans {
-        args.push(o);
-    }
-    let st = Command::new("sudo").args(&args).status();
-    match st {
-        Ok(s) if s.success() => ui::ok(&format!("removed {} orphan(s)", orphans.len())),
-        _ => ui::warn("orphan removal skipped/failed"),
-    }
-}
-
 // ── CPU / GPU / RAM reporting ───────────────────────────────────────
 
 fn report_cpu() {
@@ -371,13 +330,6 @@ fn gpu_optimize(dry: bool) {
 }
 
 // ── shell helpers ───────────────────────────────────────────────────
-
-fn run_cmd(dry: bool, args: &[&str]) { if dry {
-    ui::info(&format!("would: {}", args.join(" ")));
-    return;
-}
-ui::info(&format!("$ {}", args.join(" ")));
-let _ = Command::new(args[0]).args(&args[1..]).status(); }
 
 fn sudo_run(dry: bool, args: &[&str]) {
     if dry {

@@ -5,6 +5,15 @@ use std::process::Command;
 
 use crate::{assets, env_detect, pkg, platform, ui, verbs::profile};
 
+/// The one core package Stage A installs from the native package manager.
+/// The id differs per manager: `github-cli` on pacman, `gh` everywhere else.
+const GH: platform::CorePkg = platform::CorePkg {
+    arch: "github-cli",
+    fedora: "gh",
+    brew: "gh",
+    winget: "GitHub.cli",
+};
+
 #[derive(ClapArgs, Debug)]
 #[command(
     after_help = indoc::indoc! {"
@@ -17,9 +26,9 @@ use crate::{assets, env_detect, pkg, platform, ui, verbs::profile};
           8sync setup --dry-run                print the full plan, change nothing
 
         STAGE A — HARNESS (always run, idempotent)
-          · pacman -S --needed github-cli       (required by `8sync ship`)
+          · github-cli (gh)                     (native pkg manager; required by `8sync ship`)
           · omp AI CLI                          (curl installer from omp.sh, if missing)
-          · paru                                (AUR helper, if missing)
+          · paru                                (AUR helper — Arch family only)
           · codegraph                           (semantic code index)
           · PATH bootstrap                      (~/.local/bin, ~/.cargo/bin, ~/.bun/bin,
                                                  ~/.encore/bin — zsh/bash + fish conf.d)
@@ -41,10 +50,10 @@ use crate::{assets, env_detect, pkg, platform, ui, verbs::profile};
           1. Preflight: print OS, display manager, sessions, GPU, tool presence
           2. Log every step to ~/.cache/8sync/setup-<unix_ts>.log
           3. On any step failure: log + track + CONTINUE (re-run to retry)
-          4. Auto-yes (--noconfirm) for every pacman / AUR install
+          4. Auto-yes (--noconfirm / -y) for every native package install
 
         SAFETY
-          · Every install is transactional: failed pacman/AUR batch is rolled back.
+          · Every install is transactional: a failed package batch is rolled back.
           · Re-running setup is idempotent.
           · `--dry-run` is always safe.
     "}
@@ -94,13 +103,15 @@ pub fn run(a: Args) -> Result<()> {
     ui::header("8sync setup");
     let env = env_detect::Env::detect()?;
     crate::verbs::skill::deploy::migrate_namespace(&env.home);
+    // Stage A is cross-platform. Stage B needs a native backend, so warn only
+    // when this Linux box is in NEITHER supported family — Fedora is first-class.
     match platform::os() {
-        platform::Os::Linux if !env.is_cachyos_or_arch() => ui::warn(&format!(
-            "OS `{}` is not CachyOS/Arch — some steps may fail.",
+        platform::Os::Linux if env.family() == env_detect::Family::Other => ui::warn(&format!(
+            "OS `{}` is neither Arch- nor Fedora-family — native package steps will be skipped.",
             env.os_id
         )),
         platform::Os::Macos | platform::Os::Windows => ui::info(&format!(
-            "{} — installing the cross-platform AI-harness core (Stage A); Arch-only profiles are skipped.",
+            "{} — installing the cross-platform AI-harness core (Stage A); Linux-only profiles are skipped.",
             platform::os_name()
         )),
         _ => {}
@@ -126,20 +137,46 @@ pub fn run(a: Args) -> Result<()> {
     // ── Stage A: Harness (always run) ────────────────────────────
     ui::step("Stage A — coding harness");
     if a.dry_run {
-        ui::info("would install: github-cli");
+        // Route through the SAME decision the real install takes, so the plan
+        // names the backend and package id that would actually be used — an
+        // Arch-shaped literal here is a lie on Fedora (and proves nothing).
+        match platform::core_route(platform::os(), env.family(), GH) {
+            platform::CoreRoute::Native(p) => {
+                let mgr = pkg::backend().map(|b| b.name()).unwrap_or("native");
+                ui::info(&format!("would install {p} via {mgr}"));
+            }
+            platform::CoreRoute::Brew => ui::info(&format!("would install {} via brew", GH.brew)),
+            platform::CoreRoute::Winget => {
+                ui::info(&format!("would install {} via winget", GH.winget))
+            }
+            platform::CoreRoute::Manual => platform::no_pkg_manager_notice("gh"),
+        }
         ui::info("would install omp (curl) if missing");
-        ui::info("would install paru (AUR helper) if missing");
+        if env.family() == env_detect::Family::Arch {
+            ui::info("would install paru (AUR helper) if missing");
+        } else {
+            ui::info(&format!(
+                "would skip paru: AUR helper is Arch-only ({})",
+                env.os_id
+            ));
+        }
         ui::info("would install codegraph (curl) if missing");
         ui::info("would write: configs + skills");
         ui::info("would patch PATH in zsh/bash + ~/.config/fish/conf.d/8sync-path.fish");
         ui::info("would register codegraph as a global+local skill");
     } else {
         try_step("gh cli", yolo, &mut failures, || {
-            platform::install_core_pkg("gh", "github-cli", "gh", "GitHub.cli")
+            platform::install_core_pkg("gh", GH)
         })?;
         try_step("omp",        yolo, &mut failures, install_omp)?;
-        if platform::os() == platform::Os::Linux {
+        // The AUR helper is an Arch-family concept. Gating this on `Os::Linux`
+        // made it run on Fedora/Debian too, where `pacman` does not exist: the
+        // step failed, and in strict (non-yolo) mode `try_step` propagates, so
+        // the `?` aborted Stage A before codegraph/configs/skills ever ran.
+        if env.is_cachyos_or_arch() {
             try_step("paru",   yolo, &mut failures, install_aur_helper)?;
+        } else if platform::os() == platform::Os::Linux {
+            ui::info(&format!("AUR helper is Arch-only — skipping on {}", env.os_id));
         }
         try_step("codegraph",  yolo, &mut failures, install_codegraph)?;
         try_step("path-bootstrap", yolo, &mut failures, || { ensure_path_in_shells(); Ok(()) })?;
@@ -147,11 +184,13 @@ pub fn run(a: Args) -> Result<()> {
         try_step("skills",     yolo, &mut failures, || install_skills(&env))?;
         try_step("codegraph-skill", yolo, &mut failures, || register_codegraph_skill(&env))?;
     }
-    // Stage B profiles are Arch/Linux packages (pacman/AUR) — skip on other OSes.
-    if platform::os() != platform::Os::Linux {
+    // Stage B profiles install NATIVE packages (pacman on Arch, dnf on Fedora).
+    // Gate on the distro FAMILY, not on `Os::Linux`: a Linux host with neither
+    // backend has nothing to install from, exactly like macOS/Windows.
+    if env.family() == env_detect::Family::Other {
         ui::info(&format!(
-            "Stage B profiles are Arch/Linux-only — skipping on {}",
-            platform::os_name()
+            "Stage B profiles need pacman (Arch family) or dnf (Fedora family) — skipping on {}",
+            if platform::os() == platform::Os::Linux { env.os_id.as_str() } else { platform::os_name() }
         ));
         finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return Ok(());
@@ -364,7 +403,7 @@ fn install_aur_helper() -> Result<()> {
         ui::skip(h, "present");
         return Ok(());
     }
-    pkg::pacman_install_safe(&["git", "base-devel"], true)?;
+    pkg::install("paru build deps", &["git", "base-devel"], true)?;
     let cmd = "cd /tmp && rm -rf paru-bootstrap && \
         git clone https://aur.archlinux.org/paru.git paru-bootstrap && \
         cd paru-bootstrap && makepkg -si --noconfirm && \
@@ -514,8 +553,14 @@ fn install_configs(env: &env_detect::Env) -> Result<()> {
 
 /// Opt-in terminal/editor nicety (Stage B, NOT the AI core): kitty (terminal),
 /// helix (`hx`), and a Nerd font for the glass theme. Docker lives in `dev-stack`.
-fn install_terminal_pkgs() -> Result<()> {
-    pkg::pacman_install_safe(&["kitty", "helix", "ttf-jetbrains-mono-nerd"], true)
+fn install_terminal_pkgs(env: &env_detect::Env) -> Result<()> {
+    // Same three tools, different ids: Arch ships the patched Nerd font as
+    // `ttf-jetbrains-mono-nerd`; on Fedora JetBrains Mono is `jetbrains-mono-fonts`.
+    let font = match env.family() {
+        env_detect::Family::Fedora => "jetbrains-mono-fonts",
+        _ => "ttf-jetbrains-mono-nerd",
+    };
+    pkg::install("terminal stack", &["kitty", "helix", font], true)
 }
 
 /// Deploy the kitty glass theme (transparency + wallpaper + splits) without
@@ -568,11 +613,17 @@ fn install_terminal_config(env: &env_detect::Env) -> Result<()> {
 /// `--profile terminal`, and `--full` — never in the default AI-core Stage A.
 fn install_terminal(env: &env_detect::Env, dry_run: bool) -> Result<()> {
     if dry_run {
-        ui::info("would install: kitty + helix + JetBrains Nerd font");
+        match pkg::backend() {
+            Some(b) => ui::info(&format!(
+                "would install kitty + helix + JetBrains Mono via {}",
+                b.name()
+            )),
+            None => platform::no_pkg_manager_notice("terminal stack"),
+        }
         ui::info("would deploy kitty glass config + wallpaper + helix config (if absent)");
         return Ok(());
     }
-    install_terminal_pkgs()?;
+    install_terminal_pkgs(env)?;
     install_terminal_config(env)
 }
 
@@ -791,6 +842,21 @@ fn profile_sub(rest: Vec<String>, yes_to_all: bool, dry_run: bool) -> Result<()>
             println!("pacman       = {:?}", r.packages.pacman);
             println!("aur          = {:?}", r.packages.aur);
             println!("aur (yay)    = {:?}", r.packages.aur_yay);
+            match &r.packages.fedora {
+                Some(f) => {
+                    println!("dnf          = {:?}", f.dnf);
+                    if !f.copr.is_empty() {
+                        println!("copr         = {:?}", f.copr);
+                    }
+                    if f.rpmfusion {
+                        println!("rpmfusion    = true");
+                    }
+                    if !f.swap.is_empty() {
+                        println!("dnf swap     = {:?}", f.swap);
+                    }
+                }
+                None => println!("dnf          = (none — profile not ported to Fedora)"),
+            }
             println!("sys services = {:?}", r.services.system_enable);
             println!("user services= {:?}", r.services.user_enable);
             println!("commands     = {:?}", r.post_install.commands);
@@ -844,7 +910,15 @@ fn preflight(env: &env_detect::Env) {
     ui::step("Preflight — detecting current system state");
 
     // OS + DM
-    ui::info(&format!("OS: {} ({})", env.os_id, if env.is_cachyos_or_arch() { "supported" } else { "best-effort" }));
+    ui::info(&format!(
+        "OS: {} ({})",
+        env.os_id,
+        match env.family() {
+            env_detect::Family::Arch => "Arch family — pacman",
+            env_detect::Family::Fedora => "Fedora family — dnf",
+            env_detect::Family::Other => "no native backend — best-effort",
+        }
+    ));
     let dm = ["display-manager", "sddm", "plasmalogin", "gdm", "lightdm", "greetd"]
         .iter()
         .find(|d| systemctl_is_enabled(d));
@@ -861,7 +935,9 @@ fn preflight(env: &env_detect::Env) {
         ui::info(&format!("desktop sessions: {}", sessions.join(", ")));
     }
 
-    // Core tools
+    // Core tools. The AUR helpers are an Arch-family concept: probing for them
+    // on Fedora prints two guaranteed "missing — will be installed" lies.
+    let arch = env.family() == env_detect::Family::Arch;
     for (label, bin) in [
         ("omp", "omp"),
         ("paru", "paru"),
@@ -869,7 +945,10 @@ fn preflight(env: &env_detect::Env) {
         ("codegraph", "codegraph"),
         ("gh", "gh"),
         ("encore", "encore"),
-    ] {
+    ]
+    .into_iter()
+    .filter(|(l, _)| arch || !matches!(*l, "paru" | "yay"))
+    {
         let present = which::which(bin).is_ok();
         if present {
             let v = env_detect::cmd_version(bin, &["--version"]).unwrap_or_default();

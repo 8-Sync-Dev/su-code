@@ -1,9 +1,21 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "bluetooth"
 description = "Bluetooth stack auto-start (bluez + bluez-utils, bluetooth.service)"
 
 [packages]
 pacman = ["bluez", "bluez-utils"]
 aur = []
+
+# Arch's `bluez-utils` (bluetoothctl) is folded into Fedora's `bluez`;
+# `bluez-tools` supplies the bt-* CLI helpers. bluetooth.service and
+# /etc/bluetooth/main.conf are identical on both, so the post_install below
+# is distro-agnostic.
+[packages.fedora]
+dnf = ["bluez", "bluez-tools"]
 
 [services]
 system_enable = ["bluetooth.service"]

@@ -420,10 +420,38 @@ pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Write STEP-0 `bashInterceptor.patterns` into `~/.omp/agent/config.yml` so the
-/// agent's `bash` shell-escapes (`rg`, recursive `grep`, `find -name`) on code
-/// are BLOCKED — closing the loophole the `--tools` allowlist leaves open (it
-/// removes the `grep`/`glob` TOOLS but not `bash rg`).
+/// Which STEP-0 code-intel replacements are actually reachable on THIS machine.
+///
+/// This is the UC-7 predicate. Every layer that redirects a search to
+/// codegraph/serena/codebase-memory is installed only while at least one of them
+/// can answer, and is un-installed again when none can — enforcement must never
+/// dead-end a box that lacks the replacement. omp cannot express a capability test
+/// in a rule `condition:` or an interceptor `pattern`, so the test happens here, at
+/// deploy time, which is the only place the capability is observable.
+///
+/// Mirrors `doctor::check_ai_engines`: codegraph is a plain binary, while the MCP
+/// engines need BOTH a runnable command and a registration in
+/// `~/.omp/agent/mcp.json` — an unregistered binary is invisible to the session.
+pub(crate) fn code_intel_available(home: &Path) -> Vec<&'static str> {
+    let mcp = std::fs::read_to_string(home.join(".omp/agent/mcp.json")).unwrap_or_default();
+    let registered = |name: &str| mcp.contains(&format!("\"{}\"", name));
+    let mut out = Vec::new();
+    if which::which("codegraph").is_ok() {
+        out.push("codegraph");
+    }
+    if which::which("codebase-memory-mcp").is_ok() && registered("codebase-memory-mcp") {
+        out.push("codebase-memory-mcp");
+    }
+    if which::which("uvx").is_ok() && registered("serena") {
+        out.push("serena");
+    }
+    out
+}
+
+/// Write the STEP-0 `bashInterceptor` rules into `~/.omp/agent/config.yml` so the
+/// agent's `bash` shell-escapes (`rg`, recursive `grep`, `find -name`) on code are
+/// BLOCKED — closing the loophole the `--tools` allowlist leaves open (it removes
+/// the `grep`/`glob` TOOLS but not `bash rg`).
 ///
 /// omp's real rule shape is `{ pattern, tool, message }` (+ optional `flags`) —
 /// read off omp 17.2.9's own default array and its matcher:
@@ -439,47 +467,31 @@ pub(crate) fn ensure_omp_memory_config(home: &Path) -> Result<()> {
 ///    interceptor silently blocked NOTHING — verified live: `rg main main.rs` ran.
 /// 2. `tool` must name a tool PRESENT in the session. omp's built-in rule for
 ///    `grep|rg` points at `tool: "grep"`, which STEP-0 removes from the allowlist
-///    — so the stock rule disables itself exactly when we need it. Every rule
-///    here therefore points at `lsp`: always present, and the honest suggestion
+///    — so the stock rule disables itself exactly when we need it. Every shipped
+///    rule therefore points at `lsp`: always present, and the honest suggestion
 ///    (code intelligence) for someone reaching for `rg`.
 ///
-/// Setting this key REPLACES omp's default array, so only the escapes STEP-0
-/// cares about are listed; single-file / log `grep` stays allowed. Idempotent.
-/// If the user authored their OWN `bashInterceptor:` block, this bails out
-/// rather than appending: omp parses config.yml with `Bun.YAML.parse`, which
+/// The rules themselves live in `~/.config/8sync/models.toml` under
+/// `[bashInterceptor]` (embedded default when the user file predates the section),
+/// so a machine can tune the pattern set without a rebuild. Setting the key
+/// REPLACES omp's default array, so that list is the whole guard; single-file and
+/// log `grep` stay allowed by construction.
+///
+/// UC-7 safe degradation: the guard is installed only while this machine has a
+/// replacement ([`code_intel_available`]). With none — or with `enabled = false` /
+/// an empty pattern list — the block we previously wrote is REMOVED, so `bash`
+/// never dead-ends on a box without codegraph/serena/cbm.
+///
+/// Idempotent. If the user authored their OWN `bashInterceptor:` block, this bails
+/// out rather than appending: omp parses config.yml with `Bun.YAML.parse`, which
 /// does NOT reject duplicate mapping keys — it takes the LAST one, so appending
 /// would silently void every rule the user wrote.
 pub(crate) fn ensure_bash_interceptor(home: &Path) -> Result<()> {
-    // Each rule matches the tool at a COMMAND POSITION, not just at string start:
-    // `cd src && grep -r foo .` and `cd x && rg TODO` are exactly what an agent
-    // writes, and a bare `^` anchor lets both sail through. The shared prefix
-    // accepts start-of-string or a shell separator (`;` `&&` `||` `|`), an
-    // optional `\` escape, env assignments (`LC_ALL=C …`) and wrapper words
-    // (`sudo`/`time`/`command`/`xargs`/`do`/`then`). `(` is deliberately NOT a
-    // separator and `do`/`then` are only wrappers, so prose inside quotes
-    // (`git commit -m '(rg removal)'`, `echo "do rg later"`) does not trip it.
-    //
-    // Rule 2 finds the recursive flag by walking the OPTION CLUSTER — a run of
-    // shell words that are neither quoted nor containing `;&|` — instead of a
-    // blind `.*`. That keeps a flag-looking string INSIDE the search pattern
-    // (`grep " -r " f.txt`, `grep 'make -r' build.log`) from counting as a flag,
-    // and stops the scan at a command boundary (`grep foo a.txt; ls -r`).
-    // `rg`/`fd`/`git grep` have no single-file mode worth preserving, so rule 1
-    // blocks them outright; only `grep` needs the flag analysis.
-    const BLOCK: &str = r#"
-bashInterceptor:
-  enabled: true
-  patterns:
-    - pattern: '(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*(?:rg|ripgrep|ag|ack|fd|git\s+grep)\s+'
-      tool: lsp
-      message: 'STEP-0: search code with codegraph (`codegraph query/explore`) or mcp__codebase_memory_mcp_search_graph / mcp__serena_find_symbol — not rg/fd/git grep.'
-    - pattern: '(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*(?:e|f)?grep\s+(?:(?:-(?!-\s)[^\s;&|]+|[^\s;&|''"-][^\s;&|]*)\s+)*(?:-[A-Za-z]*[rR][A-Za-z]*|--recursive|--dereference-recursive)\b'
-      tool: lsp
-      message: 'STEP-0: recursive code search goes through codegraph / codebase-memory-mcp. Single-file and log `grep` stay allowed.'
-    - pattern: '(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*find\s+[^;&|]*(?<=\s)(?:-name|-iname|-type|-regex|-path|-wholename)\b'
-      tool: lsp
-      message: 'STEP-0: locate files with codegraph / mcp__codebase_memory_mcp_search_graph instead of find.'
-"#;
+    let models = crate::models::ModelConfig::load();
+    let bi = &models.bash_interceptor;
+    let have = code_intel_available(home);
+    let block = (bi.enabled && !bi.patterns.is_empty() && !have.is_empty())
+        .then(|| render_interceptor_block(bi));
     let cfg = home.join(".omp/agent/config.yml");
     if let Some(p) = cfg.parent() {
         std::fs::create_dir_all(p)?;
@@ -519,10 +531,27 @@ bashInterceptor:
             .filter(|(start, end)| s[*start..*end].contains("STEP-0"))
             .collect()
     };
+    let removed = !owned.is_empty();
     // Remove owned blocks from the end backwards so earlier offsets stay valid.
     for (start, end) in owned.into_iter().rev() {
         s.replace_range(start..end, "");
     }
+    // UC-7 / opt-out path: nothing to install. Our block (if any) is already gone;
+    // only touch the file when that actually changed something, and say WHY —
+    // silence here would read as a bug.
+    let Some(block) = block else {
+        if removed {
+            std::fs::write(&cfg, &s)?;
+        }
+        if !bi.enabled || bi.patterns.is_empty() {
+            ui::skip("bashInterceptor", "no rules in models.toml [bashInterceptor]");
+        } else {
+            ui::warn(
+                "  bashInterceptor OFF: no codegraph / codebase-memory-mcp / serena on this machine — shell search stays ALLOWED rather than dead-ending (install the code-intel stack, then re-run)",
+            );
+        }
+        return Ok(());
+    };
     // A `bashInterceptor:` still standing here is one the USER wrote. omp parses
     // config.yml with `Bun.YAML.parse`, which does not reject duplicate mapping
     // keys — it silently takes the LAST. Appending ours would therefore void
@@ -536,20 +565,131 @@ bashInterceptor:
         );
         return Ok(());
     }
-    // `BLOCK` starts with a '\n' and removal leaves the preceding newline, so each
+    // `block` starts with a '\n' and removal leaves the preceding newline, so each
     // run would otherwise gain a blank line. Collapse any trailing blanks first.
     while s.ends_with("\n\n") {
         s.pop();
     }
     // Only separate from EXISTING content — on a fresh machine the file is empty
-    // and `BLOCK`'s own leading newline is enough.
+    // and `block`'s own leading newline is enough.
     if !s.is_empty() && !s.ends_with('\n') {
         s.push('\n');
     }
-    s.push_str(BLOCK);
+    s.push_str(&block);
     std::fs::write(&cfg, s)?;
-    ui::ok("bashInterceptor ON (STEP-0): blocks `rg`/`fd`/`git grep`, `grep -r`, `find -name` → codegraph/cbm");
+    ui::ok(&format!(
+        "bashInterceptor ON (STEP-0): {} rule(s) → codegraph/cbm/serena (present: {})",
+        bi.patterns.len(),
+        have.join(" · ")
+    ));
     Ok(())
+}
+
+/// Render `[bashInterceptor]` as an omp `config.yml` block.
+///
+/// The indented `STEP-0` comment is the OWNERSHIP MARKER: block detection must not
+/// depend on `message` text, which the user is invited to edit, and an indented
+/// line stays inside the block for the column-0 end scan above.
+fn render_interceptor_block(bi: &crate::models::BashInterceptor) -> String {
+    let mut out = format!(
+        "\nbashInterceptor:\n  # {}:STEP-0 guard — generated from models.toml [bashInterceptor]; edits here are overwritten\n  enabled: true\n  patterns:\n",
+        crate::brand::NS
+    );
+    for r in &bi.patterns {
+        out.push_str("    - pattern: ");
+        out.push_str(&yaml_sq(&r.pattern));
+        out.push_str("\n      tool: ");
+        out.push_str(&yaml_sq(&r.tool));
+        out.push_str("\n      message: ");
+        out.push_str(&yaml_sq(&r.message));
+        out.push('\n');
+    }
+    out
+}
+
+/// YAML single-quoted scalar. It is the only style that needs no backslash
+/// escaping, which is what makes it safe for regexes; the sole escape is `'` → `''`.
+fn yaml_sq(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        if c == '\'' {
+            out.push('\'');
+        }
+        out.push(c);
+    }
+    out.push('\'');
+    out
+}
+
+/// Deploy every embedded omp rule (`assets/rules/*.md`) to `~/.omp/agent/rules/`
+/// and, inside a project, `<repo>/.omp/rules/` — the two native rule sources omp
+/// reads. This is the ENFORCED half of tool routing: a rule carrying `condition:` +
+/// `scope:` + `interruptMode:` is a TTSR rule, which omp re-evaluates on every
+/// stream, so it costs zero prompt tokens and cannot be compacted away (unlike the
+/// prose in APPEND_SYSTEM.md, which now carries only routing INTENT).
+///
+/// Directory-iterated on purpose: adding a rule means dropping a file into
+/// `assets/rules/`, never editing this function. Discovery is non-recursive and
+/// `.md`/`.mdc`-only, matching omp's own. Rule identity in omp is the NAME, so
+/// filenames are namespaced through `brand::ns_file`.
+///
+/// UC-7: a rule may declare `<!-- 8sync:requires a,b,c -->` and is then deployed
+/// only while one of those is available ([`code_intel_available`]); when none is,
+/// the deployed copies are REMOVED, so the veto disappears together with the
+/// capability. Byte-identical writes stay quiet (`deploy_omp_pair`) so omp's
+/// prompt-cache prefix survives a harness run.
+pub(crate) fn ensure_rules(home: &Path, root: Option<&Path>) -> Result<()> {
+    let have = code_intel_available(home);
+    for asset in assets::iter_under("rules/") {
+        let name = &asset["rules/".len()..];
+        if name.contains('/') || !(name.ends_with(".md") || name.ends_with(".mdc")) {
+            continue;
+        }
+        let Some(raw) = assets::read(&asset) else {
+            continue;
+        };
+        let file = crate::brand::ns_file(name);
+        let global_rel = format!(".omp/agent/rules/{}", file);
+        let proj_rel = format!(".omp/rules/{}", file);
+        if !requirements_met(&raw, &have) {
+            let _ = std::fs::remove_file(home.join(&global_rel));
+            if let Some(r) = root {
+                let _ = std::fs::remove_file(r.join(&proj_rel));
+            }
+            ui::warn(&format!(
+                "  rule {}: required code-intel tools absent — not deployed (search stays unrestricted)",
+                name
+            ));
+            continue;
+        }
+        deploy_omp_pair(home, root, &asset, &global_rel, &proj_rel, &format!("rule {}", name))?;
+    }
+    Ok(())
+}
+
+/// `<!-- 8sync:requires a,b,c -->` — satisfied when ANY listed capability is
+/// available, and vacuously satisfied when the rule declares nothing. Read from the
+/// RAW asset (before `brand::render`), so the marker is brand-independent.
+///
+/// Only a real HTML-comment marker counts: a rule that merely MENTIONS the marker
+/// in prose (this one documents its own gate) must not be misread as declaring one.
+fn requirements_met(raw: &str, have: &[&str]) -> bool {
+    const MARKER: &str = "8sync:requires";
+    let mut declared = false;
+    for (idx, _) in raw.match_indices(MARKER) {
+        if !raw[..idx].trim_end().ends_with("<!--") {
+            continue;
+        }
+        let list = raw[idx + MARKER.len()..].split("-->").next().unwrap_or("");
+        for req in list.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            declared = true;
+            if have.iter().any(|h| *h == req) {
+                return true;
+            }
+        }
+    }
+    !declared
 }
 
 /// Keep the STEP-0 MCP servers' tools ALWAYS VISIBLE via `mcp.discoveryDefaultServers`
@@ -1243,5 +1383,88 @@ pub(crate) fn migrate_namespace(home: &Path) {
 fn rename_if_new_absent(old: &Path, new: &Path) {
     if old.exists() && !new.exists() {
         let _ = std::fs::rename(old, new);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The rules layer is DIRECTORY-discovered: dropping a file into
+    /// `assets/rules/` must be enough for `ensure_rules` to ship it, and every
+    /// discovered asset must be a readable rule file.
+    #[test]
+    fn rules_dir_is_discovered() {
+        let rules = assets::iter_under("rules/");
+        assert!(!rules.is_empty(), "assets/rules/ yielded no rule");
+        for r in &rules {
+            assert!(r.ends_with(".md") || r.ends_with(".mdc"), "not an omp rule file: {}", r);
+            assert!(assets::read(r).is_some(), "unreadable rule asset: {}", r);
+        }
+        // At least one is a TTSR rule. omp only registers a rule as TTSR when it
+        // carries a `condition:`, and only aborts the offending tool call when
+        // `scope:` names that tool and `interruptMode:` allows it — all three keys
+        // are load-bearing, so a rule missing one is silently advisory.
+        assert!(
+            rules.iter().filter_map(|r| assets::read(r)).any(|b| {
+                b.starts_with("---\n")
+                    && b.contains("\ncondition:")
+                    && b.contains("\nscope:")
+                    && b.contains("\ninterruptMode:")
+            }),
+            "no TTSR rule (condition + scope + interruptMode) in assets/rules/"
+        );
+    }
+
+    /// UC-7: a gated rule ships when ONE required tool is present, is withheld when
+    /// none is, and an ungated rule always ships.
+    #[test]
+    fn requires_marker_gates_deployment() {
+        let gated = "body\n<!-- 8sync:requires codegraph,codebase-memory-mcp,serena -->\n";
+        assert!(requirements_met(gated, &["serena"]));
+        assert!(requirements_met(gated, &["codegraph", "serena"]));
+        assert!(!requirements_met(gated, &[]));
+        assert!(!requirements_met(gated, &["headroom"]));
+        assert!(requirements_met("a rule that needs nothing", &[]));
+    }
+
+    /// Every shipped rule that can veto a tool call MUST declare its requirements,
+    /// or a machine without the replacement dead-ends (UC-7).
+    #[test]
+    fn every_ttsr_rule_declares_requirements() {
+        for r in assets::iter_under("rules/") {
+            let body = assets::read(&r).unwrap();
+            if body.contains("\ncondition:") {
+                assert!(
+                    !requirements_met(&body, &[]),
+                    "{} interrupts tool calls with no capability gate",
+                    r
+                );
+            }
+        }
+    }
+
+    /// The interceptor block is rendered from `models.toml`, and a regex survives
+    /// the trip: YAML single-quoting is escape-free apart from `'` → `''`.
+    #[test]
+    fn interceptor_block_renders_from_embedded_config() {
+        let bi = crate::models::ModelConfig::default().bash_interceptor;
+        assert!(bi.enabled, "embedded models.toml disabled the STEP-0 guard");
+        assert_eq!(bi.patterns.len(), 3, "embedded models.toml lost its rules");
+        let block = render_interceptor_block(&bi);
+        // Ownership marker — `ensure_bash_interceptor` finds its own block by it.
+        assert!(block.contains("STEP-0"), "block carries no STEP-0 ownership marker");
+        for r in &bi.patterns {
+            // A rule whose `tool` is absent from the session is skipped by omp, so
+            // an empty one would block nothing at all.
+            assert!(!r.tool.is_empty(), "rule has no `tool` gate: {}", r.pattern);
+            assert!(
+                block.contains(&format!("- pattern: '{}'", r.pattern.replace('\'', "''"))),
+                "pattern not rendered verbatim: {}",
+                r.pattern
+            );
+            assert!(r.message.contains("codegraph"), "message names no replacement");
+        }
+        assert_eq!(yaml_sq("a'b"), "'a''b'");
     }
 }

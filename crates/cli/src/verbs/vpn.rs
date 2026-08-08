@@ -3,7 +3,8 @@
 // through one as a full tunnel, and cleanly restore.
 //
 //   8sync vpn                 status (service · account · egress IP/country)
-//   8sync vpn install         softethervpn (AUR) + dhcpcd + enable client service
+//   8sync vpn install         Arch: softethervpn (AUR) + dhcpcd + client service
+//                             Fedora: no SoftEther build — offers Cloudflare WARP
 //   8sync vpn list [CC]       fetch VPN Gate relays (opt. 2-letter country), by score
 //   8sync vpn on [CC|host|ip] connect best (or matching) relay + full-tunnel route
 //   8sync vpn off             disconnect + restore routes/DNS
@@ -31,7 +32,8 @@ const SERVICE: &str = "softethervpn-client.service";
 #[command(after_help = indoc::indoc! {"
     EXAMPLES
       8sync vpn                 status: service · account · egress IP/country
-      8sync vpn install         SoftEther engine (AUR) + Windows GUI via Wine + dhcpcd + enable service
+      8sync vpn install         Arch: SoftEther engine (AUR) + Windows GUI via Wine + dhcpcd + service
+                                Fedora: SoftEther is unpackaged — installs Cloudflare WARP instead
       8sync vpn install --no-gui headless: engine + dhcpcd only, no Wine desktop GUI
       8sync vpn gui             open the Windows VPN Client Manager (Wine) — the region-switch plugin
       8sync vpn list            top VPN Gate relays by score
@@ -88,23 +90,41 @@ pub fn run(a: Args) -> Result<()> {
 
 // ─── install ────────────────────────────────────────────────────────────
 
+/// Cloudflare's official Fedora/RHEL repo. SoftEther has no Fedora build at
+/// all, so WARP is the only tunnel client `vpn install` can actually deliver
+/// from a repo here.
+const CF_REPO_URL: &str = "https://pkg.cloudflareclient.com/cloudflare-warp-ascii.repo";
+const CF_KEY_URL: &str = "https://pkg.cloudflareclient.com/pubkey.gpg";
+const CF_REPO_FILE: &str = "/etc/yum.repos.d/cloudflare-warp.repo";
+
 fn install(env: &env_detect::Env, yes: bool, gui: bool) -> Result<()> {
     ui::header("8sync vpn — install SoftEther client + VPN Gate");
-    if !env.is_cachyos_or_arch() {
-        ui::warn(&format!("auto-install is Arch-only (detected: {})", env.os_id));
-        ui::info("install SoftEther VPN Client + a DHCP client (dhcpcd) manually, then `8sync vpn on`");
-        return Ok(());
+    match env.family() {
+        env_detect::Family::Arch => install_arch(yes, gui),
+        env_detect::Family::Fedora => install_fedora(yes),
+        env_detect::Family::Other => {
+            ui::warn(&format!(
+                "auto-install needs pacman or dnf (detected: {})",
+                env.os_id
+            ));
+            ui::info("install SoftEther VPN Client + a DHCP client (dhcpcd) manually, then `8sync vpn on`");
+            Ok(())
+        }
     }
+}
+
+fn install_arch(yes: bool, gui: bool) -> Result<()> {
     let Some(helper) = env_detect::aur_helper() else {
         return Err(anyhow!("no AUR helper (paru/yay) on PATH — run `8sync setup` first"));
     };
     // softethervpn = the maintained RTM 4.44 build (vpnclient + vpncmd + client
     // service) — the native Linux ENGINE that does the actual tunnel. The -git
-    // package is the unstable 5.x dev edition — not what we want.
+    // package is the unstable 5.x dev edition — not what we want. AUR-only, so
+    // this stays on the AUR path; `pkg::install` only speaks pacman/dnf.
     pkg::aur_install_safe(helper, &["softethervpn"], yes)?;
     // The SoftEther virtual NIC is a tap device that needs DHCP; this box may
     // have no DHCP client (NetworkManager only), so ensure dhcpcd (official repo).
-    pkg::pacman_install_safe(&["dhcpcd"], yes)?;
+    pkg::install("dhcpcd", &["dhcpcd"], yes)?;
     // SoftEther has NO native Linux GUI. The desktop app = the Windows VPN
     // Client Manager (vpncmgr.exe) run under Wine — this is what carries the
     // Windows-style VPN Gate region-switcher plugin. It remote-controls the
@@ -131,6 +151,74 @@ fn install(env: &env_detect::Env, yes: bool, gui: bool) -> Result<()> {
     }
     ui::info("GUI (Windows-like, region plugin): `8sync vpn gui`  ·  CLI region-switch + routing: `8sync vpn on JP`");
     Ok(())
+}
+
+/// Fedora ships no SoftEther package (not in fedora/updates, not RPM Fusion,
+/// no maintained COPR), so the VPN Gate engine cannot come from a repo here.
+/// Say that plainly instead of firing a pacman that does not exist, and install
+/// the tunnel Fedora DOES package — Cloudflare WARP, from Cloudflare's own repo.
+fn install_fedora(yes: bool) -> Result<()> {
+    ui::warn("SoftEther VPN Client is not packaged for Fedora — `8sync vpn list/on/off` (VPN Gate) need `vpncmd` on PATH");
+    ui::info("to keep VPN Gate: build SoftEther from source (github.com/SoftEtherVPN/SoftEtherVPN), then re-run `8sync vpn on`");
+
+    ui::step("Cloudflare WARP — the packaged Fedora tunnel");
+    if which::which("warp-cli").is_ok() {
+        ui::skip("cloudflare-warp", "present");
+        ui::info("register + connect: `8sync sec` (warp-cli registration + DoH/MASQUE toggles)");
+        return Ok(());
+    }
+    let go = yes
+        || (env_detect::has_tty()
+            && ui::prompt_yes_no("install Cloudflare WARP from Cloudflare's official repo?", true));
+    if !go {
+        ui::info("skipped — re-run `8sync vpn install --yes` to install cloudflare-warp non-interactively");
+        return Ok(());
+    }
+    ensure_cloudflare_repo()?;
+    pkg::install("cloudflare WARP", &["cloudflare-warp"], yes)?;
+    ui::info("register + connect: `8sync sec` (warp-cli registration + DoH/MASQUE toggles)");
+    Ok(())
+}
+
+/// Idempotent: trust Cloudflare's signing key and drop their .repo file. Both
+/// need root, so they go through `priv_cmd` (sudo unless already root).
+fn ensure_cloudflare_repo() -> Result<()> {
+    if cloudflare_repo_present() {
+        ui::skip("cloudflare repo", "already configured");
+        return Ok(());
+    }
+    ui::step("add Cloudflare package repo");
+    let key = priv_cmd("rpm")
+        .args(["--import", CF_KEY_URL])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !key {
+        ui::warn("could not import Cloudflare's signing key — the install will fail its signature check");
+    }
+    let wrote = priv_cmd("curl")
+        .args(["-fsSL", "-o", CF_REPO_FILE, CF_REPO_URL])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !wrote {
+        return Err(anyhow!(
+            "could not write {CF_REPO_FILE} — add it manually: curl -fsSL {CF_REPO_URL} | sudo tee {CF_REPO_FILE}"
+        ));
+    }
+    ui::ok(&format!("wrote {CF_REPO_FILE}"));
+    Ok(())
+}
+
+/// Any `cloudflare*.repo` in the dnf repo dir means the repo is already wired
+/// (the file Cloudflare ships is not always named the same as ours).
+fn cloudflare_repo_present() -> bool {
+    std::fs::read_dir("/etc/yum.repos.d")
+        .map(|d| {
+            d.flatten()
+                .any(|e| e.file_name().to_string_lossy().starts_with("cloudflare"))
+        })
+        .unwrap_or(false)
 }
 
 // ─── gui (Windows VPN Client Manager under Wine) ──────────────────────────
@@ -657,6 +745,7 @@ fn print_help() {
     ui::header("8sync vpn — SoftEther client + VPN Gate");
     println!("{}", crate::brand::render("  8sync vpn                 status: service · account · egress IP/country"));
     println!("{}", crate::brand::render("  8sync vpn install         SoftEther engine (softethervpn) + Windows GUI via Wine + dhcpcd + service"));
+    println!("{}", crate::brand::render("                            (Fedora: SoftEther is unpackaged — installs Cloudflare WARP instead)"));
     println!("{}", crate::brand::render("  8sync vpn gui             open the Windows VPN Client Manager (Wine) — Windows-style region-switch plugin"));
     println!("{}", crate::brand::render("  8sync vpn list [CC]       VPN Gate relays by score (optional 2-letter country)"));
     println!("{}", crate::brand::render("  8sync vpn on [CC|ip]      connect best (or matching) relay + full-tunnel route (the reliable Linux path)"));

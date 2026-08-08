@@ -5,6 +5,57 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — Fedora-first package core (8sync now works on Fedora/RHEL)
+- `trait PkgBackend` with `Pacman` + `Dnf` impls, selected by `env_detect::distro_family()`
+  (`Family::{Arch,Fedora,Other}`, reads `ID` **and** `ID_LIKE`; Fedora 44 ships no `ID_LIKE`, so
+  `ID` alone resolves). `backend()` returns `Option`, so a distro with neither manager keeps
+  today's warn-and-continue instead of failing — Debian/openSUSE users are unaffected.
+- Every package-manager spawn now lives **only** in `pkg.rs`. `platform::install_core_pkg` takes a
+  `CorePkg { arch, fedora, brew, winget }` instead of positional strings nobody could tell apart.
+- Profiles gained an **additive** `[packages.fedora]` table (`dnf`/`copr`/`rpmfusion`/`swap`)
+  beside the existing `pacman`/`aur`/`aur_yay` keys, plus `#[serde(deny_unknown_fields)]`. All 37
+  Fedora package names were verified against the live repos with `dnf repoquery`; profiles with no
+  real rpm equivalent declare none and are skipped with a printed reason rather than guessing.
+- `vpn` and `harness browser` are no longer Arch-only (Cloudflare WARP / `chromium` on Fedora);
+  `clean` gained a dnf arm (`dnf clean all`, `dnf autoremove`).
+- COPR is treated as third-party root code: `copr_enable` refuses any `owner/project` outside a
+  checked-in allowlist unless explicitly allowed, and `dnf swap --allowerasing` prints the erase
+  set first.
+
+### Fixed
+- **`8sync setup` aborted at step 3 of 8 on every non-Arch Linux.** The AUR-helper step was gated
+  on `Os::Linux` instead of the Arch family, so on Fedora it failed and `try_step`'s `?`
+  propagated — `codegraph`, `path-bootstrap`, `configs`, `skills` and `codegraph-skill` never ran.
+  This is why `~/.omp/skills` was empty on Fedora machines.
+- **Skill paths written into `AGENTS.md` were absolute to the authoring machine**
+  (`/home/alexdev/...`, `/home/alexng/...`), so on any other clone omp was told to read files that
+  do not exist and silently skipped the skills. `skill/inject.rs` now emits repo-relative paths for
+  project skills and `~/`-anchored paths for global ones. `harness audit` could never catch this
+  because it skipped every `/`-prefixed token; it now flags `/home/`, `/Users/`, `/root/` while
+  still ignoring `/etc`, `/usr`, `/tmp`.
+- `Dnf::install` left a half-applied batch: its plan can hold two transactions (install, then
+  upgrade), and a failed upgrade returned `Err` while the committed install stayed. It now reverts
+  via `dnf history undo`.
+- `install.sh` created its temp file in `/tmp` (tmpfs) while installing to `~/.local/bin` (btrfs),
+  so the "atomic" `mv` crossed filesystems and degraded to a copy. The temp file is now a sibling
+  of the destination, matching `selfup.rs`.
+- `install.ps1` hardcoded the x86_64 asset, silently giving Windows ARM64 the wrong binary.
+
+### Changed — enforced tool routing (omp stops ignoring the code-intel stack)
+- Preferring codegraph/serena/codebase-memory was previously **prose**, which omp ignores under
+  load. It is now enforced by mechanisms omp implements in code: a TTSR rule
+  (`condition` + `scope: "tool:grep(*), tool:glob(*)"` + `interruptMode: tool-only`) that aborts the
+  stream mid-tool-call, plus `bashInterceptor` patterns closing the `bash rg` escape.
+- Both are **capability-gated**: with no code-intel tool installed the rule and the interceptor
+  block are removed, so a bare machine is never dead-ended. TTSR `repeatMode: once` means the worst
+  case is one restarted turn, not a hard veto.
+- `APPEND_SYSTEM.md` shrank 9 198 → 3 260 B (−64.6 %); it is in every prompt on every turn, and the
+  TTSR rule body costs zero prompt tokens.
+- Downloads are now sha256-verified using the `digest` field the GitHub Releases API already
+  returns — no new dependency, no release-plumbing change.
+- First tests in the repo: 48 passing (`cargo test`), covering distro parsing, the pacman argv
+  regression fixture, the COPR allowlist refusal, path portability, and audit path classification.
+
 ## [0.53.0] — 2026-08-08
 
 ### Added — `8sync .` named per-project sessions (run many features at once)

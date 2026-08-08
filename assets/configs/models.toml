@@ -27,7 +27,8 @@ advisor = true
 # `--tools` DROPping the redundant `grep` + `glob` built-ins, so code lookup MUST
 # use codegraph (CLI) · codebase-memory-mcp · serena (MCP tools are orthogonal to
 # `--tools` and survive it). `bash rg`/`grep -r` shell escapes on source are also
-# blocked by `bashInterceptor.patterns` (deployed by `8sync harness`). Set false
+# blocked by `bashInterceptor.patterns` — the rules are the `[bashInterceptor]`
+# section at the bottom of this file, deployed by `8sync harness`. Set false
 # to keep `grep`/`glob`, or override one run: `8sync ai --no-step0`.
 step0 = true
 
@@ -44,3 +45,48 @@ review  = "opus"    # code review         → thinking → Opus
 debug   = "opus"    # debugging           → thinking → Opus
 code    = "glm"     # write/edit code     → mechanical → GLM
 trivial = "glm"     # tiny mechanical ops → GLM
+
+# ── bashInterceptor — the STEP-0 shell guard ─────────────────────────────────
+# `8sync harness` renders these rules into `~/.omp/agent/config.yml` as omp's own
+# `bashInterceptor.patterns`, which makes a matching `bash` command return a TOOL
+# ERROR naming the replacement. This is the layer that closes the shell escape
+# `step0` leaves open: `--tools` removes the `grep`/`glob` TOOLS, not the shell.
+# Shape is omp's, verbatim: { pattern (JS regex), tool, message }.
+#
+# `tool` is NOT the tool you want called — it is the gate omp checks. Its matcher
+# SKIPS any rule whose `tool` is absent from the session, so naming an MCP tool
+# that may not be registered silently disables the rule. `lsp` is always present
+# and is an honest code-intel answer, so every rule points there and names the
+# real replacement (codegraph / serena / codebase-memory) in `message`.
+#
+# Safe degradation (UC-7): 8sync writes this block only on a machine that really
+# has one of codegraph / codebase-memory-mcp / serena, and REMOVES the block it
+# wrote when none is left — a codegraph-less box is never dead-ended. Opt out by
+# hand with `enabled = false` or an empty `patterns` list; the next
+# `8sync harness` then un-installs the block. Editing `message` is safe; the
+# block is identified by a managed comment, not by its text.
+#
+# Each pattern matches at a COMMAND POSITION (start of string or after `;`/`&&`/
+# `||`/`|`), tolerating `\` escapes, `NAME=value` prefixes and wrapper words
+# (`sudo`/`time`/`env`/`xargs`/…), because `cd src && rg TODO` is exactly what an
+# agent writes and a bare `^` anchor lets it through. Rule 2 walks `grep`'s option
+# cluster instead of `.*` so a flag-looking string inside the SEARCH PATTERN
+# (`grep " -r " f.txt`) is not mistaken for a flag: single-file and log `grep`
+# stay allowed on purpose.
+[bashInterceptor]
+enabled = true
+
+[[bashInterceptor.patterns]]
+pattern = '(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*(?:rg|ripgrep|ag|ack|fd|git\s+grep)\s+'
+tool = "lsp"
+message = 'STEP-0: search code with `codegraph query "<symbol>"` (or `codegraph explore`) / mcp__codebase_memory_mcp_search_graph / mcp__serena_find_symbol — not rg/fd/ag/ack/git grep.'
+
+[[bashInterceptor.patterns]]
+pattern = '''(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*(?:e|f)?grep\s+(?:(?:-(?!-\s)[^\s;&|]+|[^\s;&|'"-][^\s;&|]*)\s+)*(?:-[A-Za-z]*[rR][A-Za-z]*|--recursive|--dereference-recursive)\b'''
+tool = "lsp"
+message = 'STEP-0: recursive code search goes through `codegraph query "<symbol>"` / mcp__codebase_memory_mcp_search_graph. Single-file and log `grep` stay allowed.'
+
+[[bashInterceptor.patterns]]
+pattern = '(?:^|[;&|])\s*\\?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:(?:sudo|time|command|nohup|env|xargs|do|then|else)\s+)*find\s+[^;&|]*(?<=\s)(?:-name|-iname|-type|-regex|-path|-wholename)\b'
+tool = "lsp"
+message = 'STEP-0: locate files with `codegraph query "<name>"` / mcp__codebase_memory_mcp_search_graph instead of find.'

@@ -64,24 +64,94 @@ fi
 # Release tags are vX.Y.Z; accept a bare X.Y.Z in SUSYNC_VERSION too.
 case "$version" in v*) ;; *) version="v$version" ;; esac
 
-# 3. Download the release asset to a temp file, then atomically replace.
+# 3. Optional integrity check.
+#
+# GitHub's release API exposes a per-asset `digest` of the form "sha256:<hex>".
+# Both halves of this check are best-effort: the unauthenticated API is
+# rate-limited to 60 req/hour (the very reason step 2 avoids it) and minimal
+# images may ship no sha256 tool. Either miss prints a notice and continues —
+# refusing to install because GitHub throttled us would be worse than the
+# status quo. A digest we *do* obtain that does *not* match is fatal.
+verify_checksum() {
+  _asset="$1"
+  _file="$2"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    _hasher="sha256sum"
+  elif command -v shasum >/dev/null 2>&1; then
+    _hasher="shasum"
+  else
+    echo "  checksum: skipped (no sha256sum or shasum on PATH)"
+    return 0
+  fi
+
+  # Within an asset object the API emits "name" before "digest", so latch on
+  # the matching name and take the next digest. Any other shape -> no match
+  # -> skipped, never a false pass.
+  _want="$(curl -fsSL --proto '=https' --tlsv1.2 \
+      "https://api.github.com/repos/$REPO/releases/tags/$version" 2>/dev/null \
+    | tr ',' '\n' \
+    | awk -v a="$_asset" '
+        /"name"[[:space:]]*:/ {
+          n = $0
+          sub(/.*"name"[[:space:]]*:[[:space:]]*"/, "", n)
+          sub(/".*/, "", n)
+          hit = (n == a)
+          next
+        }
+        hit && /"digest"[[:space:]]*:[[:space:]]*"sha256:/ {
+          d = $0
+          sub(/.*"sha256:/, "", d)
+          sub(/".*/, "", d)
+          print d
+          exit
+        }')"
+
+  if [ "${#_want}" -ne 64 ]; then
+    echo "  checksum: skipped (no sha256 digest published for $_asset)"
+    return 0
+  fi
+
+  if [ "$_hasher" = "sha256sum" ]; then
+    _got="$(sha256sum "$_file" | cut -d' ' -f1)"
+  else
+    _got="$(shasum -a 256 "$_file" | cut -d' ' -f1)"
+  fi
+
+  if [ "$_got" != "$_want" ]; then
+    echo "8sync: checksum mismatch for $_asset — refusing to install." >&2
+    echo "  expected sha256:$_want" >&2
+    echo "  actual   sha256:$_got" >&2
+    exit 1
+  fi
+  echo "  checksum: ok (sha256:$_want)"
+}
+
+# 4. Download the release asset to a temp file, then atomically replace.
+#
+# The temp file must be a *sibling* of the destination, not $TMPDIR: on most
+# distros /tmp is tmpfs while $BIN_DIR (~/.local/bin) is not, so `mv` across
+# that boundary is an EXDEV copy, not a rename — leaving a partially written
+# binary observable at $BIN. A same-directory rename is atomic. This mirrors
+# download_and_replace() in crates/cli/src/verbs/selfup.rs.
 asset="8sync-${version}-${os}-${arch}"
 url="https://github.com/$REPO/releases/download/$version/$asset"
 echo "Installing 8sync $version ($os-$arch)..."
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+mkdir -p "$BIN_DIR" || { echo "8sync: could not create $BIN_DIR" >&2; exit 1; }
+tmp="$BIN_DIR/.8sync.new.$$"
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
 curl -fSL --proto '=https' --tlsv1.2 "$url" -o "$tmp" 2>/dev/null \
   || { echo "8sync: download failed: $url" >&2; exit 1; }
 [ -s "$tmp" ] || { echo "8sync: downloaded an empty file from $url" >&2; exit 1; }
+verify_checksum "$asset" "$tmp"
 chmod 0755 "$tmp"
-mkdir -p "$BIN_DIR"
 mv -f "$tmp" "$BIN"
-trap - EXIT
+trap - EXIT HUP INT TERM
 
 echo "Installed → $BIN"
 "$BIN" --version 2>/dev/null || true
 
-# 4. PATH hint if ~/.local/bin is not yet on PATH (bash/zsh/fish).
+# 5. PATH hint if ~/.local/bin is not yet on PATH (bash/zsh/fish).
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
   *)

@@ -122,6 +122,21 @@ pub(crate) struct ForceLoadStats {
     pub(crate) ondemand: Vec<PathBuf>,    // on-demand visible — body read on trigger
 }
 
+/// Machine-portable reference to a skill's entry file, exactly as embedded in
+/// AGENTS.md. Project-local skills are **repo-relative**
+/// (`su-code/skills/<dir>/<entry>`) so the block survives a clone into any path;
+/// global skills genuinely live in `$HOME`, so they are `~/`-anchored and stay
+/// user-agnostic. Emitting `/home/<user>/…` is a bug: it resolves only on the
+/// machine that ran the harness, and every other machine silently skips the
+/// skill because the file the agent is told to read does not exist.
+fn skill_ref(dirname: &str, entry: &str, is_local: bool) -> String {
+    if is_local {
+        format!("su-code/skills/{}/{}", dirname, entry)
+    } else {
+        format!("~/.omp/skills/{}/{}", dirname, entry)
+    }
+}
+
 /// Gather installed skills (global ∪ project-local, deduped), classify them into
 /// CORE / SPECIALIST / on-demand, and render the force-load block. Pure: reads
 /// the skill dirs, writes nothing.
@@ -171,13 +186,13 @@ pub(crate) fn build_force_load(home: &Path, root: &Path) -> ForceLoadStats {
             if !seen_names.insert(m.name.clone()) {
                 continue;
             }
-            let abs = p.join(entry);
+            let rel = skill_ref(dirname, entry, *is_local);
             if always_on_core(dirname) {
                 core.push(p.clone());
-                core_lines.push_str(&format!("  {}. `{}`\n", core.len(), abs.display()));
+                core_lines.push_str(&format!("  {}. `{}`\n", core.len(), rel));
             } else {
                 specialist.push(p.clone());
-                specialist_lines.push_str(&format!("- `{}` — `{}`\n", m.name, abs.display()));
+                specialist_lines.push_str(&format!("- `{}` — `{}`\n", m.name, rel));
             }
         } else {
             // Tech-gated on-demand skill in a project that doesn't use that tech → hide.
@@ -187,11 +202,7 @@ pub(crate) fn build_force_load(home: &Path, root: &Path) -> ForceLoadStats {
             if !seen_names.insert(m.name.clone()) {
                 continue;
             }
-            let rel = if *is_local {
-                format!("su-code/skills/{}/{}", dirname, entry)
-            } else {
-                format!("~/.omp/skills/{}/{}", dirname, entry)
-            };
+            let rel = skill_ref(dirname, entry, *is_local);
             ondemand.push(p.clone());
             ondemand_lines.push_str(&format!("- `{}` — `{}`\n", m.name, rel));
         }
@@ -378,4 +389,60 @@ fn insert_block_after_h1(existing: &str, block: &str) -> String {
         return s;
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Minimal Agent-Skills dir: `<parent>/<name>/SKILL.md` with frontmatter, so
+    /// `meta_for_dir` resolves the name and the `SKILL.md` entry point.
+    fn skill_fixture(parent: &Path, name: &str) {
+        let dir = parent.join(name);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: fixture\n---\n\nbody\n"),
+        )
+        .unwrap();
+    }
+
+    /// Every skill path in the force-load block MUST be machine-portable:
+    /// repo-relative for a project skill, `~/`-anchored for a global one. An
+    /// absolute path is the dead-path bug — it resolves only on the box that ran
+    /// the harness, so agents on every other machine (or clone) are told to read
+    /// a file that is not there and silently skip the skill.
+    #[test]
+    fn force_load_paths_are_portable() {
+        let base = std::env::temp_dir().join(format!("8sync-force-load-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let home = base.join("home");
+        let root = base.join("repo");
+        // codegraph + ponytail are CORE (rank 0 / 2); impeccable is SPECIALIST.
+        skill_fixture(&root.join("su-code/skills"), "codegraph");
+        skill_fixture(&home.join(".omp/skills"), "ponytail");
+        skill_fixture(&home.join(".omp/skills"), "impeccable");
+
+        let stats = build_force_load(&home, &root);
+
+        assert!(
+            stats.block.contains("  1. `su-code/skills/codegraph/SKILL.md`"),
+            "CORE project skill must render repo-relative"
+        );
+        assert!(
+            stats.block.contains("  2. `~/.omp/skills/ponytail/SKILL.md`"),
+            "CORE global skill must render ~/-anchored"
+        );
+        assert!(
+            stats.block.contains("`impeccable` — `~/.omp/skills/impeccable/SKILL.md`"),
+            "SPECIALIST global skill must render ~/-anchored"
+        );
+        assert!(!stats.block.contains("/home/"), "no machine-specific path may leak");
+        assert!(
+            !stats.block.contains(&root.display().to_string()),
+            "the absolute project root must never appear in the block"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
 }

@@ -1,3 +1,8 @@
+# Packages live in two sibling tables: [packages] = Arch family
+# (pacman/aur/aur_yay, canonical, never renamed) and [packages.fedora] =
+# Fedora family (dnf/copr/rpmfusion/swap). A profile with no
+# [packages.fedora] is skipped, with a printed reason, on Fedora.
+
 name = "displaylink"
 description = "DisplayLink USB monitor driver (evdi-dkms)"
 visibility = "personal"
@@ -6,10 +11,17 @@ visibility = "personal"
 pacman = ["evdi-dkms"]
 aur = []
 
+# Fedora ships no evdi anywhere — not the main repos, not RPM Fusion. The COPR
+# below builds the full DisplayLink driver (evdi module + userspace daemon,
+# `displaylink-driver.service`) and is pinned in pkg.rs COPR_ALLOWLIST.
+[packages.fedora]
+dnf = ["displaylink"]
+copr = ["crashdummy/Displaylink"]
+
 [services]
 system_enable = []
 user_enable = []
 
 [post_install]
 commands = []
-hint = "Reboot once after install so the DKMS module loads."
+hint = "Reboot once after install so the DKMS module loads. On Fedora the driver runs as `displaylink-driver.service` — `systemctl enable --now displaylink-driver` if it is not already up."

@@ -1,42 +1,45 @@
-# 8sync — always-on operating directives (managed by `8sync harness`; appended to EVERY system prompt)
+# 8sync — always-on directives (managed by `8sync harness`; appended to EVERY system prompt)
 
-Non-negotiable. They apply on EVERY turn, never compact away — even past 50% context.
+Enforced, so NOT restated here: a TTSR rule interrupts `grep`/`glob` on code-structure queries, and
+`bashInterceptor` refuses `rg` / `grep -r` / `find -name`. Both name the exact replacement call at
+the moment they fire. Below is only the intent behind them plus what enforcement cannot express.
 
-## RULE #0 — code intelligence BEFORE native search / file CRUD
-**`grep` + `glob` are DISABLED** when `step0=true` (8sync default): 8sync launches omp with `--tools` dropping them, so code lookup MUST use the STEP-0 stack. MCP/xdev STEP-0 tools are orthogonal to `--tools` and ALWAYS present (verified omp 17.2.9: 47 MCP tools shipped under `--tools=read,bash`). Call these by EXACT name — never invent variants:
-- **Where is X · who calls X · impact · architecture** → `mcp__codebase_memory_mcp_search_graph` · `_trace_path` · `_get_architecture` · `_get_code_snippet` (158 langs, sub-ms; auto-indexes on connect).
-- **LSP-precise symbol + references** → `mcp__serena_find_symbol` · `_find_referencing_symbols` · `_get_symbols_overview` (run `_find_referencing_symbols` BEFORE editing an exported symbol; `activate_project` once per session).
-- **Fast CLI semantic intel** → `codegraph query|explore|node|callees|impact "<symbol>"` via bash (`codegraph index .` once if `.codegraph/` missing; `explore` = source + call paths in one shot). **`codegraph callers` is NOT trustworthy alone** — measured on a clean full index it reported "No callers found" for a function with two real call sites, and missed every call made inside one particular caller. **"Who calls X" MUST be answered by `mcp__serena_find_referencing_symbols`** (it found both); use `codegraph callers` only as a second opinion, never as proof that nothing calls a symbol. Never `rm -rf .codegraph` to force a rebuild — that deletes the exclusion config too, so the next index walks `target/`/`node_modules` and takes minutes; use `codegraph index --force` or `8sync harness`.
-- **Image → text** (text-only models) → `mcp__zai_vision_extract_text_from_screenshot` · `_analyze_image`.
-- **Compress big output YOU re-emit** → `mcp__headroom_compress` (60–95% fewer tokens; `headroom_retrieve` by hash). omp spills oversized tool output to artifacts — never re-paste a spilled blob; compress what YOU forward.
-**Routing decision tree (MUST, cheapest-first):** symbol / structure / call-path / impact → `cbm` → `serena` → `codegraph`. Plain-text lookup on NON-code (logs, configs, build output) → `bash grep` (the `grep`/`glob` TOOLS are gone; in bash, `rg`/`fd`/`git grep`, `grep -r`, and `find -name` are `bashInterceptor`-blocked — single-file and log `grep` stay allowed). `read` a raw file ONLY when about to edit it (read-before-edit).
-**Full catalogs visible:** ALL tools of `codebase-memory-mcp` · `serena` · `headroom` · `zai-vision` are in your tool list — serena edit/rename, cbm cypher (`query_graph`)/`detect_changes`, zai diagram/diff included. Only OTHER/newly-added MCP servers' tools hide behind ONE `search_tool_bm25` call — search before concluding a tool doesn't exist.
+## RULE #0 — code intelligence before native search
+Structure questions (where is X · who calls X · impact · architecture) go cheapest-first:
+`mcp__codebase_memory_mcp_search_graph` / `_trace_path` / `_get_architecture` / `_get_code_snippet` →
+`mcp__serena_find_symbol` and `_find_referencing_symbols` (**the** authority for callers) →
+`codegraph query|explore "<symbol>"` in bash. Plain-text lookup on NON-code (logs, configs, build
+output) → single-file `bash grep`. `read` a file when you are about to edit it (read-before-edit).
+Under `step0` (default) the `grep`/`glob` TOOLS are not in the session at all; MCP tools are
+orthogonal to that and always present — call them by exact name, never a guessed variant.
 
-## Vision — GLM-5.2 is text-only, route images through zai-vision
-GLM-5.2 cannot see pixels. Never hand it a raw screenshot expecting analysis — route it: image → **zai-vision MCP** tool (`extract_text_from_screenshot`, `analyze_image`, `diagnose_error_screenshot`, `understand_technical_diagram`, `analyze_data_visualization`, `ui_to_artifact`, `ui_diff_check`, `analyze_video`) → TEXT → act on the text. Applies to omp browser screenshots, `8sync shot`/`pdf-img`/`diff-img` output, and diagrams. omp's built-in `inspect_image` is the generic fallback. Full combination matrix (all cases, with real verified examples): `~/.omp/skills/zai-vision/SKILL.md`.
-**Positions / layout / distribution (grounding) — AUTOMATIC for non-vision models.** A text-only model (GLM-5.2) that needs WHERE things sit in an image — a UI element to click, a box around text/objects, node placement in a rendered graph — uses **`8sync locate <image> "<target>"`** (NVIDIA LocateAnything-3B via ggml, on-device, CPU or CUDA) → labeled boxes + click-center coords. This is the default reflex, not an option: zai-vision answers *what it says*, locate answers *where it is*. Pair with the `browser` tool to click exactly, or with `8sync shot` output. Setup once: `8sync locate --setup`. Skill: `~/.omp/skills/locate-anything/SKILL.md`.
+## Vision — this model may be text-only
+Self-check first: can I see pixels? GLM-5.2 cannot. Route every real image through **zai-vision MCP**
+(`extract_text_from_screenshot` · `analyze_image` · `diagnose_error_screenshot` · `ui_diff_check`) →
+text → act on the text. For WHERE something sits (click target, box, node placement) use
+`8sync locate <image> "<target>"` — zai-vision answers *what it says*, locate answers *where it is*.
+Structure (call/dependency graphs, dashboards, long PDFs) is cheaper as ONE image via `8sync shot` /
+`8sync pdf-img`; code, exact config, line-numbered data and hashes are ALWAYS text — never image-ify
+them. Decision table: `~/.omp/skills/image-routing/SKILL.md`.
 
-## Modality routing — read STRUCTURE as an image, read PRECISE things as text
-Self-check first: *can I see pixels?* (Opus-class = yes; GLM-5.2 = no.)
-- **Vision model + structural/overview content → ONE image, not a text dump.** For a codegraph / call- or dependency-graph / architecture / dashboard / diagram / large UI / long PDF, render it with `8sync shot <url|file>` (or `8sync pdf-img`) and read the image. This is *modality-fit*: a 12k-edge graph as a picture beats its adjacency-list text, and conveys layout text cannot.
-- **Codegraph quick-grab:** `8sync harness web` exposes the live memory graph — `8sync shot 'http://127.0.0.1:8731/codegraph?shot=1' -o /tmp/cg.png` (**`?shot=1` = canvas-only**: the React-Flow package graph full-viewport, big and legible, ~2k vision tokens). NEVER full-page-capture that page — everything except the canvas is exact text via `/api/codegraph/overview|search|trace`. Image for the layout, API text for the details; a non-vision model then reads node positions from the shot via `8sync locate` (above).
-- **Precise/low-entropy content → ALWAYS text.** Source code, exact config, line-numbered data, hashes, small snippets: read as text. It is cheaper AND exact. Image reading is LOSSY, and Claude bills images per 28×28 patch (`⌈W/28⌉×⌈H/28⌉`, pay-per-pixel on Opus 4.7+) — dense-text-as-image is only ~1.3-2× and risks illegibility, NOT the 10× that needs a dedicated OCR encoder. Never image-ify code.
-- **Memory the OCR-Memory way:** the *graph/index* can be an image to LOCATE a segment; the *content* is then fetched as exact TEXT (codebase-memory-mcp / the file). Image to find, text to read.
-- GLM-5.2 is text-only: it reads text, and routes any real incoming image through zai-vision (above). Enforced per-turn by `--advisor`. Full decision table: `~/.omp/skills/image-routing/SKILL.md`.
+## Always-on skills — open the SKILL.md before acting, in this order
+1. **codegraph** — `~/.omp/skills/codegraph/SKILL.md` — semantic code intel (the loop's senses).
+2. **karpathy-guidelines** — read before write, test before refactor, small steps.
+3. **ponytail** — YAGNI: do the least that works; delete > add.
+4. **8sync-cli** — prefer `8sync` verbs over raw shell.
 
-## Always-on skills — open the SKILL.md before acting (these EXIST; never reinvent them)
-- **codegraph** — `~/.omp/skills/codegraph/SKILL.md` — semantic code intel (the loop's senses).
-- **karpathy-guidelines** — `~/.omp/skills/karpathy-guidelines/SKILL.md` — read-before-write, test-before-refactor, small steps.
-- **ponytail** — `~/.omp/skills/ponytail/SKILL.md` — laziest senior dev: YAGNI, do the least that works, delete > add.
-- **8sync-cli** — `~/.omp/skills/8sync-cli/SKILL.md` — prefer `8sync` verbs over raw shell.
-Specialist (open the body only when the task matches): **impeccable** (UI/design — mandatory for any frontend), **assp** (copy/brand), **taste** (anti-slop), **image-routing** (image/PDF/diff routing decision), **zai-vision** (after image-routing says "image" — the GLM-5.2 vision bridge).
+Specialists — open the body only when the task matches: **impeccable** (any frontend — mandatory),
+**assp** (copy/brand), **taste** (anti-slop), **image-routing** → **zai-vision** (images),
+**locate-anything** (grounding).
 
-## MCP config — follow the bundled `server.json` standard (never guess field shapes)
-When you write/edit an `mcp.json` server, or reason about a registry `server.json`, follow the on-disk standard at **`~/.omp/specs/mcp-server.md`** (MCP registry schema, machine-local ground truth) — do NOT invent fields. Non-negotiable invariants: `env`/`headers` are `{NAME: value}` **maps, never arrays of descriptors**; the runtime derives from `registryType` (npm→`npx -y` · pypi→`uvx` · oci→`docker run` · nuget→`dnx`); **pin `version`** (`@ver`, or `:ver` for docker images); a `streamable-http`/`sse` transport is a remote (`url`+`headers`), not stdio. `8sync harness` marketplace install already emits exactly this shape.
-
-## Memory, recall & verification
-- **`recall` / `reflect` BEFORE** answering anything about past sessions, decisions, or user prefs; **`retain`** durable facts (decisions, conventions, prefs) AFTER. omp Mnemopi long-term memory — the recall hook also auto-injects the live skill index + STATE every turn.
-- **`browser`** to verify ANY web / UI / visual change for real (open the page + screenshot/observe) — never claim it works unseen.
-- `su-code/STATE.md` is the live plan — read it first; rewrite at every phase boundary. Record learnings in `su-code/KNOWLEDGE.md` (`validated:` / `failure:`); update `CHANGELOG.md` after any change.
-- Context auto-compacts at 50% (`8sync harness compaction <pct>`) — write a handoff into STATE before it fires. This block is never compressed, so it stays terse by design; `headroom_compress` is for large content YOU re-emit (reports, subagent prompts).
-- **`--advisor`** (omp's passive per-turn reviewer — it checks each turn against THESE rules + correct tool use and injects corrective notes) is now **ON by default** via `8sync ai` / `8sync .` (skipped for trivial prompts to stay token-optimal; opt out with `--no-advisor` or `advisor=false` in `~/.config/8sync/models.toml`). The **`--smol`/`--slow`/`--plan`** adaptive model roles are also live — don't pin one model for every task. omp's live capability surface (refreshed every `8sync harness` run): `~/.omp/capabilities.md`.
+## Memory, state, verification
+- **`recall` / `reflect` BEFORE** answering anything about past sessions, decisions or preferences;
+  **`retain`** durable facts (decisions, conventions, prefs) after.
+- **`browser`** to verify any web / UI / visual change for real — never claim it works unseen.
+- `su-code/STATE.md` is the live plan: read it first, rewrite it at every phase boundary. Learnings →
+  `su-code/KNOWLEDGE.md` (`validated:` / `failure:`); `CHANGELOG.md` after any change. Context
+  compacts at 50% — write the handoff into STATE before it fires.
+- Large output YOU re-emit (reports, subagent prompts) → `mcp__headroom_compress`; never re-paste a
+  spilled artifact.
+- Writing or reasoning about an `mcp.json` server: follow `~/.omp/specs/mcp-server.md` verbatim —
+  never invent field shapes.

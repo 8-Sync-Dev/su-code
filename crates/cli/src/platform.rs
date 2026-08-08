@@ -1,11 +1,14 @@
 //! Cross-platform OS abstraction.
 //!
 //! `8sync` began as a CachyOS/Arch-only harness; this module is the seam that
-//! lets the AI-harness core run on macOS and Windows too. It answers three
-//! questions the rest of the CLI needs:
+//! lets the AI-harness core run on other Linux distros, macOS and Windows too.
+//! It answers three questions the rest of the CLI needs:
 //!   1. **Which OS are we on?** (`os()` — compile-time constant per target).
-//!   2. **What's the native package manager?** (`pkg_manager()` — pacman on
-//!      Arch, `brew` on macOS, `winget` on Windows) + `install_core_pkg`.
+//!   2. **How do I install one core package?** (`core_route` + `install_core_pkg`
+//!      with a `CorePkg` naming it in each manager's namespace). On Linux the
+//!      backend comes from `pkg::backend()` (`pacman` on the Arch family, `dnf`
+//!      on the Fedora family), so distro dispatch lives in exactly one place;
+//!      macOS uses `brew` and Windows `winget`.
 //!   3. **How do I run a command periodically?** (`install_timer` /
 //!      `remove_timer` — systemd user timer on Linux, launchd LaunchAgent on
 //!      macOS, Scheduled Task on Windows).
@@ -18,6 +21,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
+use crate::env_detect::Family;
 use crate::ui;
 
 /// Only one variant is ever constructed per compiled target (via `os()`'s
@@ -75,26 +79,53 @@ pub fn require_linux(verb: &str, why: &str) -> bool {
 
 // ─── package manager ─────────────────────────────────────────────────
 
-/// The native package manager for this OS, if one is on PATH.
-/// Linux keys on the Arch family (`pacman`); other distros return None (the
-/// harness core installs via curl/cargo instead).
-pub fn pkg_manager() -> Option<&'static str> {
-    match os() {
-        Os::Linux => which::which("pacman").ok().map(|_| "pacman"),
-        Os::Macos => which::which("brew").ok().map(|_| "brew"),
-        Os::Windows => which::which("winget").ok().map(|_| "winget"),
-        Os::Other => None,
+/// One package's id in each package manager's namespace. They genuinely differ
+/// (`github-cli` on pacman vs `gh` on dnf/brew, `GitHub.cli` on winget), so the
+/// call site names all four rather than passing positional strings nobody can
+/// tell apart at a glance.
+#[derive(Debug, Clone, Copy)]
+pub struct CorePkg {
+    pub arch: &'static str,
+    pub fedora: &'static str,
+    pub brew: &'static str,
+    pub winget: &'static str,
+}
+
+/// Which install route [`install_core_pkg`] takes. Split out from the spawn so
+/// the routing decision — including the manual-install fallback on a distro
+/// with no native backend — is testable without a package manager present.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoreRoute {
+    /// A native Linux backend handles it; carries the package id to install.
+    Native(&'static str),
+    Brew,
+    Winget,
+    /// Nothing can install this — print the manual-install notice.
+    Manual,
+}
+
+pub fn core_route(target: Os, family: Family, names: CorePkg) -> CoreRoute {
+    match target {
+        Os::Linux => match family {
+            Family::Arch => CoreRoute::Native(names.arch),
+            Family::Fedora => CoreRoute::Native(names.fedora),
+            Family::Other => CoreRoute::Manual,
+        },
+        Os::Macos => CoreRoute::Brew,
+        Os::Windows => CoreRoute::Winget,
+        Os::Other => CoreRoute::Manual,
     }
 }
 
 /// Install a package by its per-manager name via the native package manager.
-/// `names` maps manager → package id (they differ, e.g. `github-cli` on pacman
-/// vs `gh` on brew/winget). No-op with a note when the manager is unavailable.
-pub fn install_core_pkg(label: &str, pacman: &str, brew: &str, winget: &str) -> Result<()> {
-    match pkg_manager() {
-        Some("pacman") => crate::pkg::pacman_install_safe(&[pacman], true),
-        Some("brew") => crate::pkg::run_loud("brew", &["install", brew]),
-        Some("winget") => crate::pkg::run_loud(
+/// No-op with a note when the manager is unavailable.
+pub fn install_core_pkg(label: &str, names: CorePkg) -> Result<()> {
+    match core_route(os(), crate::env_detect::distro_family(), names) {
+        CoreRoute::Native(pkg) => crate::pkg::install(label, &[pkg], true),
+        CoreRoute::Brew if which::which("brew").is_ok() => {
+            crate::pkg::run_loud("brew", &["install", names.brew])
+        }
+        CoreRoute::Winget if which::which("winget").is_ok() => crate::pkg::run_loud(
             "winget",
             &[
                 "install",
@@ -103,17 +134,23 @@ pub fn install_core_pkg(label: &str, pacman: &str, brew: &str, winget: &str) -> 
                 "--accept-source-agreements",
                 "-e",
                 "--id",
-                winget,
+                names.winget,
             ],
         ),
         _ => {
-            ui::warn(&format!(
-                "no native package manager on {} — install `{label}` manually",
-                os_name()
-            ));
+            no_pkg_manager_notice(label);
             Ok(())
         }
     }
+}
+
+/// The single manual-install notice, shared by every no-backend path so the
+/// wording cannot drift between `platform` and `pkg`.
+pub(crate) fn no_pkg_manager_notice(label: &str) {
+    ui::warn(&format!(
+        "no native package manager on {} — install `{label}` manually",
+        os_name()
+    ));
 }
 
 // ─── periodic timer ──────────────────────────────────────────────────
@@ -335,4 +372,39 @@ fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const GH: CorePkg =
+        CorePkg { arch: "github-cli", fedora: "gh", brew: "gh", winget: "GitHub.cli" };
+
+    /// AC-12: a Linux distro in neither family has no native backend, so
+    /// `install_core_pkg` must fall through to the manual-install notice
+    /// instead of shelling out to a package manager that isn't there.
+    #[test]
+    fn other_family_routes_to_manual_notice() {
+        assert_eq!(core_route(Os::Linux, Family::Other, GH), CoreRoute::Manual);
+        assert_eq!(core_route(Os::Other, Family::Other, GH), CoreRoute::Manual);
+        // And `pkg` agrees there is nothing to dispatch to.
+        assert!(crate::pkg::backend_for(Family::Other).is_none());
+    }
+
+    /// Each Linux family picks its own package id — they genuinely differ.
+    #[test]
+    fn linux_families_pick_their_own_package_id() {
+        assert_eq!(core_route(Os::Linux, Family::Arch, GH), CoreRoute::Native("github-cli"));
+        assert_eq!(core_route(Os::Linux, Family::Fedora, GH), CoreRoute::Native("gh"));
+    }
+
+    /// macOS/Windows are unaffected by the distro family (there isn't one).
+    #[test]
+    fn mac_and_windows_routes_are_family_independent() {
+        for f in [Family::Arch, Family::Fedora, Family::Other] {
+            assert_eq!(core_route(Os::Macos, f, GH), CoreRoute::Brew);
+            assert_eq!(core_route(Os::Windows, f, GH), CoreRoute::Winget);
+        }
+    }
 }
