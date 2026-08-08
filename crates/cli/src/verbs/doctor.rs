@@ -169,6 +169,17 @@ fn check_portability() {
     if present && !ignored_any {
         ui::ok("project memory is git-tracked (portable)");
     }
+    // Named sessions (cwd-scoped): surface count + any dirty worktree.
+    if let Ok(env) = crate::env_detect::Env::detect() {
+        if let Some((total, wt, dirty)) = crate::verbs::session::health(&env, &root) {
+            let msg = format!("sessions (this repo): {total} · {wt} worktree(s) · {dirty} dirty");
+            if dirty > 0 {
+                ui::warn(&msg);
+            } else {
+                ui::ok(&msg);
+            }
+        }
+    }
     // Context budget: the injected force-load block must stay lean (Gloaguen
     // 2026, arXiv 2602.11988 — bloated/auto context cuts success + ~20% cost).
     if let Ok(s) = std::fs::read_to_string(root.join("AGENTS.md")) {

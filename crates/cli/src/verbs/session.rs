@@ -355,14 +355,35 @@ fn create(env: &Env, root: &Path, reg: &mut Registry, name: &str, worktree: bool
     save(env, root, reg)
 }
 
-/// `8sync . ls` / `8sync . --list` — list sessions in this repo.
-pub fn cmd_ls(env: &Env, root: &Path) -> Result<()> {
+/// `8sync . ls` / `8sync . --list` — list sessions in this repo. `json=true`
+/// emits a machine-readable array (scripting).
+pub fn cmd_ls(env: &Env, root: &Path, json: bool) -> Result<()> {
     let reg = load(env, root);
+    let now = now();
+    if json {
+        let arr: Vec<serde_json::Value> = reg
+            .sessions
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "name": s.name,
+                    "last_used": reg.last_used.as_deref() == Some(s.name.as_str()),
+                    "last_active": s.last_active,
+                    "title": session_title(&s.session_dir),
+                    "branch": s.worktree.as_ref().map(|w| w.branch.clone()),
+                    "dirty": s.worktree.as_ref().map(|w| is_dirty(&w.path)),
+                    "worktree": s.worktree.as_ref().map(|w| w.path.clone()),
+                    "session_dir": s.session_dir,
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&arr)?);
+        return Ok(());
+    }
     if reg.sessions.is_empty() {
         ui::info("no named sessions in this repo — create one: `8sync . new <name>`");
         return Ok(());
     }
-    let now = now();
     ui::header(&format!("sessions · {}", root.display()));
     for s in &reg.sessions {
         let star = if reg.last_used.as_deref() == Some(s.name.as_str()) { "★" } else { " " };
@@ -373,8 +394,25 @@ pub fn cmd_ls(env: &Env, root: &Path) -> Result<()> {
         };
         println!("  {star} {:<18} {:<11} {:<24} {}", s.name, ago(s.last_active, now), loc, title);
     }
-    println!("\n  resume: 8sync . <name>   ·   new: 8sync . new <name> [--worktree]   ·   remove: 8sync . rm <name>");
+    println!("\n  resume: 8sync . <name>   ·   new: 8sync . new <name> [--worktree]   ·   merge: 8sync . merge <name>...");
     Ok(())
+}
+
+/// Cwd-scoped session health for `8sync doctor`: `(total, worktrees, dirty)`,
+/// or `None` when this repo has no sessions.
+pub fn health(env: &Env, root: &Path) -> Option<(usize, usize, usize)> {
+    let reg = load(env, root);
+    if reg.sessions.is_empty() {
+        return None;
+    }
+    let worktrees = reg.sessions.iter().filter(|s| s.worktree.is_some()).count();
+    let dirty = reg
+        .sessions
+        .iter()
+        .filter_map(|s| s.worktree.as_ref())
+        .filter(|w| is_dirty(&w.path))
+        .count();
+    Some((reg.sessions.len(), worktrees, dirty))
 }
 
 /// `8sync . rm <name>` — remove a session. Deletes the transcript store only

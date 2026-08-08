@@ -187,15 +187,23 @@ su-code/
 ### Vibe loop (daily, dùng liên tục)
 | Verb | Mô tả |
 |---|---|
-| `8sync .` | Mở/attach session. Nếu kitty có `allow_remote_control yes` → 3-pane; nếu không → soft 1-pane + omp trong abduco |
+| `8sync .` | Resume session **mới nhất** trong repo (seed `su-code/*` context, exec omp). Named sessions cho nhiều feat song song → xem "Session mgmt" |
 | `8sync ai [prompt]` | AI session (resume hoặc one-shot, wrap omp) |
 | `8sync find <kw>` | rg/fd + fzf preview → mở bằng `$EDITOR` (fallback hx/helix/vi) tại `file:line` |
 | `8sync note "msg" [-t tag]` | Append `su-code/NOTES.md` |
 | `8sync run [dev\|build\|test\|fmt\|lint]` | Project command theo recipe |
 | `8sync ship "msg"` | `git add -A && commit && push && gh pr create` |
 
-### Session mgmt (sub của `.`)
-`8sync . ls` / `to <n>` / `new <n> [cmd]` / `rm <n>` / `wipe` / `kick`
+### Session mgmt — named per-project sessions (sub của `.`)
+Nhiều feature song song trong 1 repo, mỗi cái 1 omp conversation cô lập. Lever = omp có sẵn (`--session-dir` + `--continue`); 8sync chỉ thêm lớp **tên → session-dir** + **git worktree** + **merge**. Registry máy-local: `~/.config/8sync/sessions/<repo>/index.json` (KHÔNG commit — trỏ path máy-local).
+| Lệnh | Mô tả |
+|---|---|
+| `8sync . <name>` | create-or-resume session theo tên |
+| `8sync . new <name> [--worktree]` | tạo session mới; `--worktree` = `git worktree` + branch `8sync/<name>` để cô lập file (2 feat sửa cùng file không đụng nhau) |
+| `8sync . ls` (hoặc `--list`, `--json`) | liệt kê session (★ = mới nhất; kèm branch + `*dirty`) |
+| `8sync . mv <old> <new>` | đổi tên (kèm `git worktree move` + rename branch) |
+| `8sync . rm <name> [--force]` | xoá session; guard worktree dirty/unmerged; `--force` xoá cả transcript + worktree |
+| `8sync . merge <name>... [--keep-worktree]` | land branch session vào nhánh hiện tại: `git merge-tree` preflight → `git merge --no-edit` → rebase-to-unblock → cleanup. **Local-only, không push** |
 
 ### Security (VPN + Firewall)
 | Verb | Mô tả |

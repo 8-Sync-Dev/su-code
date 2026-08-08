@@ -12,18 +12,20 @@ use crate::{env_detect, ui, verbs::{session, skill}};
         EXAMPLES
           8sync .                       resume the latest session in this repo (seeds su-code/* context)
           8sync . <name>                create-or-resume a named session (run many features at once)
-          8sync . new <name>            create a fresh named session (fails if it exists)
-          8sync . ls   (or --list)      list this repo's named sessions (★ = latest)
+          8sync . new <name> [--worktree]  create a fresh session; --worktree = isolated git worktree + branch
+          8sync . ls   (or --list, --json) list this repo's named sessions (★ = latest, + branch/dirty)
           8sync . mv <old> <new>        rename a session
-          8sync . rm <name> [--force]   remove a session (--force also deletes its transcript)
+          8sync . rm <name> [--force]   remove a session (--force also deletes its transcript + worktree)
+          8sync . merge <a> <b> ...     land session branches into the current branch (safe merge, local-only)
 
         BEHAVIOR
           · A named session is an isolated omp conversation (its own --session-dir), tracked in a
             machine-local registry at ~/.config/8sync/sessions/<repo>/index.json.
           · `8sync .` (no name) resumes the last-used session, or omp's default store if none was named.
           · Walks up from cwd to the project root; seeds AGENTS.md + su-code/* when missing before launching.
-          · Session lifetime is owned by omp (retain/recall/auto-compact). Worktree isolation + merge: see M1/M2.
-          · Reserved verbs (new/ls/list/mv/rm) can't be used as bare session names — quote them under `new`.
+          · --worktree gives a session its own tree/branch so features run in parallel without collision;
+            merge lands them back via git merge-tree preflight + rebase-to-unblock (never pushes).
+          · Reserved verbs (new/ls/list/mv/rm/merge) can't be used as bare session names.
     "}
 )]
 pub struct Args {
@@ -46,6 +48,10 @@ pub struct Args {
     /// With `merge`: keep merged worktrees + branches instead of cleaning them up.
     #[arg(long = "keep-worktree")]
     pub keep_worktree: bool,
+
+    /// With `ls`/`--list`: emit machine-readable JSON.
+    #[arg(long)]
+    pub json: bool,
 }
 
 pub fn run(a: Args) -> Result<()> {
@@ -61,10 +67,10 @@ pub fn run(a: Args) -> Result<()> {
 
     // Registry-only ops — quick, no context seed or omp launch.
     if a.list && verb.is_empty() {
-        return session::cmd_ls(&env, &root);
+        return session::cmd_ls(&env, &root, a.json);
     }
     match verb {
-        "ls" | "list" => return session::cmd_ls(&env, &root),
+        "ls" | "list" => return session::cmd_ls(&env, &root, a.json),
         "rm" => {
             let name = rest.first().context("usage: 8sync . rm <name> [--force]")?;
             return session::cmd_rm(&env, &root, name, a.force);

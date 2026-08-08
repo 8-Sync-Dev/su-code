@@ -8,15 +8,28 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 ### Added — `8sync .` named per-project sessions (run many features at once)
 - `8sync .` grew a session layer so you can keep several concurrent lines of work in one repo,
   each an isolated omp conversation. Surface (namespaced under `.`, no new top-level verbs):
-  `8sync . <name>` create-or-resume · `8sync . new <name>` · `8sync . ls`/`--list` · `8sync . mv
-  <old> <new>` · `8sync . rm <name> [--force]`. `8sync .` with no name resumes the last-used
-  session (omp's default store when none was ever named — unchanged legacy behavior).
-- Mechanism: one omp `--session-dir` per name (omp's own `--continue` resumes it — zero session-id
-  bookkeeping), tracked in a machine-local registry `~/.config/8sync/sessions/<repo>/index.json`.
-  Every launch reuses `ModelConfig` so STEP-0 tool-routing + advisor survive. New module
-  `crates/cli/src/verbs/session.rs`; `here.rs` dispatches. Design drawn from affaan-m/ECC (MIT) —
-  git-worktree-per-session + `git merge-tree`-gated merge, all via `git` shell-out (no new deps);
-  worktree isolation and merge land in follow-up phases.
+  `8sync . <name>` create-or-resume · `8sync . new <name> [--worktree]` · `8sync . ls`/`--list`
+  (`--json`) · `8sync . mv <old> <new>` · `8sync . rm <name> [--force]` · `8sync . merge <name>...
+  [--keep-worktree]`. `8sync .` with no name resumes the last-used session (omp's default store
+  when none was ever named — unchanged legacy behavior).
+- Mechanism (a thin layer over omp's existing session core — not a reinvention): one omp
+  `--session-dir` per name (omp's own `--continue` resumes it — zero session-id bookkeeping),
+  tracked in a machine-local registry `~/.config/8sync/sessions/<repo>/index.json` that stores
+  only what omp lacks (human name, worktree binding, last-used). Every launch reuses `ModelConfig`
+  so STEP-0 tool-routing + advisor survive.
+- `--worktree` gives a session its own `git worktree add -b 8sync/<name>` so two features edit the
+  same files concurrently without collision; `ls` shows branch + dirty state.
+- `merge <name>...` lands session branches into the current branch, ECC-style (affaan-m/ECC, MIT):
+  read-only `git merge-tree --write-tree` conflict preflight → `git merge --no-edit` → rebase the
+  conflicting worktree onto the target to unblock (auto-abort + skip on true conflict) → clean up
+  merged worktree + branch + session (`--keep-worktree` to preserve). Sequential, so branch-vs-branch
+  conflicts surface as the target advances. Local-only — never pushes.
+- Everything runs through `git`/`omp` shell-out — **no new dependencies** (ECC's rusqlite/git2/tokio
+  stack was deliberately not adopted; it would bust the size budget). `8sync doctor` reports session
+  count + dirty worktrees. New module `crates/cli/src/verbs/session.rs`; `here.rs` dispatches.
+- Evaluated but NOT integrated (user asked to review): linshenkx/prompt-optimizer (AGPL-3.0 +
+  optimizes human prose — wrong layer) and TypeScript 7 / typescript-go (transparent to `8sync run`,
+  no code change).
 
 ### Fixed — `8sync up` was Linux-only and bricked itself on Windows
 - Symptom (Windows): running `8sync up` left an un-runnable file so the next `8sync` invocation popped Windows' *"Select an app to open '8sync'"* picker instead of executing. Root cause in `crates/cli/src/verbs/selfup.rs`: the self-updater hard-coded `ASSET_SUFFIX = "-linux-x86_64"` (downloaded the **Linux** binary), wrote it to `~/.local/bin/8sync` with **no `.exe`**, and replaced it with a plain `std::fs::rename` (which Windows forbids on a running `.exe`). The release CI already publishes `8sync-<tag>-windows-x86_64.exe` and `install.ps1` installs to `%LOCALAPPDATA%\Programs\8sync\8sync.exe`, so the updater was simply never taught about non-Linux.

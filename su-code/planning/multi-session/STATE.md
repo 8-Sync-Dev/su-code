@@ -3,14 +3,14 @@ gsd_state_version: '1.0'
 feature: multi-session
 ticket: ""
 branch: ""
-status: executing
+status: complete
 active_phase: "M3"
-next_action: M3-ux-docs
+next_action: archive
 next_phases: []
 progress:
   total_phases: 4
-  completed_phases: 3
-  percent: 75
+  completed_phases: 4
+  percent: 100
 last_updated: "2026-08-08"
 ---
 
@@ -24,31 +24,29 @@ See: su-code/planning/multi-session/PROJECT.md · ROADMAP: su-code/planning/mult
 
 ## Current Position
 
-Phase: M0 of 4 (Session registry + named CRUD) — **planning, awaiting Gate 1**
-Status: `new` scaffolded + 4 files drafted from research; architecture NOT yet approved.
-Why here: `/feature new` — 3 references researched (ECC/prompt-optimizer/tsgo); design synthesized.
-Last activity: 2026-08-08 — drafted PROJECT/REQUIREMENTS/ROADMAP; ECC gives the git-shell-out
-merge blueprint (MIT). Awaiting user approval of architecture + CLI-surface fork.
+Phase: M3 of 4 (UX + docs) — **DONE**. Feature COMPLETE; all 4 phases shipped + smoke-verified.
+Status: complete. Gate 1 approved: namespaced under `8sync .` + opt-in `--worktree`.
+Last activity: 2026-08-08 — M0 registry+CRUD, M1 worktree, M2 merge, M3 `--json`/doctor/docs. All
+built clean + smoke-tested with a stub-omp harness; committed atomically per phase.
 
-## Decisions (pending confirmation at Gate 1)
+## Decisions (locked)
 
-- **Isolation:** one omp `--session-dir` per name (resume via omp's own `--continue`, no uuid
-  capture) + optional `git worktree add -b 8sync/<name>` for filesystem isolation.
-- **Merge = real git branch merge** (ECC blueprint): `git merge-tree` preflight → `git merge
-  --no-edit` → `git rebase` to unblock → cleanup. Pure `git` shell-out, zero new deps. NOT
-  context/history merge (that is v2 UC-9).
-- **Registry** machine-local: `~/.config/8sync/sessions/<project-key>.json`.
-- **CLI surface (OPEN FORK):** canonical under `8sync .` subcommands vs also adding flat
-  top-level `8sync new/rm/merge` aliases. Recommend namespaced (verb budget 26>22; generic `rm`).
+- **Thin layer over omp's session core** (per user directive): omp owns transcripts + `--continue`;
+  8sync adds only name→`--session-dir`, git worktree, merge. Registry stores just what omp lacks.
+- **Isolation:** one omp `--session-dir` per name; `--worktree` (opt-in) = `git worktree add -b
+  8sync/<name>`. CWD = worktree when isolated, else repo root.
+- **Merge = real git branch merge** (ECC/MIT blueprint): `git merge-tree` preflight → `git merge
+  --no-edit` → rebase-to-unblock → cleanup. Pure `git` shell-out, zero new deps.
+- **CLI:** namespaced under `8sync .` (no top-level verb sprawl); `rm` guards dirty/unmerged.
 - **Rejected refs:** prompt-optimizer (AGPL + wrong layer), tsgo (transparent, no change).
 
-## Open questions for Gate 1
+## Verification
 
-1. CLI surface: namespaced-under-`.` only (recommended) vs + flat `8sync new/rm/merge` aliases?
-2. Worktree default: opt-in via `--worktree` (recommended; many sessions are just parallel
-   conversations) vs every named session always gets a worktree?
+See M3-VERIFICATION.md — every AC PASS via stub-omp smoke tests (create/refuse/ls/mv/rm/resume,
+parallel worktree edits with no collision, merge clean + conflict-skip + --keep-worktree, --json,
+doctor health clean+dirty). `cargo build --release` clean each phase.
 
 ## Session Continuity
 
-Stopped at: 4 planning files written; ACTIVE = multi-session; awaiting Gate 1.
-Next: user approves architecture + answers the 2 forks → `/feature plan` for M0.
+Stopped at: feature complete, 4 phase commits on `main` (M0 3ef2929, M1 f282d3e, M2 000d3ab, M3 next),
+tree clean, nothing pushed. Next: `/feature ship` archive, or fold into the pending release tag.
