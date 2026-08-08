@@ -1,0 +1,348 @@
+//! Named, per-project work sessions on top of omp's session store.
+//!
+//! A named session = one omp conversation isolated via `omp --session-dir`,
+//! tracked in a machine-local per-project registry
+//! (`~/.config/8sync/sessions/<project-key>/index.json`). `8sync .` resumes the
+//! last-used session in the repo (omp's default store when none was ever named);
+//! `8sync . <name>` create-or-resumes a named one.
+//!
+//! Registry is machine-local on purpose: it points at machine-local omp session
+//! dirs (and, from M1, git worktree paths), so committing it would break on
+//! another box — this mirrors omp's own `~/.omp` scoping.
+//!
+//! M1 adds the `worktree` field (git worktree + branch `8sync/<name>`); M2 adds
+//! the `git`-shell-out merge engine. This module owns the registry + CRUD; the
+//! `8sync .` verb (`here.rs`) dispatches to it.
+
+use anyhow::{bail, Context, Result};
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::{env_detect::Env, ui};
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct Registry {
+    /// Name of the session most recently resumed/created; `None` = omp's default
+    /// (unnamed) store, i.e. legacy `8sync .` behavior.
+    #[serde(default)]
+    pub last_used: Option<String>,
+    #[serde(default)]
+    pub sessions: Vec<Session>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Session {
+    pub name: String,
+    /// omp `--session-dir` for this session (isolated conversation store).
+    pub session_dir: PathBuf,
+    /// git worktree binding — populated in M1 (`--worktree`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree: Option<Worktree>,
+    pub created: u64,
+    pub last_active: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Worktree {
+    pub path: PathBuf,
+    pub branch: String,
+    pub base_branch: String,
+}
+
+impl Registry {
+    pub fn get(&self, name: &str) -> Option<&Session> {
+        self.sessions.iter().find(|s| s.name == name)
+    }
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Session> {
+        self.sessions.iter_mut().find(|s| s.name == name)
+    }
+}
+
+// ── paths ────────────────────────────────────────────────────────────────
+
+fn now() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
+
+/// Sanitized, collision-safe key for a repo path. Readable like omp's own
+/// (`-Projects-tools-su-code`); very long paths fall back to a hash.
+fn project_key(root: &Path) -> String {
+    let s = root.to_string_lossy();
+    let key: String = s
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    if key.len() <= 120 {
+        return key;
+    }
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    s.hash(&mut h);
+    format!("h{:016x}", h.finish())
+}
+
+fn key_dir(env: &Env, root: &Path) -> PathBuf {
+    env.xdg_config.join("8sync").join("sessions").join(project_key(root))
+}
+
+fn index_path(env: &Env, root: &Path) -> PathBuf {
+    key_dir(env, root).join("index.json")
+}
+
+/// Names are used as directory + git branch slugs — keep them safe.
+fn valid_name(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && name.len() <= 64
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+}
+
+// ── registry load/save ─────────────────────────────────────────────────────
+
+pub fn load(env: &Env, root: &Path) -> Registry {
+    std::fs::read_to_string(index_path(env, root))
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+pub fn save(env: &Env, root: &Path, reg: &Registry) -> Result<()> {
+    let dir = key_dir(env, root);
+    std::fs::create_dir_all(&dir).with_context(|| format!("mkdir {}", dir.display()))?;
+    let json = serde_json::to_string_pretty(reg)?;
+    std::fs::write(index_path(env, root), json).context("write session index")?;
+    Ok(())
+}
+
+// ── omp launch ─────────────────────────────────────────────────────────────
+
+/// Launch omp for a named session's `--session-dir`. `fresh=true` starts a new
+/// conversation (no `--continue`); otherwise it resumes the latest one there.
+/// Reuses `ModelConfig` so STEP-0 tool-routing + advisor survive every launch.
+fn launch(root: &Path, session_dir: &Path, fresh: bool) -> Result<()> {
+    if which::which("omp").is_err() {
+        ui::err("omp not installed. Run `8sync setup` first.");
+        return Ok(());
+    }
+    std::fs::create_dir_all(session_dir)?;
+    let cfg = crate::models::ModelConfig::load();
+    let mut cmd = Command::new("omp");
+    cmd.current_dir(root)
+        .arg("--cwd")
+        .arg(root)
+        .arg("--session-dir")
+        .arg(session_dir)
+        .args(cfg.resume_flags());
+    if !fresh {
+        cmd.arg("--continue");
+    }
+    let status = cmd.status().context("could not exec omp")?;
+    if !status.success() {
+        ui::warn("omp exited non-zero");
+    }
+    Ok(())
+}
+
+/// Best-effort omp auto-title: first line of the newest `*.jsonl` in the session
+/// dir is `{"type":"title","title":"…"}`.
+fn session_title(session_dir: &Path) -> Option<String> {
+    let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+    for entry in std::fs::read_dir(session_dir).ok()?.flatten() {
+        let p = entry.path();
+        if p.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+            continue;
+        }
+        let m = entry.metadata().ok()?.modified().ok()?;
+        if newest.as_ref().map(|(t, _)| m > *t).unwrap_or(true) {
+            newest = Some((m, p));
+        }
+    }
+    let (_, path) = newest?;
+    let content = std::fs::read_to_string(path).ok()?;
+    let first = content.lines().next()?;
+    let v: serde_json::Value = serde_json::from_str(first).ok()?;
+    v.get("title").and_then(|t| t.as_str()).map(|s| s.to_string())
+}
+
+fn ago(secs: u64, now: u64) -> String {
+    let d = now.saturating_sub(secs);
+    match d {
+        0..=59 => format!("{d}s ago"),
+        60..=3599 => format!("{}m ago", d / 60),
+        3600..=86_399 => format!("{}h ago", d / 3600),
+        _ => format!("{}d ago", d / 86_400),
+    }
+}
+
+fn touch(env: &Env, root: &Path, reg: &mut Registry, name: &str) -> Result<()> {
+    let t = now();
+    if let Some(s) = reg.get_mut(name) {
+        s.last_active = t;
+    }
+    reg.last_used = Some(name.to_string());
+    save(env, root, reg)
+}
+
+// ── commands ───────────────────────────────────────────────────────────────
+
+/// `8sync .` — resume the last-used session (or omp's default store if none).
+pub fn resume_latest(env: &Env, root: &Path) -> Result<()> {
+    let mut reg = load(env, root);
+    if let Some(name) = reg.last_used.clone() {
+        if let Some(s) = reg.get(&name) {
+            let dir = s.session_dir.clone();
+            ui::ok(&format!("→ resume session '{name}' (latest)"));
+            touch(env, root, &mut reg, &name)?;
+            return launch(root, &dir, false);
+        }
+    }
+    // No named session yet — legacy behavior: omp's default path-scoped store.
+    resume_default(root)
+}
+
+/// omp's default (unnamed) session — exactly the pre-feature `8sync .`.
+fn resume_default(root: &Path) -> Result<()> {
+    if which::which("omp").is_err() {
+        ui::warn("omp not installed — run `8sync setup` first. Falling back to $SHELL.");
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+        let _ = Command::new(&shell).current_dir(root).status();
+        return Ok(());
+    }
+    ui::ok("→ exec: omp --continue");
+    let cfg = crate::models::ModelConfig::load();
+    let status = Command::new("omp")
+        .arg("--cwd")
+        .arg(root)
+        .args(cfg.resume_flags())
+        .arg("--continue")
+        .current_dir(root)
+        .status()
+        .context("could not exec omp")?;
+    if !status.success() {
+        ui::warn("omp exited non-zero");
+    }
+    Ok(())
+}
+
+/// `8sync . <name>` — create-or-resume a named session.
+pub fn resume_named(env: &Env, root: &Path, name: &str) -> Result<()> {
+    if !valid_name(name) {
+        bail!("invalid session name '{name}' (use letters, digits, '-', '_', '.'; ≤64 chars)");
+    }
+    let mut reg = load(env, root);
+    if reg.get(name).is_some() {
+        let dir = reg.get(name).unwrap().session_dir.clone();
+        ui::ok(&format!("→ resume session '{name}'"));
+        touch(env, root, &mut reg, name)?;
+        launch(root, &dir, false)
+    } else {
+        ui::info(&format!("no session '{name}' yet — creating it"));
+        create(env, root, &mut reg, name)?;
+        let dir = reg.get(name).unwrap().session_dir.clone();
+        touch(env, root, &mut reg, name)?;
+        launch(root, &dir, true)
+    }
+}
+
+/// `8sync . new <name>` — create a named session (refuses an existing name).
+pub fn cmd_new(env: &Env, root: &Path, name: &str) -> Result<()> {
+    if !valid_name(name) {
+        bail!("invalid session name '{name}' (use letters, digits, '-', '_', '.'; ≤64 chars)");
+    }
+    let mut reg = load(env, root);
+    if reg.get(name).is_some() {
+        bail!("session '{name}' already exists — resume with `8sync . {name}`");
+    }
+    create(env, root, &mut reg, name)?;
+    let dir = reg.get(name).unwrap().session_dir.clone();
+    ui::ok(&format!("created session '{name}'"));
+    touch(env, root, &mut reg, name)?;
+    launch(root, &dir, true)
+}
+
+fn create(env: &Env, root: &Path, reg: &mut Registry, name: &str) -> Result<()> {
+    let dir = key_dir(env, root).join(name);
+    std::fs::create_dir_all(&dir)?;
+    let t = now();
+    reg.sessions.push(Session {
+        name: name.to_string(),
+        session_dir: dir,
+        worktree: None,
+        created: t,
+        last_active: t,
+    });
+    save(env, root, reg)
+}
+
+/// `8sync . ls` / `8sync . --list` — list sessions in this repo.
+pub fn cmd_ls(env: &Env, root: &Path) -> Result<()> {
+    let reg = load(env, root);
+    if reg.sessions.is_empty() {
+        ui::info("no named sessions in this repo — create one: `8sync . new <name>`");
+        return Ok(());
+    }
+    let now = now();
+    ui::header(&format!("sessions · {}", root.display()));
+    for s in &reg.sessions {
+        let star = if reg.last_used.as_deref() == Some(s.name.as_str()) { "★" } else { " " };
+        let title = session_title(&s.session_dir).unwrap_or_else(|| "(no messages yet)".to_string());
+        println!("  {star} {:<20} {:<12} {}", s.name, ago(s.last_active, now), title);
+    }
+    println!("\n  resume: 8sync . <name>   ·   new: 8sync . new <name>   ·   remove: 8sync . rm <name>");
+    Ok(())
+}
+
+/// `8sync . rm <name>` — remove a session. Deletes the transcript store only
+/// with `--force` (default: unregister + keep the store, warn).
+pub fn cmd_rm(env: &Env, root: &Path, name: &str, force: bool) -> Result<()> {
+    let mut reg = load(env, root);
+    let Some(pos) = reg.sessions.iter().position(|s| s.name == name) else {
+        bail!("no session '{name}' in this repo");
+    };
+    let s = reg.sessions[pos].clone();
+    if !force {
+        ui::warn(&format!(
+            "unregistering '{name}' but KEEPING its transcript at {} — use `--force` to delete it too",
+            s.session_dir.display()
+        ));
+    } else {
+        let _ = std::fs::remove_dir_all(&s.session_dir);
+        ui::ok(&format!("deleted transcript store {}", s.session_dir.display()));
+    }
+    reg.sessions.remove(pos);
+    if reg.last_used.as_deref() == Some(name) {
+        reg.last_used = None;
+    }
+    save(env, root, &reg)?;
+    ui::ok(&format!("removed session '{name}'"));
+    Ok(())
+}
+
+/// `8sync . mv <old> <new>` — rename a session (registry + session dir).
+pub fn cmd_mv(env: &Env, root: &Path, old: &str, new: &str) -> Result<()> {
+    if !valid_name(new) {
+        bail!("invalid session name '{new}' (use letters, digits, '-', '_', '.'; ≤64 chars)");
+    }
+    let mut reg = load(env, root);
+    if reg.get(new).is_some() {
+        bail!("session '{new}' already exists");
+    }
+    let Some(s) = reg.get_mut(old) else {
+        bail!("no session '{old}' in this repo");
+    };
+    let new_dir = key_dir(env, root).join(new);
+    if s.session_dir.exists() {
+        std::fs::rename(&s.session_dir, &new_dir).context("rename session dir")?;
+    }
+    s.name = new.to_string();
+    s.session_dir = new_dir;
+    if reg.last_used.as_deref() == Some(old) {
+        reg.last_used = Some(new.to_string());
+    }
+    save(env, root, &reg)?;
+    ui::ok(&format!("renamed session '{old}' → '{new}'"));
+    Ok(())
+}

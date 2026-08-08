@@ -5,6 +5,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added — `8sync .` named per-project sessions (run many features at once)
+- `8sync .` grew a session layer so you can keep several concurrent lines of work in one repo,
+  each an isolated omp conversation. Surface (namespaced under `.`, no new top-level verbs):
+  `8sync . <name>` create-or-resume · `8sync . new <name>` · `8sync . ls`/`--list` · `8sync . mv
+  <old> <new>` · `8sync . rm <name> [--force]`. `8sync .` with no name resumes the last-used
+  session (omp's default store when none was ever named — unchanged legacy behavior).
+- Mechanism: one omp `--session-dir` per name (omp's own `--continue` resumes it — zero session-id
+  bookkeeping), tracked in a machine-local registry `~/.config/8sync/sessions/<repo>/index.json`.
+  Every launch reuses `ModelConfig` so STEP-0 tool-routing + advisor survive. New module
+  `crates/cli/src/verbs/session.rs`; `here.rs` dispatches. Design drawn from affaan-m/ECC (MIT) —
+  git-worktree-per-session + `git merge-tree`-gated merge, all via `git` shell-out (no new deps);
+  worktree isolation and merge land in follow-up phases.
+
 ### Fixed — `8sync up` was Linux-only and bricked itself on Windows
 - Symptom (Windows): running `8sync up` left an un-runnable file so the next `8sync` invocation popped Windows' *"Select an app to open '8sync'"* picker instead of executing. Root cause in `crates/cli/src/verbs/selfup.rs`: the self-updater hard-coded `ASSET_SUFFIX = "-linux-x86_64"` (downloaded the **Linux** binary), wrote it to `~/.local/bin/8sync` with **no `.exe`**, and replaced it with a plain `std::fs::rename` (which Windows forbids on a running `.exe`). The release CI already publishes `8sync-<tag>-windows-x86_64.exe` and `install.ps1` installs to `%LOCALAPPDATA%\Programs\8sync\8sync.exe`, so the updater was simply never taught about non-Linux.
 - Fix — self-update is now genuinely cross-platform:

@@ -1,55 +1,90 @@
 use anyhow::{Context, Result};
 use clap::Args as ClapArgs;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "web")]
 use std::process::Command;
 
-use crate::{env_detect, ui, verbs::skill};
+use crate::{env_detect, ui, verbs::{session, skill}};
 
 #[derive(ClapArgs, Debug)]
 #[command(
     after_help = indoc::indoc! {"
         EXAMPLES
-          8sync .                       seed su-code/* context for the current project and run `omp --continue`
+          8sync .                       resume the latest session in this repo (seeds su-code/* context)
+          8sync . <name>                create-or-resume a named session (run many features at once)
+          8sync . new <name>            create a fresh named session (fails if it exists)
+          8sync . ls   (or --list)      list this repo's named sessions (★ = latest)
+          8sync . mv <old> <new>        rename a session
+          8sync . rm <name> [--force]   remove a session (--force also deletes its transcript)
 
         BEHAVIOR
-          · Walks up from cwd to find the project root (.git / Cargo.toml / package.json / pyproject.toml / go.mod / deno.json).
-          · Detects stack (rust/node/python/nextjs/tauri/react-native/go) and seeds AGENTS.md + su-code/{PROJECT,KNOWLEDGE,DECISIONS,PREFERENCES,STATE,NOTES}.md when missing.
-          · Re-injects the dynamic skills block in AGENTS.md so omp sees up-to-date skill list.
-          · Execs `omp --continue` in the project root. Session lifetime is owned by omp (retain/recall/auto-compact); 8sync no longer manages abduco sockets or kitty panes.
-          · If omp is missing, drops into the user shell instead (run `8sync setup` to fix).
+          · A named session is an isolated omp conversation (its own --session-dir), tracked in a
+            machine-local registry at ~/.config/8sync/sessions/<repo>/index.json.
+          · `8sync .` (no name) resumes the last-used session, or omp's default store if none was named.
+          · Walks up from cwd to the project root; seeds AGENTS.md + su-code/* when missing before launching.
+          · Session lifetime is owned by omp (retain/recall/auto-compact). Worktree isolation + merge: see M1/M2.
+          · Reserved verbs (new/ls/list/mv/rm) can't be used as bare session names — quote them under `new`.
     "}
 )]
-pub struct Args {}
+pub struct Args {
+    /// Session verb + args (`new <name>`, `ls`, `mv <old> <new>`, `rm <name>`),
+    /// or a bare `<name>` to create-or-resume. Empty = resume latest.
+    pub rest: Vec<String>,
 
-pub fn run(_args: Args) -> Result<()> {
+    /// List this repo's sessions (same as `ls`).
+    #[arg(long)]
+    pub list: bool,
+
+    /// With `rm`: also delete the session's omp transcript store.
+    #[arg(long)]
+    pub force: bool,
+}
+
+pub fn run(a: Args) -> Result<()> {
     let env = env_detect::Env::detect()?;
     let cwd = std::env::current_dir().context("no cwd")?;
     let root = detect_project_root(&cwd).unwrap_or(cwd.clone());
 
+    let (verb, rest) = a
+        .rest
+        .split_first()
+        .map(|(v, r)| (v.as_str(), r))
+        .unwrap_or(("", &[][..]));
+
+    // Registry-only ops — quick, no context seed or omp launch.
+    if a.list && verb.is_empty() {
+        return session::cmd_ls(&env, &root);
+    }
+    match verb {
+        "ls" | "list" => return session::cmd_ls(&env, &root),
+        "rm" => {
+            let name = rest.first().context("usage: 8sync . rm <name> [--force]")?;
+            return session::cmd_rm(&env, &root, name, a.force);
+        }
+        "mv" => {
+            let old = rest.first().context("usage: 8sync . mv <old> <new>")?;
+            let new = rest.get(1).context("usage: 8sync . mv <old> <new>")?;
+            return session::cmd_mv(&env, &root, old, new);
+        }
+        _ => {}
+    }
+
+    // Launch paths — seed project context first.
     ui::header("8sync .");
     ui::info(&format!("project: {}", root.display()));
-
     let stack = detect_stack(&root);
     if !stack.is_empty() {
         ui::ok(&format!("stack: {}", stack.join(", ")));
     }
-
     seed_project_context(&env, &root, &stack)?;
 
-    if which::which("omp").is_ok() {
-        ui::ok("→ exec: omp --continue");
-        let cfg = crate::models::ModelConfig::load();
-        let err = Command::new("omp").arg("--cwd").arg(&root).args(cfg.resume_flags()).arg("--continue").current_dir(&root).status();
-        match err {
-            Ok(s) if s.success() => Ok(()),
-            Ok(s) => Err(anyhow::anyhow!("omp exited with {}", s)),
-            Err(e) => Err(anyhow::anyhow!("could not exec omp: {}", e)),
+    match verb {
+        "new" => {
+            let name = rest.first().context("usage: 8sync . new <name>")?;
+            session::cmd_new(&env, &root, name)
         }
-    } else {
-        ui::warn("omp not installed — run `8sync setup` first. Falling back to $SHELL.");
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-        let _ = Command::new(&shell).current_dir(&root).status();
-        Ok(())
+        "" => session::resume_latest(&env, &root),
+        name => session::resume_named(&env, &root, name),
     }
 }
 

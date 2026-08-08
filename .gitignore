@@ -31,3 +31,6 @@ reference/
 web/node_modules/
 web/dist/
 web/*.tsbuildinfo
+
+# npm fallback lock from web FE build (canonical: bun.lock + pnpm-lock.yaml)
+web/package-lock.json

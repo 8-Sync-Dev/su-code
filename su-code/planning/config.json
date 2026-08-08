@@ -1,5 +1,5 @@
 {
-  "active_feature": "",
+  "active_feature": "multi-session",
   "paths": {
     "archive": "su-code/planning/_archive",
     "planning_root": "su-code/planning"

@@ -1,5 +1,5 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** `su-code/planning/ai-router-hub/STATE.md` — `8sync feature status`
+> **Active feature:** `su-code/planning/multi-session/STATE.md` — `8sync feature status`
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.

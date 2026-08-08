@@ -8,6 +8,7 @@ pub mod up;
 pub mod selfup;
 pub mod doctor;
 pub mod here;
+pub mod session;
 pub mod ai;
 pub mod ship;
 pub mod run;
