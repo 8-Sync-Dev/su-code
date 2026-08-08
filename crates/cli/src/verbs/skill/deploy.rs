@@ -16,7 +16,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
     let bundled: [(&str, &str); 20] = [
         ("skills/codegraph",               "codegraph"),
-        ("skills/karpathy-guidelines",                "karpathy-guidelines"),
+        ("skills/karpathy-guidelines",     "karpathy-guidelines"),
         ("skills/ponytail",                "ponytail"),
         ("skills/assp-skill",              "assp-skill"),
         ("skills/impeccable",              "impeccable"),
@@ -1447,5 +1447,50 @@ mod tests {
             assert!(r.message.contains("codegraph"), "message names no replacement");
         }
         assert_eq!(yaml_sq("a'b"), "'a''b'");
+    }
+}
+
+#[cfg(test)]
+mod bundled_tests {
+    /// Every skill named in a hardcoded deploy list MUST exist as an embedded
+    /// asset. These lists are literals (`deploy.rs` and `setup.rs`), so renaming
+    /// or deleting a skill directory does not break the build — the skill just
+    /// stops deploying, silently, forever.
+    ///
+    /// That is not hypothetical: `skills/karpathy` was renamed to
+    /// `skills/karpathy-guidelines` and both lists kept pointing at the old
+    /// prefix. `assets::read` returned None and the skill vanished from every
+    /// install with no error. This test is the standing guard for that class.
+    #[test]
+    fn every_bundled_skill_prefix_resolves_to_a_real_asset() {
+        let mut missing = Vec::new();
+        for src in [
+            include_str!("deploy.rs"),
+            include_str!("../setup.rs"),
+        ] {
+            for raw in src.split("(\"skills/").skip(1) {
+                let Some(name) = raw.split('"').next() else { continue };
+                // Skip non-directory entries (e.g. `skills/00-force-load.md`,
+                // a standalone file) and format!-template fragments.
+                if name.is_empty()
+                    || name.contains(' ')
+                    || name.contains('{')
+                    || name.ends_with(".md")
+                {
+                    continue;
+                }
+                let probe = format!("skills/{name}/SKILL.md");
+                if crate::assets::read(&probe).is_none() {
+                    missing.push(probe);
+                }
+            }
+        }
+        missing.sort();
+        missing.dedup();
+        assert!(
+            missing.is_empty(),
+            "bundled skill prefixes with no embedded SKILL.md (renamed or deleted \
+             asset dir — the skill would silently stop deploying): {missing:#?}"
+        );
     }
 }
