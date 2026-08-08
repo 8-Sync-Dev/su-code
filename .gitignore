@@ -34,3 +34,7 @@ web/*.tsbuildinfo
 
 # npm fallback lock from web FE build (canonical: bun.lock + pnpm-lock.yaml)
 web/package-lock.json
+
+# npm (TS typecheck of shipped extensions — CI only)
+node_modules/
+package-lock.json

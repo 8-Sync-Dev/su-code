@@ -1,0 +1,15 @@
+{
+  "name": "su-code-assets",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Type-check gate for the TypeScript assets 8sync deploys into omp (assets/extensions, assets/hooks). Not published, not bundled, not a runtime dependency of the Rust binary — the .ts files are embedded verbatim and executed by omp's Bun runtime, which strips types without checking them.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.extensions.json"
+  },
+  "devDependencies": {
+    "@oh-my-pi/pi-coding-agent": "17.2.11",
+    "@types/node": "24.9.2",
+    "typescript": "7.0.2"
+  }
+}

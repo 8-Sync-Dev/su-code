@@ -764,7 +764,7 @@ fn install_skills(env: &env_detect::Env) -> Result<()> {
     std::fs::create_dir_all(&skills_dir)?;
     // Bundled skills: deploy entire tree (SKILL.md + scripts/ + references/).
     let bundled: [(&str, &str); 4] = [
-        ("skills/karpathy",      "karpathy-guidelines"),
+        ("skills/karpathy-guidelines",      "karpathy-guidelines"),
         ("skills/image-routing", "image-routing"),
         ("skills/8sync-cli",     "8sync-cli"),
         ("skills/codegraph",     "codegraph"),

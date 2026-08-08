@@ -1,66 +1,75 @@
-import type { HookAPI } from "@oh-my-pi/pi-coding-agent/extensibility/hooks";
+// 8sync recall — anti-forget (the LIVE half). The static, always-apply
+// directives (RULE #0 + always-on skills) live in ~/.omp/agent/APPEND_SYSTEM.md,
+// which is always in the system prompt and never compacts away. This module adds
+// the per-session LIVE context at session start, at every agent start, and into
+// every compaction summary: the available skill index (NAMES ONLY — progressive
+// disclosure stays intact, no bodies dumped) + the live STATE Current/Next.
+//
+// It is an ExtensionAPI module, not a legacy HookAPI one: `--hook` is just an
+// alias for `--extension` and `.omp/hooks/pre/*.ts` factories are loaded as
+// extension modules, so `pi.on(...)` binds to the runtime event bus either way —
+// but only ExtensionAPI is a superset (tools/commands/`session_start`).
+// Hard cap ~1k token. Fail-safe: any read error is swallowed (session unaffected).
+import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// 8sync recall hook — anti-forget (the LIVE half). The static, always-apply
-// directives (RULE #0 + always-on skills) live in ~/.omp/agent/APPEND_SYSTEM.md,
-// which is always in the system prompt and never compacts away. This hook adds
-// the per-session LIVE context at every agent-start and into every compaction
-// summary: the available skill index (NAMES ONLY — progressive disclosure stays
-// intact, no bodies dumped) + the live STATE Current/Next.
-// Hard cap ~1k token. Fail-safe: any read error is swallowed (session unaffected).
-export default function (pi: HookAPI): void {
-  const home = homedir();
-  const skillsDir = join(home, ".omp/skills");
-
-  function skillIndex(): string[] {
-    try {
-      return readdirSync(skillsDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && !e.name.startsWith("."))
-        .map((e) => e.name)
-        .sort();
-    } catch {
-      return [];
-    }
-  }
-
-  function stateHead(): string {
-    try {
-      const cwd = process.cwd();
-      let state = join(cwd, "su-code/STATE.md");
-      if (!existsSync(state)) state = join(cwd, "agents/STATE.md"); // pre-migration fallback
-      if (!existsSync(state)) return "";
-      const md = readFileSync(state, "utf8");
-      const grab = (heading: string): string => {
-        const m = md.match(new RegExp(`## ${heading}[\\s\\S]*?(?:\\n## |$)`));
-        return m ? m[0].trim() : "";
-      };
-      return ["Current step", "Next"].map(grab).filter(Boolean).join("\n\n");
-    } catch {
-      return "";
-    }
-  }
+export default function (pi: ExtensionAPI): void {
+  const skillsDir = join(homedir(), ".omp/skills");
 
   function bundle(): string {
     const lines: string[] = [
       "# 8sync recall — obey ~/.omp/agent/APPEND_SYSTEM.md",
       "Code-intel first (codegraph · codebase-memory-mcp · serena · headroom) BEFORE grep/Read; images → zai-vision (never guess a tool name — exact catalog: ~/.omp/capabilities.md); recall before / retain durable facts after; browser to verify web/UI; open a skill's SKILL.md before acting.",
     ];
-    const skills = skillIndex();
+
+    let skills: string[] = [];
+    try {
+      skills = readdirSync(skillsDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+        .map((e) => e.name)
+        .sort();
+    } catch {
+      skills = [];
+    }
     if (skills.length) {
       lines.push("", `## Skills available (open SKILL.md when the task matches): ${skills.join(", ")}`);
     }
-    const head = stateHead();
-    if (head) lines.push("", "## STATE", head);
+
+    try {
+      const cwd = process.cwd();
+      let state = join(cwd, "su-code/STATE.md");
+      if (!existsSync(state)) state = join(cwd, "agents/STATE.md"); // pre-migration fallback
+      if (existsSync(state)) {
+        const md = readFileSync(state, "utf8");
+        const head = ["Current step", "Next"]
+          .map((heading) => md.match(new RegExp(`## ${heading}[\\s\\S]*?(?:\\n## |$)`))?.[0].trim() ?? "")
+          .filter(Boolean)
+          .join("\n\n");
+        if (head) lines.push("", "## STATE", head);
+      }
+    } catch {
+      // STATE.md unreadable — ship the bundle without it.
+    }
+
     return lines.join("\n").slice(0, 4000);
   }
+
+  pi.setLabel("8sync recall (anti-forget)");
+
+  // session_start: seed a resumed/compacted session before its first turn.
+  pi.on("session_start", async () => {
+    const content = bundle();
+    return content ? { message: { customType: "8sync-recall", content } } : undefined;
+  });
 
   pi.on("before_agent_start", async () => {
     const content = bundle();
     return content ? { message: { customType: "8sync-recall", content } } : undefined;
   });
 
+  // The compaction-surviving half: the bundle is re-stated inside the summary.
   pi.on("session.compacting", async () => {
     const content = bundle();
     return content ? { context: [content] } : undefined;

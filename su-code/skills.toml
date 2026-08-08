@@ -4,28 +4,12 @@
 src = "builtin:8sync-cli"
 when = "always"
 
-[alpha-research]
-src = "https://github.com/companion-inc/feynman"
-when = "on-demand"
-
-[autoresearch]
-src = "builtin:autoresearch"
-when = "on-demand"
-
 [codegraph]
 src = "builtin:codegraph"
 when = "always"
 
 [deep-research]
 src = "builtin:deep-research"
-when = "on-demand"
-
-[docker]
-src = "builtin:docker"
-when = "on-demand"
-
-[eli5]
-src = "builtin:eli5"
 when = "on-demand"
 
 [image-routing]
@@ -36,66 +20,18 @@ when = "always"
 src = "builtin:impeccable"
 when = "on-demand"
 
-[jobs]
-src = "builtin:jobs"
-when = "on-demand"
-
-[karpathy]
-src = "builtin:karpathy"
+[karpathy-guidelines]
+src = "builtin:karpathy-guidelines"
 when = "always"
 
-[literature-review]
-src = "builtin:literature-review"
+[remote-compute]
+src = "builtin:remote-compute"
 when = "on-demand"
 
-[ml-training-recipe]
-src = "builtin:ml-training-recipe"
-when = "on-demand"
-
-[modal-compute]
-src = "builtin:modal-compute"
-when = "on-demand"
-
-[paper-code-audit]
-src = "builtin:paper-code-audit"
-when = "on-demand"
-
-[paper-writing]
-src = "builtin:paper-writing"
-when = "on-demand"
-
-[preview]
-src = "builtin:preview"
-when = "on-demand"
-
-[replication]
-src = "builtin:replication"
-when = "on-demand"
-
-[research-review]
-src = "builtin:research-review"
-when = "on-demand"
-
-[runpod-compute]
-src = "builtin:runpod-compute"
-when = "on-demand"
-
-[session-log]
-src = "builtin:session-log"
-when = "on-demand"
-
-[session-search]
-src = "builtin:session-search"
+[research-paper]
+src = "builtin:research-paper"
 when = "on-demand"
 
 [social-growth]
 src = "builtin:social-growth"
-when = "on-demand"
-
-[source-comparison]
-src = "builtin:source-comparison"
-when = "on-demand"
-
-[watch]
-src = "builtin:watch"
 when = "on-demand"

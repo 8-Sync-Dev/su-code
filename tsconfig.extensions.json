@@ -1,0 +1,46 @@
+// Type-check gate for the TypeScript assets 8sync embeds and deploys into omp.
+//
+// Why this file exists: `assets/extensions/*.ts` and `assets/hooks/*.ts` are
+// embedded verbatim into the binary and executed by omp's Bun runtime. Bun
+// STRIPS types — it never checks them — so until this config landed these files
+// were type-checked nowhere. `web/tsconfig.json` only covers `web/src`.
+//
+// `include` is a DIRECTORY GLOB on purpose: assets come and go (extensions are
+// added/removed between releases), and a file list would silently stop covering
+// new ones. Anything dropped into those directories is checked automatically.
+//
+// Every option below is set EXPLICITLY. TypeScript 7 changed several defaults;
+// pinning them here means the gate means the same thing on every tsc version.
+{
+  "compilerOptions": {
+    // Bun's runtime target. `lib` excludes DOM: these run headless, and a stray
+    // `document`/`window` reference must be a hard error, not silently allowed.
+    "target": "es2022",
+    "lib": ["es2023"],
+
+    // omp loads these as ES modules; the bundler-style resolver is what matches
+    // Bun's own resolution of `@oh-my-pi/pi-coding-agent` subpath exports.
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+
+    // Bun transpiles each file in isolation — so must the checker.
+    "isolatedModules": true,
+
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // No ambient `@types/*` auto-inclusion. `node:*` specifiers still resolve
+    // through `@types/node` because they are imported explicitly; `types: []`
+    // only suppresses AUTOMATIC global inclusion.
+    "types": [],
+
+    // Third-party .d.ts is not ours to police; we check OUR files.
+    "skipLibCheck": true,
+
+    // Gate only. Nothing is emitted: the .ts files ship as source.
+    "noEmit": true
+  },
+  "include": ["assets/extensions/**/*.ts", "assets/hooks/**/*.ts"]
+}

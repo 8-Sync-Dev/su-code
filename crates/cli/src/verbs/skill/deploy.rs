@@ -16,7 +16,7 @@ pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
     let bundled: [(&str, &str); 20] = [
         ("skills/codegraph",               "codegraph"),
-        ("skills/karpathy",                "karpathy-guidelines"),
+        ("skills/karpathy-guidelines",                "karpathy-guidelines"),
         ("skills/ponytail",                "ponytail"),
         ("skills/assp-skill",              "assp-skill"),
         ("skills/impeccable",              "impeccable"),
@@ -1297,46 +1297,27 @@ pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
         &format!(".omp/extensions/{eng}"),
         "8sync-engine extension",
     )?;
-    deploy_omp_pair(
-        home,
-        root,
-        "commands/auto.md",
-        ".omp/agent/commands/auto.md",
-        ".omp/commands/auto.md",
-        "/auto command",
-    )?;
-    deploy_omp_pair(
-        home,
-        root,
-        "commands/feature.md",
-        ".omp/agent/commands/feature.md",
-        ".omp/commands/feature.md",
-        "/feature command",
-    )?;
-    deploy_omp_pair(
-        home,
-        root,
-        "commands/push-now.md",
-        ".omp/agent/commands/push-now.md",
-        ".omp/commands/push-now.md",
-        "/push-now command",
-    )?;
-    deploy_omp_pair(
-        home,
-        root,
-        "commands/pull-now.md",
-        ".omp/agent/commands/pull-now.md",
-        ".omp/commands/pull-now.md",
-        "/pull-now command",
-    )?;
-    deploy_omp_pair(
-        home,
-        root,
-        "commands/sync-pr.md",
-        ".omp/agent/commands/sync-pr.md",
-        ".omp/commands/sync-pr.md",
-        "/sync-pr command",
-    )
+    // Slash commands deploy by ITERATING the `commands/` asset dir — never a
+    // hardcoded block per file. Dropping a new `assets/commands/<n>.md` into the
+    // tree is therefore all it takes to ship a command; `/create-command` relies
+    // on exactly this. (This replaced five copy-pasted `deploy_omp_pair` calls,
+    // which is why `create-command` could not exist before.)
+    for asset in crate::assets::iter_under("commands/") {
+        let Some(file) = asset.rsplit('/').next() else { continue };
+        if !file.ends_with(".md") {
+            continue;
+        }
+        let name = file.trim_end_matches(".md");
+        deploy_omp_pair(
+            home,
+            root,
+            &asset,
+            &format!(".omp/agent/commands/{file}"),
+            &format!(".omp/commands/{file}"),
+            &format!("/{name} command"),
+        )?;
+    }
+    Ok(())
 }
 
 /// One-time rebrand migration: when the binary is rebranded (`brand::NS` differs

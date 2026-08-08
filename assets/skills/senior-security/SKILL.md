@@ -1,6 +1,6 @@
 ---
 name: senior-security
-description: Security engineering toolkit for threat modeling, vulnerability analysis, secure architecture, and penetration testing. Includes STRIDE analysis, OWASP guidance, cryptography patterns, and security scanning tools.
+description: Security engineering toolkit for threat modeling, vulnerability analysis, secure architecture, and penetration testing. Includes STRIDE analysis, OWASP guidance, cryptography selection tables, and a map of the security scanners to reach for.
 triggers:
   - security architecture
   - threat modeling
@@ -87,8 +87,6 @@ Identify and analyze security threats using STRIDE methodology.
 | Data Store | | X | X | X | X | |
 | Data Flow | | X | | X | X | |
 
-See: [references/threat-modeling-guide.md](references/threat-modeling-guide.md)
-
 ---
 
 ## Security Architecture Workflow
@@ -154,8 +152,6 @@ Layer 5: DATA
 | Service-to-service | mTLS with certificate rotation |
 | CLI/Automation | API keys with IP allowlisting |
 | High security | FIDO2/WebAuthn hardware keys |
-
-See: [references/security-architecture-patterns.md](references/security-architecture-patterns.md)
 
 ---
 
@@ -362,40 +358,21 @@ Respond to and contain security incidents.
 | Key exchange | X25519 | 256 bits |
 | TLS | TLS 1.3 | N/A |
 
-See: [references/cryptography-implementation.md](references/cryptography-implementation.md)
-
 ---
 
-## Tools and References
+## Tools
 
-### Scripts
+No scanners are bundled with this skill — use the maintained ones already on the machine:
 
-| Script | Purpose | Usage |
-|--------|---------|-------|
-| [threat_modeler.py](scripts/threat_modeler.py) | STRIDE threat analysis with risk scoring | `python threat_modeler.py --component "Authentication"` |
-| [secret_scanner.py](scripts/secret_scanner.py) | Detect hardcoded secrets and credentials | `python secret_scanner.py /path/to/project` |
+| Need | Tool |
+|------|------|
+| Secret detection | `gitleaks detect` / `gitleaks protect --staged` — the 8sync pre-commit hook already enforces this on every commit |
+| Dependency CVEs | `cargo audit` · `npm audit` · `pip-audit` · `osv-scanner` |
+| SAST | `semgrep --config auto` |
+| Container / IaC | `trivy fs .` · `checkov -d .` |
+| Threat modeling | Work the STRIDE-per-element matrix above directly; record the outcome as an ADR in `su-code/DECISIONS.md` |
 
-**Threat Modeler Features:**
-- STRIDE analysis for any system component
-- DREAD risk scoring
-- Mitigation recommendations
-- JSON and text output formats
-- Interactive mode for guided analysis
-
-**Secret Scanner Features:**
-- Detects AWS, GCP, Azure credentials
-- Finds API keys and tokens (GitHub, Slack, Stripe)
-- Identifies private keys and passwords
-- Supports 20+ secret patterns
-- CI/CD integration ready
-
-### References
-
-| Document | Content |
-|----------|---------|
-| [security-architecture-patterns.md](references/security-architecture-patterns.md) | Zero Trust, defense-in-depth, authentication patterns, API security |
-| [threat-modeling-guide.md](references/threat-modeling-guide.md) | STRIDE methodology, attack trees, DREAD scoring, DFD creation |
-| [cryptography-implementation.md](references/cryptography-implementation.md) | AES-GCM, RSA, Ed25519, password hashing, key management |
+Deeper background — Zero Trust and defense-in-depth patterns, attack trees and DREAD scoring, AES-GCM / Ed25519 / Argon2id implementation detail — is standard published material. `web_search` + `read` the current authoritative source instead of a vendored snapshot that silently drifts.
 
 ---
 

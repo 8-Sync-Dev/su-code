@@ -9,6 +9,7 @@ use clap::Args as ClapArgs;
 use crate::{env_detect, ui};
 
 pub(crate) mod add;
+pub(crate) mod create;
 pub(crate) mod deploy;
 pub(crate) mod discover;
 pub(crate) mod gen;
@@ -33,6 +34,9 @@ pub(crate) use inject::inject_agents_md;
       8sync skill add gh:owner/repo                              same, short form
       8sync skill add path:/abs/path#better-name                 register a local dir (symlink), optionally renamed
       8sync skill add builtin:karpathy                           register a builtin skill (already shipped)
+      8sync skill new flaky-test-triage 'Use when a CI test flakes.'   SCAFFOLD a new skill (SKILL.md + body skeleton)
+      8sync skill new --command ship-notes 'Draft release notes.'      scaffold a new slash command instead
+      8sync skill new command ship-notes                               same, bare word; add --force to overwrite
       8sync skill gen 1 2                                        FUSE local skill #1 and #2 into one combined SKILL.md
       8sync skill gen karpathy-guidelines codegraph              same, but by name
       8sync skill update [name]                                  re-pull registered skills from their source (git/builtin/path)
@@ -53,10 +57,11 @@ pub(crate) use inject::inject_agents_md;
       <project>/su-code/skills/         project-local skills (referenced from AGENTS.md)
 "})]
 pub struct Args {
-    /// Sub-action: list (default) | help | add <spec> | gen <id> <id> … | update [name]
+    /// Sub-action: list (default) | help | new <name> | add <spec> | gen <id> <id> … | update [name]
     pub sub: Option<String>,
     /// Arguments for the sub-action.
     /// - `add`: source spec (one)
+    /// - `new`: `<name> [description…]`, plus `--command` / `--force` / `--desc <text>`
     /// - `gen`: 2+ skill IDs (1-based index from local list, OR skill name)
     #[arg(trailing_var_arg = true)]
     pub args: Vec<String>,
@@ -73,6 +78,7 @@ pub fn run(a: Args) -> Result<()> {
             let spec = a.args.iter().find(|s| !s.starts_with('-')).map(|s| s.as_str());
             add::add_skill(&env, &skills_toml, spec, force)
         }
+        Some("new") => create::run_new(&env, &a.args),
         Some("gen") => gen::gen_skill(&env, &a.args),
         Some("update") => update::update_skills(&env, &skills_toml, a.args.first().map(|s| s.as_str())),
         Some(other) => {

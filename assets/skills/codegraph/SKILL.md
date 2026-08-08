@@ -66,4 +66,4 @@ For batch refactors (many files): `codegraph index .` to rebuild from scratch.
 
 ---
 
-For the full upstream CLI surface and installer details see `references/upstream-readme.md`. For a one-page command cheatsheet see `references/cli-cheatsheet.md`. **Do NOT read those during normal coding** — only when the user asks about install / uninstall / agent integration.
+For a one-page command cheatsheet see `references/cli-cheatsheet.md`. **Do NOT read it during normal coding** — only when the user asks about install / uninstall / agent integration. Upstream install/uninstall details: `codegraph --help` or the project's own README (not vendored here).
