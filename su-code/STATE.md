@@ -1,12 +1,12 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** `su-code/planning/multi-session/STATE.md` — `8sync feature status`
+> **Active feature:** none — `multi-session` SHIPPED in v0.53.0. Next large work: `ai-router-hub` M1 (in monorepo `8sync-startup`, blocked on B3 creds).
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
-## 🚚 HANDOFF — 2026-08-07 (cold resume from here)
+## 🚚 HANDOFF — 2026-08-08 (RELEASED v0.53.0)
 
-**Repo state (su-code):** branch `main`, tag **v0.52.0** (Cargo.toml chưa bump — WIP checkpoint, không phải release). HEAD = tip của push này (subject: `wip(handoff): 8sync self-update+serena fixes + ai-router-hub M0`). Tree clean sau push. `origin/main` = HEAD sau khi `/push-now` chạy xong.
+**Repo state (su-code):** branch `main`, **RELEASED tag `v0.53.0`** @ `8379798` (Cargo.toml+lock bumped 0.52.0→0.53.0). Tree clean, `origin/main` == HEAD, tag pushed → Release CI built + published 5 platform assets (linux x86_64/aarch64-musl, darwin x86_64/arm64, windows-msvc). `8sync up` now SAFE — it reinstalls v0.53.0 which carries every Luồng-A fix + the new session layer.
 
 **Repo state (monorepo `8sync-startup`):** branch `main` @ `ddfff79` — KHÔNG đụng tới session này; code `ai-router-hub` nằm ở `deploy/ai-router-hub/backend-go/` nhưng **gitignored** (`/deploy/*`), nên nó **sống trên disk máy này thôi** → xem "backend-go-snapshot" bên dưới.
 
@@ -26,16 +26,17 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
 **Done ✓**
 - [x] Luồng A: selfup cross-platform (native Linux build clean; nhánh `#[cfg(windows)]` type-check OK), serena dashboard off (no listener :24282), step0/interceptor deploy.
 - [x] Luồng B: M0 scaffold authored + Go-verified (5/5 engine task), CI gate PASS, independent review = READY, `M0-VERIFICATION.md` ghi.
+- [x] **multi-session feature (v0.53.0):** `8sync .` named sessions (new/ls/mv/rm/merge) + `--worktree` isolation + git-shell-out merge engine. 4 phases M0–M3, all smoke-verified (`multi-session/M3-VERIFICATION.md`), zero new deps.
+- [x] **RELEASED v0.53.0** — bumped Cargo.toml+lock, tagged, pushed; Release CI publishing 5-platform assets. `8sync up` safe again.
 
 **Next / TODO ▸**
-- [ ] **Release tag** (bump `Cargo.toml` 0.52.0→0.53.0 + tag + push) — cho tới lúc đó `8sync up` reinstall v0.52.0 & revert MỌI fix Luồng A. Đây là action giá trị nhất. (LƯU Ý: `/push-now` KHÔNG bump tag — đây là WIP checkpoint.)
 - [ ] **M1 (ai-router-hub)** — đã dời sang monorepo `8sync-startup`; tiếp ở đó (restore snapshot + `/feature plan` M1). Cần B3 credentials (Postgres + provider account + CLIProxyAPI host).
 - [ ] **Máy có Docker:** `encore run`/`encore test` backend-go + kiểm **Risk #1** (`Response.Result interface{}` — Encore schema parser có thể reject; fix 1 dòng). Xem `M0-VERIFICATION.md`.
 - [ ] `8sync harness toolstats` sau vài session enforcement: kỳ vọng `grep`→0, `cbm`/`serena`>0 (baseline 66.7% optimizer).
 
 **Blockers ⚠**
 - **M1 = true blocker (per-machine, NOT in git):** cần (a) Postgres, (b) ≥1 account provider (Claude/Gemini/Codex subscription) để onboard, (c) host chạy CLIProxyAPI binary. Credentials/data ngoài tầm agent → `/auto` dừng đúng luật.
-- **`8sync up` reverts Luồng A** cho tới khi cắt tag. Máy mới: build từ source (`bootstrap.sh`), **đừng** `8sync up`.
+- ~~`8sync up` reverts Luồng A~~ **RESOLVED by v0.53.0** — `8sync up` now reinstalls v0.53.0 (all fixes + session layer). Máy mới vẫn build từ source (`bootstrap.sh`) cho HEAD chưa release, else `8sync up` OK.
 - **bashInterceptor/serena config per-machine** (`~/.omp/agent/config.yml`, `mcp.json`): mỗi máy cần `8sync harness global`; `omp update` có thể rewrite config → re-run.
 - **`codegraph callers` FALSE NEGATIVE** — dùng `mcp__serena_find_referencing_symbols`. **Đừng `rm -rf .codegraph`** → `codegraph index --force` hoặc `8sync harness`.
 
