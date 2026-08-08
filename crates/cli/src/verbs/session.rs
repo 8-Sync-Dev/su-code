@@ -475,3 +475,118 @@ pub fn cmd_mv(env: &Env, root: &Path, old: &str, new: &str) -> Result<()> {
     ui::ok(&format!("renamed session '{old}' → '{new}'"));
     Ok(())
 }
+
+/// `8sync . merge <name>...` — land session branches into the repo's current
+/// branch, ECC-style: read-only `git merge-tree` conflict preflight → `git merge
+/// --no-edit` → rebase-to-unblock a conflicted branch → clean up the merged
+/// worktree + branch + session (unless `--keep-worktree`). Sequential: the target
+/// advances after each merge, so a later branch is re-checked against the earlier
+/// ones (branch-vs-branch conflicts surface naturally). Local only — never pushes.
+pub fn cmd_merge(env: &Env, root: &Path, names: &[String], keep_worktree: bool) -> Result<()> {
+    if names.is_empty() {
+        bail!("usage: 8sync . merge <name> [<name>...]  (lands each session's branch into the current branch)");
+    }
+    if !root.join(".git").exists() {
+        bail!("merge needs a git repo at {}", root.display());
+    }
+    if is_dirty(root) {
+        bail!(
+            "main working tree at {} has uncommitted changes — commit or stash them before merging",
+            root.display()
+        );
+    }
+    let target = current_branch(root)?;
+    ui::header(&format!("merge → {target}"));
+    let mut reg = load(env, root);
+
+    for name in names {
+        let Some(s) = reg.get(name) else {
+            ui::warn(&format!("no session '{name}' — skipped"));
+            continue;
+        };
+        let Some(w) = s.worktree.clone() else {
+            ui::warn(&format!("session '{name}' has no worktree/branch — nothing to merge, skipped"));
+            continue;
+        };
+        if w.branch == target {
+            ui::warn(&format!("session '{name}' is on the target branch '{target}' — skipped"));
+            continue;
+        }
+        if is_dirty(&w.path) {
+            ui::err(&format!("'{name}' has uncommitted changes at {} — commit them first, skipped", w.path.display()));
+            continue;
+        }
+
+        // 1. Read-only conflict preflight.
+        if let Some(files) = merge_conflicts(root, &target, &w.branch)? {
+            ui::warn(&format!("'{name}' ({}) conflicts with {target} [{}] — rebasing to unblock", w.branch, files.join(", ")));
+            // 2. Rebase the src worktree onto the target to unblock.
+            if git_ok(&w.path, &["rebase", target.as_str()]) {
+                ui::ok(&format!("rebased {} onto {target}", w.branch));
+            } else {
+                let _ = git_ok(&w.path, &["rebase", "--abort"]);
+                ui::err(&format!("'{name}' still conflicts after rebase — resolve manually in {}, then re-run", w.path.display()));
+                continue;
+            }
+            if let Some(files) = merge_conflicts(root, &target, &w.branch)? {
+                ui::err(&format!("'{name}' still conflicts ({}) — skipped", files.join(", ")));
+                continue;
+            }
+        }
+
+        // 3. Merge into the current branch (in the main working tree).
+        if git_ok(root, &["merge", "--no-edit", w.branch.as_str()]) {
+            ui::ok(&format!("merged '{name}' ({}) → {target}", w.branch));
+        } else {
+            let _ = git_ok(root, &["merge", "--abort"]);
+            ui::err(&format!("merge of '{name}' failed — skipped"));
+            continue;
+        }
+
+        // 4. Clean up the landed feature (worktree + branch + session).
+        if keep_worktree {
+            ui::info(&format!("kept worktree {} + branch {} (--keep-worktree)", w.path.display(), w.branch));
+        } else {
+            let wt_str = w.path.to_string_lossy().to_string();
+            let _ = git_ok(root, &["worktree", "remove", "--force", wt_str.as_str()]);
+            let _ = git_ok(root, &["branch", "-d", w.branch.as_str()]); // safe: now merged
+            if let Some(pos) = reg.sessions.iter().position(|x| &x.name == name) {
+                let _ = std::fs::remove_dir_all(&reg.sessions[pos].session_dir);
+                reg.sessions.remove(pos);
+                if reg.last_used.as_deref() == Some(name.as_str()) {
+                    reg.last_used = None;
+                }
+            }
+            ui::ok(&format!("cleaned up session '{name}' (worktree + branch + transcript)"));
+        }
+        save(env, root, &reg)?;
+    }
+    ui::ok("merge complete");
+    Ok(())
+}
+
+/// Read-only conflict preflight via `git merge-tree --write-tree` (never mutates
+/// the working tree). `None` = clean; `Some(files)` = conflicted paths.
+fn merge_conflicts(root: &Path, target: &str, branch: &str) -> Result<Option<Vec<String>>> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["merge-tree", "--write-tree", "--name-only", target, branch])
+        .output()
+        .context("git merge-tree")?;
+    if out.status.success() {
+        return Ok(None);
+    }
+    // Non-zero exit ⇒ conflicts. Output: <tree-oid>, then a blank line, then the
+    // conflicted file names (best-effort parse — exit code is the source of truth).
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let files: Vec<String> = stdout
+        .lines()
+        .skip(1) // tree oid
+        .map(str::trim)
+        .take_while(|l| !l.is_empty()) // stop at the blank before info messages
+        .filter(|l| !l.contains(' ')) // drop "Auto-merging …" / "CONFLICT …" info lines
+        .map(String::from)
+        .collect();
+    Ok(Some(if files.is_empty() { vec!["conflict".to_string()] } else { files }))
+}

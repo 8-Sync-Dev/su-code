@@ -42,6 +42,10 @@ pub struct Args {
     /// With `new`: give the session its own git worktree + branch `8sync/<name>`.
     #[arg(long)]
     pub worktree: bool,
+
+    /// With `merge`: keep merged worktrees + branches instead of cleaning them up.
+    #[arg(long = "keep-worktree")]
+    pub keep_worktree: bool,
 }
 
 pub fn run(a: Args) -> Result<()> {
@@ -69,6 +73,9 @@ pub fn run(a: Args) -> Result<()> {
             let old = rest.first().context("usage: 8sync . mv <old> <new>")?;
             let new = rest.get(1).context("usage: 8sync . mv <old> <new>")?;
             return session::cmd_mv(&env, &root, old, new);
+        }
+        "merge" => {
+            return session::cmd_merge(&env, &root, rest, a.keep_worktree);
         }
         _ => {}
     }

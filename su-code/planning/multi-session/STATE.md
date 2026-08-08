@@ -4,13 +4,13 @@ feature: multi-session
 ticket: ""
 branch: ""
 status: executing
-active_phase: "M2"
-next_action: M2-merge-engine
-next_phases: [M3]
+active_phase: "M3"
+next_action: M3-ux-docs
+next_phases: []
 progress:
   total_phases: 4
-  completed_phases: 2
-  percent: 50
+  completed_phases: 3
+  percent: 75
 last_updated: "2026-08-08"
 ---
 
