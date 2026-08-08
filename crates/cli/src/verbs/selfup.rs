@@ -173,21 +173,61 @@ fn fetch_latest_release() -> Option<(String, String)> {
     None
 }
 
-/// Cheap auto-check called from main(). Prints a 1-line notice if a newer
-/// release exists. Never blocks for long (5s timeout). Silent on offline.
+/// Is `remote` strictly newer than `local`? Compares dotted numeric components
+/// left to right, so `0.54.0 > 0.53.9` and a LOCAL build ahead of the published
+/// release (a dev build) never reports an update. String equality — the previous
+/// test — called every non-identical string an upgrade, including downgrades.
+/// Non-numeric suffixes are ignored rather than pulling in a semver crate.
+fn is_newer(remote: &str, local: &str) -> bool {
+    let part = |s: &str| -> Vec<u64> {
+        s.split(['.', '-', '+'])
+            .map(|c| {
+                let digits: String = c.chars().take_while(|c| c.is_ascii_digit()).collect();
+                digits.parse().unwrap_or(0)
+            })
+            .collect()
+    };
+    let (r, l) = (part(remote), part(local));
+    for i in 0..r.len().max(l.len()) {
+        let (a, b) = (r.get(i).copied().unwrap_or(0), l.get(i).copied().unwrap_or(0));
+        if a != b {
+            return a > b;
+        }
+    }
+    false
+}
+
+/// Auto-check called from main(). Runs the network probe on a DETACHED thread and
+/// never joins it, so the user's command is not delayed — previously this blocked
+/// dispatch for up to 5s against a rate-limited api.github.com, on every command
+/// including a bare `8sync`.
+///
+/// Silent unless stderr is a TTY and this is not CI: a notice in piped output or a
+/// CI log is noise nobody asked for. `last_seen_tag` suppresses re-notifying about
+/// a version the user has already been told about (it was written and never read).
 pub fn auto_check_notice() {
     if std::env::var("SUSYNC_NO_AUTO_CHECK").is_ok() { return; }
+    if std::env::var("CI").is_ok() { return; }
+    if !std::io::IsTerminal::is_terminal(&std::io::stderr()) { return; }
     if !should_check() { return; }
     touch_check();
-    let local = build_version();
-    let Some((tag, _url)) = fetch_latest_release() else { return; };
-    let remote = strip_v(&tag);
-    if remote == local { return; }
-    let _ = std::fs::write(last_seen_tag_file(), &tag);
-    eprintln!(
-        "\x1b[33m! 8sync update available: v{} → {} — run `8sync up` to install\x1b[0m",
-        local, tag
-    );
+    std::thread::spawn(|| {
+        let local = build_version();
+        let Some((tag, _url)) = fetch_latest_release() else { return; };
+        let remote = strip_v(&tag);
+        if !is_newer(&remote, &local) { return; }
+        // Already told the user about this exact release? Stay quiet.
+        if std::fs::read_to_string(last_seen_tag_file()).is_ok_and(|s| s.trim() == tag) {
+            return;
+        }
+        let _ = std::fs::write(last_seen_tag_file(), &tag);
+        let msg = format!("! 8sync update available: v{local} → {tag} — run `8sync up` to install");
+        if std::env::var("NO_COLOR").is_ok() {
+            eprintln!("{msg}");
+        } else {
+            eprintln!("\x1b[33m{msg}\x1b[0m");
+        }
+    });
 }
 
 /// Force self-update: download the latest release asset and install it.
@@ -199,8 +239,11 @@ pub fn run_self_update(force: bool) -> Result<bool> {
     let (tag, asset_url) = fetch_latest_release()
         .ok_or_else(|| anyhow!("could not query latest release from github.com/{}/{}", REPO_OWNER, REPO_NAME))?;
     let remote = strip_v(&tag);
-    if !force && remote == local {
-        ui::skip("8sync", &format!("up to date (v{})", local));
+    // Skip unless the release is strictly newer. `up.rs` used to pass force=true
+    // unconditionally, making this branch unreachable and re-downloading ~5 MB on
+    // every single `8sync up`.
+    if !force && !is_newer(&remote, &local) {
+        ui::skip("8sync", &format!("up to date (v{local}) — `8sync up --force` to reinstall"));
         return Ok(false);
     }
 
@@ -229,4 +272,26 @@ pub fn install_tag(tag: &str) -> Result<bool> {
     let _ = std::fs::write(last_seen_tag_file(), &tag);
     ui::ok(&format!("installed {} → {}", tag, dst.display()));
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_newer;
+
+    #[test]
+    fn only_strictly_newer_releases_notify() {
+        // upgrade
+        assert!(is_newer("0.54.0", "0.53.0"));
+        assert!(is_newer("0.53.10", "0.53.9")); // numeric, not lexicographic
+        assert!(is_newer("1.0.0", "0.99.99"));
+        // equal -> never
+        assert!(!is_newer("0.53.0", "0.53.0"));
+        // downgrade -> never (string equality used to call this an "update")
+        assert!(!is_newer("0.52.0", "0.53.0"));
+        // a local dev build ahead of the published release must stay quiet
+        assert!(!is_newer("0.53.0", "0.54.0-dev"));
+        // missing components are zero, not an error
+        assert!(is_newer("0.53.1", "0.53"));
+        assert!(!is_newer("0.53", "0.53.0"));
+    }
 }

@@ -24,13 +24,16 @@ pub struct Args {
     /// Pin to a specific release tag (e.g. `v0.6.10`). Default: latest.
     #[arg(long, value_name = "TAG")]
     pub to: Option<String>,
+    /// Re-download and reinstall even when already on the latest release.
+    #[arg(long)]
+    pub force: bool,
 }
 
 pub fn run(a: Args) -> Result<()> {
     ui::header("8sync up");
     let updated = match a.to {
         Some(tag) => selfup::install_tag(&tag)?,
-        None      => selfup::run_self_update(true)?,
+        None      => selfup::run_self_update(a.force)?,
     };
     if updated {
         ui::info("done — re-run any 8sync command to pick up the new binary");

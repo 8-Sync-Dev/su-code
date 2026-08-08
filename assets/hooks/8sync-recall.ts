@@ -58,12 +58,11 @@ export default function (pi: ExtensionAPI): void {
 
   pi.setLabel("8sync recall (anti-forget)");
 
-  // session_start: seed a resumed/compacted session before its first turn.
-  pi.on("session_start", async () => {
-    const content = bundle();
-    return content ? { message: { customType: "8sync-recall", content } } : undefined;
-  });
-
+  // NOTE: `session_start` is deliberately NOT used. Its signature is
+  // `ExtensionHandler<SessionStartEvent>` with no result type — it is an
+  // observe-only event and cannot inject a message. `before_agent_start` fires
+  // ahead of EVERY agent start, including the first one of a resumed or
+  // compacted session, so it already covers that case.
   pi.on("before_agent_start", async () => {
     const content = bundle();
     return content ? { message: { customType: "8sync-recall", content } } : undefined;

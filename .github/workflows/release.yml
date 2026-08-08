@@ -107,6 +107,23 @@ jobs:
         if: ${{ matrix.zig }}
         run: cargo zigbuild --release --locked --target ${{ matrix.target }}
 
+      # Correctness gate. Runs only on the native host build — the cross targets
+      # cannot execute their own test binaries, and running it once is enough.
+      - name: Test
+        if: ${{ !matrix.zig }}
+        run: cargo test --release --locked --target ${{ matrix.target }}
+
+      # `assets/extensions/*.ts` and `assets/hooks/*.ts` are embedded verbatim and
+      # run by omp under Bun, which STRIPS types without checking them. Without
+      # this step a type error in a shipped extension is only discovered at
+      # runtime, in the user's session.
+      - name: Typecheck shipped TypeScript assets
+        if: ${{ !matrix.zig && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --silent
+          npx tsc --noEmit -p tsconfig.extensions.json
+
       - name: Compute asset name
         shell: bash
         run: |

@@ -23,6 +23,9 @@
 // It never patches omp: it loads from `~/.omp/agent/extensions/` (global) and
 // `<root>/.omp/extensions/` (project), so omp updates stay safe.
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+// `z` is destructured from `pi.zod` at runtime (a value), so it cannot double as
+// a TYPE namespace. Import the same zod under an alias for `Zod.infer<…>` only.
+import type { z as Zod } from "@oh-my-pi/pi-coding-agent";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -142,26 +145,38 @@ export default function (pi: ExtensionAPI) {
   // never fires it for subagents, and hard-caps consecutive continuations at 8.
   let armed = false;
 
+  // Tool parameter schemas are hoisted so `execute` can be annotated with
+  // `z.infer<typeof …>`. `registerTool` is not generic over `parameters`, so
+  // without this `params` lands as `unknown` and every field access is an
+  // implicit-any that Bun would strip and ship unchecked.
+  const planParams = z.object({
+    goal: z.string(),
+    maxRetries: z.number().int().min(0).max(10).default(3),
+    slices: z
+      .array(
+        z.object({
+          title: z.string(),
+          tasks: z.array(
+            z.object({ title: z.string(), verify: z.array(z.string()).default(() => []) }),
+          ),
+        }),
+      )
+      .min(1),
+  });
+  const verifyParams = z.object({ taskId: z.string(), commands: z.array(z.string()).optional() });
+  const advanceParams = z.object({
+    taskId: z.string(),
+    commit: z.boolean().default(false),
+    message: z.string().optional(),
+  });
+
   pi.registerTool({
     name: "engine_plan",
     label: "Engine: plan",
     description:
       "Record the run-to-done plan: a goal, its slices, each slice's atomic tasks and their verify commands (the project's real lint/test/build). This is the durable gate ledger at .cache/8sync/engine/state.json — mirror the same tasks into `todo` for turn-by-turn tracking.",
-    parameters: z.object({
-      goal: z.string(),
-      maxRetries: z.number().int().min(0).max(10).default(3),
-      slices: z
-        .array(
-          z.object({
-            title: z.string(),
-            tasks: z.array(
-              z.object({ title: z.string(), verify: z.array(z.string()).default(() => []) }),
-            ),
-          }),
-        )
-        .min(1),
-    }),
-    async execute(_id, params) {
+    parameters: planParams,
+    async execute(_id, params: Zod.infer<typeof planParams>) {
       const now = new Date().toISOString();
       let si = 0;
       const state: EngineState = {
@@ -254,8 +269,8 @@ export default function (pi: ExtensionAPI) {
     label: "Engine: verify (the gate)",
     description:
       "Run the task's verify commands (or the ones passed). ALL must pass. Each failure increments the retry counter; at maxRetries the task is BLOCKED. The verdict is recorded in code — engine_advance refuses a task this never passed for.",
-    parameters: z.object({ taskId: z.string(), commands: z.array(z.string()).optional() }),
-    async execute(_id, params) {
+    parameters: verifyParams,
+    async execute(_id, params: Zod.infer<typeof verifyParams>) {
       const state = load();
       if (!state) return text("No plan yet. Call engine_plan first.");
       const target = find(state, params.taskId);
@@ -300,12 +315,8 @@ export default function (pi: ExtensionAPI) {
     label: "Engine: advance",
     description:
       "Mark a verified task done and optionally commit it. REFUSES a task with verify commands but no passing engine_verify run. With commit:true a gitleaks staged-diff gate runs first — a finding aborts the commit and unstages.",
-    parameters: z.object({
-      taskId: z.string(),
-      commit: z.boolean().default(false),
-      message: z.string().optional(),
-    }),
-    async execute(_id, params) {
+    parameters: advanceParams,
+    async execute(_id, params: Zod.infer<typeof advanceParams>) {
       const state = load();
       if (!state) return text("No plan yet. Call engine_plan first.");
       const target = find(state, params.taskId);
