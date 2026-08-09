@@ -47,7 +47,7 @@ Every verb supports -h / --help for detailed help with examples:
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Install harness (gh + omp + configs + skills) then prompt per personal profile
+    /// Install harness (gh + omp + configs + skills) then prompt per community profile
     Setup(verbs::setup::Args),
 
     /// Full update: 8sync + omp + system pkgs (pacman/AUR) + rustup + flatpak. See `8sync up -h`.
@@ -131,6 +131,12 @@ enum Cmd {
 }
 
 fn main() -> Result<()> {
+    // Hidden refresh child spawned by `auto_check_notice`. Handled before clap so
+    // it stays out of help and cannot collide with a verb.
+    if std::env::args().nth(1).as_deref() == Some(verbs::selfup::PROBE_ARG) {
+        verbs::selfup::run_probe();
+        return Ok(());
+    }
     // Single-source rebrand: when `brand::CMD`/`NS` differ from the default,
     // rewrite the command name + every help/EXAMPLES block through `brand::render`
     // in one pass. No-op (vanilla clap) on the default build → byte-identical help.

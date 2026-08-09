@@ -68,6 +68,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The tag is the only thing that names a release; the binary reports
+      # `env!("CARGO_PKG_VERSION")`. Let those disagree and every up-to-date user
+      # is told "update available" on every check, forever, and `8sync up`
+      # re-downloads the binary each run because the comparison never converges.
+      - name: Gate — tag matches Cargo.toml version
+        shell: bash
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          manifest=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "${tag#v}" != "$manifest" ]; then
+            echo "::error::tag $tag does not match Cargo.toml version $manifest"
+            exit 1
+          fi
+          echo "tag $tag == Cargo.toml $manifest"
+
       - name: Install musl toolchain
         if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
         run: |

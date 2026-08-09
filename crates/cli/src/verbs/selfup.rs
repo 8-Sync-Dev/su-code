@@ -206,28 +206,79 @@ fn is_newer(remote: &str, local: &str) -> bool {
 /// CI log is noise nobody asked for. `last_seen_tag` suppresses re-notifying about
 /// a version the user has already been told about (it was written and never read).
 pub fn auto_check_notice() {
-    if std::env::var("SUSYNC_NO_AUTO_CHECK").is_ok() { return; }
-    if std::env::var("CI").is_ok() { return; }
-    if !std::io::IsTerminal::is_terminal(&std::io::stderr()) { return; }
-    if !should_check() { return; }
-    touch_check();
-    std::thread::spawn(|| {
+    if std::env::var("SUSYNC_NO_AUTO_CHECK").is_ok() {
+        return;
+    }
+    if std::env::var("CI").is_ok() {
+        return;
+    }
+    if !std::io::IsTerminal::is_terminal(&std::io::stderr()) {
+        return;
+    }
+
+    // Print from CACHE — instant, no network on the command's critical path.
+    //
+    // The probe deliberately does not run inline. A previous revision spawned a
+    // detached `std::thread`, which the runtime kills the moment `main` returns:
+    // a `curl --max-time 5` never outlived an `8sync doctor`, and `touch_check()`
+    // had already burned the 6-hour window, so the notice could never appear.
+    // Refreshing a cache in a child process and reading it on the NEXT run gets a
+    // reliable notice with zero added latency.
+    if let Ok(tag) = std::fs::read_to_string(latest_tag_file()) {
+        let tag = tag.trim();
         let local = build_version();
-        let Some((tag, _url)) = fetch_latest_release() else { return; };
-        let remote = strip_v(&tag);
-        if !is_newer(&remote, &local) { return; }
-        // Already told the user about this exact release? Stay quiet.
-        if std::fs::read_to_string(last_seen_tag_file()).is_ok_and(|s| s.trim() == tag) {
-            return;
+        if !tag.is_empty()
+            && is_newer(strip_v(tag), local)
+            && !std::fs::read_to_string(last_seen_tag_file()).is_ok_and(|s| s.trim() == tag)
+        {
+            let _ = std::fs::write(last_seen_tag_file(), tag);
+            let msg =
+                format!("! 8sync update available: v{local} → {tag} — run `8sync up` to install");
+            if std::env::var("NO_COLOR").is_ok() {
+                eprintln!("{msg}");
+            } else {
+                eprintln!("\x1b[33m{msg}\x1b[0m");
+            }
         }
-        let _ = std::fs::write(last_seen_tag_file(), &tag);
-        let msg = format!("! 8sync update available: v{local} → {tag} — run `8sync up` to install");
-        if std::env::var("NO_COLOR").is_ok() {
-            eprintln!("{msg}");
-        } else {
-            eprintln!("\x1b[33m{msg}\x1b[0m");
-        }
-    });
+    }
+
+    if !should_check() {
+        return;
+    }
+    touch_check();
+    spawn_detached_probe();
+}
+
+fn latest_tag_file() -> PathBuf {
+    cache_dir().join("latest_tag")
+}
+
+/// Re-exec ourselves as a fire-and-forget child that refreshes the cache.
+/// Detached on purpose: it must survive this process exiting, which is exactly
+/// what a thread could not do.
+fn spawn_detached_probe() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let _ = std::process::Command::new(exe)
+        .arg(PROBE_ARG)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+/// Hidden argv marker for the refresh child. Matched in `main` before clap runs,
+/// so it never appears in help and can never collide with a real verb.
+pub const PROBE_ARG: &str = "__update-probe";
+
+/// Child-process entry point: fetch the latest tag and cache it. Never prints.
+pub fn run_probe() {
+    let Some((tag, _url)) = fetch_latest_release() else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(cache_dir());
+    let _ = std::fs::write(latest_tag_file(), tag);
 }
 
 /// Force self-update: download the latest release asset and install it.

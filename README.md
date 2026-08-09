@@ -93,7 +93,7 @@ Stage A (harness, always idempotent):
 - `pacman -S --needed helix lazygit abduco github-cli`
 - omp CLI via `curl -fsSL https://omp.sh/install | sh` (skipped if already present)
 - writes configs: `~/.config/helix/`, `~/.config/kitty/8sync.session`, `~/.config/8sync/{global,skills}.toml`
-- writes skills (37 bundled) to `~/.omp/skills/<name>/SKILL.md` + `00-force-load.md`. Always-on: codegraph, karpathy-guidelines, ponytail, assp-skill, impeccable, taste-skill, 8sync-cli, image-routing. On-demand: feature (large-scope GSD), code-review-and-quality, senior-security, senior-frontend, full-flow, last30days + 18 research skills (`social-growth` opt-in)
+- writes skills (23 bundled) to `~/.omp/skills/<name>/SKILL.md` + `00-force-load.md`. Core always-on: codegraph, karpathy-guidelines, ponytail, 8sync-cli. Specialist always-on: assp-skill, impeccable, taste-skill, image-routing, zai-vision, locate-anything. On-demand: feature (large-scope GSD), code-review-and-quality, senior-security, senior-frontend, full-flow, last30days, branch-sync, token-bench + research: deep-research, research-paper, remote-compute (`encore-deploy` tech-gated, `social-growth` opt-in)
 
 Stage B (community profiles, opt-in y/N per profile):
 
@@ -180,7 +180,7 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 | `8sync skill update [name]` | Re-pull from `src` (git dedup by URL, honors `rev` pins) |
 | `8sync skill gen <id> <id>` | Fuse N local skills into 1 combined SKILL.md |
 
-**37 skills bundled** in the binary. Always-on (read in order): codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing. On-demand: feature (large-scope GSD) · code-review-and-quality · senior-security · senior-frontend · full-flow · last30days + 18 research skills (deep-research, literature-review, autoresearch, paper-writing…). `encore-deploy` is tech-gated; `social-growth` is opt-in. Idempotent: re-running `add` with the same URL → `git pull --ff-only`.
+**23 skills bundled** in the binary. Core always-on (read in order): codegraph → karpathy-guidelines → ponytail → 8sync-cli. Specialist always-on (body read when the task matches): assp-skill · impeccable · taste-skill · image-routing · zai-vision · locate-anything. On-demand: feature (large-scope GSD) · code-review-and-quality · senior-security · senior-frontend · full-flow · last30days · branch-sync · token-bench + 3 research skills (deep-research, research-paper, remote-compute). `encore-deploy` is tech-gated; `social-growth` is opt-in. Idempotent: re-running `add` with the same URL → `git pull --ff-only`.
 
 
 ### Lifecycle
@@ -236,7 +236,7 @@ The sidebar is grouped — every page reads **real data** (no mocks), and most p
 | Group | Page | What you can do |
 |---|---|---|
 | Session | **State · Context** | Live plan (`su-code/STATE.md`), real session token/compaction stats |
-| Configure | **Models · Skills · Memory · Rules** | Change the model per role/task (writes `models.toml` immediately) · filter + cycle tiers across the 37 skills · edit the 6 memory files (STATE/KNOWLEDGE…) · add/remove rules |
+| Configure | **Models · Skills · Memory · Rules** | Change the model per role/task (writes `models.toml` immediately) · filter + cycle tiers across the 23 skills · edit the 6 memory files (STATE/KNOWLEDGE…) · add/remove rules |
 | Runtime | **Engines · Codegraph · MCP · Submodules** | Engine status (codegraph/cbm/headroom/serena/mnemopi) · **codebase graph**: package call graph (dagre layered layout) + 12 Leiden clusters + symbol search + caller/callee tracing · MCP servers · git submodules |
 | Quality | **Bench · Readiness · Team** | Run `harness bench` live — the page auto-loads with upfront breakdown meters (prefix / CORE / memory-spine) + a spine advisory · readiness gate · team roster |
 | Discover | **Marketplace** | Browse + one-click install MCP servers & skills from the official registry, Smithery, Glama, and mcp.so |
@@ -287,7 +287,7 @@ Edit `docs/index.html` → push to `main` → Pages rebuilds in ~1 minute.
 
 ## Stack & contribute
 
-Rust workspace, 1 binary (`8sync` ≈ 4.9 MB stripped, or 3.1 MB with `--no-default-features` — the `web` feature adds the dashboard FE + axum/tokio/scraper; 37 skills are always bundled, heaviest is `impeccable`). Measure with `bash scripts/size-report.sh`. Toolchain pinned in `rust-toolchain.toml`. The web dashboard is built from `web/` (Vite/React) via `build.rs` and embedded with rust-embed. The CLI command name + on-disk namespace are single-sourced in `crates/cli/src/brand.rs` — set `SC_CMD`/`SC_NS` at build time to rebrand the whole binary in one place (the default build stays `8sync`, byte-identical).
+Rust workspace, 1 binary (`8sync` ≈ 4.9 MB stripped, or 3.1 MB with `--no-default-features` — the `web` feature adds the dashboard FE + axum/tokio/scraper; 23 skills are always bundled, heaviest is `impeccable`). Measure with `bash scripts/size-report.sh`. Toolchain pinned in `rust-toolchain.toml`. The web dashboard is built from `web/` (Vite/React) via `build.rs` and embedded with rust-embed. The CLI command name + on-disk namespace are single-sourced in `crates/cli/src/brand.rs` — set `SC_CMD`/`SC_NS` at build time to rebrand the whole binary in one place (the default build stays `8sync`, byte-identical).
 
 Source layout:
 
@@ -303,7 +303,7 @@ crates/cli/src/
 assets/                           embedded into the binary via rust-embed
 ├── configs/                      kitty.session, helix-config, fish-config, 8sync/*.toml
 ├── presets/                      kitty preset themes
-├── skills/                       37 bundled (codegraph, karpathy, ponytail, assp, impeccable, taste, 8sync-cli, image-routing, feature, code-review, senior-security/frontend, full-flow, encore-deploy, last30days, 18 research skills, …)
+├── skills/                       23 bundled (codegraph, karpathy-guidelines, ponytail, 8sync-cli, assp-skill, impeccable, taste-skill, image-routing, zai-vision, locate-anything, feature, code-review-and-quality, senior-security/frontend, full-flow, encore-deploy, last30days, branch-sync, token-bench, deep-research, research-paper, remote-compute, social-growth)
 └── wallpapers/
 ```
 

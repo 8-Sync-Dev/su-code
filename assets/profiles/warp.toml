@@ -5,6 +5,7 @@
 
 name = "warp"
 description = "Cloudflare WARP VPN + DoH + MASQUE + malware DNS filter"
+visibility = "community"
 
 [packages]
 pacman = []

@@ -60,7 +60,6 @@ fn refresh_once(env: &env_detect::Env, pull: bool, commit: bool) -> Result<()> {
     let _ = crate::verbs::skill::deploy::ensure_engine(&env.home, Some(&root));
     let _ = crate::verbs::skill::deploy::ensure_rules(&env.home, Some(&root));
     let _ = crate::verbs::skill::deploy::cleanup_legacy_gs(&env.home, Some(&root));
-    let _ = crate::verbs::skill::deploy::ensure_workflow_extension(&env.home, Some(&root));
     seed_harness_memory(&root)?;
     let _ = consolidate_learnings(&root);
     seed_gitleaks_hook(&root);

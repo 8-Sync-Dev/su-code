@@ -72,7 +72,6 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     let _ = deploy::ensure_zai_vision_mcp(env);
     let _ = deploy::ensure_omp_capabilities_snapshot(&env.home);
     deploy::ensure_feynman_cli();
-    let _ = deploy::ensure_workflow_extension(&env.home, None);
     let _ = deploy::ensure_engine(&env.home, None);
     let _ = deploy::cleanup_legacy_gs(&env.home, None);
 
@@ -116,7 +115,6 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
         if n > 0 {
             ui::ok(&format!("dropped skill-index AGENTS.md into {} sub-folder(s)", n));
         }
-        let _ = deploy::ensure_workflow_extension(&env.home, Some(&root));
         let _ = deploy::ensure_engine(&env.home, Some(&root));
         let _ = deploy::cleanup_legacy_gs(&env.home, Some(&root));
         p.done();
@@ -127,7 +125,6 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
         p.done();
         ui::warn("not inside a project (no AGENTS.md/.git/Cargo.toml/package.json/... in cwd or ancestors)");
         ui::info("  → `cd` into a project root, then re-run `8sync harness init`");
-        let _ = deploy::ensure_workflow_extension(&env.home, None);
         let _ = deploy::ensure_engine(&env.home, None);
     }
     Ok(())

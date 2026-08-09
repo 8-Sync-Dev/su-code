@@ -1,6 +1,6 @@
 # ~/.config/8sync/skills.toml — skill registry (managed by 8sync skill)
-[karpathy]
-src  = "builtin:karpathy"
+[karpathy-guidelines]
+src  = "builtin:karpathy-guidelines"
 when = "always"
 
 [image-routing]

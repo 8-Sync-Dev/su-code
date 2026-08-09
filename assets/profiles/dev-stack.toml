@@ -5,6 +5,7 @@
 
 name = "dev-stack"
 description = "Dev runtime cho Next.js 16 + Encore TS: Docker + Node/Bun/pnpm + Encore CLI + native build deps"
+visibility = "community"
 
 [packages]
 pacman = [

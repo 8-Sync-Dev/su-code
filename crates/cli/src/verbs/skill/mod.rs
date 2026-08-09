@@ -33,7 +33,7 @@ pub(crate) use inject::inject_agents_md;
       8sync skill add https://github.com/addyosmani/agent-skills install a skill OR a whole skills/<name>/ collection
       8sync skill add gh:owner/repo                              same, short form
       8sync skill add path:/abs/path#better-name                 register a local dir (symlink), optionally renamed
-      8sync skill add builtin:karpathy                           register a builtin skill (already shipped)
+      8sync skill add builtin:karpathy-guidelines                register a builtin skill (already shipped)
       8sync skill new flaky-test-triage 'Use when a CI test flakes.'   SCAFFOLD a new skill (SKILL.md + body skeleton)
       8sync skill new --command ship-notes 'Draft release notes.'      scaffold a new slash command instead
       8sync skill new command ship-notes                               same, bare word; add --force to overwrite

@@ -152,7 +152,7 @@
       </article>
       <article class="card">
         <h3><span class="dot"></span>Skill injection</h3>
-        <p><b>37 skills</b> bundled. <code>8sync skill add &lt;github-url&gt;</code> clones into both the global <code>~/.omp/skills/</code> and the project's <code>su-code/skills/</code>.</p>
+        <p><b>23 skills</b> bundled. <code>8sync skill add &lt;github-url&gt;</code> clones into both the global <code>~/.omp/skills/</code> and the project's <code>su-code/skills/</code>.</p>
       </article>
     </section>
 
@@ -277,7 +277,7 @@ cd ~/code/my-app
     <!-- SKILLS -->
     <section id="skills">
       <h2>Skill injection</h2>
-      <p class="lede">A skill is an instruction module for the AI. 8sync bundles <b>37 skills</b> (codegraph · karpathy · ponytail · assp · impeccable · taste · 8sync-cli · image-routing · feature (large-scope GSD) + 18 research skills · …); <code>8sync skill add</code> is collection-aware and pulls whole sets from GitHub.</p>
+      <p class="lede">A skill is an instruction module for the AI. 8sync bundles <b>23 skills</b> (codegraph · karpathy-guidelines · ponytail · 8sync-cli · assp-skill · impeccable · taste-skill · image-routing · zai-vision · locate-anything · feature (large-scope GSD) + 3 research skills: deep-research · research-paper · remote-compute · …); <code>8sync skill add</code> is collection-aware and pulls whole sets from GitHub.</p>
       <div class="codeblock">
         <span class="lbl">bash</span>
 <pre><code># Clone from a URL: installs into BOTH ~/.omp/skills/ (global, read by omp) and su-code/skills/ (project)
@@ -287,7 +287,7 @@ cd ~/code/my-app
 # Other spec forms
 8sync skill add gh:owner/repo
 8sync skill add path:/abs/local/dir
-8sync skill add builtin:karpathy
+8sync skill add builtin:social-growth
 
 # Idempotent: re-running = git pull --ff-only
 8sync skill add https://github.com/colbymchenry/codegraph   # → "updated"

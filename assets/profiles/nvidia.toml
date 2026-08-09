@@ -5,6 +5,15 @@
 
 name = "nvidia"
 description = "NVIDIA — auto-detect driver (Blackwell/Ada/Ampere/Turing → open-dkms; Maxwell/Pascal → proprietary dkms) + DRM modeset + kernel params. Skips entirely if CachyOS `chwd` already configured a driver."
+visibility = "community"
+
+[requires]
+# Skip before installing a single package when the box has no NVIDIA hardware.
+# The post_install steps below also self-gate, but they run AFTER the package
+# lists, far too late to stop an AMD/Intel machine pulling the whole driver stack.
+# Reads the PCI vendor id straight from sysfs (0x10de = NVIDIA) so the probe needs
+# no lspci and works on a minimal install; no NVIDIA device => no match => skipped.
+detect = "grep -qi 0x10de /sys/bus/pci/devices/*/vendor 2>/dev/null"
 
 [packages]
 pacman = [

@@ -24,11 +24,18 @@ use std::path::PathBuf;
 
 use crate::{assets, env_detect, pkg, ui};
 
+/// Who a profile may be offered to.
+///
+/// Defaults to `Personal` — fail-CLOSED. `Community` is what makes a profile
+/// eligible for the y/N prompt and for unattended `--full`, so a profile that
+/// simply forgets the line must not silently become installable on every
+/// teammate's machine. Being offered to everyone is opt-in, and a user's own
+/// profile in `~/.config/8sync/profiles/` is machine-specific by nature.
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Visibility {
-    #[default]
     Community,
+    #[default]
     Personal,
 }
 
@@ -54,12 +61,25 @@ pub struct Profile {
     /// bundle can say which member it silently dropped on Fedora.
     #[serde(skip)]
     pub fedora_gaps: Vec<String>,
+    /// Filled by [`resolve`]: members dropped by their `requires.detect` probe.
+    #[serde(skip)]
+    pub hw_skipped: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct Requires {
     #[serde(default)]
     pub aur_helper: bool,
+    /// Read-only shell probe deciding whether this profile applies to THIS machine.
+    /// Non-zero exit => the profile is skipped before a single package is installed.
+    ///
+    /// Exists because a profile's own `post_install` guard runs far too late: `apply()`
+    /// installs packages first, so a GPU/chassis/dock profile would already have pulled
+    /// its driver stack onto hardware that cannot use it. That is exactly the "installs
+    /// garbage nobody asked for" failure mode. Evaluated in `--dry-run` too, so the
+    /// printed plan matches what a real run would do.
+    #[serde(default)]
+    pub detect: String,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -171,6 +191,8 @@ struct Acc {
     cmds: Vec<String>,
     hints: Vec<String>,
     requires_aur: bool,
+    /// Members whose `requires.detect` probe said "not this machine".
+    hw_skipped: Vec<String>,
 }
 
 /// Resolve a profile's full effective package/service set by walking `extends`.
@@ -181,7 +203,22 @@ struct Acc {
 /// that will not be installed (`warp-svc.service` and four `warp-cli` calls
 /// are pure noise on a box with no `cloudflare-warp`). The member is recorded
 /// in `fedora_gaps` so [`apply`] can name what it dropped.
+/// Resolve WITHOUT running any hardware probe — for read-only query paths
+/// (`doctor`, `setup profile show`, `unsupported_on_family`). `doctor` resolves
+/// every profile in the map, so probing here would spawn one shell per profile
+/// on a command that is supposed to only look.
 pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
+    resolve_with(name, all, false)
+}
+
+/// `probe_hardware` runs each member's `requires.detect`. Callers that are about
+/// to install pass `true`; `--dry-run` also passes `true` so the printed plan is
+/// the plan that would really run. Probes are read-only by contract.
+pub fn resolve_with(
+    name: &str,
+    all: &HashMap<String, Profile>,
+    probe_hardware: bool,
+) -> Result<Profile> {
     let mut visited: BTreeSet<String> = BTreeSet::new();
     let mut acc = Acc::default();
     let fedora = env_detect::distro_family() == env_detect::Family::Fedora;
@@ -192,11 +229,24 @@ pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
         visited: &mut BTreeSet<String>,
         acc: &mut Acc,
         fedora: bool,
+        probe_hardware: bool,
     ) -> Result<()> {
         if !visited.insert(n.to_string()) { return Ok(()); }
         let p = all.get(n).ok_or_else(|| anyhow!("profile not found: {}", n))?;
+        // Hardware gate, per MEMBER — a bundle keeps the rest of its members.
+        // Must run before the merges below: `apply` installs packages first, so
+        // a profile that only self-gates in post_install has already dragged its
+        // driver stack onto hardware that cannot use it. Skipping the subtree is
+        // the right reading of "this profile is not for this machine".
+        if probe_hardware
+            && !p.requires.detect.is_empty()
+            && !hardware_present(&p.requires.detect)
+        {
+            acc.hw_skipped.push(p.name.clone());
+            return Ok(());
+        }
         for e in &p.extends {
-            walk(e, all, visited, acc, fedora)?;
+            walk(e, all, visited, acc, fedora, probe_hardware)?;
         }
         // Packages are merged unconditionally: the two tables are already
         // family-split, and `apply` needs the Arch set intact to tell "not
@@ -232,7 +282,7 @@ pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
         Ok(())
     }
 
-    walk(name, all, &mut visited, &mut acc, fedora)?;
+    walk(name, all, &mut visited, &mut acc, fedora, probe_hardware)?;
 
     let description = all.get(name).map(|p| p.description.clone()).unwrap_or_default();
 
@@ -240,7 +290,12 @@ pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
         name: name.to_string(),
         description,
         extends: vec![],
-        requires: Requires { aur_helper: acc.requires_aur },
+        // The probe already ran during the walk; the resolved profile carries no
+        // gate of its own so `apply` cannot double-evaluate it.
+        requires: Requires {
+            aur_helper: acc.requires_aur,
+            detect: String::new(),
+        },
         packages: Packages {
             pacman: dedup(acc.pacman),
             aur: dedup(acc.aur),
@@ -259,6 +314,7 @@ pub fn resolve(name: &str, all: &HashMap<String, Profile>) -> Result<Profile> {
         },
         visibility: all.get(name).map(|p| p.visibility).unwrap_or_default(),
         fedora_gaps: dedup(acc.fedora_gaps),
+        hw_skipped: dedup(acc.hw_skipped),
     })
 }
 
@@ -313,13 +369,32 @@ pub fn unsupported_on_family(
     out
 }
 
+/// Run a profile's `requires.detect` probe. Absent/blank probe is handled by the
+/// caller; here a probe that cannot even be spawned counts as "not present" so a
+/// broken probe errs toward installing nothing rather than installing everything.
+fn hardware_present(probe: &str) -> bool {
+    std::process::Command::new("sh")
+        .arg("-c")
+        .arg(probe)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 /// Apply a resolved profile (idempotent). `yes_to_all` → unattended `--noconfirm`.
 /// `dry_run` → print plan only.
 ///
 /// A dry run is side-effect-free *and* infallible on a missing tool: every
 /// helper lookup (AUR helper, yay bootstrap, COPR, RPM Fusion) sits on the
 /// non-dry branch, so `--dry-run` always prints a plan instead of erroring.
-pub fn apply(p: &Profile, yes_to_all: bool, dry_run: bool) -> Result<()> {
+/// Returns whether the profile actually did anything. A profile that was fully
+/// gated out — every member hardware-skipped, or unported to this distro — did
+/// not "apply", and the caller must not record it as applied: doing so makes
+/// `8sync doctor` claim an NVIDIA profile is active on an AMD box and lets a
+/// later `--force` believe there is something to reinstall.
+pub fn apply(p: &Profile, yes_to_all: bool, dry_run: bool) -> Result<bool> {
     let fedora = env_detect::distro_family() == env_detect::Family::Fedora;
 
     ui::step(&format!("profile: {}", p.name));
@@ -329,7 +404,16 @@ pub fn apply(p: &Profile, yes_to_all: bool, dry_run: bool) -> Result<()> {
             &p.name,
             "no Fedora packages — add a [packages.fedora] table to port it",
         );
-        return Ok(());
+        return Ok(false);
+    }
+
+    // `resolve` already ran each member's probe and dropped everything it
+    // contributed; name the drops so a skip is never silent. Deliberately NOT an
+    // early return: a bundle's surviving members still own services and
+    // post_install steps that must run even when the resolved package set is
+    // empty (a configuration-only profile is legitimate).
+    for n in &p.hw_skipped {
+        ui::skip(n, "hardware not present on this machine");
     }
 
     if !p.description.is_empty() {
@@ -378,7 +462,11 @@ pub fn apply(p: &Profile, yes_to_all: bool, dry_run: bool) -> Result<()> {
         ui::info(&p.post_install.hint);
     }
 
-    Ok(())
+    Ok(declares_native(&p.packages)
+        || p.packages.fedora.is_some()
+        || !p.services.system_enable.is_empty()
+        || !p.services.user_enable.is_empty()
+        || !p.post_install.commands.is_empty())
 }
 
 /// Dry-run plan line for the native package set, naming the resolved backend.
@@ -540,4 +628,93 @@ fn current_ts() -> String {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     format!("epoch:{}", secs)
+}
+
+#[cfg(test)]
+mod hw_gate_tests {
+    use super::*;
+
+    fn prof(name: &str, detect: &str, pkg: &str, extends: &[&str]) -> Profile {
+        Profile {
+            name: name.to_string(),
+            description: String::new(),
+            extends: extends.iter().map(|s| s.to_string()).collect(),
+            requires: Requires {
+                aur_helper: false,
+                detect: detect.to_string(),
+            },
+            packages: Packages {
+                pacman: if pkg.is_empty() {
+                    vec![]
+                } else {
+                    vec![pkg.to_string()]
+                },
+                ..Default::default()
+            },
+            services: Services::default(),
+            post_install: PostInstall::default(),
+            visibility: Visibility::Community,
+            fedora_gaps: vec![],
+            hw_skipped: vec![],
+        }
+    }
+
+    fn map(ps: Vec<Profile>) -> HashMap<String, Profile> {
+        ps.into_iter().map(|p| (p.name.clone(), p)).collect()
+    }
+
+    /// The gate must drop a member's PACKAGES, not merely its post-install steps.
+    /// `apply` installs packages before post_install, so a profile that only
+    /// self-guards later has already pulled a driver stack onto wrong hardware.
+    #[test]
+    fn failing_probe_drops_the_members_packages_and_names_it() {
+        let all = map(vec![prof("gpu", "false", "nvidia-utils", &[])]);
+        let r = resolve_with("gpu", &all, true).unwrap();
+        assert!(
+            r.packages.pacman.is_empty(),
+            "gated profile still contributed packages: {:?}",
+            r.packages.pacman
+        );
+        assert_eq!(r.hw_skipped, vec!["gpu".to_string()], "skip must be reported");
+    }
+
+    #[test]
+    fn passing_probe_contributes_normally() {
+        let all = map(vec![prof("gpu", "true", "nvidia-utils", &[])]);
+        let r = resolve_with("gpu", &all, true).unwrap();
+        assert_eq!(r.packages.pacman, vec!["nvidia-utils".to_string()]);
+        assert!(r.hw_skipped.is_empty());
+    }
+
+    /// A bundle keeps every member the machine CAN use. Gating the whole bundle on
+    /// one member's hardware would be the opposite bug: absent GPU, no terminal.
+    #[test]
+    fn one_gated_member_does_not_sink_the_rest_of_the_bundle() {
+        let all = map(vec![
+            prof("gpu", "false", "nvidia-utils", &[]),
+            prof("term", "", "fish", &[]),
+            prof("bundle", "", "", &["gpu", "term"]),
+        ]);
+        let r = resolve_with("bundle", &all, true).unwrap();
+        assert_eq!(r.packages.pacman, vec!["fish".to_string()]);
+        assert_eq!(r.hw_skipped, vec!["gpu".to_string()]);
+    }
+
+    /// An unspawnable probe must fail CLOSED. Erring toward "install it anyway"
+    /// is how a broken one-liner silently reintroduces the garbage-install bug.
+    #[test]
+    fn unrunnable_probe_is_treated_as_absent_hardware() {
+        let all = map(vec![prof("gpu", "exit 127", "nvidia-utils", &[])]);
+        let r = resolve_with("gpu", &all, true).unwrap();
+        assert!(r.packages.pacman.is_empty());
+        assert_eq!(r.hw_skipped, vec!["gpu".to_string()]);
+    }
+
+    /// The resolved profile must not carry a probe of its own, or `apply` would
+    /// run it a second time (and a bundle would inherit a member's gate).
+    #[test]
+    fn resolved_profile_carries_no_residual_probe() {
+        let all = map(vec![prof("gpu", "true", "nvidia-utils", &[])]);
+        assert!(resolve_with("gpu", &all, true).unwrap().requires.detect.is_empty());
+    }
 }

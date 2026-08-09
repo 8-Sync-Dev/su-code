@@ -128,11 +128,32 @@ export default function (pi: ExtensionAPI) {
     return undefined;
   }
 
+  function clip(raw: string): string {
+    const s = raw.trim();
+    return s.length > MAX_OUTPUT ? `${s.slice(0, MAX_OUTPUT)}\n…[truncated]` : s;
+  }
+
+  /// Shell-evaluated. ONLY for a task's `verify` commands, where "this is a
+  /// shell command line" is the documented contract the user opted into.
   function run(cmd: string): { ok: boolean; output: string } {
     const r = spawnSync("bash", ["-lc", cmd], { cwd: process.cwd(), encoding: "utf8" });
-    const raw = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
-    const output = raw.length > MAX_OUTPUT ? `${raw.slice(0, MAX_OUTPUT)}\n…[truncated]` : raw;
-    return { ok: r.status === 0, output };
+    return { ok: r.status === 0, output: clip(`${r.stdout ?? ""}${r.stderr ?? ""}`) };
+  }
+
+  /// No shell, ever. Arguments reach the program as an argv array, so `$(…)`,
+  /// backticks and newlines inside them stay inert data.
+  ///
+  /// Required because a commit message is attacker-reachable: it comes from a
+  /// tool parameter the model fills in, and the model routinely paraphrases text
+  /// it just read from an issue, a README or a dependency changelog. Building
+  /// `git commit -m "<msg>"` as a string and handing it to `bash -lc` turned that
+  /// into arbitrary code execution — `JSON.stringify` escapes `"` and `\` but a
+  /// double-quoted bash word still performs command substitution. It also ran
+  /// beneath omp's approval policy and the STEP-0 interceptor, because the
+  /// extension spawns bash itself.
+  function runArgv(file: string, args: string[]): { ok: boolean; output: string } {
+    const r = spawnSync(file, args, { cwd: process.cwd(), encoding: "utf8" });
+    return { ok: r.status === 0, output: clip(`${r.stdout ?? ""}${r.stderr ?? ""}`) };
   }
 
   function text(s: string) {
@@ -331,18 +352,27 @@ export default function (pi: ExtensionAPI) {
       armed = true;
       let committed = "";
       if (params.commit) {
-        run("git add -A");
+        runArgv("git", ["add", "-A"]);
         // Secret gate before every autonomous commit — same check as the 8sync
-        // pre-commit hook. gitleaks absent → the `if` runs no branch and exits 0
-        // (best-effort skip); present + a finding → non-zero → abort and unstage.
-        const scan = run("if command -v gitleaks >/dev/null 2>&1; then gitleaks protect --staged --no-banner; fi");
+        // pre-commit hook. Presence is probed separately instead of being folded
+        // into `if command -v gitleaks; then …; fi`: that shell form exits 0 when
+        // gitleaks is absent, so a machine without it — i.e. most fresh installs —
+        // got a silently unscanned commit from a gate that claimed to scan.
+        const haveGitleaks = runArgv("gitleaks", ["version"]).ok;
+        const scan = haveGitleaks
+          ? runArgv("gitleaks", ["protect", "--staged", "--no-banner"])
+          : { ok: true, output: "" };
         if (!scan.ok) {
-          run("git reset");
+          runArgv("git", ["reset"]);
           committed = `\nCommit ABORTED: gitleaks flagged a secret in the staged diff. Task is done; resolve the leak, then commit manually.\n${scan.output}`;
         } else {
           const msg = params.message ?? `feat: ${target.title}`;
-          const r = run(`git commit -m ${JSON.stringify(msg)}`);
+          // argv, never a shell string — `msg` is model-supplied.
+          const r = runArgv("git", ["commit", "-m", msg]);
           committed = r.ok ? `\nCommitted: ${msg}` : `\nCommit skipped/failed: ${r.output}`;
+          if (!haveGitleaks) {
+            committed += `\nWARNING: gitleaks is not installed — this commit was NOT scanned for secrets. Install it to arm the gate: 8sync doctor reports it.`;
+          }
         }
       }
       const c = counts(state);

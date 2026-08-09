@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Args as ClapArgs;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -64,9 +65,9 @@ pub struct Args {
     /// Arguments for the sub-command.
     pub rest: Vec<String>,
 
-    /// Install EVERYTHING unattended (alexdev bundle = nvidia driver + all personal profiles).
-    /// Equivalent to applying the `alexdev` bundle. Aliases: `--yall`, `--yes`, `-y`.
-    /// Implies preflight + log + skip-on-error.
+    /// Unattended: accept every COMMUNITY profile (what the y/N prompt offers).
+    /// Personal profiles are NOT included — ask for them: `--profile alexdev`.
+    /// Aliases: `--yall`, `--yes`, `-y`. Implies preflight + log + skip-on-error.
     #[arg(long = "full", alias = "yall", alias = "yes", short = 'y')]
     pub full: bool,
 
@@ -215,9 +216,9 @@ pub fn run(a: Args) -> Result<()> {
         }
         ui::step(&format!("Stage B — applying profile `{}`", name));
         try_step(&format!("profile:{}", name), yolo, &mut failures, || {
-            let resolved = profile::resolve(name, &all)?;
-            profile::apply(&resolved, true, a.dry_run)?;
-            if !a.dry_run {
+            let resolved = profile::resolve_with(name, &all, true)?;
+            let did = profile::apply(&resolved, true, a.dry_run)?;
+            if did && !a.dry_run {
                 profile::mark_applied(name)?;
             }
             Ok(())
@@ -226,35 +227,38 @@ pub fn run(a: Args) -> Result<()> {
         return Ok(());
     }
 
-    // --full: apply alexdev bundle (nvidia + all personal profiles)
+    // --full: say yes to everything the interactive prompt would have offered.
+    //
+    // This used to apply the `alexdev` bundle, i.e. one maintainer's personal
+    // machine — so a teammate running `8sync setup --yall` got Lian Li chassis
+    // drivers, a Vietnamese IME and a DisplayLink DKMS module on hardware that
+    // has none of them. "Full" now means the full COMMUNITY set, the exact list
+    // `offered_profiles()` puts in the prompt. Personal profiles stay reachable
+    // only by asking for them: `--profile alexdev` restores the old behaviour in
+    // one flag.
     if a.full {
-        let bundle = if all.contains_key("alexdev") { "alexdev" } else { "" };
-        if !bundle.is_empty() {
-            ui::step(&format!("Stage B — --full: applying `{}` bundle", bundle));
-            try_step(&format!("profile:{}", bundle), yolo, &mut failures, || {
-                let resolved = profile::resolve(bundle, &all)?;
-                profile::apply(&resolved, true, a.dry_run)?;
-                if !a.dry_run {
-                    profile::mark_applied(bundle)?;
+        // `warp` is offered at the prompt but never taken unattended: it is a VPN
+        // that rewrites the machine's DNS and routing. `--community` already
+        // documents that opt-out, and a flag meaning "don't ask me" is the worst
+        // possible way to acquire one. `--profile warp` remains the way in.
+        let names: Vec<String> = offered_profiles(&all)
+            .into_iter()
+            .filter(|n| n != "warp")
+            .collect();
+        ui::step("Stage B — --full: every community profile (except the warp VPN)");
+        for n in &names {
+            try_step(&format!("profile:{}", n), yolo, &mut failures, || {
+                let resolved = profile::resolve_with(n, &all, true)?;
+                let did = profile::apply(&resolved, true, a.dry_run)?;
+                if did && !a.dry_run {
+                    profile::mark_applied(n)?;
                 }
                 Ok(())
             })?;
-        } else {
-            ui::warn("no `alexdev` bundle — applying every non-bundle profile individually");
-            let mut names: Vec<&String> = all.keys().collect();
-            names.sort();
-            for n in &names {
-                let p = match all.get(*n) { Some(p) => p, None => continue };
-                if !p.extends.is_empty() { continue; } // skip bundles
-                try_step(&format!("profile:{}", n), yolo, &mut failures, || {
-                    let resolved = profile::resolve(n, &all)?;
-                    profile::apply(&resolved, true, a.dry_run)?;
-                    if !a.dry_run { profile::mark_applied(n)?; }
-                    Ok(())
-                })?;
-            }
         }
-        try_step("terminal", yolo, &mut failures, || install_terminal(&env, a.dry_run))?;
+        try_step("terminal", yolo, &mut failures, || {
+            install_terminal(&env, a.dry_run)
+        })?;
         finish_summary(&failures, log_path.as_ref(), a.reboot, a.dry_run);
         return Ok(());
     }
@@ -269,9 +273,9 @@ pub fn run(a: Args) -> Result<()> {
                 continue;
             }
             try_step(&format!("profile:{}", n), yolo, &mut failures, || {
-                let resolved = profile::resolve(n, &all)?;
-                profile::apply(&resolved, true, a.dry_run)?;
-                if !a.dry_run { profile::mark_applied(n)?; }
+                let resolved = profile::resolve_with(n, &all, true)?;
+                let did = profile::apply(&resolved, true, a.dry_run)?;
+                if did && !a.dry_run { profile::mark_applied(n)?; }
                 Ok(())
             })?;
         }
@@ -288,26 +292,12 @@ pub fn run(a: Args) -> Result<()> {
 
 
     ui::step("Stage B — community profiles (y/N each)");
-    let order = ["dev-stack", "nvidia", "bluetooth", "warp"];
-    let mut names: Vec<&String> = all
-        .iter()
-        .filter(|(_, p)| p.extends.is_empty() && p.visibility == profile::Visibility::Community)
-        .map(|(k, _)| k)
-        .collect();
-    names.sort_by_key(|n| {
-        order
-            .iter()
-            .position(|o| o == &n.as_str())
-            .unwrap_or(usize::MAX)
-    });
+    let names = offered_profiles(&all);
     for name in &names {
-        let p = match all.get(*name) {
+        let p = match all.get(name.as_str()) {
             Some(p) => p,
             None => continue,
         };
-        if !p.extends.is_empty() {
-            continue;
-        }
         let desc = if p.description.is_empty() {
             name.as_str()
         } else {
@@ -315,7 +305,7 @@ pub fn run(a: Args) -> Result<()> {
         };
         let q = format!("Apply `{}` — {}", name, desc);
         if ui::prompt_yes_no(&q, false) {
-            let resolved = profile::resolve(name, &all)?;
+            let resolved = profile::resolve_with(name, &all, true)?;
             if let Err(e) = profile::apply(&resolved, false, a.dry_run) {
                 ui::err(&format!("profile {} failed: {}", name, e));
             } else if !a.dry_run {
@@ -337,6 +327,29 @@ fn finish_msg() {
     ui::header("Done — next steps");
     println!("  · 8sync doctor               — verify");
     println!("  · cd <project> && 8sync .    — seed su-code/ + start omp --continue");
+}
+
+/// The profiles a machine that is not the maintainer's may be offered: community
+/// visibility, non-bundle, in a stable presentation order.
+///
+/// SINGLE SOURCE OF TRUTH for "what does a teammate get". Both the interactive
+/// y/N prompt and `--full` read it, so the unattended path can never drift from
+/// the interactive one and quietly install a personal profile. Anything marked
+/// `visibility = "personal"` is reachable only through an explicit
+/// `--profile <name>` / `setup profile apply <name>`.
+pub(crate) fn offered_profiles(all: &HashMap<String, profile::Profile>) -> Vec<String> {
+    const ORDER: [&str; 4] = ["dev-stack", "nvidia", "bluetooth", "warp"];
+    let mut names: Vec<String> = all
+        .iter()
+        .filter(|(_, p)| p.extends.is_empty() && p.visibility == profile::Visibility::Community)
+        .map(|(k, _)| k.clone())
+        .collect();
+    // Listed names first in ORDER; anything new a user drops in follows, sorted.
+    names.sort_by(|a, b| {
+        let rank = |n: &str| ORDER.iter().position(|o| *o == n).unwrap_or(ORDER.len());
+        rank(a).cmp(&rank(b)).then_with(|| a.cmp(b))
+    });
+    names
 }
 
 /// Print final summary: log path (if any) + list of failures (if any).
@@ -869,9 +882,9 @@ fn profile_sub(rest: Vec<String>, yes_to_all: bool, dry_run: bool) -> Result<()>
             let name = rest
                 .get(1)
                 .ok_or_else(|| anyhow::anyhow!("usage: 8sync setup profile apply <name>"))?;
-            let resolved = profile::resolve(name, &all)?;
-            profile::apply(&resolved, yes_to_all, dry_run)?;
-            if !dry_run {
+            let resolved = profile::resolve_with(name, &all, true)?;
+            let did = profile::apply(&resolved, yes_to_all, dry_run)?;
+            if did && !dry_run {
                 profile::mark_applied(name)?;
             }
             Ok(())
@@ -1005,5 +1018,99 @@ where
             Ok(())
         }
         Err(e) => Err(e),
+    }
+}
+
+#[cfg(test)]
+mod offered_tests {
+    use super::*;
+
+    /// Every bundled profile, parsed from the embedded assets only — deliberately
+    /// NOT `profile::load_all()`, which also reads the developer's own
+    /// `~/.config/8sync/profiles/` and would make this test machine-dependent.
+    fn bundled() -> HashMap<String, profile::Profile> {
+        let mut map = HashMap::new();
+        for f in assets::Assets::iter() {
+            let path = f.as_ref();
+            let Some(rel) = path.strip_prefix("profiles/") else {
+                continue;
+            };
+            if !rel.ends_with(".toml") {
+                continue;
+            }
+            let s = assets::read(path).expect("embedded profile readable");
+            let p: profile::Profile =
+                toml::from_str(&s).unwrap_or_else(|e| panic!("parse {}: {}", path, e));
+            map.insert(p.name.clone(), p);
+        }
+        map
+    }
+
+    /// THE release invariant. A teammate must never receive a maintainer's
+    /// personal profile from an unattended run. `--full` and the y/N prompt both
+    /// read `offered_profiles`, so covering it covers both.
+    ///
+    /// Regression: `--full` used to apply the `alexdev` bundle outright, which put
+    /// Lian Li chassis drivers, a Vietnamese IME and DisplayLink DKMS on machines
+    /// that had none of that hardware.
+    #[test]
+    fn offered_profiles_never_include_a_personal_one() {
+        let all = bundled();
+        assert!(
+            all.values()
+                .any(|p| p.visibility == profile::Visibility::Personal),
+            "fixture is meaningless if no bundled profile is marked personal"
+        );
+
+        for name in offered_profiles(&all) {
+            let p = &all[&name];
+            assert_eq!(
+                p.visibility,
+                profile::Visibility::Community,
+                "`{name}` is offered unattended but is not community-visible"
+            );
+            assert!(
+                p.extends.is_empty(),
+                "`{name}` is a bundle; bundles are never offered directly"
+            );
+        }
+    }
+
+    /// Pins the exact set a teammate may be offered. A new bundled profile that
+    /// forgets `visibility` now defaults to Personal and simply will not appear
+    /// here; one that is wrongly marked community WILL, and fails this test.
+    #[test]
+    fn the_offered_set_is_exactly_the_reviewed_community_profiles() {
+        let mut got = offered_profiles(&bundled());
+        got.sort();
+        assert_eq!(
+            got,
+            vec!["bluetooth", "dev-stack", "nvidia", "warp"],
+            "the set of profiles offered to non-maintainers changed — this is a \
+             deliberate, reviewed decision, not something to update reflexively"
+        );
+    }
+
+    /// Fail-closed default: an unmarked profile must NOT be offered.
+    #[test]
+    fn a_profile_that_forgets_visibility_is_not_offered() {
+        let p: profile::Profile =
+            toml::from_str("name = \"forgot\"\ndescription = \"no visibility line\"")
+                .expect("parses");
+        assert_eq!(p.visibility, profile::Visibility::Personal);
+        let all = HashMap::from([("forgot".to_string(), p)]);
+        assert!(offered_profiles(&all).is_empty());
+    }
+
+    /// A personal profile stays reachable on purpose — the fix must not have
+    /// made the maintainer's own one-command setup impossible.
+    #[test]
+    fn personal_profiles_still_resolve_when_asked_for_by_name() {
+        let all = bundled();
+        let resolved = profile::resolve("alexdev", &all).expect("alexdev resolves");
+        assert!(
+            !resolved.packages.pacman.is_empty() || resolved.packages.fedora.is_some(),
+            "explicitly requesting the personal bundle must still install something"
+        );
     }
 }

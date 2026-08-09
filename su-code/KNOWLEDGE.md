@@ -294,3 +294,35 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1786020546.md)_
 - validated (fedora-harness): **6 agents editing one Rust crate in parallel compiled on the FIRST try** because the exact trait/struct signatures were fixed in the batch `context` up front and every agent was told to skip `cargo build`. Contract-first + no mid-flight validation is what makes wide fan-out safe; agents then self-corrected over IRC (one caught that `load_all()` returns `HashMap`, not a slice, and refused my wrong signature).
 - gotcha (fedora-harness): **`.gitignore` bare `reference/` silently swallows any `reference/` dir at any depth.** Distilled omp docs written to `su-code/reference/omp/` vanished from `git status`; relocated to `su-code/omp-reference/`. `assets/skills/impeccable/reference/` survives only because it was tracked BEFORE the rule existed. Verify a new doc dir is actually tracked (`git check-ignore -v <file>`) before assuming it is committed.
 - gotcha: a "dead code" warning can be a real bug in disguise — `undo` was unused because nothing wired it to the partial-failure path, and deleting the warning properly meant fixing the rollback. Prefer wiring over `#[allow(dead_code)]`.
+
+## v0.54.0 release closeout (2026-08-09)
+
+- **validated: an independent reviewer pass before a tag pays for itself.** Two `task` reviewers
+  (`reviewer` + `security-reviewer`) on `git diff origin/main..HEAD` found 28 issues the author
+  (me) had missed, including one that would have broken the release outright and two exploitable
+  bugs. Cost ~18 min wall-clock, run in parallel with the test suite. Do this for every tag.
+- **failure: `--full`/`--yall` hardcoded the maintainer's personal bundle** (`"alexdev"`) as the
+  meaning of "install everything". Any teammate running it got Lian Li chassis drivers, a
+  Vietnamese IME and DisplayLink DKMS. Root cause: three separate hardcoded profile lists that
+  could disagree with the `Visibility` enum. Fix = one `offered_profiles()` source of truth, and
+  `Visibility` now defaults to `Personal` so a forgotten marker fails CLOSED.
+- **failure: a profile's own `post_install` guard is too late to stop a bad install.**
+  `profile::apply` installs packages first, so `nvidia`'s "no NVIDIA GPU detected" check ran after
+  the driver stack was already on an AMD box. Gates must live in `resolve`'s walk, per bundle
+  member, before any package work.
+- **failure: `std::thread::spawn` cannot do background work in a CLI.** The M5 "non-blocking"
+  update check spawned a detached thread; the runtime kills it when `main` returns, and
+  `touch_check()` had already burned the 6-hour window — so the notice could never print. A CLI
+  that needs work to outlive the command must re-exec itself as a detached child process and read
+  the result from cache on the next run.
+- **failure: `JSON.stringify` is not shell quoting.** It escapes `"` and `\` but a double-quoted
+  bash word still performs `$()`/backtick substitution. `git commit -m ${JSON.stringify(msg)}` via
+  `bash -lc`, with `msg` model-supplied, was arbitrary code execution. Use argv (`spawnSync(file,
+  args)`); never build a shell string from data.
+- **failure: package names spliced into a `sudo` argv with no `--`.** A profile entry starting
+  with `-` becomes a package-manager FLAG: `--hookdir=` gives alpm attacker-written root hooks.
+  Validate AND emit `--`.
+- **validated: `if command -v X; then X …; fi` is a fail-OPEN security gate** — it exits 0 when X
+  is absent. Probe presence separately and say so when a check did not run.
+- **validated: test the negative direction too.** The existing guard only checked
+  list→asset, so two new skills silently never deployed. Every registry needs both directions.

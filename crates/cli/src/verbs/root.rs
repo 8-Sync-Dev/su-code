@@ -26,7 +26,7 @@ pub fn print_cheatsheet() {
     println!("{}", "FIRST TIME (new machine)".bold().green());
     println!("  {}", "1. clone + bootstrap — installs rustup if missing, builds binary into ~/.local/bin".dimmed());
     println!("     {}", "git clone https://github.com/8-Sync-Dev/su-code && cd su-code && bash scripts/bootstrap.sh".cyan());
-    println!("  {}", "2. install harness + pick personal profiles (asks y/N for each)".dimmed());
+    println!("  {}", "2. install harness + pick community profiles (asks y/N for each)".dimmed());
     println!("     {}", crate::brand::render("8sync setup").cyan());
     println!("  {}", crate::brand::render("3. log in to GitHub (so `8sync ship` can open PRs)").dimmed());
     println!("     {}", "gh auth login".cyan());
@@ -78,9 +78,9 @@ pub fn print_cheatsheet() {
     ]);
     println!("  {}", "→ palettes = color fragments; wallpaper swaps the kitty background_image. Both reload via SIGUSR1 (instant)".dimmed());
 
-    println!("\n{}", "PROFILES (opt-in personal customization, idempotent)".bold().yellow());
+    println!("\n{}", "PROFILES (opt-in, idempotent)".bold().yellow());
     rows(&[
-        ("8sync setup --yall",           "install harness + `alexdev` bundle, no prompts"),
+        ("8sync setup --yall",           "unattended (alias --full): harness + every community profile except warp (VPN); no personal ones"),
         ("8sync setup --no-profile",     "install harness only, skip the y/N profile stage"),
         ("8sync setup --profile <name>", "install harness + apply ONE profile non-interactively"),
         ("8sync setup --dry-run",        "print the full plan, change nothing (combine with any flag)"),
@@ -88,10 +88,12 @@ pub fn print_cheatsheet() {
         ("8sync setup profile show <n>", "show resolved packages + services + post-install of a profile"),
         ("8sync setup profile apply <n>", "(re-)apply one profile idempotently"),
     ]);
-    println!("  {}", "Built-in profiles (in priority order of independence):".dimmed());
-    println!("  {}", "  vietnamese · hardware-cooling · hardware-lianli · displaylink · apps-personal · warp".dimmed());
+    println!("  {}", "Community profiles — offered by setup; --full/--yall takes all of them but warp:".dimmed());
+    println!("  {}", "  dev-stack · bluetooth · warp (Cloudflare VPN — opt-in only)".dimmed());
     println!("  {}", "  nvidia (auto-detect: Blackwell→Turing→open-dkms; Maxwell/Pascal→dkms)".dimmed());
-    println!("  {}", "  alexdev (bundle: nvidia driver + all personal profiles)".dimmed());
+    println!("  {}", "Personal profiles — never offered, never in --full/--yall; only --profile <name>:".dimmed());
+    println!("  {}", "  vietnamese · hardware-cooling · hardware-lianli · displaylink · apps-personal".dimmed());
+    println!("  {}", "  alexdev (bundle: extends hardware-cooling + hardware-lianli + warp + vietnamese, adds kitty + AFFiNE)".dimmed());
     println!("  {}", crate::brand::render("Override any built-in: drop a TOML into ~/.config/8sync/profiles/<name>.toml").dimmed());
 
     println!("\n{}", "SECURITY (VPN + firewall)".bold().yellow());

@@ -5,6 +5,7 @@
 
 name = "bluetooth"
 description = "Bluetooth stack auto-start (bluez + bluez-utils, bluetooth.service)"
+visibility = "community"
 
 [packages]
 pacman = ["bluez", "bluez-utils"]

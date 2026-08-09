@@ -864,9 +864,9 @@ async fn api_rule_delete(
 //
 // Workflows are stored as react-flow node/edge JSON in <root>/su-code/workflows/.
 // `export` generates a STANDALONE omp extension <root>/.omp/extensions/<name>.ts
-// (NOT appended to the harness-managed 8sync-workflow.ts, which is redeployed
-// verbatim) that registers a model-callable `<name>_run` tool dispatching the
-// steps as followUp messages.
+// (its own file, never folded into a harness-managed extension — those are
+// redeployed verbatim) that registers a model-callable `<name>_run` tool
+// dispatching the steps as followUp messages.
 
 fn workflows_dir(root: &std::path::Path) -> std::path::PathBuf {
     root.join("su-code/workflows")

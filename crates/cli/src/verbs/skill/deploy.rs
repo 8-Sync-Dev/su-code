@@ -7,36 +7,44 @@ use std::process::Command;
 use super::discover::list_installed_skill_dirs;
 use crate::{assets, env_detect, ui};
 
+/// Every bundled skill tree: (asset prefix, target subdir name). Always-on first
+/// (this is the read order the agent is given), then on-demand specialists, then
+/// the research trio. Encore/full-flow are on-demand + tech-gated.
+///
+/// Module-level so the guard tests can assert BOTH directions against the real
+/// data — a fn-local literal can only be text-scraped, and the direction that
+/// actually bites (an asset dir nobody registered) needs the list itself.
+const BUNDLED_SKILLS: [(&str, &str); 22] = [
+    ("skills/codegraph",               "codegraph"),
+    ("skills/karpathy-guidelines",     "karpathy-guidelines"),
+    ("skills/ponytail",                "ponytail"),
+    ("skills/assp-skill",              "assp-skill"),
+    ("skills/impeccable",              "impeccable"),
+    ("skills/taste-skill",             "taste-skill"),
+    ("skills/8sync-cli",               "8sync-cli"),
+    ("skills/image-routing",           "image-routing"),
+    ("skills/zai-vision",              "zai-vision"),
+    ("skills/locate-anything",         "locate-anything"),
+    ("skills/code-review-and-quality", "code-review-and-quality"),
+    ("skills/senior-security",         "senior-security"),
+    ("skills/senior-frontend",         "senior-frontend"),
+    ("skills/full-flow",               "full-flow"),
+    ("skills/encore-deploy",           "encore-deploy"),
+    ("skills/last30days",              "last30days"),
+    ("skills/token-bench",             "token-bench"),
+    ("skills/feature",                 "feature"),
+    ("skills/branch-sync",             "branch-sync"),
+    ("skills/deep-research",           "deep-research"),
+    ("skills/research-paper",          "research-paper"),
+    ("skills/remote-compute",          "remote-compute"),
+];
+
 /// Deploy every bundled skill tree under `assets/skills/<name>/` into
 /// `~/.omp/skills/<name>/`. Each tree is deployed verbatim including any
 /// `references/` or `scripts/` subdirs. Shell scripts get mode 0755.
 pub(crate) fn install_bundled_global(env: &env_detect::Env) -> Result<()> {
     let skills_dir = env.home.join(".omp/skills");
-    // (asset prefix, target subdir name). always-on first (read order), then
-    // on-demand specialists. Encore/full-flow are on-demand + tech-gated.
-    let bundled: [(&str, &str); 20] = [
-        ("skills/codegraph",               "codegraph"),
-        ("skills/karpathy-guidelines",     "karpathy-guidelines"),
-        ("skills/ponytail",                "ponytail"),
-        ("skills/assp-skill",              "assp-skill"),
-        ("skills/impeccable",              "impeccable"),
-        ("skills/taste-skill",             "taste-skill"),
-        ("skills/8sync-cli",               "8sync-cli"),
-        ("skills/image-routing",           "image-routing"),
-        ("skills/zai-vision",              "zai-vision"),
-        ("skills/locate-anything",         "locate-anything"),
-        ("skills/code-review-and-quality", "code-review-and-quality"),
-        ("skills/senior-security",         "senior-security"),
-        ("skills/senior-frontend",         "senior-frontend"),
-        ("skills/full-flow",               "full-flow"),
-        ("skills/encore-deploy",           "encore-deploy"),
-        ("skills/last30days",              "last30days"),
-        ("skills/token-bench",             "token-bench"),
-        ("skills/feature",                 "feature"),
-        ("skills/branch-sync",             "branch-sync"),
-        ("skills/deep-research",           "deep-research"),
-    ];
-    for (asset_prefix, name) in bundled {
+    for (asset_prefix, name) in BUNDLED_SKILLS {
         let target_dir = skills_dir.join(name);
         std::fs::create_dir_all(&target_dir)?;
         let (written, _unchanged) = assets::install_tree(asset_prefix, &target_dir)?;
@@ -289,6 +297,14 @@ fn register_omp_mcp(home: &Path, name: &str, command: &str, args: &[&str], env: 
     let updating = smap.contains_key(name);
     smap.insert(name.to_string(), desired);
     std::fs::write(&mcp_path, serde_json::to_string_pretty(&root)?)?;
+    // 0600: this file carries live API keys (the zai-vision server's key lands in
+    // its `env` block). `fs::write` creates 0644 under a stock umask, leaving
+    // every local account able to read them.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&mcp_path, std::fs::Permissions::from_mode(0o600));
+    }
     let verb = if updating { "updated" } else { "registered" };
     ui::ok(&format!("{} {} MCP → {}", verb, name, mcp_path.display()));
     Ok(())
@@ -1211,41 +1227,6 @@ pub(crate) fn ensure_feynman_cli() {
     }
 }
 
-/// Deploy the `8sync-workflow` omp extension — a gsd-pi-grade surface that
-/// registers model-callable workflow tools (wf_state_get/set, persisted across
-/// compaction via a custom session entry) + a `/wf` status command + a
-/// session_start state-restore handler. Lives in omp's config dir
-/// (`~/.omp/agent/extensions/` global + `<root>/.omp/extensions/` project) so it
-/// NEVER patches omp core → omp updates stay safe. The Workflow viz page
-/// (`8sync harness web`) appends exported-workflow `registerTool` blocks to the
-/// project copy. Idempotent (byte-identical skip), mirrors `ensure_gs_command`.
-pub(crate) fn ensure_workflow_extension(home: &Path, root: Option<&Path>) -> Result<()> {
-    let Some(body) = assets::read("extensions/8sync-workflow.ts") else {
-        return Ok(());
-    };
-    let global = home.join(".omp/agent/extensions").join(crate::brand::ns_file("workflow.ts"));
-    if let Some(p) = global.parent() {
-        std::fs::create_dir_all(p)?;
-    }
-    let changed = std::fs::read_to_string(&global).map(|s| s != body).unwrap_or(true);
-    std::fs::write(&global, &body)?;
-    if changed {
-        ui::ok(&format!("8sync-workflow extension → {}", global.display()));
-    }
-    if let Some(r) = root {
-        let proj = r.join(".omp/extensions").join(crate::brand::ns_file("workflow.ts"));
-        if let Some(p) = proj.parent() {
-            std::fs::create_dir_all(p)?;
-        }
-        let changed = std::fs::read_to_string(&proj).map(|s| s != body).unwrap_or(true);
-        std::fs::write(&proj, &body)?;
-        if changed {
-            ui::ok(&format!("8sync-workflow extension → {}", proj.display()));
-        }
-    }
-    Ok(())
-}
-
 /// Deploy an omp artifact (command/extension) to the global config dir and, when
 /// inside a project, the project config dir too. Byte-identical writes are quiet.
 fn deploy_omp_pair(
@@ -1283,11 +1264,28 @@ fn deploy_omp_pair(
     Ok(())
 }
 
+/// Clean cutover for machines that ran an earlier 8sync: the `<NS>-workflow.ts`
+/// extension is retired — its tools now live in `8sync-engine.ts`. A copy left on
+/// disk would keep registering the same tool names alongside the engine, so it is
+/// swept from the global and project extension dirs (a rebranded build also has to
+/// sweep the historical `8sync-` name). Best-effort: absent is the normal case and
+/// a failed unlink never bails the harness run.
+fn remove_retired_workflow_extension(home: &Path, root: Option<&Path>) {
+    let ns = crate::brand::ns_file("workflow.ts");
+    for name in [ns.as_str(), "8sync-workflow.ts"] {
+        let _ = std::fs::remove_file(home.join(".omp/agent/extensions").join(name));
+        if let Some(r) = root {
+            let _ = std::fs::remove_file(r.join(".omp/extensions").join(name));
+        }
+    }
+}
+
 /// Deploy the gsd-pi-style automation engine — the `8sync-engine` omp extension
 /// (durable slice/task state machine + code-enforced verify-retry gate + git
 /// worktree tools) and its `/auto` orchestration command. 100% on omp core (config
-/// dirs only, never patches omp) so updates stay safe. Mirrors the workflow ext.
+/// dirs only, never patches omp) so updates stay safe.
 pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
+    remove_retired_workflow_extension(home, root);
     let eng = crate::brand::ns_file("engine.ts");
     deploy_omp_pair(
         home,
@@ -1353,7 +1351,6 @@ pub(crate) fn migrate_namespace(home: &Path) {
     for stale in [
         home.join(".omp/hooks/pre/8sync-recall.ts"),
         home.join(".omp/agent/extensions/8sync-engine.ts"),
-        home.join(".omp/agent/extensions/8sync-workflow.ts"),
     ] {
         let _ = std::fs::remove_file(&stale);
     }
@@ -1491,6 +1488,52 @@ mod bundled_tests {
             missing.is_empty(),
             "bundled skill prefixes with no embedded SKILL.md (renamed or deleted \
              asset dir — the skill would silently stop deploying): {missing:#?}"
+        );
+    }
+
+    /// The other direction, which the scrape above structurally cannot cover:
+    /// every embedded `assets/skills/<name>/SKILL.md` must be REGISTERED in
+    /// [`super::BUNDLED_SKILLS`]. An unregistered asset dir is shipped inside the
+    /// binary and deployed nowhere, so `~/.omp/skills/<name>/` never exists on any
+    /// machine but this checkout — while `assets/skills/00-force-load.md` still
+    /// tells the agent to open that SKILL.md. `research-paper` and
+    /// `remote-compute` shipped exactly like that.
+    ///
+    /// Opt-in skills are the one legitimate exception: they ship on purpose and
+    /// are enabled per-machine with `8sync skill add builtin:<name>`. Adding a
+    /// name here is a deliberate decision, not a way to silence this test.
+    #[test]
+    fn every_asset_skill_is_registered_or_explicitly_opt_in() {
+        const OPT_IN: [&str; 1] = ["social-growth"];
+
+        let mut unregistered = Vec::new();
+        for path in crate::assets::iter_under("skills/") {
+            let Some(name) = path
+                .strip_prefix("skills/")
+                .and_then(|rest| rest.strip_suffix("/SKILL.md"))
+            else {
+                continue; // `00-force-load.md`, references/, scripts/, …
+            };
+            // Skill roots are flat by construction (`install_bundled_global`
+            // deploys `skills/<name>/`), so a nested SKILL.md is reference
+            // material carried inside a tree, not a skill of its own.
+            if name.contains('/') || OPT_IN.contains(&name) {
+                continue;
+            }
+            let registered = super::BUNDLED_SKILLS
+                .iter()
+                .any(|(prefix, _)| prefix.strip_prefix("skills/") == Some(name));
+            if !registered {
+                unregistered.push(name.to_string());
+            }
+        }
+        unregistered.sort();
+        assert!(
+            unregistered.is_empty(),
+            "asset skill(s) missing from BUNDLED_SKILLS — shipped in the binary but \
+             never deployed to ~/.omp/skills/: {unregistered:#?}. Add each to \
+             BUNDLED_SKILLS, or to this test's OPT_IN list if it is deliberately \
+             opt-in."
         );
     }
 }

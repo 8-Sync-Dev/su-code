@@ -5,6 +5,65 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-08-09
+
+### Security
+- **Command injection in the shipped `8sync-engine.ts`.** `engine_advance` built
+  `git commit -m <msg>` as a string for `bash -lc`; `JSON.stringify` escapes `"` and `\` but a
+  double-quoted bash word still performs command substitution, and the message is a model-supplied
+  parameter routinely paraphrased from files the agent just read. Git and gitleaks now run through
+  an argv-based `runArgv` with no shell. Shell evaluation is retained only for a task's `verify`
+  commands, where it is the documented contract.
+- **Argument injection into `sudo pacman` / `sudo dnf`.** Profile package lists were spliced into a
+  privileged argv with no end-of-options separator, so an entry beginning with `-` became a flag —
+  `--hookdir=` hands alpm attacker-written root hooks, `--setopt=reposdir=` repoints dnf. Package
+  names starting with `-` are now refused outright at all three privileged entry points, and the
+  planners emit `--` before the package list.
+- The autonomous-commit gitleaks gate no longer fails open silently: `if command -v gitleaks` exits
+  0 when gitleaks is absent, so fresh machines got unscanned commits from a gate that claimed to
+  scan. Presence is probed separately and an unscanned commit says so.
+
+### Fixed — profiles a teammate never asked for
+- **`--full`/`--yall`/`-y` applied the maintainer's personal `alexdev` bundle**, so a teammate
+  running "install everything" got Lian Li chassis drivers, a Vietnamese IME, DisplayLink DKMS and
+  Bitwarden. `--full` now means every **community** profile, read from the same
+  `offered_profiles()` the y/N prompt uses. Personal profiles are reachable only via
+  `--profile <name>`; `--profile alexdev` restores the old behaviour in one flag.
+- `--full` also skips the `warp` VPN: a flag meaning "don't ask me" is the wrong way to acquire
+  something that rewrites DNS and routing, and `--community` already documented that opt-out.
+- **Profiles installed packages for hardware the machine does not have.** `apply` installs packages
+  before `post_install`, so the nvidia profile's own "no NVIDIA GPU detected" guard ran far too
+  late. New `requires.detect` probe is evaluated in `resolve`, per bundle member, before any
+  package work; `nvidia` probes sysfs PCI vendor `0x10de` (no `lspci` dependency) and fails closed.
+- A profile skipped for missing hardware is no longer recorded as applied.
+
+### Fixed
+- `Cargo.toml` version now matches the release tag, enforced by a new CI gate. Shipping 0.53.0
+  under a v0.54.0 tag would have told every up-to-date user "update available" forever and made
+  `8sync up` re-download the binary on every run.
+- **A stale `8sync-workflow.ts` kept loading after upgrade.** The extension was retired this
+  release, but nothing deleted the copy an earlier 8sync had already written to
+  `~/.omp/agent/extensions/` and `<root>/.omp/extensions/`, so omp went on registering its tools
+  next to the engine's. `8sync harness` (any subcommand) now removes both copies; the retired
+  deploy path and its six call sites are gone.
+- **Two shipped skills never deployed.** `research-paper` and `remote-compute` were added to
+  `assets/skills/` but never registered in the deploy list, so `~/.omp/skills/<name>/` was never
+  created on any machine — while `00-force-load.md` told the agent to open those SKILL.md files.
+  Both are registered now, and a new guard test walks the embedded assets in the opposite
+  direction (asset → list) so an unregistered skill dir fails the build by name; `social-growth`
+  stays the single documented opt-in exception.
+- **The shipped skill registry pointed at a deleted asset dir.** `assets/configs/skills.toml`
+  (deployed to `~/.config/8sync/skills.toml`) still declared `src = "builtin:karpathy"` after the
+  rename to `karpathy-guidelines`, so `8sync skill update` warned and skipped it on every run.
+- **User-facing docs advertised 15 skills that no longer ship.** `README.md`, `AGENTS.md` and the
+  docs site claimed "37 skills bundled" (and, elsewhere, 17) and named `literature-review`,
+  `autoresearch` and `paper-writing` among "18 research skills" — all three directories were
+  deleted, and the research set is now `deep-research`, `research-paper`, `remote-compute`. Every
+  count now reads 23, matching `assets/skills/*/SKILL.md`, every named skill resolves to a real
+  directory, and the two-tier force-load order (4 CORE + 6 specialist always-on) is described as
+  `00-force-load.md` actually implements it. The docs site also told users to run
+  `8sync skill add builtin:karpathy`, which no longer resolves.
+
 ### Added — Fedora-first package core (8sync now works on Fedora/RHEL)
 - `trait PkgBackend` with `Pacman` + `Dnf` impls, selected by `env_detect::distro_family()`
   (`Family::{Arch,Fedora,Other}`, reads `ID` **and** `ID_LIKE`; Fedora 44 ships no `ID_LIKE`, so

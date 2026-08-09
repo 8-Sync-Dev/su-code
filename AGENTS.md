@@ -104,7 +104,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - **Helix editor** (`hx` hoặc `helix`)
 - **omp** (oh-my-pi.sh) — AI engine, `~/.bun/bin/omp`
 
-Stack: **Rust** (single workspace, 1 binary `8sync` ≈ **4.9 MB stripped**, hoặc **3.1 MB** với `--no-default-features` — feature `web` gánh dashboard FE + axum/tokio/scraper; 37 bundled skill luôn có, nặng nhất là `impeccable` ~2 MB scripts/reference). Đo: `bash scripts/size-report.sh`.
+Stack: **Rust** (single workspace, 1 binary `8sync` ≈ **4.9 MB stripped**, hoặc **3.1 MB** với `--no-default-features` — feature `web` gánh dashboard FE + axum/tokio/scraper; 23 bundled skill luôn có, nặng nhất là `impeccable` ~2 MB scripts/reference). Đo: `bash scripts/size-report.sh`.
 
 ---
 
@@ -124,7 +124,7 @@ Sau đó:
 ```bash
 8sync setup                      # AI core thuần (omp + codegraph + MCP/skills + gh + PATH) + hỏi y/N từng profile (kitty/helix, dev-stack… đều opt-in)
 # hoặc:
-8sync setup --yall               # cài full harness + ALL profiles, không hỏi
+8sync setup --yall               # unattended: mọi profile COMMUNITY (không gồm personal), không hỏi
 8sync setup --no-profile         # chỉ harness (không hỏi profile)
 8sync setup --profile alexdev    # apply bundle cá nhân hóa của alexdev
 
@@ -308,23 +308,30 @@ Session memory được `omp` tự quản (retain/recall/auto-compact). 8sync ch
 
 ## 7. Skill system (force-load)
 
-Khi `8sync harness init` (hoặc `8sync setup`) chạy, **17 skill bundled** được deploy vào `~/.omp/skills/` theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview). 9 skill **always-on** đọc theo đúng thứ tự ưu tiên (codegraph → karpathy → ponytail → assp → impeccable → taste → 8sync-cli → image-routing → locate-anything); phần còn lại on-demand; `encore-deploy` tech-gated; `social-growth` opt-in:
+Khi `8sync harness init` (hoặc `8sync setup`) chạy, **23 skill bundled** được deploy vào `~/.omp/skills/` theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview). 10 skill **always-on** chia 2 tầng (progressive disclosure — giữ prefix gọn cho KV-cache): 4 **CORE** đọc body ngay đúng thứ tự (codegraph → karpathy-guidelines → ponytail → 8sync-cli), 6 **specialist** chỉ biết khả năng rồi đọc body khi task khớp; phần còn lại on-demand; `encore-deploy` tech-gated; `social-growth` opt-in:
 
 | Skill | Trigger | Mô tả |
 |---|---|---|
-|`codegraph`|`always`|semantic code intelligence (binary + SKILL.md) — STEP 0, mọi explore code|
-|`karpathy-guidelines`|`always`|kỷ luật engineering Karpathy-style|
-|`ponytail`|`always`|"laziest senior dev" — YAGNI, làm ít nhất, xoá > thêm|
-|`assp-skill`|`always`|brand DNA 8 Sync Dev + ASSP validate-before-build (UI copy, landing/pricing, feature mới)|
-|`impeccable`|`always`|**design system CHUẨN — BẮT BUỘC cho mọi UI/design/redesign/audit**; có `scripts/` + `references/house/*` (frontend-agent-workflow + clouds-f orchestration + keyword routers)|
-|`taste-skill`|`always`|anti-slop frontend taste cho landing/portfolio/redesign|
-|`8sync-cli`|`always`|dạy AI ưu tiên verb 8sync hơn shell thô|
-|`image-routing`|`always`|chọn image vs text reads để tiết kiệm token|
-|`locate-anything`|`always`|visual grounding (NVIDIA LocateAnything-3B qua `8sync locate`) — box + click-center coords cho GUI/OCR/detection; non-commercial license|
+|`codegraph`|`always` (CORE)|semantic code intelligence (binary + SKILL.md) — STEP 0, mọi explore code|
+|`karpathy-guidelines`|`always` (CORE)|kỷ luật engineering Karpathy-style|
+|`ponytail`|`always` (CORE)|"laziest senior dev" — YAGNI, làm ít nhất, xoá > thêm|
+|`8sync-cli`|`always` (CORE)|dạy AI ưu tiên verb 8sync hơn shell thô|
+|`assp-skill`|`always` (specialist)|brand DNA 8 Sync Dev + ASSP validate-before-build (UI copy, landing/pricing, feature mới)|
+|`impeccable`|`always` (specialist)|**design system CHUẨN — BẮT BUỘC cho mọi UI/design/redesign/audit**; có `scripts/` + `references/house/*` (frontend-agent-workflow + clouds-f orchestration + keyword routers)|
+|`taste-skill`|`always` (specialist)|anti-slop frontend taste cho landing/portfolio/redesign|
+|`image-routing`|`always` (specialist)|chọn image vs text reads để tiết kiệm token|
+|`zai-vision`|`always` (specialist)|GLM-5.2 text-only → GLM-5V bridge qua MCP `zai-vision`; đọc pixel: OCR screenshot, chẩn đoán lỗi từ ảnh, diagram/chart, UI→code, visual regression|
+|`locate-anything`|`always` (specialist)|visual grounding (NVIDIA LocateAnything-3B qua `8sync locate`) — box + click-center coords cho GUI/OCR/detection; non-commercial license|
+|`feature`|on-demand|feature LỚN nhiều phase/nhiều session (>10 file) theo GSD; state ở `su-code/planning/<slug>/`|
 |`code-review-and-quality` · `senior-security` · `senior-frontend`|on-demand|review/quality/security/frontend chuyên sâu|
 |`full-flow`|on-demand|self-driving fix/dev/verify loop (Encore + Next)|
-|`encore-deploy`|tech-gated|deploy runbook — chỉ hiện khi project dùng Encore|
+|`branch-sync`|on-demand|check/preview/merge/sync mọi git branch về main không conflict|
+|`token-bench`|on-demand|đo token thật mà codegraph/codebase-memory-mcp tiết kiệm vs grep+read (kèm correctness check)|
 |`last30days`|on-demand|research social recency (Reddit/X/YouTube/HN…)|
+|`deep-research`|on-demand|điều tra source-heavy → brief có provenance/citation|
+|`research-paper`|on-demand|paper end-to-end: replicate · recipe · audit · draft · autoresearch loop|
+|`remote-compute`|on-demand|chạy code ở Docker sandbox · Modal GPU · RunPod pod thay vì bare host|
+|`encore-deploy`|tech-gated|deploy runbook — chỉ hiện khi project dùng Encore|
 |`social-growth`|opt-in|social/branding/leads — bật bằng `8sync skill add builtin:social-growth`|
 
 **External skill packs** (best-effort, `harness init` tự clone vào `~/.omp/skills/`): [`ponytail`](https://github.com/DietrichGebert/ponytail) (full: audit/debt/review/help) + [`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills) (24 production-grade eng skills). Offline thì skip; bundled vẫn đủ mạnh.

@@ -68,7 +68,6 @@ pub(crate) fn harness_global(
     // 1. Machine-wide rule layer (~/.omp) — applies to EVERY omp session anywhere.
     ui::step("global rules → ~/.omp (skills · APPEND_SYSTEM · MCP · hooks)");
     global_pass(env)?;
-    let _ = deploy::ensure_workflow_extension(&env.home, None);
     let _ = deploy::ensure_engine(&env.home, None);
     let _ = deploy::cleanup_legacy_gs(&env.home, None);
 

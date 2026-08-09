@@ -52,6 +52,28 @@ fn pick(pkgs: &[&str], states: &[InstallState], want: InstallState) -> Vec<Strin
         .collect()
 }
 
+/// Reject package names a package manager would read as OPTIONS.
+///
+/// Profile TOMLs are user-authored and meant to be shared, and their package
+/// lists are spliced straight into an argv that runs under `sudo`. Without this
+/// a single entry beginning with `-` stops being a package and becomes a flag:
+/// `--hookdir=<dir>` points alpm at attacker-written hooks whose `Exec=` runs as
+/// root, and `--setopt=reposdir=<dir>` redirects dnf at an attacker's repo. The
+/// planners below also emit a `--` end-of-options separator, but this is the
+/// guarantee — it does not depend on any particular tool's argument parser.
+///
+/// A leading `-` is never a legitimate package name on any of these managers,
+/// so refusing outright costs nothing and keeps the failure loud.
+pub fn reject_option_like(pkgs: &[&str]) -> Result<()> {
+    if let Some(bad) = pkgs.iter().find(|p| p.starts_with('-')) {
+        anyhow::bail!(
+            "refusing to run a package manager with `{bad}` as a package name: \
+             a leading `-` would be parsed as an option, not a package"
+        );
+    }
+    Ok(())
+}
+
 /// The exact pacman install argv for `pkgs` given their pre-install `states`.
 ///
 /// Returns zero commands when nothing is `Missing` (today's behaviour: already
@@ -66,6 +88,9 @@ pub fn plan_argv(pkgs: &[&str], states: &[InstallState], noconfirm: bool) -> Vec
     if noconfirm {
         cmd.push("--noconfirm".to_string());
     }
+    // `--`: everything after this is a package, never a flag. Defence in depth
+    // behind `reject_option_like`; pacman and dnf both honour it.
+    cmd.push("--".to_string());
     cmd.extend(new_pkgs);
     vec![cmd]
 }
@@ -79,6 +104,7 @@ pub fn plan_rollback_argv(pkgs: &[&str], noconfirm: bool) -> Vec<Vec<String>> {
     if noconfirm {
         cmd.push("--noconfirm".to_string());
     }
+    cmd.push("--".to_string());
     cmd.extend(pkgs.iter().map(|p| p.to_string()));
     vec![cmd]
 }
@@ -129,6 +155,7 @@ pub fn plan_dnf_argv(pkgs: &[&str], states: &[InstallState], noconfirm: bool) ->
         if noconfirm {
             cmd.push("-y".to_string());
         }
+        cmd.push("--".to_string());
         cmd.extend(set);
         out.push(cmd);
     }
@@ -203,6 +230,7 @@ impl PkgBackend for Pacman {
         if pkgs.is_empty() {
             return Ok(Txn::default());
         }
+        reject_option_like(pkgs)?;
 
         // 1. Snapshot pre-install state
         let states: Vec<InstallState> = pkgs.iter().map(|p| self.state(p)).collect();
@@ -310,6 +338,7 @@ impl PkgBackend for Dnf {
         if pkgs.is_empty() {
             return Ok(Txn::default());
         }
+        reject_option_like(pkgs)?;
 
         let states: Vec<InstallState> = pkgs.iter().map(|p| self.state(p)).collect();
         let touched: Vec<String> = pkgs
@@ -670,6 +699,7 @@ pub fn aur_install_safe(helper: &str, pkgs: &[&str], noconfirm: bool) -> Result<
     if pkgs.is_empty() {
         return Ok(());
     }
+    reject_option_like(pkgs)?;
 
     let states: Vec<InstallState> = pkgs.iter().map(|p| pacman_state(p)).collect();
     let new_pkgs: Vec<&str> = pkgs
@@ -787,7 +817,8 @@ mod tests {
 
     // ── Arch regression fixture (AC-10) ──
     // These pin the pacman/AUR command lines exactly as they were before the
-    // Fedora port. Any change here is an Arch behaviour change.
+    // Fedora port, plus the `--` end-of-options separator added in v0.54.0.
+    // Any other change here is an Arch behaviour change.
 
     #[test]
     fn pacman_install_argv_skips_installed() {
@@ -795,7 +826,16 @@ mod tests {
         let states = [Missing, UpToDate, Missing];
         assert_eq!(
             plan_argv(&pkgs, &states, true),
-            vec![v(&["sudo", "pacman", "-S", "--needed", "--noconfirm", "git", "fd"])]
+            vec![v(&[
+                "sudo",
+                "pacman",
+                "-S",
+                "--needed",
+                "--noconfirm",
+                "--",
+                "git",
+                "fd"
+            ])]
         );
     }
 
@@ -803,7 +843,7 @@ mod tests {
     fn pacman_install_argv_without_noconfirm() {
         assert_eq!(
             plan_argv(&["git"], &[Missing], false),
-            vec![v(&["sudo", "pacman", "-S", "--needed", "git"])]
+            vec![v(&["sudo", "pacman", "-S", "--needed", "--", "git"])]
         );
     }
 
@@ -819,11 +859,11 @@ mod tests {
     fn pacman_rollback_argv() {
         assert_eq!(
             plan_rollback_argv(&["git", "fd"], true),
-            vec![v(&["sudo", "pacman", "-Rns", "--noconfirm", "git", "fd"])]
+            vec![v(&["sudo", "pacman", "-Rns", "--noconfirm", "--", "git", "fd"])]
         );
         assert_eq!(
             plan_rollback_argv(&["git"], false),
-            vec![v(&["sudo", "pacman", "-Rns", "git"])]
+            vec![v(&["sudo", "pacman", "-Rns", "--", "git"])]
         );
         assert!(plan_rollback_argv(&[], true).is_empty());
     }
@@ -879,10 +919,54 @@ mod tests {
         assert_eq!(
             plan_dnf_argv(&pkgs, &states, true),
             vec![
-                v(&["sudo", "dnf", "install", "-y", "gcc"]),
-                v(&["sudo", "dnf", "upgrade", "-y", "git"]),
+                v(&["sudo", "dnf", "install", "-y", "--", "gcc"]),
+                v(&["sudo", "dnf", "upgrade", "-y", "--", "git"]),
             ]
         );
+    }
+
+    // ── argument-injection guard (SEC-003) ──
+
+    /// A package list is profile data, and profiles are shareable. A name that
+    /// starts with `-` becomes a package-manager FLAG under sudo: `--hookdir=`
+    /// gives alpm attacker-written root hooks, `--setopt=reposdir=` repoints dnf.
+    #[test]
+    fn option_like_package_names_are_refused() {
+        for bad in [
+            "--hookdir=/tmp/evil",
+            "-Rns",
+            "--setopt=reposdir=/tmp/evil",
+            "-",
+        ] {
+            assert!(
+                reject_option_like(&["git", bad]).is_err(),
+                "`{bad}` must be refused as a package name"
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_package_names_are_accepted() {
+        // Interior and trailing dashes are legitimate and must keep working.
+        assert!(reject_option_like(&["git", "xorg-x11-drv-nvidia", "c++"]).is_ok());
+        assert!(reject_option_like(&[]).is_ok());
+    }
+
+    /// Even if a name slipped past the guard, `--` stops the manager reading it
+    /// as an option. Both layers are asserted so removing either one fails.
+    #[test]
+    fn every_privileged_planner_emits_end_of_options() {
+        let plans = [
+            plan_argv(&["git"], &[Missing], true),
+            plan_rollback_argv(&["git"], true),
+            plan_dnf_argv(&["git"], &[Missing], true),
+        ];
+        for plan in plans {
+            let cmd = plan.first().expect("planner produced a command");
+            let sep = cmd.iter().position(|a| a == "--").expect("`--` present");
+            let pkg = cmd.iter().position(|a| a == "git").expect("package present");
+            assert!(sep < pkg, "`--` must precede the package list in {cmd:?}");
+        }
     }
 
     #[test]
