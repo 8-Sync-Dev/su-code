@@ -1,0 +1,17 @@
+# Line endings are part of the product here, not a style preference.
+#
+# `rust-embed` bakes everything under assets/ into the binary VERBATIM. Without
+# this file a Windows checkout (core.autocrlf=true by default on the GitHub
+# runners) produces CRLF working-tree copies, so the Windows release binary ships
+# assets that are byte-different from every other platform's. That breaks three
+# things at once:
+#   - the byte-compare writes 8sync relies on to leave user-edited files alone and
+#     to keep omp's prompt-cache prefix stable;
+#   - frontmatter/YAML parsing of the deployed rules, which matches on "\n" keys;
+#   - shell installers and hooks, which must be LF to run at all.
+#
+# Normalise every text file to LF in the repo AND in the working tree.
+* text=auto eol=lf
+
+# Binary formats: never touched, never diffed as text.
+*.png binary

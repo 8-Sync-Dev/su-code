@@ -1383,13 +1383,21 @@ mod tests {
         // carries a `condition:`, and only aborts the offending tool call when
         // `scope:` names that tool and `interruptMode:` allows it — all three keys
         // are load-bearing, so a rule missing one is silently advisory.
+        // `.gitattributes` pins every asset to LF so the embedded bytes are
+        // identical on every platform, but a developer whose worktree predates it
+        // would otherwise see this fail for a reason that has nothing to do with
+        // the rule's content. Compare on normalised text and keep the signal real.
         assert!(
-            rules.iter().filter_map(|r| assets::read(r)).any(|b| {
-                b.starts_with("---\n")
-                    && b.contains("\ncondition:")
-                    && b.contains("\nscope:")
-                    && b.contains("\ninterruptMode:")
-            }),
+            rules
+                .iter()
+                .filter_map(|r| assets::read(r))
+                .map(|b| b.replace("\r\n", "\n"))
+                .any(|b| {
+                    b.starts_with("---\n")
+                        && b.contains("\ncondition:")
+                        && b.contains("\nscope:")
+                        && b.contains("\ninterruptMode:")
+                }),
             "no TTSR rule (condition + scope + interruptMode) in assets/rules/"
         );
     }

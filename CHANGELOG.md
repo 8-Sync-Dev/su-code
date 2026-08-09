@@ -38,6 +38,11 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 - A profile skipped for missing hardware is no longer recorded as applied.
 
 ### Fixed
+- Line endings are now pinned to LF by `.gitattributes`. 14 embedded assets (a skill and the
+  impeccable keyword rules) had CRLF committed, so the binary shipped assets whose bytes differed
+  from every other asset — defeating the byte-compare that keeps user-edited files untouched and
+  omp's prompt-cache prefix stable, and breaking frontmatter matching that keys on `\n`. A Windows
+  checkout would have baked CRLF into every asset; the new CI `Test` step caught it.
 - `Cargo.toml` version now matches the release tag, enforced by a new CI gate. Shipping 0.53.0
   under a v0.54.0 tag would have told every up-to-date user "update available" forever and made
   `8sync up` re-download the binary on every run.
