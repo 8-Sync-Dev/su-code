@@ -252,4 +252,6 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1786239305.md)_
   (`hid:…`) **and** `device_id` must be `serial:<that id>` — upstream matches on
   `LcdConfig::device_id()`, so any other spelling appends a duplicate instead of replacing.
   `type` is one of `image|gif|video|color|sensor|doublegauge|cooler|custom`; paths must be
+- validated: (Kernel default boot mismatch root-causes system driver losses): On Fedora 44 with dual kernels (e.g. 7.1.7 testing vs 6.19.10 official), GRUB defaults to the higher lexical version (7.1.7). If 7.1.7 lacks specific modules like `btusb.ko.xz`, Bluetooth service fails completely (`bluetooth.service` inactive). Fix: `grubby --set-default=/boot/vmlinuz-6.19.10-300.fc44.x86_64` permanently forces the official kernel with full driver stack (`btusb`, `nvidia`, 180Hz) on all reboots.
+- validated: (Lian Li TLV2 Wireless LCD config lock vs image pipeline): In Lian Li daemon `config.json`, setting a fan entry to `"type": "color"` with `"rgb": [255, 0, 0]` locks the fan to red and rejects IPC image frames. Updating `config.json` to `"type": "image"` unlocks the fan for realtime LCD sensor dashboard streaming (`/tmp/lcd_m_*.png`).
   absolute (the daemon has its own cwd).

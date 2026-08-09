@@ -38,6 +38,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
+- `ai-microservice-design` — `su-code/skills/ai-microservice-design/SKILL.md` · **foundation/locked** (non-deletable; fullstack AI system topology + eval gate; grounded in ai-router-hub/zus-work/pro-v2)
 - `api-and-interface-design` — `su-code/skills/api-and-interface-design/SKILL.md`
 - `branch-sync` — `su-code/skills/branch-sync/SKILL.md`
 - `browser-testing-with-devtools` — `su-code/skills/browser-testing-with-devtools/SKILL.md`
@@ -50,6 +51,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `deprecation-and-migration` — `su-code/skills/deprecation-and-migration/SKILL.md`
 - `documentation-and-adrs` — `su-code/skills/documentation-and-adrs/SKILL.md`
 - `doubt-driven-development` — `su-code/skills/doubt-driven-development/SKILL.md`
+- `encore-eino-go` — `su-code/skills/encore-eino-go/SKILL.md` · **foundation/locked** (non-deletable; Encore.go services + Eino LLM orchestration; grounded in zus-work/agentic-cloudgo)
 - `feature` — `su-code/skills/feature/SKILL.md`
 - `frontend-ui-engineering` — `su-code/skills/frontend-ui-engineering/SKILL.md`
 - `full-flow` — `su-code/skills/full-flow/SKILL.md`
@@ -58,6 +60,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `incremental-implementation` — `su-code/skills/incremental-implementation/SKILL.md`
 - `interview-me` — `su-code/skills/interview-me/SKILL.md`
 - `last30days` — `su-code/skills/last30days/SKILL.md`
+- `nextjs-app` — `su-code/skills/nextjs-app/SKILL.md` · **foundation/locked** (non-deletable; Next.js App Router 15/16; grounded in crm-pro-ai/pro-v2/8sync-verse)
 - `observability-and-instrumentation` — `su-code/skills/observability-and-instrumentation/SKILL.md`
 - `performance-optimization` — `su-code/skills/performance-optimization/SKILL.md`
 - `planning-and-task-breakdown` — `su-code/skills/planning-and-task-breakdown/SKILL.md`
@@ -75,6 +78,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `social-growth` — `su-code/skills/social-growth/SKILL.md`
 - `source-driven-development` — `su-code/skills/source-driven-development/SKILL.md`
 - `spec-driven-development` — `su-code/skills/spec-driven-development/SKILL.md`
+- `tauri-v2` — `su-code/skills/tauri-v2/SKILL.md` · **foundation/locked** (non-deletable; Tauri 2 desktop apps; grounded in open-musik/sidex/zus)
 - `test-driven-development` — `su-code/skills/test-driven-development/SKILL.md`
 - `token-bench` — `su-code/skills/token-bench/SKILL.md`
 - `using-agent-skills` — `su-code/skills/using-agent-skills/SKILL.md`
