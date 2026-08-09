@@ -1,10 +1,10 @@
 ---
-name: create-skill
+name: sx-create-skill
 argument-hint: '<description of what the skill should do> [--force]'
 description: Scaffold a new Agent Skill from a plain-English description — decide whether a skill is even warranted, pick the trigger wording, then generate a spec-valid SKILL.md via `8sync skill new` and fill in the body.
 ---
 
-# /create-skill — author a new skill, properly
+# /sx-create-skill — author a new skill, properly
 
 `$ARGUMENTS` = what the skill should do, in plain English. Add `--force` to overwrite an existing one.
 
@@ -57,7 +57,7 @@ was 83.7% of the `codegraph` skill before it was removed.)
 ## 4. Pair it with a command when it needs an entry point
 
 A skill is knowledge; a slash command is a trigger. When the skill should be *invocable*, run
-`/create-command` too and have the command name the skill. The in-repo reference pair is
+`/sx-create-command` too and have the command name the skill. The in-repo reference pair is
 `branch-sync` (skill) ↔ `commands/sync-pr.md` (command).
 
 ## 5. Verify

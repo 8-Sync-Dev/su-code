@@ -1,15 +1,15 @@
 ---
-name: feature
+name: sx-feature
 argument-hint: '[new <slug> | plan | go | ship | status | switch <slug> | list] [--auto]'
-description: Large multi-phase feature scopes (GSD). Drives the `feature` skill — scaffold a planning tree (su-code/planning/<slug>/), plan a phase (Goal+AC), execute it via the engine_* loop, and verify against the AC matrix. Cross-session, switchable. Small/single-concern work → /auto.
+description: Large multi-phase feature scopes (GSD). Drives the `feature` skill — scaffold a planning tree (su-code/planning/<slug>/), plan a phase (Goal+AC), execute it via the engine_* loop, and verify against the AC matrix. Cross-session, switchable. Small/single-concern work → /sx-auto.
 ---
 
-# /feature — large-scope GSD framework
+# /sx-feature — large-scope GSD framework
 
 `$ARGUMENTS` first word selects the subcommand; `--auto` anywhere = autonomous full-phase.
 
 Use this for **large, multi-phase features** (>10 files, multiple milestones, spanning
-sessions). Small/single-concern work → **`/auto`** (drive the engine directly). This layer
+sessions). Small/single-concern work → **`/sx-auto`** (drive the engine directly). This layer
 owns the multi-feature ROADMAP + per-phase Acceptance-Criteria contract *above* the
 `engine_*` loop.
 
@@ -42,7 +42,7 @@ If `$ARGUMENTS` contains `--auto`, load `references/auto.md` FIRST, then run the
 autonomously: replace user gates with a `task` discuss-agent + plan-review; run `go` via the
 engine to DONE; a hard blocker (credential / real external data) → SKIP the item, record
 NEEDS-CONFIRM in VERIFICATION/STATE, and finish the rest of the phase. Stop at the next phase
-boundary (never auto-advance phases). This mirrors `/auto`'s engine discipline, scoped to one
+boundary (never auto-advance phases). This mirrors `/sx-auto`'s engine discipline, scoped to one
 phase.
 
 ## Guardrails

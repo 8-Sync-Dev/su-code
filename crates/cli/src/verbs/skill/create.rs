@@ -224,14 +224,19 @@ pub(crate) fn skill_md(name: &str, description: &str) -> String {
 /// numbered workflow, guardrails, and a `Begin:` imperative.
 pub(crate) fn command_md(name: &str, description: &str, argument_hint: &str) -> String {
     let title = title_case(name);
+    // The asset keeps the bare stem, but omp registers a command by its DEPLOYED
+    // filename — so the frontmatter and the heading must say the name a user can
+    // actually type, or the scaffold documents a command that does not exist.
+    let deployed = crate::brand::cmd_file(&format!("{name}.md"));
+    let invoked = deployed.trim_end_matches(".md");
     format!(
         "---\n\
-         name: {name}\n\
+         name: {invoked}\n\
          argument-hint: '{hint}'\n\
          description: {desc}\n\
          ---\n\
          \n\
-         # /{name} — {title}\n\
+         # /{invoked} — {title}\n\
          \n\
          `$ARGUMENTS` = <what the argument means; say \"(none)\" if the command takes none>.\n\
          \n\
@@ -253,7 +258,7 @@ pub(crate) fn command_md(name: &str, description: &str, argument_hint: &str) -> 
          - NO `git push` / PR unless explicitly asked.\n\
          \n\
          Begin: <the first action, in the imperative>.\n",
-        name = name,
+        invoked = invoked,
         hint = argument_hint.replace('\'', ""),
         desc = yaml_quote(description),
         title = title,
@@ -525,7 +530,7 @@ mod tests {
         assert!(proj.join(".omp/commands/ship-notes.md").is_file(), "project mirror written");
 
         let body = std::fs::read_to_string(&p).unwrap();
-        assert!(body.starts_with("---\nname: ship-notes\n"));
+        assert!(body.starts_with("---\nname: sx-ship-notes\n"), "scaffold must declare the INVOKED name");
         assert!(body.contains("\nargument-hint: '[<args>]'\n"));
         assert!(body.contains("\ndescription: \"Draft release notes from the diff.\"\n"));
         assert!(body.contains("$ARGUMENTS"), "house format threads the argument through");

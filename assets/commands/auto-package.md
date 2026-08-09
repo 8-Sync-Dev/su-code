@@ -1,10 +1,10 @@
 ---
-name: auto-package
+name: sx-auto-package
 argument-hint: '[<name for the packaged command>] [--skill] [--force]'
 description: Turn the workflow you just performed in this session into ONE reusable slash command — harvest the real steps from the transcript, drop the dead ends, parameterise what varied, and write it out.
 ---
 
-# /auto-package — package what just happened into one command
+# /sx-auto-package — package what just happened into one command
 
 `$ARGUMENTS` = optional name for the new command. `--skill` also emits a companion skill when the
 procedure carries real domain knowledge. `--force` overwrites.

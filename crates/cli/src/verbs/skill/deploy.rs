@@ -1280,10 +1280,42 @@ fn remove_retired_workflow_extension(home: &Path, root: Option<&Path>) {
     }
 }
 
+/// Delete the pre-prefix copy of a command we previously deployed.
+///
+/// Without this an upgrade leaves BOTH `/auto` and `/sx-auto` in omp's flat
+/// command namespace: two entries, same body, one of them frozen at whatever
+/// version shipped last.
+///
+/// Removal is content-gated on purpose. `~/.omp/agent/commands/` is shared with
+/// commands the USER wrote, and `auto.md` is an obvious name for someone to pick.
+/// Deleting by name alone would silently eat their file, so the old copy is only
+/// removed when it is byte-identical to some version of our asset — i.e. when we
+/// can prove we wrote it. Anything the user has touched is left alone, and they
+/// end up with both names, which is noisy but never destructive.
+fn remove_unprefixed_predecessor(home: &Path, root: Option<&Path>, asset: &str, file: &str) {
+    let Some(ours) = crate::assets::read(asset) else {
+        return;
+    };
+    let mut targets = vec![home.join(".omp/agent/commands").join(file)];
+    if let Some(r) = root {
+        targets.push(r.join(".omp/commands").join(file));
+    }
+    for p in targets {
+        // Compare on normalised text: a CRLF checkout of an older release wrote
+        // CRLF here, and that copy is still unmistakably ours.
+        let same = std::fs::read_to_string(&p)
+            .map(|on_disk| on_disk.replace("\r\n", "\n") == ours.replace("\r\n", "\n"))
+            .unwrap_or(false);
+        if same {
+            let _ = std::fs::remove_file(&p);
+        }
+    }
+}
+
 /// Deploy the gsd-pi-style automation engine — the `8sync-engine` omp extension
 /// (durable slice/task state machine + code-enforced verify-retry gate + git
-/// worktree tools) and its `/auto` orchestration command. 100% on omp core (config
-/// dirs only, never patches omp) so updates stay safe.
+/// worktree tools) and every slash command under `assets/commands/`. 100% on omp
+/// core (config dirs only, never patches omp) so updates stay safe.
 pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
     remove_retired_workflow_extension(home, root);
     let eng = crate::brand::ns_file("engine.ts");
@@ -1305,14 +1337,18 @@ pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
         if !file.ends_with(".md") {
             continue;
         }
-        let name = file.trim_end_matches(".md");
+        // Deployed under the command prefix; the asset itself stays bare so a
+        // rebranded build can choose its own prefix from one const.
+        let deployed = crate::brand::cmd_file(file);
+        let invoked = deployed.trim_end_matches(".md");
+        remove_unprefixed_predecessor(home, root, &asset, file);
         deploy_omp_pair(
             home,
             root,
             &asset,
-            &format!(".omp/agent/commands/{file}"),
-            &format!(".omp/commands/{file}"),
-            &format!("/{name} command"),
+            &format!(".omp/agent/commands/{deployed}"),
+            &format!(".omp/commands/{deployed}"),
+            &format!("/{invoked} command"),
         )?;
     }
     Ok(())
@@ -1543,5 +1579,49 @@ mod bundled_tests {
              BUNDLED_SKILLS, or to this test's OPT_IN list if it is deliberately \
              opt-in."
         );
+    }
+}
+
+#[cfg(test)]
+mod command_prefix_tests {
+    use super::*;
+
+    #[test]
+    fn prefixing_is_idempotent() {
+        assert_eq!(crate::brand::cmd_file("auto.md"), "sx-auto.md");
+        // A future asset that already carries the prefix must not become sx-sx-.
+        assert_eq!(crate::brand::cmd_file("sx-auto.md"), "sx-auto.md");
+    }
+
+    /// Every shipped command deploys under the prefix, so the whole set is
+    /// attributable to 8sync in omp's flat, shared command namespace.
+    #[test]
+    fn every_shipped_command_deploys_prefixed() {
+        let mut n = 0;
+        for asset in crate::assets::iter_under("commands/") {
+            let Some(file) = asset.rsplit('/').next() else { continue };
+            if !file.ends_with(".md") {
+                continue;
+            }
+            let deployed = crate::brand::cmd_file(file);
+            assert!(
+                deployed.starts_with(crate::brand::CMD_PREFIX),
+                "`{file}` would deploy unprefixed as `{deployed}`"
+            );
+            n += 1;
+        }
+        assert!(n >= 8, "expected the bundled command set, found {n}");
+    }
+
+    /// The lifecycle command must exist and declare the frontmatter omp needs to
+    /// register it; a command that fails to parse is silently absent at the prompt.
+    #[test]
+    fn super_dev_command_is_shipped_and_parseable() {
+        let body = crate::assets::read("commands/super-dev.md")
+            .expect("super-dev command is bundled");
+        assert!(body.starts_with("---\n"), "missing frontmatter");
+        assert!(body.contains("\nname: sx-super-dev\n"), "frontmatter must state the INVOKED name");
+        assert!(body.contains("\ndescription: "), "missing description");
+        assert!(body.contains("$ARGUMENTS"), "takes no arguments");
     }
 }

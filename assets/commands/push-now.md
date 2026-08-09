@@ -1,10 +1,10 @@
 ---
-name: push-now
+name: sx-push-now
 argument-hint: '[<commit message>]'
 description: Urgent cross-machine handoff — rewrite su-code/STATE.md with a cold-resume handoff (branch/HEAD, what changed this session, done, next, blockers, new-machine runbook), update CHANGELOG/KNOWLEDGE if code changed, then git add -A + commit (gitleaks-clean) + push origin current branch. NO PR. For "I'm switching machines right now, capture everything and push."
 ---
 
-# /push-now — capture state + commit + push (switching machines)
+# /sx-push-now — capture state + commit + push (switching machines)
 
 `$ARGUMENTS` = optional commit message (a good default is derived from the diff if empty).
 
@@ -25,7 +25,7 @@ Rewrite the `## 🚚 HANDOFF` block (create it right under `## Goal` if absent) 
 ## 3. Repo hygiene (only if code changed)
 - Code touched → add a `## [Unreleased]`/version bullet to `CHANGELOG.md` (repo convention).
 - Learned something durable → append a `validated:`/`failure:` line to `su-code/KNOWLEDGE.md` (append-only; never edit the managed block).
-- Do NOT bump the version tag here — `/push-now` is a work-in-progress checkpoint, not a release. (Release = separate, with a tag push.)
+- Do NOT bump the version tag here — `/sx-push-now` is a work-in-progress checkpoint, not a release. (Release = separate, with a tag push.)
 
 ## 4. Commit + push (this is the whole point — pushing IS authorized by invoking me)
 - `git add -A`.

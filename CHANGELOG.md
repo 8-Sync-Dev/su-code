@@ -5,6 +5,27 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-08-09
+
+### Added
+- **`/sx-super-dev`** — one command for the whole lifecycle: ground → research (feynman/web) →
+  plan → parallel build → adversarial review (reviewer + security-reviewer, fresh context) → deep
+  UAT that role-plays a real user with browser capture and a clean-environment CLI run → ship →
+  CI/CD and **published-artifact** verification. Distilled from the v0.54.x release, including the
+  traps it hit: a tag that disagrees with the manifest, a "non-blocking" background thread the
+  runtime kills at exit, and reviewers finding release-breaking defects the author could not see.
+  Its governing rule is that the author's own "done" is never the evidence.
+
+### Changed
+- **Every slash command now deploys under an `sx-` prefix** (`/sx-auto`, `/sx-feature`, …).
+  omp merges commands from every tool into one flat namespace shared with the user's own, so an
+  unprefixed `/auto` was unattributable and collided with any other tool shipping the same obvious
+  name. The prefix comes from `brand::CMD_PREFIX`, so a rebranded build picks its own; assets stay
+  bare and are prefixed at deploy time. omp registers a command by FILENAME, so the frontmatter
+  `name:` was realigned to the invoked name, and `8sync skill new --command` scaffolds it that way.
+- Upgrades remove the pre-prefix copy of a command, but ONLY when it is byte-identical to the asset
+  we shipped — a same-named command the user wrote is never touched.
+
 ## [0.54.1] - 2026-08-09
 
 ### Security

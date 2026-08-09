@@ -1,10 +1,10 @@
 ---
-name: sync-pr
+name: sx-sync-pr
 argument-hint: '[<branch>]'
 description: Sync all branches across any project — audit local/remote branches, deep-preview PR/feature branch changes, safely merge verified branches into main, and update all active branches to latest main with zero conflicts. Powered by the branch-sync skill.
 ---
 
-# /sync-pr — Multi-branch audit, preview, merge & zero-conflict sync
+# /sx-sync-pr — Multi-branch audit, preview, merge & zero-conflict sync
 
 `$ARGUMENTS` = optional branch name to deep-preview and merge into `main` before syncing all branches.
 

@@ -1,10 +1,10 @@
 ---
-name: auto
+name: sx-auto
 argument-hint: '[<goal> | status | resume]'
 description: 8sync autonomous engine — decompose a goal into slices/tasks and run to DONE on omp core via the code-enforced engine_* tools (durable state, verify-with-retry gate, git worktree). Right-sized, token-lean (codegraph/cbm/serena/headroom), ponytail/karpathy discipline.
 ---
 
-# /auto — run to done on the 8sync engine
+# /sx-auto — run to done on the 8sync engine
 
 `$ARGUMENTS` first word: `<goal>` = plan + run · `status` = report · `resume`/empty = continue the saved plan.
 

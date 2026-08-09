@@ -1,10 +1,10 @@
 ---
-name: create-command
+name: sx-create-command
 argument-hint: '<description of what the command should do> [--force]'
 description: Scaffold a new slash command from a plain-English description — write a spec-valid command file with frontmatter and a runnable procedure, deployed to both global and project scope with zero Rust changes.
 ---
 
-# /create-command — author a new slash command
+# /sx-create-command — author a new slash command
 
 `$ARGUMENTS` = what the command should do. Add `--force` to overwrite an existing one.
 
@@ -13,7 +13,7 @@ description: Scaffold a new slash command from a plain-English description — w
 - **Command** = a trigger the user types. Short, imperative, owns a procedure.
 - **Skill** = knowledge the model loads when a situation matches. Never typed directly.
 
-Needs both? Write the skill first (`/create-skill`), then a thin command that invokes it — that is
+Needs both? Write the skill first (`/sx-create-skill`), then a thin command that invokes it — that is
 the `branch-sync` ↔ `sync-pr` pattern. Needs neither? Say so and stop.
 
 ## 1. Scaffold
@@ -23,7 +23,12 @@ the `branch-sync` ↔ `sync-pr` pattern. Needs neither? Say so and stop.
 ```
 
 Writes `assets/commands/<name>.md` when run inside the su-code repo, otherwise
-`~/.omp/agent/commands/<name>.md` (global) **and** `<repo>/.omp/commands/<name>.md` (project).
+`~/.omp/agent/commands/sx-<name>.md` (global) **and** `<repo>/.omp/commands/sx-<name>.md` (project).
+
+**Naming.** Assets are stored bare (`auto.md`); the `sx-` prefix is added at deploy time from
+`brand::CMD_PREFIX`, so a rebranded build picks its own. omp derives the invoked name from the
+FILENAME, not the frontmatter — `sx-auto.md` is `/sx-auto`. Keep the frontmatter `name:` equal to
+the invoked name (`sx-<name>`) so the file does not describe a command nobody can type.
 
 **No Rust change is required.** Command deployment iterates the `commands/` asset directory, so a
 new file is picked up on the next `8sync harness`. (This used to need a hardcoded block per command

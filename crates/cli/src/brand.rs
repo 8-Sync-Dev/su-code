@@ -30,6 +30,33 @@ pub const NS: &str = match option_env!("SC_NS") {
     None => "8sync",
 };
 
+/// Prefix on every DEPLOYED slash command (`/sx-auto`, `/sx-feature`, …).
+///
+/// omp merges commands from every tool that writes into `~/.omp/agent/commands/`,
+/// into one flat namespace shared with whatever the user authors themselves. An
+/// unprefixed `/auto` says nothing about where it came from, collides with any
+/// other tool shipping the same obvious name, and gives no way to tell "mine"
+/// from "8sync's" when one starts misbehaving. The prefix makes provenance
+/// visible at the point of use and makes the whole set tab-completable as a group.
+///
+/// Kept separate from [`NS`] on purpose: the on-disk namespace may be `8sync`,
+/// but `/8sync-auto` is a poor thing to type twenty times a day.
+pub const CMD_PREFIX: &str = match option_env!("SC_CMD_PREFIX") {
+    Some(v) => v,
+    None => "sx-",
+};
+
+/// The deployed filename for a command asset: `sx-auto.md` from `auto.md`.
+/// Idempotent — an asset that already carries the prefix is left alone, so a
+/// prefixed asset and a bare one cannot produce `sx-sx-`.
+pub fn cmd_file(asset_file: &str) -> String {
+    if asset_file.starts_with(CMD_PREFIX) {
+        asset_file.to_string()
+    } else {
+        format!("{CMD_PREFIX}{asset_file}")
+    }
+}
+
 /// The legacy sentinels an older (`8sync`-namespaced) binary wrote into AGENTS.md.
 /// Parsers accept BOTH these and the current [`sentinel_begin`]/[`sentinel_end`]
 /// so a rebranded binary can recognise + migrate existing project files.
