@@ -307,7 +307,7 @@ assets/                           embedded into the binary via rust-embed
 └── wallpapers/
 ```
 
-To add a new verb: create `verbs/<new>.rs` with `pub fn run(a: Args) -> Result<()>`, add `pub mod <new>;` to `verbs/mod.rs`, and a `<New>` variant + match arm in `main.rs`.
+To add a new verb: create `crates/cli/src/verbs/<new>.rs` with `pub fn run(a: Args) -> Result<()>`, add `pub mod <new>;` to `crates/cli/src/verbs/mod.rs`, and a `<New>` variant + match arm in `crates/cli/src/main.rs`.
 
 Smoke test:
 

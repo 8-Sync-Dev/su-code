@@ -6,6 +6,106 @@ use std::path::{Path, PathBuf};
 use crate::ui;
 use crate::verbs::skill::index::always_on_names_in_order;
 
+/// Verifiable facts about THIS repo, for `su-code/PROJECT.md`.
+///
+/// The file used to be seeded as literally `_empty_`, which wasted the single
+/// highest-leverage read an agent makes: the first one. An agent that does not
+/// know the stack guesses the build command, greps for an entrypoint, and burns
+/// context rediscovering what a manifest states outright.
+///
+/// Only things read off disk are written — never a guess. Nothing recognised
+/// yields the old empty skeleton rather than a confident lie.
+fn project_facts(root: &Path) -> Option<String> {
+    let read = |f: &str| std::fs::read_to_string(root.join(f)).ok();
+    let mut stacks: Vec<String> = Vec::new();
+    let mut cmds: Vec<(&str, String)> = Vec::new();
+
+    if let Some(s) = read("Cargo.toml") {
+        let name = toml_str(&s, "name").unwrap_or_else(|| "?".into());
+        let kind = if s.contains("[workspace]") { "Rust workspace" } else { "Rust crate" };
+        stacks.push(format!("{kind} `{name}`"));
+        cmds.push(("build", "cargo build --release".into()));
+        cmds.push(("test", "cargo test".into()));
+        cmds.push(("lint", "cargo clippy".into()));
+    }
+    if let Some(s) = read("package.json") {
+        let name = json_str(&s, "name").unwrap_or_else(|| "?".into());
+        // Framework beats "Node": it decides where routes and entrypoints live.
+        let fw = ["next", "nuxt", "astro", "svelte", "remix", "vite", "encore.dev", "express", "fastify"]
+            .iter()
+            .find(|f| s.contains(&format!("\"{f}\"")))
+            .map(|f| format!(" ({f})"))
+            .unwrap_or_default();
+        stacks.push(format!("Node/TS `{name}`{fw}"));
+        for k in ["dev", "build", "test", "lint"] {
+            if s.contains(&format!("\"{k}\":")) {
+                cmds.push((k, format!("npm run {k}")));
+            }
+        }
+    }
+    if let Some(s) = read("pyproject.toml") {
+        let name = toml_str(&s, "name").unwrap_or_else(|| "?".into());
+        let fw = ["fastapi", "django", "flask"]
+            .iter()
+            .find(|f| s.contains(*f))
+            .map(|f| format!(" ({f})"))
+            .unwrap_or_default();
+        stacks.push(format!("Python `{name}`{fw}"));
+        cmds.push(("test", "pytest".into()));
+    }
+    if let Some(s) = read("go.mod") {
+        let m = s.lines().find_map(|l| l.strip_prefix("module ")).unwrap_or("?").trim();
+        stacks.push(format!("Go `{m}`"));
+        cmds.push(("build", "go build ./...".into()));
+        cmds.push(("test", "go test ./...".into()));
+    }
+    if stacks.is_empty() {
+        return None;
+    }
+
+    let entries: Vec<&str> = [
+        "src/main.rs", "src/lib.rs", "src/index.ts", "src/index.js", "src/app/page.tsx",
+        "main.py", "app/main.py", "src/main.py", "main.go", "cmd",
+    ]
+    .into_iter()
+    .filter(|p| root.join(p).exists())
+    .collect();
+
+    let mut out = String::from("# PROJECT (8sync managed — facts only)\n\n");
+    out.push_str("_Detected from the manifests on disk at harness time. Correct anything wrong;\nthis file is seeded once and never overwritten._\n\n");
+    out.push_str(&format!("## Stack\n{}\n\n", stacks.iter().map(|s| format!("- {s}")).collect::<Vec<_>>().join("\n")));
+    if !entries.is_empty() {
+        out.push_str(&format!("## Entrypoints\n{}\n\n", entries.iter().map(|e| format!("- `{e}`")).collect::<Vec<_>>().join("\n")));
+    }
+    if !cmds.is_empty() {
+        out.push_str("## Commands\n");
+        for (k, v) in &cmds {
+            out.push_str(&format!("- {k}: `{v}`\n"));
+        }
+        out.push('\n');
+    }
+    Some(out)
+}
+
+/// First `key = "value"` in a TOML blob. Deliberately not a full parse: this is
+/// a best-effort seed, and a malformed manifest must not fail the harness run.
+fn toml_str(s: &str, key: &str) -> Option<String> {
+    s.lines()
+        .map(str::trim)
+        .find(|l| l.starts_with(key) && l.contains('='))
+        .and_then(|l| l.split('=').nth(1))
+        .map(|v| v.trim().trim_matches('"').to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn json_str(s: &str, key: &str) -> Option<String> {
+    let pat = format!("\"{key}\"");
+    let rest = &s[s.find(&pat)? + pat.len()..];
+    let rest = rest.trim_start().strip_prefix(':')?.trim_start();
+    let inner = rest.strip_prefix('"')?;
+    inner.find('"').map(|e| inner[..e].to_string()).filter(|v| !v.is_empty())
+}
+
 /// Structured live-plan seed for `su-code/STATE.md` — the loop-engineering
 /// recitation anchor (Manus todo.md pattern): the agent rewrites it at each
 /// phase boundary and reads it at session start, keeping the plan in recent
@@ -203,6 +303,9 @@ pub(crate) fn seed_harness_memory(root: &Path) -> Result<()> {
                 STATE_TEMPLATE.to_string()
             } else if f == "PLAYBOOKS.md" {
                 PLAYBOOKS_TEMPLATE.to_string()
+            } else if f == "PROJECT.md" {
+                project_facts(root)
+                    .unwrap_or_else(|| "# PROJECT (8sync managed — append-only)\n\n_empty_\n".into())
             } else {
                 format!("# {} (8sync managed — append-only)\n\n_empty_\n", f.trim_end_matches(".md"))
             };
@@ -315,5 +418,82 @@ pub(crate) fn seed_gitleaks_hook(root: &Path) {
             let _ = std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755));
         }
         ui::ok("installed gitleaks pre-commit hook (.git/hooks/pre-commit)");
+    }
+}
+
+#[cfg(test)]
+mod project_facts_tests {
+    use super::*;
+
+    /// Unique per test so the suite stays parallel-safe; the crate carries no
+    /// dev-dependencies and the rest of the suite builds scratch dirs the same way.
+    struct Scratch(PathBuf);
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn scratch(tag: &str, files: &[(&str, &str)]) -> Scratch {
+        let d = std::env::temp_dir().join(format!("8sync-facts-{}-{}", std::process::id(), tag));
+        let _ = std::fs::remove_dir_all(&d);
+        for (p, body) in files {
+            let full = d.join(p);
+            std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+            std::fs::write(full, body).unwrap();
+        }
+        Scratch(d)
+    }
+
+    /// The framework matters more than the language: it decides where routes and
+    /// entrypoints live, which is the thing an agent would otherwise grep for.
+    #[test]
+    fn detects_framework_entrypoint_and_commands_per_ecosystem() {
+        let d = scratch("node", &[
+            ("package.json", r#"{"name":"shop","dependencies":{"next":"15"},"scripts":{"build":"next build"}}"#),
+            ("src/app/page.tsx", ""),
+        ]);
+        let f = project_facts(&d.0).expect("node project recognised");
+        assert!(f.contains("Node/TS `shop` (next)"), "{f}");
+        assert!(f.contains("`src/app/page.tsx`"), "{f}");
+        assert!(f.contains("npm run build"), "{f}");
+        // A script that is absent must not be advertised.
+        assert!(!f.contains("npm run test"), "{f}");
+    }
+
+    #[test]
+    fn detects_go_module_path() {
+        let d = scratch("go", &[("go.mod", "module github.com/acme/gw\n\ngo 1.23\n"), ("main.go", "")]);
+        let f = project_facts(&d.0).unwrap();
+        assert!(f.contains("Go `github.com/acme/gw`"), "{f}");
+        assert!(f.contains("go test ./..."), "{f}");
+    }
+
+    /// A polyglot repo is the normal case for a large project; report every stack
+    /// rather than letting whichever manifest is checked first win.
+    #[test]
+    fn reports_every_stack_in_a_polyglot_repo() {
+        let d = scratch("poly", &[
+            ("Cargo.toml", "[package]\nname = \"engine\"\n"),
+            ("pyproject.toml", "[project]\nname = \"trainer\"\n"),
+        ]);
+        let f = project_facts(&d.0).unwrap();
+        assert!(f.contains("Rust crate `engine`"), "{f}");
+        assert!(f.contains("Python `trainer`"), "{f}");
+    }
+
+    /// Never invent facts: an unrecognised tree falls back to the empty skeleton.
+    #[test]
+    fn unknown_project_yields_no_facts() {
+        let d = scratch("unknown", &[("README.md", "# hi")]);
+        assert!(project_facts(&d.0).is_none());
+    }
+
+    /// A malformed manifest must degrade, never abort the harness run.
+    #[test]
+    fn malformed_manifest_still_produces_a_usable_seed() {
+        let d = scratch("malformed", &[("package.json", "{ this is not json")]);
+        let f = project_facts(&d.0).expect("still recognised as a node project");
+        assert!(f.contains("Node/TS `?`"), "{f}");
     }
 }

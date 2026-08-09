@@ -12,6 +12,15 @@ su-code/planning/**/evidence-*.png
 # KEEP COMMITTED (do NOT add here): su-code/ (memory), su-code/skills/, AGENTS.md, CHANGELOG.md
 # <<< 8sync <<<
 
+# This repo dogfoods its own harness, so `8sync harness` deploys the shipped
+# `assets/commands/` + `assets/extensions/` into `/.omp/` here too. That tree is
+# REGENERATED OUTPUT, and tracking it guaranteed drift: the committed copy of
+# 8sync-engine.ts went stale and shadowed the hardened asset. Edit the asset;
+# never re-add the deployed copy. Root-anchored so `assets/` — the authoritative
+# source — is unaffected. Deliberately OUTSIDE the managed block above, which
+# `8sync harness init` rewrites verbatim.
+/.omp/
+
 target/
 *.bak
 .DS_Store

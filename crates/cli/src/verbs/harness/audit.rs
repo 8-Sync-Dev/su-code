@@ -96,12 +96,20 @@ fn scan_docs(root: &Path) -> Vec<String> {
             docs.insert(f.to_string());
         }
     }
+    // Archives are exempt. An `*-ARCHIVE.md` is append-only history that no agent
+    // force-loads, so the oversized-doc rule does not apply, and the paths quoted
+    // inside it are accurate records of a layout that existed then — reporting
+    // them as "stale" is noise that trains people to ignore the audit. Without
+    // this, splitting an oversized CHANGELOG just moves the warning to the file
+    // the split created.
     if let Ok(rd) = std::fs::read_dir(root) {
         for e in rd.flatten() {
             let p = e.path();
             if p.extension().and_then(|s| s.to_str()) == Some("md") {
                 if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-                    docs.insert(name.to_string());
+                    if !name.ends_with("-ARCHIVE.md") {
+                        docs.insert(name.to_string());
+                    }
                 }
             }
         }

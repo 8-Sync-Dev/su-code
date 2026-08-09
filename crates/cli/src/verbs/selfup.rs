@@ -94,12 +94,108 @@ fn sweep_old_siblings(dst: &Path) {
     }
 }
 
-/// Download `asset_url` into a temp sibling of `dst` and move it into place with
-/// platform-correct replace semantics. Unix swaps the inode with a same-dir
-/// rename (fine even while running). Windows cannot overwrite a live .exe, but
-/// CAN rename it aside, so the live binary is moved to `.8sync.old.<pid>` first
-/// and restored if the install fails.
-fn download_and_replace(asset_url: &str, dst: &Path) -> Result<()> {
+/// Normalise a release asset's `digest` field. GitHub publishes it as
+/// `sha256:<hex>`; a bare hex string is accepted too, but an explicit
+/// non-sha256 algorithm is not — an unknown algorithm must read as "no digest"
+/// rather than as a value we would then compare against a sha256 sum. Anything
+/// that is not exactly 64 hex characters is treated as absent, never as a pass,
+/// which is the same length check install.sh applies.
+fn parse_digest(raw: &str) -> Option<String> {
+    let hex = match raw.split_once(':') {
+        Some(("sha256", h)) => h,
+        Some(_) => return None,
+        None => raw,
+    };
+    let hex = hex.trim();
+    is_hex64(hex).then(|| hex.to_ascii_lowercase())
+}
+
+fn is_hex64(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Pull the hash out of a hasher's stdout. coreutils/shasum print
+/// `<hex>  <file>`; certutil prints a header line, the digest (older builds
+/// space-separate every byte), then a trailer. Testing the first field and then
+/// the whitespace-stripped line covers all three without a per-tool parser.
+fn first_hex64(stdout: &str) -> Option<String> {
+    for line in stdout.lines() {
+        if let Some(tok) = line.split_whitespace().next() {
+            if is_hex64(tok) {
+                return Some(tok.to_ascii_lowercase());
+            }
+        }
+        let joined: String = line.split_whitespace().collect();
+        if is_hex64(&joined) {
+            return Some(joined.to_ascii_lowercase());
+        }
+    }
+    None
+}
+
+/// sha256 of `path` using whatever the box already has: coreutils `sha256sum`,
+/// the BSD/macOS `shasum`, or Windows `certutil`. Deliberately not a crate —
+/// the binary sits near its size ceiling and a hashing dependency is not worth
+/// it for one call per update. `None` means no hasher on PATH, which the caller
+/// reports out loud instead of pretending the download was checked.
+fn sha256_file(path: &Path) -> Option<String> {
+    let p = path.to_str()?;
+    let (bin, args): (&str, Vec<&str>) = if which::which("sha256sum").is_ok() {
+        ("sha256sum", vec![p])
+    } else if which::which("shasum").is_ok() {
+        ("shasum", vec!["-a", "256", p])
+    } else if which::which("certutil").is_ok() {
+        ("certutil", vec!["-hashfile", p, "SHA256"])
+    } else {
+        return None;
+    };
+    let out = Command::new(bin).args(&args).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    first_hex64(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// Check the freshly downloaded `tmp` against the release's published digest
+/// before it can become the live binary. Mirrors `verify_checksum` in
+/// install.sh: a digest we DID obtain that does not match is fatal, while a
+/// missing digest or missing hasher is a loud warning rather than an abort —
+/// refusing to upgrade because GitHub rate-limited the API (60 req/h
+/// unauthenticated) or because a minimal image ships no coreutils would be
+/// worse than the status quo. What it must never do is look verified when it
+/// was not.
+fn verify_download(tmp: &Path, expected: Option<&str>, asset_url: &str) -> Result<()> {
+    let Some(want) = expected else {
+        ui::warn("checksum NOT VERIFIED — no sha256 digest published for this asset");
+        return Ok(());
+    };
+    let Some(got) = sha256_file(tmp) else {
+        ui::warn("checksum NOT VERIFIED — no sha256sum, shasum or certutil on PATH");
+        return Ok(());
+    };
+    if !got.eq_ignore_ascii_case(want) {
+        bail!(
+            "checksum mismatch for {} — refusing to install\n  expected sha256:{}\n  actual   sha256:{}",
+            asset_url,
+            want,
+            got
+        );
+    }
+    ui::info(&format!("checksum ok (sha256:{})", want));
+    Ok(())
+}
+
+/// Download `asset_url` into a temp sibling of `dst`, verify it against
+/// `expected_digest`, and move it into place with platform-correct replace
+/// semantics. Unix swaps the inode with a same-dir rename (fine even while
+/// running). Windows cannot overwrite a live .exe, but CAN rename it aside, so
+/// the live binary is moved to `.8sync.old.<pid>` first and restored if the
+/// install fails.
+///
+/// Verification runs before the temp file is made executable and before the
+/// current binary is touched, so a mismatch can never leave a runnable artefact
+/// behind or a half-replaced install.
+fn download_and_replace(asset_url: &str, dst: &Path, expected_digest: Option<&str>) -> Result<()> {
     let dir = dst
         .parent()
         .ok_or_else(|| anyhow!("bad destination path: {}", dst.display()))?;
@@ -107,12 +203,25 @@ fn download_and_replace(asset_url: &str, dst: &Path) -> Result<()> {
     sweep_old_siblings(dst);
 
     let tmp = dir.join(format!(".8sync.new.{}", std::process::id()));
+    // `--proto =https --tlsv1.2` matches install.sh: never let the transfer be
+    // talked down to plaintext or an obsolete TLS version.
     let status = Command::new("curl")
-        .args(["-fsSL", "--max-time", "120", "-o", tmp.to_str().unwrap(), asset_url])
+        .args([
+            "-fsSL",
+            "--proto", "=https",
+            "--tlsv1.2",
+            "--max-time", "120",
+            "-o", tmp.to_str().unwrap(),
+            asset_url,
+        ])
         .status()?;
     if !status.success() {
         let _ = std::fs::remove_file(&tmp);
         bail!("download failed: {}", asset_url);
+    }
+    if let Err(e) = verify_download(&tmp, expected_digest, asset_url) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
     }
     #[cfg(unix)]
     {
@@ -140,17 +249,21 @@ fn download_and_replace(asset_url: &str, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Query GitHub for the latest release. Returns `(tag_name, asset_browser_download_url)`.
-/// Short timeout so it never blocks. Silent on offline / no-curl.
-fn fetch_latest_release() -> Option<(String, String)> {
-    if which::which("curl").is_err() { return None; }
+/// GET a GitHub release payload (`releases/<path>`). Hardened the same way as
+/// install.sh; short timeout so it never blocks a command.
+fn github_release_json(path: &str) -> Option<serde_json::Value> {
+    if which::which("curl").is_err() {
+        return None;
+    }
     let url = format!(
-        "https://api.github.com/repos/{}/{}/releases/latest",
-        REPO_OWNER, REPO_NAME
+        "https://api.github.com/repos/{}/{}/releases/{}",
+        REPO_OWNER, REPO_NAME, path
     );
     let out = Command::new("curl")
         .args([
             "-fsSL",
+            "--proto", "=https",
+            "--tlsv1.2",
             "--max-time", "5",
             "-H", "Accept: application/vnd.github+json",
             "-H", "User-Agent: 8sync-selfup",
@@ -158,19 +271,42 @@ fn fetch_latest_release() -> Option<(String, String)> {
         ])
         .output()
         .ok()?;
-    if !out.status.success() { return None; }
-    let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
-    let tag = v.get("tag_name")?.as_str()?.to_string();
-    let assets = v.get("assets")?.as_array()?;
-    let want_name = asset_filename(&tag);
-    for a in assets {
-        let name = a.get("name").and_then(|n| n.as_str()).unwrap_or("");
-        if name == want_name {
-            let dl = a.get("browser_download_url").and_then(|u| u.as_str())?;
-            return Some((tag, dl.to_string()));
+    if !out.status.success() {
+        return None;
+    }
+    serde_json::from_slice(&out.stdout).ok()
+}
+
+/// Find `want_name` in a release payload's `assets` array; returns its download
+/// URL and published sha256 digest. The digest is optional: GitHub only started
+/// emitting `digest` in 2025 and can lag right after a release is cut.
+fn find_asset(release: &serde_json::Value, want_name: &str) -> Option<(String, Option<String>)> {
+    for a in release.get("assets")?.as_array()? {
+        if a.get("name").and_then(|n| n.as_str()) == Some(want_name) {
+            let url = a.get("browser_download_url")?.as_str()?.to_string();
+            let digest = a.get("digest").and_then(|d| d.as_str()).and_then(parse_digest);
+            return Some((url, digest));
         }
     }
     None
+}
+
+/// Query GitHub for the latest release. Returns
+/// `(tag_name, asset_browser_download_url, sha256_digest)`.
+/// Short timeout so it never blocks. Silent on offline / no-curl.
+fn fetch_latest_release() -> Option<(String, String, Option<String>)> {
+    let v = github_release_json("latest")?;
+    let tag = v.get("tag_name")?.as_str()?.to_string();
+    let (url, digest) = find_asset(&v, &asset_filename(&tag))?;
+    Some((tag, url, digest))
+}
+
+/// Digest for a pinned tag's asset, read from `releases/tags/<tag>` — the same
+/// endpoint install.sh consults when SUSYNC_VERSION is set. `None` (API down or
+/// throttled) downgrades to an explicit "not verified" warning, not a failure.
+fn fetch_tag_digest(tag: &str) -> Option<String> {
+    let v = github_release_json(&format!("tags/{}", tag))?;
+    find_asset(&v, &asset_filename(tag))?.1
 }
 
 /// Is `remote` strictly newer than `local`? Compares dotted numeric components
@@ -274,7 +410,7 @@ pub const PROBE_ARG: &str = "__update-probe";
 
 /// Child-process entry point: fetch the latest tag and cache it. Never prints.
 pub fn run_probe() {
-    let Some((tag, _url)) = fetch_latest_release() else {
+    let Some((tag, _url, _digest)) = fetch_latest_release() else {
         return;
     };
     let _ = std::fs::create_dir_all(cache_dir());
@@ -287,7 +423,7 @@ pub fn run_self_update(force: bool) -> Result<bool> {
     ui::step("Self-update — GitHub Releases");
     let local = build_version();
 
-    let (tag, asset_url) = fetch_latest_release()
+    let (tag, asset_url, digest) = fetch_latest_release()
         .ok_or_else(|| anyhow!("could not query latest release from github.com/{}/{}", REPO_OWNER, REPO_NAME))?;
     let remote = strip_v(&tag);
     // Skip unless the release is strictly newer. `up.rs` used to pass force=true
@@ -300,7 +436,7 @@ pub fn run_self_update(force: bool) -> Result<bool> {
 
     let dst = dest_path()?;
     ui::info(&format!("local v{} → {} ({})", local, tag, asset_url));
-    download_and_replace(&asset_url, &dst)?;
+    download_and_replace(&asset_url, &dst, digest.as_deref())?;
 
     let _ = std::fs::write(last_seen_tag_file(), &tag);
     ui::ok(&format!("installed {} → {}", tag, dst.display()));
@@ -318,7 +454,10 @@ pub fn install_tag(tag: &str) -> Result<bool> {
     );
     let dst = dest_path()?;
     ui::info(&format!("local v{} → {} ({})", build_version(), tag, asset_url));
-    download_and_replace(&asset_url, &dst)?;
+    // A pinned tag skips the /latest payload, so its digest comes from the
+    // per-tag endpoint — the same one install.sh uses under SUSYNC_VERSION.
+    let digest = fetch_tag_digest(&tag);
+    download_and_replace(&asset_url, &dst, digest.as_deref())?;
 
     let _ = std::fs::write(last_seen_tag_file(), &tag);
     ui::ok(&format!("installed {} → {}", tag, dst.display()));
@@ -327,7 +466,7 @@ pub fn install_tag(tag: &str) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::is_newer;
+    use super::{find_asset, first_hex64, is_newer, parse_digest};
 
     #[test]
     fn only_strictly_newer_releases_notify() {
@@ -344,5 +483,76 @@ mod tests {
         // missing components are zero, not an error
         assert!(is_newer("0.53.1", "0.53"));
         assert!(!is_newer("0.53", "0.53.0"));
+    }
+
+    #[test]
+    fn digest_parsing_accepts_only_a_real_sha256() {
+        let hex = "a".repeat(64);
+        // GitHub's published form, and the bare hex some tooling emits.
+        assert_eq!(parse_digest(&format!("sha256:{hex}")), Some(hex.clone()));
+        assert_eq!(parse_digest(&hex), Some(hex.clone()));
+        // Another algorithm must read as "absent", never as a sha256 to compare.
+        assert_eq!(parse_digest(&format!("sha512:{hex}")), None);
+        assert_eq!(parse_digest(&format!("md5:{}", "a".repeat(32))), None);
+        // Malformed / wrong length / non-hex -> absent, never a pass.
+        assert_eq!(parse_digest(""), None);
+        assert_eq!(parse_digest("sha256:"), None);
+        assert_eq!(parse_digest("sha256:deadbeef"), None);
+        assert_eq!(parse_digest(&"a".repeat(63)), None);
+        assert_eq!(parse_digest(&"a".repeat(65)), None);
+        assert_eq!(parse_digest(&format!("sha256:{}z", "a".repeat(63))), None);
+    }
+
+    #[test]
+    fn digest_comparison_ignores_case() {
+        let upper = "AB".repeat(32);
+        let lower = upper.to_ascii_lowercase();
+        // Both sides normalise, so an uppercase API digest still matches a
+        // hasher that printed lowercase (and vice versa).
+        assert_eq!(parse_digest(&format!("sha256:{upper}")), Some(lower.clone()));
+        assert_eq!(first_hex64(&format!("{upper}  8sync-v1.0.0-linux-x86_64")), Some(lower.clone()));
+        assert!(parse_digest(&upper).unwrap().eq_ignore_ascii_case(&lower));
+    }
+
+    #[test]
+    fn hasher_output_parses_for_every_supported_tool() {
+        let hex = "b".repeat(64);
+        // coreutils sha256sum / shasum -a 256
+        assert_eq!(first_hex64(&format!("{hex}  /tmp/.8sync.new.1\n")), Some(hex.clone()));
+        // certutil: header, digest, trailer — including the space-separated form
+        let spaced = hex
+            .as_bytes()
+            .chunks(2)
+            .map(|c| std::str::from_utf8(c).unwrap())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let certutil = format!(
+            "SHA256 hash of 8sync.exe:\n{spaced}\nCertUtil: -hashfile command completed successfully.\n"
+        );
+        assert_eq!(first_hex64(&certutil), Some(hex.clone()));
+        // No digest anywhere -> None, so the caller warns instead of comparing junk.
+        assert_eq!(first_hex64("sha256sum: /tmp/x: No such file or directory\n"), None);
+        assert_eq!(first_hex64(""), None);
+    }
+
+    #[test]
+    fn asset_lookup_reports_a_missing_digest_rather_than_faking_one() {
+        let hex = "c".repeat(64);
+        let release = serde_json::json!({
+            "assets": [
+                { "name": "8sync-v1.0.0-darwin-arm64", "browser_download_url": "https://x/darwin", "digest": format!("sha256:{hex}") },
+                { "name": "8sync-v1.0.0-linux-x86_64", "browser_download_url": "https://x/linux" }
+            ]
+        });
+        assert_eq!(
+            find_asset(&release, "8sync-v1.0.0-darwin-arm64"),
+            Some(("https://x/darwin".to_string(), Some(hex)))
+        );
+        // Asset published before GitHub computed a digest: URL yes, digest no.
+        assert_eq!(
+            find_asset(&release, "8sync-v1.0.0-linux-x86_64"),
+            Some(("https://x/linux".to_string(), None))
+        );
+        assert_eq!(find_asset(&release, "8sync-v1.0.0-windows-x86_64"), None);
     }
 }
