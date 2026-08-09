@@ -20,6 +20,10 @@ when = "always"
 src = "builtin:impeccable"
 when = "on-demand"
 
+[karpathy]
+src = "builtin:karpathy"
+when = "always"
+
 [karpathy-guidelines]
 src = "builtin:karpathy-guidelines"
 when = "always"

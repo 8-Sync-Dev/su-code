@@ -47,7 +47,16 @@ pub fn run() -> Result<()> {
         ("8sync bt restart", "restart bluetooth.service + power on"),
     ]);
 
-    section("5. SECURITY (VPN + firewall)", &[
+    section("5. DISPLAY (monitor refresh + Lian Li screens)", &[
+        ("8sync hz",     "current vs highest available Hz per output — and why it is capped"),
+        ("8sync hz max", "raise every output to its highest refresh (resolution untouched)"),
+        ("8sync hz 144", "set one specific rate (--output DP-4 to narrow, --dry-run to preview)"),
+        ("8sync lcd",    "Lian Li fan/AIO screens found by lianli-daemon"),
+        ("8sync lcd photo.png", "draw an image/GIF/mp4 on them (--device N, `off` to blank)"),
+        ("8sync lcd gui", "open the upstream GUI with the WebKit/Wayland fix"),
+    ]);
+
+    section("6. SECURITY (VPN + firewall)", &[
         ("8sync sec",                   "show current status of WARP and ufw"),
         ("8sync sec on",                "enable WARP VPN + ufw firewall (going to a cafe)"),
         ("8sync sec off",               "disable both (back home)"),
@@ -56,7 +65,7 @@ pub fn run() -> Result<()> {
         ("8sync sec ufw status",        "show ufw status only"),
     ]);
 
-    section("6. MAINTENANCE", &[
+    section("7. MAINTENANCE", &[
         ("8sync up",                       "self-update 8sync only (omp: `omp update`; no `paru -Syu`)"),
         ("8sync clean",                    "reclaim disk + tidy caches + CPU/GPU/RAM report (--deep/--timer 1h)"),
         ("8sync doctor",                   "full health check"),
@@ -68,7 +77,7 @@ pub fn run() -> Result<()> {
         ("8sync setup profile apply warp", "(re-)apply a profile idempotently"),
     ]);
 
-    section("7. TERMINAL (kitty palette + wallpaper)", &[
+    section("8. TERMINAL (kitty palette + wallpaper)", &[
         ("8sync theme",            "list color palettes (★ = active)"),
         ("8sync theme set dracula", "switch palette + reload kitty live (tokyo-night · catppuccin-mocha · gruvbox-dark · nord · rose-pine · dracula)"),
         ("8sync bg",               "show the current wallpaper (rendered inline in kitty)"),

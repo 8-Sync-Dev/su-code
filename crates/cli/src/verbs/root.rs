@@ -54,6 +54,25 @@ pub fn print_cheatsheet() {
     ]);
     println!("  {}", crate::brand::render("→ requires `bluetooth` profile applied (8sync setup --profile bluetooth)").dimmed());
 
+    println!("\n{}", "DISPLAY".bold().yellow());
+    rows(&[
+        ("8sync hz",          "per output: current vs highest available refresh (+ why it is capped)"),
+        ("8sync hz max",      "raise every output to its highest refresh — resolution unchanged"),
+        ("8sync hz 144",      "set a specific rate where the output offers it"),
+        ("8sync hz max --output DP-4", "one connector only (add --dry-run to preview)"),
+    ]);
+    println!("  {}", crate::brand::render("→ GNOME/Mutter · Hyprland · KDE · X11; a panel that beats its driver is diagnosed, not ignored").dimmed());
+
+    println!("\n{}", "LIAN LI SCREENS".bold().yellow());
+    rows(&[
+        ("8sync lcd",            "daemon status + every fan/AIO screen it found"),
+        ("8sync lcd photo.png",  "show an image / GIF / mp4 on every screen (--device N for one)"),
+        ("8sync lcd '#ff0055'",  "solid colour; `8sync lcd off` blanks them"),
+        ("8sync lcd bright 60",  "brightness 0-100 (live + persisted)"),
+        ("8sync lcd gui",        "open the upstream GUI with the WebKit/Wayland fix applied"),
+    ]);
+    println!("  {}", crate::brand::render("→ talks to lianli-daemon directly; no GUI needed (8sync setup --profile hardware-lianli)").dimmed());
+
     println!("\n{}", "CLEAN / OPTIMIZE".bold().yellow());
     rows(&[
         ("8sync clean",          "reclaim disk (pacman/AUR/journal/tmp/thumbnails) + CPU/GPU/RAM report"),

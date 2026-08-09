@@ -66,10 +66,13 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `ponytail-gain` — `su-code/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `su-code/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `su-code/skills/ponytail-review/SKILL.md`
+- `remote-compute` — `su-code/skills/remote-compute/SKILL.md`
+- `research-paper` — `su-code/skills/research-paper/SKILL.md`
 - `security-and-hardening` — `su-code/skills/security-and-hardening/SKILL.md`
 - `senior-frontend` — `su-code/skills/senior-frontend/SKILL.md`
 - `senior-security` — `su-code/skills/senior-security/SKILL.md`
 - `shipping-and-launch` — `su-code/skills/shipping-and-launch/SKILL.md`
+- `social-growth` — `su-code/skills/social-growth/SKILL.md`
 - `source-driven-development` — `su-code/skills/source-driven-development/SKILL.md`
 - `spec-driven-development` — `su-code/skills/spec-driven-development/SKILL.md`
 - `test-driven-development` — `su-code/skills/test-driven-development/SKILL.md`
@@ -182,7 +185,7 @@ su-code/
 
 ---
 
-## 5. Toàn bộ verb (13 verb flat sau khi slim-down cho HyDE)
+## 5. Toàn bộ verb
 
 ### Vibe loop (daily, dùng liên tục)
 | Verb | Mô tả |
@@ -220,6 +223,27 @@ Nhiều feature song song trong 1 repo, mỗi cái 1 omp conversation cô lập.
 | `8sync bt on \| off` | Unblock + enable + power on / power off + stop |
 | `8sync bt fix` | Troubleshoot adapter chết (rfkill, reload btusb, restart, power on, AutoEnable) |
 | `8sync bt restart` | Restart bluetooth.service + power on |
+
+### Display (refresh rate)
+| Verb | Mô tả |
+|---|---|
+| `8sync hz` | Report mỗi output: rate hiện tại vs rate cao nhất có sẵn. Panel khai (EDID) cao hơn driver expose → **chẩn đoán** (tên driver + cách fix), không im lặng chấp nhận |
+| `8sync hz max` | Nâng mọi output lên refresh cao nhất — **giữ nguyên resolution** (mode nhanh nhất thường là mode NHỎ hơn) |
+| `8sync hz <Hz>` | Set đúng 1 rate (vd `8sync hz 144`); không có thì liệt kê rate khả dụng |
+| `8sync hz … --output DP-4 --dry-run` | Giới hạn 1 connector / in lệnh backend mà không đổi gì |
+
+Backend: GNOME/Mutter (`busctl`, Wayland + X11) · Hyprland (`hyprctl`) · KDE (`kscreen-doctor`) · X11 (`xrandr`). Mutter apply luôn `VERIFY` trước rồi mới persistent, và echo lại NGUYÊN layout (vị trí/scale/xoay/primary) vì `ApplyMonitorsConfig` thay **toàn bộ** layout — bỏ sót field nào là reset field đó.
+
+### Lian Li screens (`lianli-daemon`)
+| Verb | Mô tả |
+|---|---|
+| `8sync lcd` | Status daemon + liệt kê mọi màn hình fan/AIO (index + id + độ phân giải) |
+| `8sync lcd <file>` | Hiện ảnh/GIF/mp4 lên MỌI màn (`--device N` để chỉ 1 màn, `--fps`, `--orientation`) |
+| `8sync lcd '#ff0055'` \| `8sync lcd off` | Màu đơn / tắt (frame đen) |
+| `8sync lcd bright 0..100` | Độ sáng — gửi `SetLcdBrightness` (ăn ngay) **và** patch config đã lưu (sống qua reboot) |
+| `8sync lcd gui` | Mở GUI upstream kèm `WEBKIT_DISABLE_DMABUF_RENDERER=1` |
+
+Không tự nói chuyện USB: đi qua IPC của `lian-li-linux` daemon (`$XDG_RUNTIME_DIR/lianli-daemon.sock`, JSON theo dòng, `{"method":…,"params":…}`). `SetLcdMedia.device_id` **phải** là `serial:<device_id>` vì upstream so với `LcdConfig::device_id()` — sai format là append entry trùng thay vì replace. GUI Tauri/WebKitGTK chết trên Wayland (`Error 71 Protocol error`) khi GPU path hỏng (vd nouveau) → `lcd gui` luôn set biến tắt DMA-BUF renderer.
 
 ### Clean / Optimize
 | Verb | Mô tả |
@@ -351,7 +375,7 @@ Repo chưa theo spec (không có `SKILL.md`)? 8sync fallback: phát hiện `CLAU
 - **Idempotent install**: mọi thao tác cài đặt trong `setup.rs`/`pkg.rs` phải an toàn khi chạy lần 2.
 - **Default KHÔNG ĐÈ (invariant cho mọi verb)**: file user-owned (`su-code/*.md`, `CHANGELOG.md`, `su-code/skills/`, `AGENTS.md` ngoài sentinel, hooks, config key user đã set) → chỉ seed-if-missing hoặc update trong sentinel-block; đè thật CHỈ qua flag rõ ràng (`--force`). File managed (bundled `~/.omp/skills`, `00-force-load.md`, `APPEND_SYSTEM.md`, extensions) → refresh byte-compare khi binary update; user custom thì sửa bản project.
 - **Smart-parse args**: 1 verb nhận nhiều dạng input (vd `8sync ai "..."` = prompt · `8sync ai --model glm "..."` = model override · `8sync find -f x` = filename mode · `8sync harness compaction 50` = set). Tránh subcommand sâu.
-- **Verb count target**: giữ ≤ 22 verb flat (hiện ~19; look&feel delegate cho HyDE, kitty glass deploy qua `setup`).
+- **Verb count target**: giữ ≤ 30 verb flat (hiện 27 gồm cả `help`/`flow`; look&feel delegate cho HyDE, kitty glass deploy qua `setup`).
 - **Binary size — ceiling 5 MiB (ENFORCED), goal 4 MiB**: `scripts/size-gate.sh` chạy trong `release.yml` cho MỌI asset → build **FAIL** nếu vượt `5 242 880 B`; vượt goal `4 194 304 B` chỉ warn. Ceiling đặt TRÊN size hiện tại có chủ ý — gate đỏ sẵn thì ai cũng phớt lờ; hạ dần mỗi khi có headroom (ratchet). Hiện tại: **x86_64 4 859 696 B** (+15.87% so goal) · **aarch64-musl 4 151 328 B** (−1.02%, đạt goal) · **minimal (`--no-default-features`) 3 109 496 B** (−25.86%). Attribute bằng `bash scripts/size-report.sh` (A/B từng feature, mỗi build 1 `--target-dir` riêng + `--target` tường minh). Số của `cargo bloat` CHỈ để xếp hạng nghi phạm — nó hụt SQLite ~26× (xem `su-code/KNOWLEDGE.md`). Skill mới chỉ bundle nếu thật sự always-on; còn lại để `8sync skill add`.
 - **Help format**: mọi verb có `-h`/`--help` với `EXAMPLES` block (xem `setup.rs:7-15`).
 

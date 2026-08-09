@@ -1,14 +1,20 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** none — `multi-session` SHIPPED in v0.53.0. Next large work: `ai-router-hub` M1 (in monorepo `8sync-startup`, blocked on B3 creds).
+> **Active feature:** none — v0.56.0 (`8sync hz` + `8sync lcd`) shipped. Next large work: `ai-router-hub` M1 (in monorepo `8sync-startup`, blocked on B3 creds).
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
-## 🚚 HANDOFF — 2026-08-08 (RELEASED v0.53.0)
+## 🚚 HANDOFF — 2026-08-09 (v0.56.0: `hz` + `lcd`, on Fedora 44 / GNOME Wayland)
 
-**Repo state (su-code):** branch `main`, **RELEASED tag `v0.53.0`** @ `8379798` (Cargo.toml+lock bumped 0.52.0→0.53.0). Tree clean, `origin/main` == HEAD, tag pushed → Release CI built + published 5 platform assets (linux x86_64/aarch64-musl, darwin x86_64/arm64, windows-msvc). `8sync up` now SAFE — it reinstalls v0.53.0 which carries every Luồng-A fix + the new session layer.
+**Repo state (su-code):** branch `main`, version bumped 0.55.0 → **0.56.0**, 98 tests green, size gate OK (under the 5 MiB ceiling, over the 4 MiB goal as usual). Binary installed to `~/.local/bin/8sync` — the machine had silently been running **0.53.0** while HEAD was 0.55.0.
 
-**Repo state (monorepo `8sync-startup`):** branch `main` @ `ddfff79` — KHÔNG đụng tới session này; code `ai-router-hub` nằm ở `deploy/ai-router-hub/backend-go/` nhưng **gitignored** (`/deploy/*`), nên nó **sống trên disk máy này thôi** → xem "backend-go-snapshot" bên dưới.
+**Shipped this session**
+- **Fixed the v0.55.0 upgrade defect:** the `sx-` command migration content-gated on the *current* asset, which the same release had rewritten — so every upgraded machine kept 8 duplicate un-prefixed commands. Now gated on a frozen table of every body ever shipped (`LEGACY_COMMAND_BODIES` in `skill/deploy.rs`). Verified: the 8 stale files disappeared on this box.
+- **`8sync hz`** (`verbs/hz.rs`) — refresh-rate manager over Mutter/Hyprland/kscreen/xrandr, plus an EDID-vs-driver bottleneck diagnosis. Live-proven 100 → 60 → 100 Hz through Mutter with the layout preserved.
+- **`8sync lcd`** (`verbs/lcd.rs`) — Lian Li fan/AIO screens over `lianli-daemon`'s IPC socket. Live-proven on 8× UNI FAN TL V2 LCD: colour, image, `--device N`, brightness. `8sync lcd gui` launches the upstream Tauri app with `WEBKIT_DISABLE_DMABUF_RENDERER=1` (without it: `Error 71`, no window).
+
+**Open on THIS machine (hardware, not code)**
+- The 3440x1440 panel is capped at **100 Hz** because the RTX 5080 is on **nouveau**. `8sync setup --profile nvidia` installs RPM Fusion `akmod-nvidia`; Secure Boot is **disabled**, so no MOK enrolment is needed. After a reboot, `8sync hz max` should offer 180 Hz. Not run — driver swaps are the user's call.
 
 **Session này làm 2 luồng song song — cả hai ở repo `su-code`:**
 

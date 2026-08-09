@@ -65,10 +65,13 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `ponytail-gain` — `su-code/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `su-code/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `su-code/skills/ponytail-review/SKILL.md`
+- `remote-compute` — `su-code/skills/remote-compute/SKILL.md`
+- `research-paper` — `su-code/skills/research-paper/SKILL.md`
 - `security-and-hardening` — `su-code/skills/security-and-hardening/SKILL.md`
 - `senior-frontend` — `su-code/skills/senior-frontend/SKILL.md`
 - `senior-security` — `su-code/skills/senior-security/SKILL.md`
 - `shipping-and-launch` — `su-code/skills/shipping-and-launch/SKILL.md`
+- `social-growth` — `su-code/skills/social-growth/SKILL.md`
 - `source-driven-development` — `su-code/skills/source-driven-development/SKILL.md`
 - `spec-driven-development` — `su-code/skills/spec-driven-development/SKILL.md`
 - `test-driven-development` — `su-code/skills/test-driven-development/SKILL.md`

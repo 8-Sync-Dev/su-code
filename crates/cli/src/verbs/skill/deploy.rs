@@ -1280,6 +1280,49 @@ fn remove_retired_workflow_extension(home: &Path, root: Option<&Path>) {
     }
 }
 
+/// FNV-1a 64 over `bytes`. Not a crate and not a security boundary — the only
+/// use is recognising a file we wrote against the frozen list below, so eight
+/// dependency-free lines beat adding `sha2` or shelling out to `sha256sum` once
+/// per command file. `DefaultHasher` is explicitly not used: its output is not
+/// guaranteed stable across Rust releases, and these constants must never rot.
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
+/// Every un-prefixed command body 8sync has ever shipped, LF-normalised, up to
+/// v0.54.1 — the last release that deployed commands without the `sx-` prefix.
+///
+/// FROZEN by construction: no build after v0.54.1 writes an un-prefixed command,
+/// so this set can never grow. Delete the whole migration once every user has
+/// passed through a release carrying it.
+const LEGACY_COMMAND_BODIES: &[u64] = &[
+    0x07c2_eb60_e607_6b34, // push-now.md
+    0x11eb_9293_f0df_b294, // auto.md
+    0x2d30_a3d6_672c_f75d, // feature.md
+    0x3485_1cf3_bd99_e0dd, // auto.md
+    0x7667_5a1e_2d94_198c, // create-command.md
+    0xa804_2999_eaa7_a198, // auto-package.md
+    0xb9b2_8906_5a74_c4a4, // auto.md
+    0xd938_b6b8_bf89_9ef6, // auto.md
+    0xe7dd_6b8c_27b0_93a7, // auto.md
+    0xea20_6d38_a0f6_0a37, // pull-now.md
+    0xf25a_62bd_7152_a3c9, // create-skill.md
+    0xfe57_329d_5bc7_2dfe, // sync-pr.md
+];
+
+/// Is this text a command body we shipped before the `sx-` prefix?
+///
+/// Normalised first: a CRLF checkout of a pre-0.54.2 release baked CRLF into the
+/// shipped asset, and that copy is still unmistakably ours.
+fn is_retired_command_body(text: &str) -> bool {
+    LEGACY_COMMAND_BODIES.contains(&fnv1a64(text.replace("\r\n", "\n").as_bytes()))
+}
+
 /// Delete the pre-prefix copy of a command we previously deployed.
 ///
 /// Without this an upgrade leaves BOTH `/auto` and `/sx-auto` in omp's flat
@@ -1288,25 +1331,18 @@ fn remove_retired_workflow_extension(home: &Path, root: Option<&Path>) {
 ///
 /// Removal is content-gated on purpose. `~/.omp/agent/commands/` is shared with
 /// commands the USER wrote, and `auto.md` is an obvious name for someone to pick.
-/// Deleting by name alone would silently eat their file, so the old copy is only
-/// removed when it is byte-identical to some version of our asset — i.e. when we
-/// can prove we wrote it. Anything the user has touched is left alone, and they
-/// end up with both names, which is noisy but never destructive.
-fn remove_unprefixed_predecessor(home: &Path, root: Option<&Path>, asset: &str, file: &str) {
-    let Some(ours) = crate::assets::read(asset) else {
-        return;
-    };
+/// Deleting by name alone would silently eat their file, so the old copy goes
+/// only when its body is one we shipped. The gate compares against EVERY shipped
+/// version, not just the current asset: the release that introduced the prefix
+/// also rewrote each body's self-references, so a current-asset-only compare
+/// never matched and left both names behind on every upgraded machine.
+fn remove_unprefixed_predecessor(home: &Path, root: Option<&Path>, file: &str) {
     let mut targets = vec![home.join(".omp/agent/commands").join(file)];
     if let Some(r) = root {
         targets.push(r.join(".omp/commands").join(file));
     }
     for p in targets {
-        // Compare on normalised text: a CRLF checkout of an older release wrote
-        // CRLF here, and that copy is still unmistakably ours.
-        let same = std::fs::read_to_string(&p)
-            .map(|on_disk| on_disk.replace("\r\n", "\n") == ours.replace("\r\n", "\n"))
-            .unwrap_or(false);
-        if same {
+        if std::fs::read_to_string(&p).is_ok_and(|on_disk| is_retired_command_body(&on_disk)) {
             let _ = std::fs::remove_file(&p);
         }
     }
@@ -1341,7 +1377,7 @@ pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
         // rebranded build can choose its own prefix from one const.
         let deployed = crate::brand::cmd_file(file);
         let invoked = deployed.trim_end_matches(".md");
-        remove_unprefixed_predecessor(home, root, &asset, file);
+        remove_unprefixed_predecessor(home, root, file);
         deploy_omp_pair(
             home,
             root,
@@ -1623,5 +1659,45 @@ mod command_prefix_tests {
         assert!(body.contains("\nname: sx-super-dev\n"), "frontmatter must state the INVOKED name");
         assert!(body.contains("\ndescription: "), "missing description");
         assert!(body.contains("$ARGUMENTS"), "takes no arguments");
+    }
+}
+
+#[cfg(test)]
+mod legacy_command_tests {
+    use super::*;
+
+    /// Reference vectors from the FNV-1a 64 spec. If these drift, every constant
+    /// in `LEGACY_COMMAND_BODIES` silently stops matching and the migration
+    /// becomes a no-op — exactly the failure this module exists to prevent.
+    #[test]
+    fn hash_matches_the_fnv1a64_spec() {
+        assert_eq!(fnv1a64(b""), 0xcbf2_9ce4_8422_2325);
+        assert_eq!(fnv1a64(b"a"), 0xaf63_dc4c_8601_ec8c);
+        assert_eq!(fnv1a64(b"foobar"), 0x85944171f73967e8);
+    }
+
+    /// A command the USER wrote at a name we once used is never deleted.
+    #[test]
+    fn a_user_authored_command_is_not_ours() {
+        assert!(!is_retired_command_body("---\nname: auto\n---\n\nmy own /auto\n"));
+        assert!(!is_retired_command_body(""));
+    }
+
+    /// The list is a closed set of PRE-prefix bodies. Nothing shipped today may
+    /// appear in it: that would mean someone appended post-migration content to a
+    /// table whose whole premise is that it can never grow.
+    #[test]
+    fn the_legacy_set_is_frozen_and_distinct_from_what_ships_now() {
+        let mut seen = LEGACY_COMMAND_BODIES.to_vec();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), LEGACY_COMMAND_BODIES.len(), "duplicate digest");
+        for asset in crate::assets::iter_under("commands/") {
+            let Some(body) = crate::assets::read(&asset) else { continue };
+            assert!(
+                !is_retired_command_body(&body),
+                "`{asset}` ships today yet is listed as a retired body"
+            );
+        }
     }
 }

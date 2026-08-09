@@ -213,6 +213,8 @@ System packages (`pacman -Syu`) are **not** run automatically — you decide whe
 | Command | Description |
 |---|---|
 | `8sync bt [on\|off\|fix\|restart]` | Bluetooth (bluez): status / on-off / troubleshoot a dead adapter / restart |
+| `8sync hz [max\|<Hz>] [--output N] [--dry-run]` | Refresh rate per display: report, or set the highest the output offers (resolution untouched). GNOME/Mutter · Hyprland · KDE · X11. A panel whose EDID beats what the driver exposes is **diagnosed** — driver named, fix printed — not silently accepted |
+| `8sync lcd [<file>\|#RRGGBB\|off\|bright N\|gui]` | Lian Li fan/AIO screens straight from the shell — talks to `lianli-daemon` over its Unix socket, so no GUI is needed. `--device N` targets one screen; `lcd gui` opens the upstream app with the WebKit/Wayland fix that stops it dying with `Error 71` |
 | `8sync clean [--deep\|--ram\|--gpu\|--timer 1h]` | Reclaim disk (paccache/journal/thumbnails) + CPU/GPU/RAM report. `--deep` removes orphans; never touches models/package download caches |
 | `8sync theme [list\|set <name>\|show]` | Switch the kitty color palette live (colors only, structure untouched) |
 | `8sync bg [set\|list\|add <url>\|search <q>]` | Kitty wallpaper live swap + inline preview; `bg search` = wallhaven.cc (no API key) |

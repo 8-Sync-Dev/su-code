@@ -3,6 +3,8 @@ pub mod setup;
 pub mod profile;
 pub mod sec;
 pub mod bt;
+pub mod hz;
+pub mod lcd;
 pub mod clean;
 pub mod up;
 pub mod selfup;

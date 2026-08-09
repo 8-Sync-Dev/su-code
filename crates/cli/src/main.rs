@@ -79,6 +79,12 @@ enum Cmd {
     /// Bluetooth control + troubleshoot (status/on/off/fix/restart)
     Bt(verbs::bt::Args),
 
+    /// Refresh rate: report or set the highest Hz per display (status/max/<Hz>)
+    Hz(verbs::hz::Args),
+
+    /// Lian Li fan/AIO screens from the shell: show an image, GIF, video or colour
+    Lcd(verbs::lcd::Args),
+
     /// SoftEther VPN Client + VPN Gate academic relays (install/gui/list/on/off/status)
     Vpn(verbs::vpn::Args),
 
@@ -169,6 +175,8 @@ fn main() -> Result<()> {
         Some(Cmd::Theme(a)) => verbs::theme::run(a),
         Some(Cmd::Sec(a))     => verbs::sec::run(a),
         Some(Cmd::Bt(a))      => verbs::bt::run(a),
+        Some(Cmd::Hz(a))      => verbs::hz::run(a),
+        Some(Cmd::Lcd(a))     => verbs::lcd::run(a),
         Some(Cmd::Vpn(a))     => verbs::vpn::run(a),
         Some(Cmd::Clean(a))   => verbs::clean::run(a),
         Some(Cmd::Skill(a))   => verbs::skill::run(a),

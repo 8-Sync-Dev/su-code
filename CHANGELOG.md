@@ -5,6 +5,55 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-08-09
+
+### Added
+- **`8sync lcd` — Lian Li fan/AIO screens from the shell.** `8sync lcd` lists every screen the
+  `lian-li-linux` daemon can see, `8sync lcd photo.png` (or `.gif` / `.mp4` / `#ff0055` / `off`)
+  draws on all of them, `--device` targets one by index or id, `8sync lcd bright 60` sets
+  brightness. It speaks the daemon's own newline-JSON IPC on
+  `$XDG_RUNTIME_DIR/lianli-daemon.sock` instead of re-implementing the USB protocol, so the
+  setting lands in the daemon's config and survives a reboot — and none of it needs the GUI.
+  `SetLcdMedia.device_id` is sent as `serial:<id>` because upstream matches the request against
+  `LcdConfig::device_id()`; any other spelling appends a duplicate entry rather than replacing the
+  screen's existing one. Verified on 8× UNI FAN TL V2 LCD (400x400): colour, image and
+  single-screen targeting all confirmed in the daemon's own log.
+- **`8sync lcd gui` launches the upstream GUI with the fix already applied.** `lianli-gui` is
+  Tauri/WebKitGTK and its DMA-BUF renderer dies with `Error 71 (Protocol error) dispatching to
+  Wayland display` on a machine whose GPU path is degraded (here: an RTX 5080 on `nouveau`) — the
+  window simply never appears. The verb sets `WEBKIT_DISABLE_DMABUF_RENDERER=1`, which costs
+  nothing visible and is the difference between an app that starts and one that does not.
+- **`8sync hz` — refresh-rate manager.** `8sync hz` reports every output's current rate against
+  the highest one available, `8sync hz max` raises each to its ceiling, `8sync hz 144` picks a
+  specific rate; `--output` narrows to one connector and `--dry-run` prints the backend call.
+  Resolution is never changed — only the refresh field of the mode already in use — because the
+  fastest mode a monitor offers is routinely a *smaller* one (this dev box lists 2560x1440@144
+  while running 3440x1440@100), and "faster" must never mean "smaller".
+  Backends: GNOME/Mutter over `busctl` (Wayland *and* X11 — the only supported way to set a mode
+  under GNOME Wayland), Hyprland `hyprctl`, KDE `kscreen-doctor`, and X11 `xrandr`. Mutter applies
+  are `VERIFY`-ed before they are made persistent, and the full logical-monitor layout (position,
+  scale, rotation, primary) is echoed back untouched, because `ApplyMonitorsConfig` replaces the
+  *whole* layout and silently resets anything omitted. Backends that cannot persist a change say
+  so and print the config line that would.
+- **`8sync hz` diagnoses a capped panel instead of accepting it.** The verb parses the display's
+  own EDID range-limits descriptor and compares the panel's ceiling with what the driver exposes.
+  A 180 Hz monitor pinned to 100 Hz is not a compositor setting: the kernel filters out every mode
+  above the negotiated DisplayPort link bandwidth, so the fast mode is gone before GNOME ever sees
+  it. When the gap is real, `hz` names the bound driver, explains it, and prints the fix — on an
+  NVIDIA card still on `nouveau` that is `8sync setup --profile nvidia`, worded per distro family
+  (RPM Fusion `akmod-nvidia` on Fedora, `nvidia-open-dkms` on Arch). `8sync doctor` carries the
+  same check as a one-liner. Distro-agnostic: no package manager is involved in reading or setting
+  a mode, so Fedora and Arch behave identically.
+
+### Fixed
+- **Upgrading no longer leaves duplicate slash commands.** v0.55.0 removed the pre-prefix copy of a
+  command only when it was byte-identical to the asset in the *current* build — but that same
+  release rewrote every command body to self-reference the new prefixed name, so the compare could
+  never match and every upgraded machine kept both `/auto` and `/sx-auto` (eight stale pairs,
+  frozen at v0.54.1). The gate now recognises any body 8sync has ever shipped, from a frozen table
+  of digests that by construction can never grow. A command the user wrote at one of those names is
+  still never touched.
+
 ## [0.55.0] - 2026-08-09
 
 ### Added

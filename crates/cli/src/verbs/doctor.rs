@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::{env_detect, pkg, ui, verbs::{profile, sec, bt}};
+use crate::{env_detect, pkg, ui, verbs::{profile, sec, bt, hz}};
 
 pub fn run() -> Result<()> {
     ui::header("8sync doctor");
@@ -99,6 +99,9 @@ pub fn run() -> Result<()> {
 
     // Bluetooth (bluez) — compact status
     bt::status_quiet();
+
+    // Display refresh — warns when the panel can beat what the driver offers
+    hz::status_quiet();
 
     // Security (warp + ufw) — compact one-liners
     sec::status_quiet();
