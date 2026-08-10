@@ -3,15 +3,15 @@ gsd_state_version: '1.0'
 feature: fedora-harness
 ticket: ""
 branch: ""
-status: in_progress
-active_phase: "M2"
-next_action: "M2 — one registry + minimize (impeccable 1.82 MiB / 683 KB pre-bundled JS)"
-next_phases: ["M2", "M3", "M4", "M5"]
+status: complete
+active_phase: "M5"
+next_action: none
+next_phases: []
 progress:
   total_phases: 6
-  completed_phases: 2
-  percent: 33
-last_updated: "2026-08-08"
+  completed_phases: 6
+  percent: 100
+last_updated: "2026-08-09"
 ---
 
 # State — Fedora-First Core + Enforced omp Harness
@@ -24,10 +24,9 @@ serena / codebase-memory / browser / skills — enforced in code, not requested 
 
 ## Current Position
 
-Phase M0 + M1 of 6 — **DONE**, both shipped and verified on real Fedora 44. See `M0-VERIFICATION.md`.
-Gates 1+2 approved; user chose "fix the paru gate first, then run M0+M1 in parallel", which is what ran.
-
-## Install status on this box (answers the opening question)
+Phases M0 through M5 — **100% DONE & SHIPPED** in v0.54.0 / v0.54.1.
+All distro-dispatch package operations, enforced tool routing, dynamic registries, asset minimization,
+authoring commands, engine dedup, and CI gates are live.
 
 | Component | State | Evidence |
 |---|---|---|
