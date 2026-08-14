@@ -153,19 +153,31 @@ pub(crate) fn step0_overlay() -> Option<PathBuf> {
 ///
 /// The rename matters: `fs::write` truncates first, so a second `8sync` starting
 /// concurrently — or omp itself, reading the `--config` it was just handed — can
-/// observe an EMPTY file and hard-error on it. Writing a pid-unique sibling and
-/// renaming over the target means every reader sees one whole version or the
-/// other. (`fs::rename` replaces an existing file on Windows too.)
+/// observe an EMPTY file and hard-error on it. Staging a sibling and renaming
+/// over the target means every reader sees one whole version or the other.
+/// (`fs::rename` replaces an existing file on Windows too.)
+///
+/// The stage name carries a per-CALL sequence, not just the pid: two THREADS in
+/// one process would otherwise pick the same sibling, and whichever renamed
+/// second would fail on a file the first had already moved away — silently
+/// dropping STEP-0 for that launch. The linux CI leg caught exactly that.
 ///
 /// Skipping the write when nothing changed keeps the mtime, and with it omp's
 /// config layer byte-stable across launches.
 fn write_overlay(path: &Path) -> Option<()> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+
     if std::fs::read_to_string(path).ok().as_deref() == Some(STEP0_OVERLAY) {
         return Some(());
     }
     let dir = path.parent()?;
     std::fs::create_dir_all(dir).ok()?;
-    let tmp = dir.join(format!(".omp-step0.{}.tmp", std::process::id()));
+    let tmp = dir.join(format!(
+        ".omp-step0.{}.{}.tmp",
+        std::process::id(),
+        SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
     std::fs::write(&tmp, STEP0_OVERLAY).ok()?;
     match std::fs::rename(&tmp, path) {
         Ok(()) => Some(()),
@@ -453,6 +465,48 @@ mod tests {
         std::fs::write(&path, "grep:\n  enabled: true\n").unwrap();
         write_overlay(&path).expect("overlay rewritten");
         assert_eq!(std::fs::read_to_string(&path).unwrap(), STEP0_OVERLAY);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    /// Two CI legs failed on this in a row, from both sides: a reader catching
+    /// `fs::write`'s truncate window, then two threads colliding on one
+    /// pid-named stage file so the loser silently dropped STEP-0. Concurrent
+    /// callers must ALL succeed and the file must never be observed torn.
+    #[test]
+    fn step0_overlay_survives_concurrent_writers() {
+        let path = scratch("race");
+        let readers_saw_torn = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        std::thread::scope(|s| {
+            for _ in 0..8 {
+                let p = path.clone();
+                s.spawn(move || {
+                    for _ in 0..25 {
+                        write_overlay(&p).expect("every concurrent write must succeed");
+                    }
+                });
+            }
+            for _ in 0..4 {
+                let (p, torn) = (path.clone(), readers_saw_torn.clone());
+                s.spawn(move || {
+                    for _ in 0..50 {
+                        if let Ok(body) = std::fs::read_to_string(&p) {
+                            if body != STEP0_OVERLAY {
+                                torn.store(true, std::sync::atomic::Ordering::Relaxed);
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        assert!(
+            !readers_saw_torn.load(std::sync::atomic::Ordering::Relaxed),
+            "a reader observed a partially written overlay"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), STEP0_OVERLAY);
+        assert!(
+            std::fs::read_dir(path.parent().unwrap()).unwrap().count() == 1,
+            "stage files leaked"
+        );
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 }

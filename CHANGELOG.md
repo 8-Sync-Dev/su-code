@@ -42,8 +42,11 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 - **The STEP-0 overlay is written atomically.** `fs::write` truncates before it writes, so a
   second `8sync` starting concurrently — or omp itself, reading the `--config` it was just
   handed — could observe an empty file and hard-error on it. The overlay now lands via a
-  pid-unique sibling plus `rename`, so every reader sees one whole version or the other. The
-  Windows CI runner found this first, as a parallel test reading `""`.
+  staged sibling plus `rename`, so every reader sees one whole version or the other. The stage
+  name carries a per-call sequence, not just the pid: two threads in one process would otherwise
+  choose the same sibling and the one that renamed second would fail on a file already moved
+  away, silently dropping STEP-0 for that launch. Both directions were found by the release CI
+  (Windows read `""`, then Linux hit the collision) and are now covered by a concurrency test.
 
 ## [0.56.0] - 2026-08-09
 

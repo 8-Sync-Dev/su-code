@@ -249,3 +249,9 @@ _(consolidated 45 dòng cũ → su-code/archive/KNOWLEDGE-1786671697.md)_
   built 4/5 platforms and SKIPPED `publish release`, so no assets and no GitHub release existed —
   the tag could be deleted and re-cut with no consumer impact. Check
   `gh run view <id> --json jobs` per leg, not just the run conclusion.
+- **failure: a pid is not a unique temp name — threads share it.** The atomic-write fix staged
+  `.omp-step0.<pid>.tmp`; two test threads in ONE process picked the same sibling and the loser's
+  `rename` hit an already-moved file, returned `None`, and silently dropped STEP-0 for that call.
+  Windows went green and linux-x86_64 went red on the very next run. A stage filename needs
+  pid **plus** a per-call atomic counter. Covered now by `step0_overlay_survives_concurrent_
+  writers` (8 writers × 25 + 4 readers asserting no torn read, no leaked stage file).
