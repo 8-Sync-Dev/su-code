@@ -37,7 +37,7 @@ installed to `~/.local/bin/8sync`; `8sync harness` re-run on this box.
   default store.
 
 **Done ✓**
-- [x] STEP-0 deny-list (`models.rs`, `doctor.rs`, `assets/configs/models.toml`) — 101 tests green.
+- [x] STEP-0 deny-list (`models.rs`, `doctor.rs`, `assets/configs/models.toml`) — 102 tests green.
 - [x] Named-session store hint (`session.rs`).
 - [x] 4 foundation skills registered in `BUNDLED_SKILLS` (`skill/deploy.rs`) + deployed here.
 - [x] **`sx-` commands are now machine-wide.** `~/.omp/agent/commands/` = 10 `sx-*`, 0 unprefixed.
@@ -46,8 +46,13 @@ installed to `~/.local/bin/8sync`; `8sync harness` re-run on this box.
       agentic-cloudgo-v1, agentic-cloudgo-gitlab, box-work, 8sync-startup) are clean.
       `defensible-cv/.omp/commands/omp-update.md` intentionally survives — user-authored, and the
       deletion gate is content-based, so it is never eaten.
-- [x] **RELEASED v0.57.0** — `Cargo.toml`+lock bumped, CHANGELOG cut, tag `v0.57.0` pushed;
-      Release CI publishes the 5 platform assets, so `8sync up` now carries the fix.
+- [x] **RELEASED v0.57.0** — all 5 platform assets published
+      (`gh release view v0.57.0`), so `8sync up` now carries the fix.
+      The tag sits on `9ae3c2c`, not on the `release:` commit: the first two CI runs failed and
+      the tag was deleted + re-cut each time (nothing had published, so no consumer saw them).
+      Both failures were the overlay write, from opposite sides — Windows read a truncated `""`,
+      then Linux hit two threads staging the same pid-named temp file. Fixed by staged-write +
+      `rename` with a per-call sequence; `step0_overlay_survives_concurrent_writers` covers it.
 
 **Next / TODO ▸**
 - [ ] `8sync harness audit` — doctor reports 9 stale doc paths / 2 oversized.
