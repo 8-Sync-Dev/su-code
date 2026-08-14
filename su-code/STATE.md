@@ -1,5 +1,5 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** none — STEP-0 deny-list fix landed on top of v0.56.0, **release pending**. Next large work: `ai-router-hub` M1 (in monorepo `8sync-startup`, blocked on B3 creds).
+> **Active feature:** none — **v0.57.0 released** (STEP-0 deny-list; `8sync up` is safe again). Next large work: `ai-router-hub` M1 (in monorepo `8sync-startup`, blocked on B3 creds).
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
@@ -46,19 +46,17 @@ installed to `~/.local/bin/8sync`; `8sync harness` re-run on this box.
       agentic-cloudgo-v1, agentic-cloudgo-gitlab, box-work, 8sync-startup) are clean.
       `defensible-cv/.omp/commands/omp-update.md` intentionally survives — user-authored, and the
       deletion gate is content-based, so it is never eaten.
+- [x] **RELEASED v0.57.0** — `Cargo.toml`+lock bumped, CHANGELOG cut, tag `v0.57.0` pushed;
+      Release CI publishes the 5 platform assets, so `8sync up` now carries the fix.
 
 **Next / TODO ▸**
-- [ ] **Cut the release** — the fix only reaches other boxes via `8sync up` after a tag.
-      `su-code-release-cut` skill: bump `Cargo.toml`+lock to 0.57.0, move `[Unreleased]` under
-      `## [0.57.0]`, `git tag v0.57.0 && git push origin v0.57.0` → Release CI builds 5 assets.
-      Until then a new machine MUST `bash scripts/bootstrap.sh`, not `8sync up`.
 - [ ] `8sync harness audit` — doctor reports 9 stale doc paths / 2 oversized.
 - [ ] **M1 (ai-router-hub)** — in monorepo `8sync-startup`; needs B3 credentials.
 
 **Blockers ⚠**
-- **Any machine still on ≤v0.56.0 with omp ≥17.3 cannot launch `8sync .` at all** (the
-  `--tools` usage error). Workarounds until the release lands: `8sync ai --no-step0`, or build
-  from source. This is the reason to tag soon.
+- **Any machine still on ≤v0.56.0 with omp ≥17.3 cannot launch `8sync .` at all** (the `--tools`
+  usage error). Cured by `8sync up` now that v0.57.0 is tagged; before upgrading, the escape
+  hatch on such a box is `8sync ai --no-step0`.
 - M1 needs Postgres + a provider account + a CLIProxyAPI host — outside agent reach.
 
 **Per-machine (NOT in git) — re-apply on the other box**
@@ -77,7 +75,7 @@ installed to `~/.local/bin/8sync`; `8sync harness` re-run on this box.
 
 **New-machine runbook (ordered):**
 1. `git pull`
-2. `bash scripts/bootstrap.sh` — build from source; **do NOT `8sync up`** until v0.57.0 is tagged.
+2. `8sync up` (v0.57.0+) — or `bash scripts/bootstrap.sh` when HEAD is ahead of the last tag.
 3. `8sync setup`
 4. `8sync harness global --sweep` — global rules + `sx-` commands + per-project layers.
 5. `cd <repo> && 8sync harness` — full pass incl. codegraph index for the repo you work in.

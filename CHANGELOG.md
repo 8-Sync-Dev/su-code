@@ -5,6 +5,8 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.57.0] — 2026-08-14
+
 ### Added
 - **`sx-plan` command**: Autonomous plan-review gate for deep research, slice decomposition, and task-reviewer contract verification using `engine_plan`, `task`, and `recall`.
 - **`sx-sync-pr` command hardened**: Existence guards, branch validation gate, SHA-based main up-to-date checks, and non-push default safety.
@@ -37,6 +39,7 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   `encore-eino-go` and `ai-microservice-design` were embedded in the binary and listed in
   `AGENTS.md` but missing from `BUNDLED_SKILLS`, so `8sync harness` never wrote them to
   `~/.omp/skills/`. The registry test caught it; they are registered now.
+
 ## [0.56.0] - 2026-08-09
 
 ### Added
