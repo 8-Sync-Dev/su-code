@@ -8,7 +8,7 @@
 
 use serde::Deserialize;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize)]
 pub struct ModelConfig {
@@ -145,11 +145,35 @@ const STEP0_OVERLAY: &str = "# 8sync STEP-0 — managed file, rewritten whenever
 /// this whole change exists to prevent.
 pub(crate) fn step0_overlay() -> Option<PathBuf> {
     let path = dirs::config_dir()?.join(crate::brand::NS).join("omp-step0.yml");
-    if std::fs::read_to_string(&path).ok().as_deref() != Some(STEP0_OVERLAY) {
-        std::fs::create_dir_all(path.parent()?).ok()?;
-        std::fs::write(&path, STEP0_OVERLAY).ok()?;
-    }
+    write_overlay(&path)?;
     Some(path)
+}
+
+/// Refresh `path` to [`STEP0_OVERLAY`], atomically and only when it has drifted.
+///
+/// The rename matters: `fs::write` truncates first, so a second `8sync` starting
+/// concurrently — or omp itself, reading the `--config` it was just handed — can
+/// observe an EMPTY file and hard-error on it. Writing a pid-unique sibling and
+/// renaming over the target means every reader sees one whole version or the
+/// other. (`fs::rename` replaces an existing file on Windows too.)
+///
+/// Skipping the write when nothing changed keeps the mtime, and with it omp's
+/// config layer byte-stable across launches.
+fn write_overlay(path: &Path) -> Option<()> {
+    if std::fs::read_to_string(path).ok().as_deref() == Some(STEP0_OVERLAY) {
+        return Some(());
+    }
+    let dir = path.parent()?;
+    std::fs::create_dir_all(dir).ok()?;
+    let tmp = dir.join(format!(".omp-step0.{}.tmp", std::process::id()));
+    std::fs::write(&tmp, STEP0_OVERLAY).ok()?;
+    match std::fs::rename(&tmp, path) {
+        Ok(()) => Some(()),
+        Err(_) => {
+            let _ = std::fs::remove_file(&tmp);
+            None
+        }
+    }
 }
 
 /// Whether STEP-0 still bites, asked of omp itself: with the overlay applied,
@@ -389,29 +413,46 @@ mod tests {
         }
     }
 
+    /// Test-private overlay path: these cases WRITE, and the real one is shared
+    /// with every other test that builds launch flags. Pointing three tests at
+    /// one file is how the first cut failed on the Windows runner — a parallel
+    /// reader caught the truncate window and read `""`.
+    fn scratch(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir()
+            .join(format!("8sync-step0-{}-{tag}", std::process::id()))
+            .join("omp-step0.yml")
+    }
+
     /// The overlay is the whole enforcement: it must name the two searchers and
     /// nothing else, or STEP-0 either stops biting or starts disabling tools the
     /// agent needs.
     #[test]
     fn step0_overlay_disables_exactly_grep_and_glob() {
-        let path = step0_overlay().expect("overlay written");
+        let path = scratch("content");
+        write_overlay(&path).expect("overlay written");
         let body = std::fs::read_to_string(&path).unwrap();
         assert_eq!(body, STEP0_OVERLAY);
         for tool in ["grep", "glob"] {
             assert!(body.contains(&format!("{tool}:\n  enabled: false")), "{body}");
         }
         assert_eq!(body.matches("enabled: false").count(), 2, "{body}");
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     /// Rewritten only when it drifts, so an unchanged overlay keeps its mtime and
     /// omp's config layer stays byte-stable across launches (prompt-cache hit).
     #[test]
     fn step0_overlay_is_idempotent() {
-        let a = step0_overlay().expect("overlay written");
-        let m1 = std::fs::metadata(&a).unwrap().modified().unwrap();
+        let path = scratch("idem");
+        write_overlay(&path).expect("overlay written");
+        let m1 = std::fs::metadata(&path).unwrap().modified().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(20));
-        let b = step0_overlay().expect("overlay written");
-        assert_eq!(a, b);
-        assert_eq!(m1, std::fs::metadata(&b).unwrap().modified().unwrap());
+        write_overlay(&path).expect("overlay written");
+        assert_eq!(m1, std::fs::metadata(&path).unwrap().modified().unwrap());
+        // Drifted content IS repaired.
+        std::fs::write(&path, "grep:\n  enabled: true\n").unwrap();
+        write_overlay(&path).expect("overlay rewritten");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), STEP0_OVERLAY);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 }

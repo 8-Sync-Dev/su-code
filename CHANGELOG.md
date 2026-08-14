@@ -39,6 +39,11 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   `encore-eino-go` and `ai-microservice-design` were embedded in the binary and listed in
   `AGENTS.md` but missing from `BUNDLED_SKILLS`, so `8sync harness` never wrote them to
   `~/.omp/skills/`. The registry test caught it; they are registered now.
+- **The STEP-0 overlay is written atomically.** `fs::write` truncates before it writes, so a
+  second `8sync` starting concurrently — or omp itself, reading the `--config` it was just
+  handed — could observe an empty file and hard-error on it. The overlay now lands via a
+  pid-unique sibling plus `rename`, so every reader sees one whole version or the other. The
+  Windows CI runner found this first, as a parallel test reading `""`.
 
 ## [0.56.0] - 2026-08-09
 

@@ -238,3 +238,14 @@ _(consolidated 45 dòng cũ → su-code/archive/KNOWLEDGE-1786671697.md)_
   registered_or_explicitly_opt_in` caught 4 foundation skills (tauri-v2, nextjs-app,
   encore-eino-go, ai-microservice-design) embedded in the binary and advertised in AGENTS.md but
   absent from `BUNDLED_SKILLS`, so `8sync harness` never deployed them to `~/.omp/skills/`.
+- **failure: `fs::write` is not an atomic config update, and the Windows runner proves it.**
+  Three tests shared the one real `~/.config/8sync/omp-step0.yml`; cargo runs them in parallel,
+  one caught the truncate window and read `""`, and the release CI's windows-x86_64 leg failed
+  while all four unix legs passed. Two fixes, both needed: write via pid-unique sibling +
+  `fs::rename` (atomic, and `rename` replaces on Windows too) so no reader — including the omp
+  process being handed the `--config` — can see a half-written file; and give writing tests their
+  own path under `env::temp_dir()`. A test that writes a real user-scoped path is not isolated.
+- **validated: watch the release run, do not assume the tag published.** `v0.57.0`'s tag push
+  built 4/5 platforms and SKIPPED `publish release`, so no assets and no GitHub release existed —
+  the tag could be deleted and re-cut with no consumer impact. Check
+  `gh run view <id> --json jobs` per leg, not just the run conclusion.
