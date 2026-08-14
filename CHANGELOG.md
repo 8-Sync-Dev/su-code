@@ -10,6 +10,33 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 - **`sx-sync-pr` command hardened**: Existence guards, branch validation gate, SHA-based main up-to-date checks, and non-push default safety.
 - **4 Foundation Reference Skills**: Added `tauri-v2`, `nextjs-app`, `encore-eino-go`, and `ai-microservice-design` with `locked: true` frontmatter, grounded in real 8syncdev production repos. Registered as foundation skills in `AGENTS.md` and committed under `assets/skills/`.
 - **Default Boot Kernel Enforcement**: Configured `grubby` to set `/boot/vmlinuz-6.19.10-300.fc44.x86_64` as default boot kernel, restoring native Fedora Bluetooth support (`btusb`), 180Hz display rate, and official NVIDIA RTX 5080 driver persistence across reboots.
+
+### Fixed
+- **`8sync .` and `8sync ai` could not launch omp at all.** STEP-0 steered omp with
+  `--tools`, which is an ALLOWLIST — so 8sync had to name every built-in tool omp has, and
+  omp 17.3 renaming `ast_grep` and dropping `github`/`checkpoint`/`rewind`/`security_scan`
+  made every launch die on the spot with `CliUsageError: Unknown tools in --tools`. The
+  failure looked like a session bug rather than a flag bug: `8sync . core` printed
+  `→ resume session 'core'`, omp exited before drawing a frame, and the user fell back to a
+  bare `omp --continue` — which reads omp's *default* per-cwd store, not the named session's,
+  so the session they had just opened appeared to have vanished.
+  STEP-0 is now a DENY-list: 8sync writes `grep.enabled: false` + `glob.enabled: false` to a
+  managed overlay (`~/.config/8sync/omp-step0.yml`) and passes it as `--config`. It names only
+  the two tools that must go, so no omp release can brick a launch or silently disable a tool
+  again, and MCP/xdev tools are untouched. Per-launch, so `--no-step0` and the user's own bare
+  `omp` still get the searchers. omp's accepted-tool set turned out to be assembled
+  asynchronously and to differ between runs of the same binary, so the old
+  "mirror omp's list, probe for drift" approach could never have been made correct.
+- **`8sync doctor` checks that STEP-0 still bites, not that a list still matches.** It asks omp
+  to accept `--tools grep,glob` under the overlay and expects a rejection; the answer is now
+  a property of the running omp rather than of a constant in this repo.
+- **A named session now prints the omp command that reopens it** (`omp --session-dir … --continue`),
+  because a named session deliberately lives in its own store and a bare `omp --continue` will
+  never find it.
+- **The four foundation skills shipped in v0.56.0 were never deployed.** `tauri-v2`, `nextjs-app`,
+  `encore-eino-go` and `ai-microservice-design` were embedded in the binary and listed in
+  `AGENTS.md` but missing from `BUNDLED_SKILLS`, so `8sync harness` never wrote them to
+  `~/.omp/skills/`. The registry test caught it; they are registered now.
 ## [0.56.0] - 2026-08-09
 
 ### Added

@@ -23,13 +23,15 @@
 # globally, or `8sync ai --no-advisor` for one run.
 advisor = true
 
-# step0 = STEP-0 tool-routing enforcement (default ON). 8sync launches omp with
-# `--tools` DROPping the redundant `grep` + `glob` built-ins, so code lookup MUST
-# use codegraph (CLI) · codebase-memory-mcp · serena (MCP tools are orthogonal to
-# `--tools` and survive it). `bash rg`/`grep -r` shell escapes on source are also
-# blocked by `bashInterceptor.patterns` — the rules are the `[bashInterceptor]`
-# section at the bottom of this file, deployed by `8sync harness`. Set false
-# to keep `grep`/`glob`, or override one run: `8sync ai --no-step0`.
+# step0 = STEP-0 tool-routing enforcement (default ON). 8sync launches omp with a
+# `--config` overlay setting `grep.enabled = false` + `glob.enabled = false`, so
+# the two redundant searchers are gone from the session and code lookup MUST use
+# codegraph (CLI) · codebase-memory-mcp · serena. It names only what to REMOVE,
+# so every other tool omp ships (MCP/xdev included) survives untouched.
+# `bash rg`/`grep -r` shell escapes on source are also blocked by
+# `bashInterceptor.patterns` — the rules are the `[bashInterceptor]` section at
+# the bottom of this file, deployed by `8sync harness`. Set false to keep
+# `grep`/`glob`, or override one run: `8sync ai --no-step0`.
 step0 = true
 
 [roles]
@@ -50,7 +52,7 @@ trivial = "glm"     # tiny mechanical ops → GLM
 # `8sync harness` renders these rules into `~/.omp/agent/config.yml` as omp's own
 # `bashInterceptor.patterns`, which makes a matching `bash` command return a TOOL
 # ERROR naming the replacement. This is the layer that closes the shell escape
-# `step0` leaves open: `--tools` removes the `grep`/`glob` TOOLS, not the shell.
+# `step0` leaves open: the overlay removes the `grep`/`glob` TOOLS, not the shell.
 # Shape is omp's, verbatim: { pattern (JS regex), tool, message }.
 #
 # `tool` is NOT the tool you want called — it is the gate omp checks. Its matcher

@@ -8,6 +8,7 @@
 
 use serde::Deserialize;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 pub struct ModelConfig {
@@ -21,13 +22,14 @@ pub struct ModelConfig {
     #[serde(default = "advisor_default")]
     pub advisor: bool,
     /// STEP-0 tool-routing enforcement (default ON). When ON, 8sync launches omp
-    /// with `--tools` DROPping the redundant built-in searchers `grep` + `glob`,
-    /// so code lookup MUST go through codegraph (CLI) · codebase-memory-mcp ·
-    /// serena. MCP/xdev tools are orthogonal to `--tools` and survive it
-    /// (verified omp 17.2.9: 47 MCP tools present under `--tools=read,bash`).
-    /// `bash rg`/`grep -r` shell escapes are additionally blocked by
-    /// `bashInterceptor.patterns` (deployed by `8sync harness`). Opt out:
-    /// `8sync ai --no-step0`, or `step0 = false` in models.toml.
+    /// with a `--config` overlay that sets `grep.enabled`/`glob.enabled` to
+    /// false, so the two redundant searchers are absent from the session and
+    /// code lookup MUST go through codegraph (CLI) · codebase-memory-mcp ·
+    /// serena. Everything else omp offers — including MCP/xdev tools — is
+    /// untouched, because this names only what to remove. `bash rg`/`grep -r`
+    /// shell escapes are additionally blocked by `bashInterceptor.patterns`
+    /// (deployed by `8sync harness`). Opt out: `8sync ai --no-step0`, or
+    /// `step0 = false` in models.toml.
     #[serde(default = "step0_default")]
     pub step0: bool,
     /// STEP-0 shell guard: the omp `bashInterceptor` rules `8sync harness` renders
@@ -113,42 +115,57 @@ fn embedded_bash_interceptor() -> BashInterceptor {
         .unwrap_or_default()
 }
 
-/// Built-in omp tools KEPT when STEP-0 enforcement is ON. `--tools` is an
-/// ALLOWLIST (omp has no deny-list — `tools.blocked` is only a telemetry
-/// counter), so this must name EVERY tool we want to keep: anything omitted is
-/// silently disabled. Only the two redundant searchers `grep` + `glob` are
-/// dropped, so code lookup must flow through codegraph (CLI) /
-/// codebase-memory-mcp / serena. `lsp` is KEPT (zero-friction; serena needs
-/// `activate_project` per session). `computer` is deliberately omitted to
-/// preserve its default-disabled state. MCP/xdev tools are orthogonal to
-/// `--tools` and survive it.
+/// STEP-0 tool enforcement, expressed as a DENY-list.
 ///
-/// MUST match omp's validator exactly — an unknown name makes omp exit with
-/// `Unknown tools in --tools: …`, which bricks every `8sync ai` / `8sync .`
-/// launch. The `--help` "Available Tools" section is STALE (it still lists
-/// `python`/`notebook`, which the validator rejects); the authoritative list is
-/// the one omp prints in that error. Re-check on every omp major upgrade —
-/// `8sync doctor` probes for drift.
-pub(crate) const STEP0_TOOLS: &str = "read,bash,edit,write,lsp,task,todo,web_search,ask,inspect_image,\
-                           browser,ast_grep,ast_edit,debug,eval,github,hub,checkpoint,rewind,\
-                           security_scan,memory_edit,retain,recall,reflect,learn,manage_skill,\
-                           yield,goal";
-
-/// Built-ins STEP-0 drops on purpose: the two redundant searchers, plus
-/// `computer`, which is disabled by default and must stay that way (naming it
-/// in an allowlist would ENABLE it).
-const STEP0_INTENTIONAL_DROPS: &[&str] = &["grep", "glob", "computer"];
-
-/// Ask omp itself which built-in tool names it accepts.
+/// omp's `--tools` is an ALLOWLIST, so steering it forces 8sync to mirror omp's
+/// ENTIRE built-in tool set — and that mirror rotted the moment omp 17.3
+/// renamed `ast_grep` and dropped `github`/`checkpoint`/`rewind`/
+/// `security_scan`: every `8sync .` and `8sync ai` launch died instantly with
+/// `CliUsageError: Unknown tools in --tools`, which sent the user back to a bare
+/// `omp --continue` — a DIFFERENT session store, so the named session they had
+/// just opened looked lost. The registry omp validates against is also built
+/// asynchronously, so the accepted set is not even stable within one version:
+/// no mirrored list can be correct.
 ///
-/// There is no machine-readable listing (`--help`'s "Available Tools" section is
-/// stale — it advertises `python`/`notebook`, which the validator rejects), but
-/// omp enumerates the real set when it refuses an unknown one, and it does so
-/// before contacting any provider, so the probe is free and offline:
-/// `Unknown tools in --tools: …. Valid tools: read, bash, ….`
-fn omp_valid_tools() -> Option<Vec<String>> {
+/// omp exposes per-tool switches instead (`grep.enabled`, `glob.enabled` —
+/// settings.md), which name only what we want GONE and stay valid however many
+/// tools omp adds or renames. Shipping them as a `--config` overlay keeps the
+/// scope per-launch, so `8sync ai --no-step0` and the user's own bare `omp` are
+/// untouched.
+const STEP0_OVERLAY: &str = "# 8sync STEP-0 — managed file, rewritten whenever it drifts.\n\
+                             # Code lookup must go through codegraph / codebase-memory-mcp / serena.\n\
+                             grep:\n  enabled: false\nglob:\n  enabled: false\n";
+
+/// Path to the STEP-0 overlay, written only when its bytes differ (omp treats a
+/// `--config` file as strict input, so it must exist and parse).
+///
+/// `None` when it cannot be written — the caller then launches WITHOUT STEP-0
+/// rather than pointing `--config` at a file omp would hard-error on. Losing the
+/// tool drop for one run is recoverable; a launch that refuses to start is what
+/// this whole change exists to prevent.
+pub(crate) fn step0_overlay() -> Option<PathBuf> {
+    let path = dirs::config_dir()?.join(crate::brand::NS).join("omp-step0.yml");
+    if std::fs::read_to_string(&path).ok().as_deref() != Some(STEP0_OVERLAY) {
+        std::fs::create_dir_all(path.parent()?).ok()?;
+        std::fs::write(&path, STEP0_OVERLAY).ok()?;
+    }
+    Some(path)
+}
+
+/// Whether STEP-0 still bites, asked of omp itself: with the overlay applied,
+/// `--tools grep,glob` must be REJECTED, because the two names are no longer in
+/// omp's registry. `--tools` is validated before any provider is contacted, so
+/// the probe is offline and free.
+///
+/// `Some(false)` means omp stopped honouring the `grep.enabled`/`glob.enabled`
+/// keys (renamed, removed) and the agent silently regained the searchers.
+/// `None` when omp is absent or the overlay could not be written.
+pub(crate) fn step0_effective() -> Option<bool> {
+    let overlay = step0_overlay()?;
     let out = std::process::Command::new("omp")
-        .args(["--tools", "__8sync_probe__", "-p", ""])
+        .arg("--config")
+        .arg(&overlay)
+        .args(["--tools", "grep,glob", "-p", ""])
         .output()
         .ok()?;
     let text = format!(
@@ -156,41 +173,7 @@ fn omp_valid_tools() -> Option<Vec<String>> {
         String::from_utf8_lossy(&out.stderr),
         String::from_utf8_lossy(&out.stdout)
     );
-    let tail = text.split("Valid tools:").nth(1)?;
-    let list = tail.split('.').next()?;
-    let tools: Vec<String> = list
-        .split(',')
-        .map(|t| t.trim().to_string())
-        .filter(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
-        .collect();
-    (!tools.is_empty()).then_some(tools)
-}
-
-/// Compare `STEP0_TOOLS` against omp's live validator list.
-///
-/// Returns `(rejected, silently_disabled)`:
-/// - `rejected` — names we send that omp does not know. Non-empty means omp
-///   exits with `Unknown tools in --tools` and EVERY `8sync ai` / `8sync .`
-///   launch is bricked. This is exactly how STEP-0 v1 shipped broken.
-/// - `silently_disabled` — tools omp offers that the allowlist omits (minus the
-///   deliberate drops). These vanish from the agent with no error at all, which
-///   is how an omp upgrade could quietly remove `recall`/`retain` again.
-///
-/// `None` when omp is absent or the probe could not be parsed — report nothing
-/// rather than guess.
-pub(crate) fn step0_tool_drift() -> Option<(Vec<String>, Vec<String>)> {
-    let valid = omp_valid_tools()?;
-    let ours: Vec<&str> = STEP0_TOOLS.split(',').map(str::trim).collect();
-    let rejected: Vec<String> = ours
-        .iter()
-        .filter(|t| !valid.iter().any(|v| v == *t))
-        .map(|t| t.to_string())
-        .collect();
-    let silently_disabled: Vec<String> = valid
-        .into_iter()
-        .filter(|v| !ours.contains(&v.as_str()) && !STEP0_INTENTIONAL_DROPS.contains(&v.as_str()))
-        .collect();
-    Some((rejected, silently_disabled))
+    Some(text.contains("Unknown tool") && text.contains("grep"))
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -270,9 +253,7 @@ impl ModelConfig {
         if self.advisor && class != TaskClass::Trivial {
             out.push("--advisor".to_string());
         }
-        if self.step0 {
-            push_flag(&mut out, "--tools", STEP0_TOOLS);
-        }
+        self.push_step0(&mut out);
         out
     }
 
@@ -286,10 +267,25 @@ impl ModelConfig {
         if self.advisor {
             out.push("--advisor".to_string());
         }
-        if self.step0 {
-            push_flag(&mut out, "--tools", STEP0_TOOLS);
-        }
+        self.push_step0(&mut out);
         out
+    }
+
+    /// STEP-0: hand omp the deny-list overlay. Skipped (with a warning) when the
+    /// file cannot be written — never send `--config` at a path omp will reject.
+    fn push_step0(&self, out: &mut Vec<String>) {
+        if !self.step0 {
+            return;
+        }
+        match step0_overlay() {
+            Some(p) => {
+                out.push("--config".to_string());
+                out.push(p.to_string_lossy().into_owned());
+            }
+            None => crate::ui::warn(
+                "STEP-0 overlay unwritable — launching with grep/glob ENABLED for the agent",
+            ),
+        }
     }
 
     fn push_role_flags(&self, out: &mut Vec<String>) {
@@ -371,5 +367,51 @@ mod tests {
         // explicit override wins.
         let f2 = cfg.omp_flags("plan something", Some("glm"));
         assert!(f2.windows(2).any(|w| w == ["--model", "glm"]));
+    }
+
+    /// The regression this replaced: STEP-0 used to send omp an ALLOWLIST of
+    /// every built-in tool, so omp 17.3 renaming `ast_grep` and dropping
+    /// `github`/`checkpoint`/`rewind`/`security_scan` made omp exit with
+    /// `CliUsageError: Unknown tools in --tools` on EVERY `8sync .` launch.
+    /// `--tools` must never be emitted again: the flag is what coupled us to a
+    /// list we do not own.
+    #[test]
+    fn step0_never_sends_a_tool_allowlist() {
+        let cfg = ModelConfig::default();
+        assert!(cfg.step0, "STEP-0 defaults ON");
+        for flags in [cfg.resume_flags(), cfg.omp_flags("refactor the parser", None)] {
+            assert!(
+                !flags.iter().any(|f| f == "--tools"),
+                "STEP-0 must deny grep/glob by config, never allowlist tools: {flags:?}"
+            );
+            let i = flags.iter().position(|f| f == "--config").expect("overlay passed");
+            assert!(flags[i + 1].ends_with("omp-step0.yml"), "{flags:?}");
+        }
+    }
+
+    /// The overlay is the whole enforcement: it must name the two searchers and
+    /// nothing else, or STEP-0 either stops biting or starts disabling tools the
+    /// agent needs.
+    #[test]
+    fn step0_overlay_disables_exactly_grep_and_glob() {
+        let path = step0_overlay().expect("overlay written");
+        let body = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(body, STEP0_OVERLAY);
+        for tool in ["grep", "glob"] {
+            assert!(body.contains(&format!("{tool}:\n  enabled: false")), "{body}");
+        }
+        assert_eq!(body.matches("enabled: false").count(), 2, "{body}");
+    }
+
+    /// Rewritten only when it drifts, so an unchanged overlay keeps its mtime and
+    /// omp's config layer stays byte-stable across launches (prompt-cache hit).
+    #[test]
+    fn step0_overlay_is_idempotent() {
+        let a = step0_overlay().expect("overlay written");
+        let m1 = std::fs::metadata(&a).unwrap().modified().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let b = step0_overlay().expect("overlay written");
+        assert_eq!(a, b);
+        assert_eq!(m1, std::fs::metadata(&b).unwrap().modified().unwrap());
     }
 }

@@ -278,31 +278,15 @@ fn check_ai_engines(home: &std::path::Path) {
     } else {
         ui::warn("  MCP tools HIDDEN behind search_tool_bm25 (fix: run `8sync harness global`) — serena/cbm never get called");
     }
-    // `--tools` is an allowlist, so it rots silently: a name omp drops bricks
-    // every launch, a name omp ADDS disappears from the agent with no error.
-    // Both have already happened once, so ask omp directly instead of trusting
-    // the constant.
-    match crate::models::step0_tool_drift() {
-        Some((rejected, disabled)) => {
-            // Report both: an omp upgrade can rename a tool (rejected) AND add a
-            // new one (silently disabled) at once — surfacing only half makes the
-            // maintainer fix STEP0_TOOLS twice.
-            if !rejected.is_empty() {
-                ui::warn(&format!(
-                    "  STEP-0 allowlist REJECTED by omp: {} — every `8sync ai` / `8sync .` will fail to launch. Fix STEP0_TOOLS in models.rs (or `8sync ai --no-step0` to work around)",
-                    rejected.join(", ")
-                ));
-            }
-            if !disabled.is_empty() {
-                ui::warn(&format!(
-                    "  STEP-0 allowlist is missing omp tool(s): {} — silently disabled for the agent. Add them to STEP0_TOOLS in models.rs",
-                    disabled.join(", ")
-                ));
-            }
-            if rejected.is_empty() && disabled.is_empty() {
-                ui::ok("  STEP-0 allowlist matches omp's tool list (grep/glob dropped on purpose)");
-            }
-        }
+    // STEP-0 is a deny-list overlay (`grep.enabled`/`glob.enabled` = false), so
+    // it cannot rot into an unlaunchable state the way the old `--tools`
+    // allowlist did. It can still stop BITING if omp renames those keys, and
+    // that failure is silent — so ask omp whether the two names really are gone.
+    match crate::models::step0_effective() {
+        Some(true) => ui::ok("  STEP-0 in force: omp rejects grep/glob (code lookup → codegraph/cbm/serena)"),
+        Some(false) => ui::warn(
+            "  STEP-0 NOT in force: omp still offers grep/glob — the `grep.enabled`/`glob.enabled` keys changed. Fix STEP0_OVERLAY in models.rs",
+        ),
         None => {}
     }
     if mcp.contains("\"serena\"") && which::which("uvx").is_ok() {

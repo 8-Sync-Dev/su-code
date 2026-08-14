@@ -1,60 +1,105 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** none — v0.56.0 (`8sync hz` + `8sync lcd`) shipped. Next large work: `ai-router-hub` M1 (in monorepo `8sync-startup`, blocked on B3 creds).
+> **Active feature:** none — STEP-0 deny-list fix landed on top of v0.56.0, **release pending**. Next large work: `ai-router-hub` M1 (in monorepo `8sync-startup`, blocked on B3 creds).
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
 
-## 🚚 HANDOFF — 2026-08-09 (v0.56.0: `hz` + `lcd`, on Fedora 44 / GNOME Wayland)
+## 🚚 HANDOFF — 2026-08-14 (STEP-0 deny-list: `8sync .` could not launch omp)
 
-**Repo state (su-code):** branch `main`, version bumped 0.55.0 → **0.56.0**, 98 tests green, size gate OK (under the 5 MiB ceiling, over the 4 MiB goal as usual). Binary installed to `~/.local/bin/8sync` — the machine had silently been running **0.53.0** while HEAD was 0.55.0.
+**Repo state (su-code):** branch `main`, still 0.56.0, **101 tests green**, size gate OK
+(4 859 696 B — under the 5 MiB ceiling, over the 4 MiB goal as always). Binary rebuilt and
+installed to `~/.local/bin/8sync`; `8sync harness` re-run on this box.
 
-**Shipped this session**
-- **Fixed the v0.55.0 upgrade defect:** the `sx-` command migration content-gated on the *current* asset, which the same release had rewritten — so every upgraded machine kept 8 duplicate un-prefixed commands. Now gated on a frozen table of every body ever shipped (`LEGACY_COMMAND_BODIES` in `skill/deploy.rs`). Verified: the 8 stale files disappeared on this box.
-- **`8sync hz`** (`verbs/hz.rs`) — refresh-rate manager over Mutter/Hyprland/kscreen/xrandr, plus an EDID-vs-driver bottleneck diagnosis. Live-proven 100 → 60 → 100 Hz through Mutter with the layout preserved.
-- **`8sync lcd`** (`verbs/lcd.rs`) — Lian Li fan/AIO screens over `lianli-daemon`'s IPC socket. Live-proven on 8× UNI FAN TL V2 LCD: colour, image, `--device N`, brightness. `8sync lcd gui` launches the upstream Tauri app with `WEBKIT_DISABLE_DMABUF_RENDERER=1` (without it: `Error 71`, no window).
+**Shipped this session — the launcher was dead, not the sessions**
+- `8sync . <name>` / `8sync ai` had been exiting instantly with
+  `CliUsageError: Unknown tools in --tools: ast_grep, github, checkpoint, rewind, security_scan`.
+  STEP-0 drove omp with `--tools`, an ALLOWLIST, so 8sync mirrored omp's whole built-in set;
+  omp 17.3 renamed/dropped 5 of those names. Because omp died before drawing a frame, the user
+  fell back to a bare `omp --continue` — omp's DEFAULT per-cwd store, not the named session's —
+  and the named session looked lost. Nothing was ever lost.
+- STEP-0 is now a deny-list: `models.rs` writes `~/.config/8sync/omp-step0.yml`
+  (`grep.enabled: false`, `glob.enabled: false`) and passes `--config <that file>`. Names only
+  what must go, so no omp release can brick a launch. `STEP0_TOOLS`, `omp_valid_tools()` and
+  `step0_tool_drift()` are gone.
+- `8sync doctor` now probes ENFORCEMENT (`omp --tools grep,glob` must be rejected under the
+  overlay) instead of comparing a constant against a list that is not even stable per version.
+- A named session prints `omp --session-dir … --continue` on launch, so the other lane is
+  reachable by hand.
+- Registered the 4 foundation skills v0.56.0 forgot (`tauri-v2`, `nextjs-app`, `encore-eino-go`,
+  `ai-microservice-design`) in `BUNDLED_SKILLS` — embedded + in AGENTS.md but never deployed.
 
-**Open on THIS machine (hardware, not code)**
-- The 3440x1440 panel is capped at **100 Hz** because the RTX 5080 is on **nouveau**. `8sync setup --profile nvidia` installs RPM Fusion `akmod-nvidia`; Secure Boot is **disabled**, so no MOK enrolment is needed. After a reboot, `8sync hz max` should offer 180 Hz. Not run — driver swaps are the user's call.
-
-**Session này làm 2 luồng song song — cả hai ở repo `su-code`:**
-
-### Luồng A — 8sync binary fixes (self-update + serena) · TRẠNG THÁI: xong, chờ release tag
-`git diff --stat` (files touched + WHY, 1 dòng mỗi cái):
-- `crates/cli/src/verbs/selfup.rs` (+158) — `8sync up` từng hard-code `ASSET_SUFFIX="-linux-x86_64"` → trên Windows tải nhầm binary Linux, ghi file không `.exe`, `rename` đè lên `.exe` đang chạy (Windows cấm) → popup "Select an app to open '8sync'". Fix: `asset_label()` map theo `platform::os()`+`ARCH` (macOS arm = `arm64`), install vào `std::env::current_exe()`, Windows-safe replace (rename `.exe` sống → `.8sync.old.<pid>` rồi trượt bản mới vào).
-- `crates/cli/src/verbs/skill/deploy.rs` (+11) — `ensure_serena_mcp` giờ register serena `--enable-web-dashboard False` (serena mặc định mở 1 tab dashboard + bind HTTP mỗi session → 16 proc/878 MB); flag truyền qua **command line** (serena tự rewrite `serena_config.yml` nên sửa file không sống). Kèm step0 tool-routing + bashInterceptor deploy.
-- `AGENTS.md`, `CLAUDE.md` (−mỗi cái ~30 net) — re-inject sentinel block (RULE#0 step0 + serena note); managed block, đừng sửa tay ngoài sentinel.
-- `CHANGELOG.md` (+14) — 2 mục `[Unreleased] Fixed`: selfup cross-platform + serena dashboard off. (Đã có sẵn, không cần thêm.)
-
-### Luồng B — sản phẩm `ai-router-hub` M0 · ĐÃ DỜI sang monorepo (canonical)
-- `ai-router-hub` là product của cụm `8sync-startup` → toàn bộ memory (planning + code snapshot + _RESTORE + feature STATE) dời về **monorepo** `~/Projects/startup/8sync-startup/su-code/planning/ai-router-hub/` (commit `be18d7e`), cạnh mind0-brain-go / news-admin / zus. Repo `tools/su-code` này chỉ cho binary 8sync — KHÔNG giữ product memory nữa.
-- Trạng thái: **M0 DONE** (Go-level, podman vet/build/test PASS, review READY); **M1 BLOCKED** trên B3 credentials. Tiếp ở monorepo: đọc `8sync-startup/su-code/STATE.md` (khối "Parked: ai-router-hub") → restore theo `backend-go-snapshot/_RESTORE.md`.
+**Verified live (not inferred)**
+- `8sync . core` in `~/Projects/startup/8sync-startup` → omp v17.3.2 TUI up, no usage error.
+- Scratch project: create → turn → the jsonl lands in the NAMED store and NOT in omp's default
+  store; re-`8sync . <name>` resumes the SAME file and the model recalled the earlier word.
+- `8sync ai "…"` one-shot clean; `8sync doctor` → "STEP-0 in force: omp rejects grep/glob".
+- Isolation is sound: `--session-dir <empty dir> --continue` starts fresh, never leaks into the
+  default store.
 
 **Done ✓**
-- [x] Luồng A: selfup cross-platform (native Linux build clean; nhánh `#[cfg(windows)]` type-check OK), serena dashboard off (no listener :24282), step0/interceptor deploy.
-- [x] Luồng B: M0 scaffold authored + Go-verified (5/5 engine task), CI gate PASS, independent review = READY, `M0-VERIFICATION.md` ghi.
-- [x] **multi-session feature (v0.53.0):** `8sync .` named sessions (new/ls/mv/rm/merge) + `--worktree` isolation + git-shell-out merge engine. 4 phases M0–M3, all smoke-verified (`multi-session/M3-VERIFICATION.md`), zero new deps.
-- [x] **RELEASED v0.53.0** — bumped Cargo.toml+lock, tagged, pushed; Release CI publishing 5-platform assets. `8sync up` safe again.
+- [x] STEP-0 deny-list (`models.rs`, `doctor.rs`, `assets/configs/models.toml`) — 101 tests green.
+- [x] Named-session store hint (`session.rs`).
+- [x] 4 foundation skills registered in `BUNDLED_SKILLS` (`skill/deploy.rs`) + deployed here.
+- [x] **`sx-` commands are now machine-wide.** `~/.omp/agent/commands/` = 10 `sx-*`, 0 unprefixed.
+      `8sync harness global --sweep` stamped **10 omp projects**; the 6 repos still holding
+      pre-prefix `auto/feature/pull-now/push-now/sync-pr.md` (defensible-cv, auto-work-cloudgo,
+      agentic-cloudgo-v1, agentic-cloudgo-gitlab, box-work, 8sync-startup) are clean.
+      `defensible-cv/.omp/commands/omp-update.md` intentionally survives — user-authored, and the
+      deletion gate is content-based, so it is never eaten.
 
 **Next / TODO ▸**
-- [ ] **M1 (ai-router-hub)** — đã dời sang monorepo `8sync-startup`; tiếp ở đó (restore snapshot + `/feature plan` M1). Cần B3 credentials (Postgres + provider account + CLIProxyAPI host).
-- [ ] **Máy có Docker:** `encore run`/`encore test` backend-go + kiểm **Risk #1** (`Response.Result interface{}` — Encore schema parser có thể reject; fix 1 dòng). Xem `M0-VERIFICATION.md`.
-- [ ] `8sync harness toolstats` sau vài session enforcement: kỳ vọng `grep`→0, `cbm`/`serena`>0 (baseline 66.7% optimizer).
+- [ ] **Cut the release** — the fix only reaches other boxes via `8sync up` after a tag.
+      `su-code-release-cut` skill: bump `Cargo.toml`+lock to 0.57.0, move `[Unreleased]` under
+      `## [0.57.0]`, `git tag v0.57.0 && git push origin v0.57.0` → Release CI builds 5 assets.
+      Until then a new machine MUST `bash scripts/bootstrap.sh`, not `8sync up`.
+- [ ] `8sync harness audit` — doctor reports 9 stale doc paths / 2 oversized.
+- [ ] **M1 (ai-router-hub)** — in monorepo `8sync-startup`; needs B3 credentials.
 
 **Blockers ⚠**
-- **M1 = true blocker (per-machine, NOT in git):** cần (a) Postgres, (b) ≥1 account provider (Claude/Gemini/Codex subscription) để onboard, (c) host chạy CLIProxyAPI binary. Credentials/data ngoài tầm agent → `/auto` dừng đúng luật.
-- ~~`8sync up` reverts Luồng A~~ **RESOLVED by v0.53.0** — `8sync up` now reinstalls v0.53.0 (all fixes + session layer). Máy mới vẫn build từ source (`bootstrap.sh`) cho HEAD chưa release, else `8sync up` OK.
-- **bashInterceptor/serena config per-machine** (`~/.omp/agent/config.yml`, `mcp.json`): mỗi máy cần `8sync harness global`; `omp update` có thể rewrite config → re-run.
-- **`codegraph callers` FALSE NEGATIVE** — dùng `mcp__serena_find_referencing_symbols`. **Đừng `rm -rf .codegraph`** → `codegraph index --force` hoặc `8sync harness`.
+- **Any machine still on ≤v0.56.0 with omp ≥17.3 cannot launch `8sync .` at all** (the
+  `--tools` usage error). Workarounds until the release lands: `8sync ai --no-step0`, or build
+  from source. This is the reason to tag soon.
+- M1 needs Postgres + a provider account + a CLIProxyAPI host — outside agent reach.
+
+**Per-machine (NOT in git) — re-apply on the other box**
+- `8sync harness global --sweep` is REQUIRED per machine: `~/.omp/agent/commands/`,
+  `~/.omp/skills/`, `APPEND_SYSTEM.md`, MCP registrations and the per-project `.omp/` layers all
+  live in `~`, not in the repo. Without it the other box still shows the pre-prefix `/push-now`
+  and no `/sx-*`. This is exactly what bit this session.
+- `~/.config/8sync/omp-step0.yml` is written on demand by the binary — nothing to copy.
+- The 3440x1440 panel is capped at **100 Hz** because the RTX 5080 is on **nouveau**.
+  `8sync setup --profile nvidia` installs RPM Fusion `akmod-nvidia`; Secure Boot is **disabled**,
+  so no MOK enrolment is needed. After a reboot, `8sync hz max` should offer 180 Hz. Not run —
+  driver swaps are the user's call.
+- `~/.omp/agent/models.yml` holds a plaintext agentrouter API key. Machine-local, not in git,
+  but rotate it if that file was ever shared.
+- Lessons: `su-code/KNOWLEDGE.md` §"STEP-0 must be a deny-list, not an allowlist (2026-08-14)".
 
 **New-machine runbook (ordered):**
-1. `git pull` (repo su-code)
-2. `bash scripts/bootstrap.sh` → build từ source (lấy mọi fix Luồng A) + install `~/.local/bin/8sync`. **KHÔNG** `8sync up`.
-3. `8sync setup` (omp + codegraph + MCP/skills + gh + PATH)
-4. `8sync harness` → redeploy extension + bashInterceptor + serena(no-dashboard) + skills + memory + inject + codegraph index
-5. `8sync doctor` — phải thấy `✓ STEP-0 allowlist matches omp's tool list`
-6. Tiếp `ai-router-hub`: restore code theo `su-code/planning/ai-router-hub/backend-go-snapshot/_RESTORE.md`, rồi đọc `su-code/planning/ai-router-hub/STATE.md`.
-- Decisions + lessons: `su-code/KNOWLEDGE.md` (+ `su-code/archive/`).
+1. `git pull`
+2. `bash scripts/bootstrap.sh` — build from source; **do NOT `8sync up`** until v0.57.0 is tagged.
+3. `8sync setup`
+4. `8sync harness global --sweep` — global rules + `sx-` commands + per-project layers.
+5. `cd <repo> && 8sync harness` — full pass incl. codegraph index for the repo you work in.
+6. `8sync doctor` — expect `✓ STEP-0 in force: omp rejects grep/glob`.
 
+## Prior sessions — still-live facts only
+- **`ai-router-hub` moved out.** Product memory lives in the monorepo
+  `~/Projects/startup/8sync-startup/su-code/planning/ai-router-hub/` (commit `be18d7e`); this repo
+  is the 8sync binary only. **M0 DONE** (Go vet/build/test PASS, review READY), **M1 BLOCKED** on
+  credentials. Resume there: `8sync-startup/su-code/STATE.md` → `backend-go-snapshot/_RESTORE.md`.
+- **Shipped and released:** v0.53.0 named sessions (`new/ls/mv/rm/merge` + `--worktree`), v0.54.1
+  cross-platform `8sync up` (`selfup.rs::asset_label`), serena registered with
+  `--enable-web-dashboard False` (default cost 16 proc / 878 MB), v0.56.0 `8sync hz` + `8sync lcd`.
+- **`codegraph callers` gives FALSE NEGATIVES** — use `mcp__serena_find_referencing_symbols`.
+  Never `rm -rf .codegraph`; re-index with `codegraph index --force` or `8sync harness`.
+- **`omp update` can rewrite `~/.omp/agent/config.yml`** (bashInterceptor, MCP) — re-run
+  `8sync harness global` after updating omp.
+- **Docker box still owed:** `encore run`/`encore test` on ai-router-hub backend-go, checking
+  Risk #1 (`Response.Result interface{}` may be rejected by Encore's schema parser) —
+  see `M0-VERIFICATION.md`.
+- `8sync harness toolstats` after a few enforced sessions: expect `grep`→0, `cbm`/`serena`>0
+  (baseline 66.7% optimizer).
 
 ## ✅ SHIPPED — `lean-binary` feature (2026-08-02)
 1. **M0** — landed 5 pending deliverables (`8sync omp update` verb · `branch-sync` skill + `/sync-pr` · `harness global` auto-stamp · `deep-research` §5 + binary brief).

@@ -10,51 +10,7 @@
 # KNOWLEDGE (8sync managed — append-only)
 
 ## Learnings (append-only — ghi DƯỚI đây; KHÔNG sửa block `8sync:harness` ở trên)
-_(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1786239305.md)_
-  and STILL unused — `cbm 0 · serena 0 · headroom 0` agent calls, every lookup falling to `read`/`grep`.
-  **Lesson: a zero-friction built-in always beats an instruction; if a rule keeps losing, delete the
-  thing it competes with rather than writing the rule louder.** omp's enforcement surface, mapped from
-  the binary: (1) `--tools=<list>` CLI allowlist — **BUILT-INS ONLY**, verified by capturing a real
-  provider request (`omp -p ""` 400s and logs the full body to `~/.omp/logs/http-400-requests/`): under
-  `--tools=read,bash,todo` the request still carried **48 `mcp__*` tools + `engine_*` + `wf_state_*`** —
-  so dropping `grep`/`glob` costs zero MCP. There is NO persistent `tools.enabled` key; only the launch
-  flag. (2) `bashInterceptor.patterns` — user-configurable, shape `{ pattern: <regex>, reason: <string> }`
-  (from omp's own `explicitExclusions` schema + runtime `Blocked by bash pattern: ${match}`); omp itself
-  uses this pattern to redirect raw `git` to its structured git tool, which is exactly the raw→structured
-  redirect we needed. (3) Hooks are **message/session-scoped only** (`before_agent_start`,
-  `session.compacting`, post-hoc `on_tool_execution_success/failed`) — there is **no pre-tool-call guard
-  event**, so "block `read` until codegraph ran" is NOT implementable as a hook; the allowlist is the
-  only pre-execution lever. (4) `--advisor` is passive (notes, never blocks).
-  Trick worth reusing: **a rejected request still logs its full tool array** — the cheapest way to prove
-  what omp actually ships to the model, with no successful model call needed.
-- failure (STEP-0 v1 shipped BROKEN — `8sync ai` bricked; "verified" checked the wrong thing):
-  the `--tools` allowlist listed `python` + `notebook`, taken from omp's `--help` "Available
-  Tools" section. That section is STALE. omp 17.2.9's validator rejects both and **exits**:
-  `Error: Unknown tools in --tools: python, notebook`, so EVERY `8sync ai` / `8sync .` launch
-  died before omp started. The commit claimed "verified: allowlist embedded in binary ✓" — it
-  verified the string was in the binary, never that omp ACCEPTS it. Rule: a flag is verified only
-  by running the program end-to-end and observing the effect, never by grepping the binary for
-  the value. Authoritative tool list = the one omp prints in that error, not `--help`:
-  read, bash, edit, ast_grep, ast_edit, ask, debug, eval, github, glob, grep, lsp, inspect_image,
-  browser, computer, checkpoint, rewind, security_scan, task, hub, todo, web_search, write,
-  memory_edit, retain, recall, reflect, learn, manage_skill, yield, goal.
-- gotcha (`--tools` is an ALLOWLIST and omp has NO deny-list): `tools.blocked` in the schema is a
-  telemetry counter, not config. So `--tools` must enumerate everything you want to KEEP; every
-  omitted name is silently disabled. STEP-0 v1 omitted 17 real tools including `recall`/`retain`/
-  `reflect`/`memory_edit` (the whole mnemopi memory stack), `hub`, `eval`, `ast_grep`/`ast_edit` —
-  fixing only `python`/`notebook` would have silently killed memory. Correct list = validator list
-  − `grep` − `glob` − `computer` (omit `computer` so it keeps its default-disabled state).
-  Verify with the real provider request, not the model's self-report: omp logs a rejected request
-  body to `~/.omp/logs/http-400-requests/` (`omp --tools <list> -p ""`), which shows the exact tool
-  array. NOTE the names there are `_`-prefixed (`_read`, `_recall`) — matching bare names gives
-  false negatives.
-- failure (bashInterceptor silently blocked NOTHING — wrong rule shape + a self-disabling gate):
-  8sync wrote `{pattern, reason}`. omp's real shape is `{pattern, tool, message}` (+ optional
-  `flags`), and its matcher is:
-  `for ({rule:p, regex:o} of rules) { if (!toolNames.includes(p.tool)) continue; ... }`
-  A rule with no `tool` key hits `includes(undefined)` → false → **skipped unconditionally**, so
-  the interceptor was inert; verified live, `rg main main.rs` ran fine. Worse, the obvious repair
-  is also wrong: omp's own default rule for `grep|rg` carries `tool:"grep"`, and STEP-0 removes
+_(consolidated 45 dòng cũ → su-code/archive/KNOWLEDGE-1786671697.md)_
   `grep` from the allowlist — so the stock rule disables itself exactly when it is needed
   (catch-22). Fix: point every rule's `tool` at something guaranteed PRESENT — `lsp`. Verified
   live after the fix: `rg` and `grep -r` are refused with `Blocked: STEP-0: …`, single-file
@@ -255,3 +211,30 @@ _(consolidated 1 dòng cũ → su-code/archive/KNOWLEDGE-1786239305.md)_
 - validated: (Kernel default boot mismatch root-causes system driver losses): On Fedora 44 with dual kernels (e.g. 7.1.7 testing vs 6.19.10 official), GRUB defaults to the higher lexical version (7.1.7). If 7.1.7 lacks specific modules like `btusb.ko.xz`, Bluetooth service fails completely (`bluetooth.service` inactive). Fix: `grubby --set-default=/boot/vmlinuz-6.19.10-300.fc44.x86_64` permanently forces the official kernel with full driver stack (`btusb`, `nvidia`, 180Hz) on all reboots.
 - validated: (Lian Li TLV2 Wireless LCD config lock vs image pipeline): In Lian Li daemon `config.json`, setting a fan entry to `"type": "color"` with `"rgb": [255, 0, 0]` locks the fan to red and rejects IPC image frames. Updating `config.json` to `"type": "image"` unlocks the fan for realtime LCD sensor dashboard streaming (`/tmp/lcd_m_*.png`).
   absolute (the daemon has its own cwd).
+## STEP-0 must be a deny-list, not an allowlist (2026-08-14)
+
+- **failure: mirroring another program's tool list bricks the launcher.** STEP-0 shipped omp a
+  `--tools` ALLOWLIST, so 8sync had to name all ~29 built-ins to drop 2. omp 17.3 renamed
+  `ast_grep` → `ast_edit` and dropped `github`/`checkpoint`/`rewind`/`security_scan`, and every
+  `8sync .` / `8sync ai` died at argv-parse time with `CliUsageError: Unknown tools in --tools`.
+  Rule: when you only want N things GONE, use the API that names those N. `omp` has one —
+  `grep.enabled`/`glob.enabled` (settings.md §"Individual built-in tools are toggled by their own
+  keys") — passed per-launch as a `--config` overlay so `--no-step0` and bare `omp` stay clean.
+- **failure: omp's "Valid tools:" error list is NOT a stable inventory.** It is a snapshot of
+  whatever is registered at validation time, and MCP/xdev registration is async: two runs of the
+  same binary in the same cwd returned 64 vs 65 names, and a real project returned 35 built-ins
+  with zero `mcp__*` while `/tmp` returned 17 built-ins plus 47 `mcp__*`. Any allowlist derived
+  from that probe — and the old `step0_tool_drift()` doctor check built on it — is unsound.
+  Verify enforcement instead: with the overlay, `omp --tools grep,glob -p ""` must be REJECTED.
+  `--tools` is validated before any provider call, so the check is offline and free.
+- **validated: a crashing launcher reads as a data-loss bug.** `8sync . core` printed
+  `→ resume session 'core'`, omp exited before drawing a frame, and the user typed
+  `omp --continue` — which reads omp's DEFAULT per-cwd store (`~/.omp/agent/sessions/<key>/`),
+  not the named store (`~/.config/8sync/sessions/<key>/<name>/`). The named session looked lost.
+  The two stores are correctly isolated (proven: `--session-dir` on an empty dir starts fresh and
+  does not leak into the default store), so the cure was fixing the launch, plus printing the
+  `omp --session-dir … --continue` line that reopens a named session without 8sync.
+- **validated: the both-directions registry test earns its keep again.** `every_asset_skill_is_
+  registered_or_explicitly_opt_in` caught 4 foundation skills (tauri-v2, nextjs-app,
+  encore-eino-go, ai-microservice-design) embedded in the binary and advertised in AGENTS.md but
+  absent from `BUNDLED_SKILLS`, so `8sync harness` never deployed them to `~/.omp/skills/`.

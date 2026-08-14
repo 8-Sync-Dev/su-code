@@ -128,6 +128,10 @@ fn launch(cwd: &Path, session_dir: &Path, fresh: bool) -> Result<()> {
         return Ok(());
     }
     std::fs::create_dir_all(session_dir)?;
+    // A named session lives in its OWN omp store, so a bare `omp --continue`
+    // (omp's default per-cwd store) lands somewhere else entirely and the
+    // session looks lost. Print the command that reopens THIS one.
+    ui::info(&format!("omp --session-dir {} --continue", session_dir.display()));
     let cfg = crate::models::ModelConfig::load();
     let mut cmd = Command::new("omp");
     cmd.current_dir(cwd)
