@@ -211,3 +211,4 @@ _(consolidated 19 dòng cũ → su-code/archive/KNOWLEDGE-1787286513.md)_
   unrelated skill task. Recovery: `git reset --soft HEAD~1` + per-group commits before
   continuing the engine run. Prevention: land or stash pending work BEFORE starting an
   engine run with commit:true.
+- **rename note (2026-08-21, same session):** the ported skill SHIPS as `super-pdf` (v0.58.0). Paths `~/.omp/skills/report-pdf/…` in the entries above are the pre-release draft name — post-release the deployed path is `~/.omp/skills/super-pdf/` and the mirror `su-code/skills/super-pdf/` (gitignored). Any `su-code/skills/report-pdf` dir found on disk is a mirror re-vendor leftover; safe to delete.
