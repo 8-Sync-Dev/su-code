@@ -34,7 +34,7 @@ const BUNDLED_SKILLS: [(&str, &str); 27] = [
     ("skills/token-bench",             "token-bench"),
     ("skills/feature",                 "feature"),
     ("skills/branch-sync",             "branch-sync"),
-    ("skills/report-pdf",            "report-pdf"),
+    ("skills/super-pdf",             "super-pdf"),
     ("skills/deep-research",           "deep-research"),
     ("skills/research-paper",          "research-paper"),
     ("skills/remote-compute",          "remote-compute"),

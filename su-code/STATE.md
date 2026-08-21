@@ -9,12 +9,12 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
   `ckit-*` + `8sync-gs/` ở 3 project (agentic-cloudgo-v1/gitlab, defensible-cv) đã xoá;
   `remove_retired_extensions` (deploy.rs) tự sweep mỗi `8sync harness`, content-gate
   lineage marker `8sync-engine|8sync-workflow`. omp `update` khoẻ (17.4.0).
-- **`report-pdf` = skill bundled thứ 27** — HTML design system (đúng họ template các PDF
-  review CloudGO: kicker + meta + tagbox, §N spine, cmp navy + pills, callout 4 màu,
-  stat cards, footer 3 vùng) + `scripts/build.sh` (WeasyPrint qua `uv run`). E2E: render
-  3 trang A4 từ bản DEPLOYED + zai-vision verify toàn bộ token = YES hết. Managed skill
+- **`super-pdf` = skill bundled thứ 27** (rename từ draft `report-pdf` trước release) —
+  HTML design system (đúng họ template các PDF review CloudGO: chips strip + kicker +
+  meta + tagbox, §N spine, cmp navy + pills, callout 4 màu, stat cards, footer 3 vùng)
+  + `scripts/build.sh` (WeasyPrint qua `uv run`). E2E: render 3 trang A4 từ bản
+  DEPLOYED + zai-vision verify toàn bộ token = YES hết. Managed skill
   `repo-md2pdf-git-report` đã trỏ về engine sống (đường `tools/report-github-md2pf` chết).
-  Máy khác nhận skill này sau `8sync up` (khi release) hoặc build từ HEAD.
 
 ## 🚚 HANDOFF — 2026-08-14 (STEP-0 deny-list: `8sync .` could not launch omp)
 

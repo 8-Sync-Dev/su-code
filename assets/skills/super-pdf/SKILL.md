@@ -1,9 +1,9 @@
 ---
-name: report-pdf
-description: Generate boardroom-grade PDF reports via an HTML design system + WeasyPrint — the same template family that produced the admired CloudGO review/architecture PDFs (kicker cover with meta table, §N numbered section spine, navy comparison tables, colored callouts, pills, stat cards, running footer with page numbers). Use whenever asked for a beautiful/professional PDF report, "báo cáo PDF đẹp", review verdict PDF, architecture doc PDF, tài liệu giao sếp/khách, or "PDF như bản review MR".
+name: super-pdf
+description: Generate boardroom-grade PDF reports via an HTML design system + WeasyPrint — the same template family that produced the admired CloudGO review/architecture PDFs (kicker cover with chips strip + meta table, §N numbered section spine, navy comparison tables, colored callouts, pills, stat cards, running footer with page numbers). Use whenever asked for a beautiful/professional PDF, "báo cáo PDF đẹp", super pdf, review verdict PDF, architecture doc PDF, tài liệu giao sếp/khách, or "PDF như bản review MR".
 ---
 
-# report-pdf — HTML design system → PDF A4
+# super-pdf — HTML design system → PDF A4
 
 Turn notes/markdown into a **cited, sharp PDF**. The template IS the design system:
 copy `references/report-template.html`, **keep the `<style>` block byte-identical**,
@@ -20,7 +20,7 @@ content ready ─► cp references/report-template.html /tmp/<slug>.html
 ```
 
 ```bash
-~/.omp/skills/report-pdf/scripts/build.sh /tmp/my-report.html /tmp/my-report.pdf
+~/.omp/skills/super-pdf/scripts/build.sh /tmp/my-report.html /tmp/my-report.pdf
 # rendered -> /tmp/my-report.pdf
 # pages: N        ← a report is 2–10 pages; a jump means a broken page-break
 ```
@@ -34,7 +34,8 @@ after the first dependency pull.
    `.callout`) + 3–6 evidence bullets. Front-load everything.
 2. **Numbered spine.** Every `h2` carries `<span class="n">§N</span>` — manual numbering,
    never auto. `h3` for sub-points, no span.
-3. **Cover = 4 blocks, in order:** `.kicker` (uppercase, loại tài liệu · phạm vi) →
+3. **Cover = 5 blocks, in order:** `.chips` strip (2–4 category chips, uppercase —
+   omit when there is nothing to classify) → `.kicker` (loại tài liệu · phạm vi) →
    `h1` (conclusion-oriented title) → `.sub` (one line) → orange `.rule` → `.meta`
    table (Chuẩn bị cho / Người soạn / Ngày / Phạm vi) → `.tagbox` (central question,
    verbatim).
@@ -48,10 +49,11 @@ after the first dependency pull.
 
 | Token | Value | Use |
 |---|---|---|
-| Navy | `#0f2b46` | headings, table head, strong |
+| Navy | `#0f2b46` | headings, table head, strong, chip border |
 | Orange | `#d47a1e` | `.rule`, `h2 .n`, stat numbers, default callout |
 | Body | `#1f2733` on white, Liberation Sans 9.7pt, justified | prose |
 | Page | A4 `20mm 18mm 18mm 18mm` | footer left brand · center classification · right `Trang N/M`; `@page :first` blanks it |
+| `.chips` | row of bordered uppercase navy chips | cover category strip (optional) |
 | `.callout` | amber default; `.blue` `#10618f` · `.green` `#1c7c54` · `.red` `#c0392b` + uppercase `.lbl` | verdict / context / pass / risk |
 | `.stats` | flex row of `.stat` → `.big` number + `.cap` source | headline metrics |
 | `.quote` | italic, left rule | pull-quotes |

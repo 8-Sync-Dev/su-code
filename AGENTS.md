@@ -355,7 +355,7 @@ Khi `8sync harness init` (hoặc `8sync setup`) chạy, **27 skill bundled** đ�
 |`code-review-and-quality` · `senior-security` · `senior-frontend`|on-demand|review/quality/security/frontend chuyên sâu|
 |`full-flow`|on-demand|self-driving fix/dev/verify loop (Encore + Next)|
 |`branch-sync`|on-demand|check/preview/merge/sync mọi git branch về main không conflict|
-|`report-pdf`|on-demand|báo cáo/tài liệu PDF "boardroom-grade" từ HTML design system (§N section spine, bảng cmp navy + pills, callout 4 màu, stat cards, footer chạy) — template + `scripts/build.sh` (WeasyPrint); cùng họ với các PDF review CloudGO|
+|`super-pdf`|on-demand|báo cáo/tài liệu PDF "boardroom-grade" từ HTML design system (chips strip + kicker cover, §N section spine, bảng cmp navy + pills, callout 4 màu, stat cards, footer chạy) — template + `scripts/build.sh` (WeasyPrint); cùng họ với các PDF review CloudGO|
 |`token-bench`|on-demand|đo token thật mà codegraph/codebase-memory-mcp tiết kiệm vs grep+read (kèm correctness check)|
 |`last30days`|on-demand|research social recency (Reddit/X/YouTube/HN…)|
 |`deep-research`|on-demand|điều tra source-heavy → brief có provenance/citation|
