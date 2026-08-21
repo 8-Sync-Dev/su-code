@@ -211,3 +211,21 @@ _(consolidated 71 dòng cũ → su-code/archive/KNOWLEDGE-1787280413.md)_
   deleted. Gate: `contains("8sync-engine") || contains("8sync-workflow")`. Proof pattern:
   plant a mention-only control file in the sandbox and assert it SURVIVES the sweep, not
   just that stale files die.
+
+## report-pdf engine port — self-contained PDF skill (2026-08-21)
+
+- **validated: port the design system, not the tool.** The admired CloudGO PDFs came from
+  an HTML design system (review-mr / business-brief templates). Porting the TEMPLATE + a
+  12-line build.sh into a bundled skill made the capability machine-portable with zero
+  Rust deps, while the old ReportLab tool path had already rotted away
+  (`tools/report-github-md2pf` deleted from the repo). The guard pair
+  (`every_asset_skill_is_registered_or_explicitly_opt_in`, both directions) makes
+  registration self-enforcing. E2E proof pattern that generalises: render from the
+  DEPLOYED copy (`~/.omp/skills/report-pdf/`), not the repo tree, then zai-vision a
+  token checklist (kicker, §N spine, navy table, pills, footer page numbers) — 3 pages,
+  all YES.
+- **failure: `engine_advance {commit:true}` stages the WHOLE worktree, not the task's
+  files.** It swept a pre-existing 224-line `omp.rs` fix into a commit titled after an
+  unrelated skill task. Recovery: `git reset --soft HEAD~1` + per-group commits before
+  continuing the engine run. Prevention: land or stash pending work BEFORE starting an
+  engine run with commit:true.
