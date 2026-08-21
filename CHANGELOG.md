@@ -20,6 +20,14 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   Renamed from the in-session `report-pdf` draft before release. Also adds an optional
   cover `.chips` strip (category chips, as on the architecture-PDF variant).
 
+### Changed
+- **Size ceiling recalibrated `5 MiB` → `5 180 KiB` (5,304,320 B), attribution-first.** The
+  ratchet headroom was 4,208 B at v0.57.0; v0.56+v0.57 feature growth had eaten it all,
+  so this release`s legitimate +20,608 B (omp hardening + sweep + super-pdf) tripped the
+  gate. `size-report.sh` attribution: the `web` feature gate alone = +1,732,232 B — the
+  only elephant. Ceiling stays tight on purpose: the next feature release trips it again
+  and must attribute again. `AGENTS.md` §8 numbers refreshed (CI musl sizes).
+
 ### Fixed
 - **`8sync omp update` could hang forever and repaired via the wrong channel.** omp's
   self-updater downloads a ~185 MB standalone binary with no progress output and no timeout
@@ -46,6 +54,14 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 - **`sx-sync-pr` command hardened**: Existence guards, branch validation gate, SHA-based main up-to-date checks, and non-push default safety.
 - **4 Foundation Reference Skills**: Added `tauri-v2`, `nextjs-app`, `encore-eino-go`, and `ai-microservice-design` with `locked: true` frontmatter, grounded in real 8syncdev production repos. Registered as foundation skills in `AGENTS.md` and committed under `assets/skills/`.
 - **Default Boot Kernel Enforcement**: Configured `grubby` to set `/boot/vmlinuz-6.19.10-300.fc44.x86_64` as default boot kernel, restoring native Fedora Bluetooth support (`btusb`), 180Hz display rate, and official NVIDIA RTX 5080 driver persistence across reboots.
+
+### Changed
+- **Size ceiling recalibrated `5 MiB` → `5 180 KiB` (5,304,320 B), attribution-first.** The
+  ratchet headroom was 4,208 B at v0.57.0; v0.56+v0.57 feature growth had eaten it all,
+  so this release`s legitimate +20,608 B (omp hardening + sweep + super-pdf) tripped the
+  gate. `size-report.sh` attribution: the `web` feature gate alone = +1,732,232 B — the
+  only elephant. Ceiling stays tight on purpose: the next feature release trips it again
+  and must attribute again. `AGENTS.md` §8 numbers refreshed (CI musl sizes).
 
 ### Fixed
 - **`8sync .` and `8sync ai` could not launch omp at all.** STEP-0 steered omp with
@@ -122,6 +138,14 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   same check as a one-liner. Distro-agnostic: no package manager is involved in reading or setting
   a mode, so Fedora and Arch behave identically.
 
+### Changed
+- **Size ceiling recalibrated `5 MiB` → `5 180 KiB` (5,304,320 B), attribution-first.** The
+  ratchet headroom was 4,208 B at v0.57.0; v0.56+v0.57 feature growth had eaten it all,
+  so this release`s legitimate +20,608 B (omp hardening + sweep + super-pdf) tripped the
+  gate. `size-report.sh` attribution: the `web` feature gate alone = +1,732,232 B — the
+  only elephant. Ceiling stays tight on purpose: the next feature release trips it again
+  and must attribute again. `AGENTS.md` §8 numbers refreshed (CI musl sizes).
+
 ### Fixed
 - **Upgrading no longer leaves duplicate slash commands.** v0.55.0 removed the pre-prefix copy of a
   command only when it was byte-identical to the asset in the *current* build — but that same
@@ -196,6 +220,14 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
   package work; `nvidia` probes sysfs PCI vendor `0x10de` (no `lspci` dependency) and fails closed.
 - A profile skipped for missing hardware is no longer recorded as applied.
 
+### Changed
+- **Size ceiling recalibrated `5 MiB` → `5 180 KiB` (5,304,320 B), attribution-first.** The
+  ratchet headroom was 4,208 B at v0.57.0; v0.56+v0.57 feature growth had eaten it all,
+  so this release`s legitimate +20,608 B (omp hardening + sweep + super-pdf) tripped the
+  gate. `size-report.sh` attribution: the `web` feature gate alone = +1,732,232 B — the
+  only elephant. Ceiling stays tight on purpose: the next feature release trips it again
+  and must attribute again. `AGENTS.md` §8 numbers refreshed (CI musl sizes).
+
 ### Fixed
 - Line endings are now pinned to LF by `.gitattributes`. 14 embedded assets (a skill and the
   impeccable keyword rules) had CRLF committed, so the binary shipped assets whose bytes differed
@@ -244,6 +276,14 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 - COPR is treated as third-party root code: `copr_enable` refuses any `owner/project` outside a
   checked-in allowlist unless explicitly allowed, and `dnf swap --allowerasing` prints the erase
   set first.
+
+### Changed
+- **Size ceiling recalibrated `5 MiB` → `5 180 KiB` (5,304,320 B), attribution-first.** The
+  ratchet headroom was 4,208 B at v0.57.0; v0.56+v0.57 feature growth had eaten it all,
+  so this release`s legitimate +20,608 B (omp hardening + sweep + super-pdf) tripped the
+  gate. `size-report.sh` attribution: the `web` feature gate alone = +1,732,232 B — the
+  only elephant. Ceiling stays tight on purpose: the next feature release trips it again
+  and must attribute again. `AGENTS.md` §8 numbers refreshed (CI musl sizes).
 
 ### Fixed
 - **`8sync setup` aborted at step 3 of 8 on every non-Arch Linux.** The AUR-helper step was gated

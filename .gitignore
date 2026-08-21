@@ -9,7 +9,7 @@ su-code/planning/**/evidence-*.png
 .env
 .env.*
 !.env.example
-# KEEP COMMITTED (do NOT add here): su-code/ (memory), su-code/skills/, AGENTS.md, CHANGELOG.md
+# KEEP COMMITTED (do NOT add here): su-code/ (memory), AGENTS.md, CHANGELOG.md
 # <<< 8sync <<<
 
 # This repo dogfoods its own harness, so `8sync harness` deploys the shipped
