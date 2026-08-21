@@ -69,6 +69,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `ponytail-help` — `su-code/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `su-code/skills/ponytail-review/SKILL.md`
 - `remote-compute` — `su-code/skills/remote-compute/SKILL.md`
+- `report-pdf` — `su-code/skills/report-pdf/SKILL.md`
 - `research-paper` — `su-code/skills/research-paper/SKILL.md`
 - `security-and-hardening` — `su-code/skills/security-and-hardening/SKILL.md`
 - `senior-frontend` — `su-code/skills/senior-frontend/SKILL.md`
