@@ -5,6 +5,17 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added
+- **`report-pdf` bundled skill** — the HTML→PDF report engine (design system that produced
+  the admired CloudGO review/architecture PDFs) is now self-contained in su-code: annotated
+  `references/report-template.html` (kicker cover + meta table + tagbox, §N section spine,
+  navy comparison tables with pills, 4 callout variants, stat cards, 3-zone running footer
+  with page numbers) + `scripts/build.sh` (WeasyPrint via `uv run`, page-count guard) +
+  content rules (§0 = verdict first, every number traces to a source). Every machine gets
+  it after `8sync setup`; previously the engine only lived inside `agentic-cloudgo-v1`
+  project skills while the `repo-md2pdf-git-report` managed skill pointed at a deleted
+  tool path.
+
 ### Fixed
 - **`8sync omp update` could hang forever and repaired via the wrong channel.** omp's
   self-updater downloads a ~185 MB standalone binary with no progress output and no timeout

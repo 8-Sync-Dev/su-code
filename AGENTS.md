@@ -336,7 +336,7 @@ Session memory được `omp` tự quản (retain/recall/auto-compact). 8sync ch
 
 ## 7. Skill system (force-load)
 
-Khi `8sync harness init` (hoặc `8sync setup`) chạy, **23 skill bundled** được deploy vào `~/.omp/skills/` theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview). 10 skill **always-on** chia 2 tầng (progressive disclosure — giữ prefix gọn cho KV-cache): 4 **CORE** đọc body ngay đúng thứ tự (codegraph → karpathy-guidelines → ponytail → 8sync-cli), 6 **specialist** chỉ biết khả năng rồi đọc body khi task khớp; phần còn lại on-demand; `encore-deploy` tech-gated; `social-growth` opt-in:
+Khi `8sync harness init` (hoặc `8sync setup`) chạy, **27 skill bundled** được deploy vào `~/.omp/skills/` theo [Agent Skills open standard](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview). 10 skill **always-on** chia 2 tầng (progressive disclosure — giữ prefix gọn cho KV-cache): 4 **CORE** đọc body ngay đúng thứ tự (codegraph → karpathy-guidelines → ponytail → 8sync-cli), 6 **specialist** chỉ biết khả năng rồi đọc body khi task khớp; phần còn lại on-demand; `encore-deploy` tech-gated; `social-growth` opt-in:
 
 | Skill | Trigger | Mô tả |
 |---|---|---|
@@ -354,6 +354,7 @@ Khi `8sync harness init` (hoặc `8sync setup`) chạy, **23 skill bundled** đ�
 |`code-review-and-quality` · `senior-security` · `senior-frontend`|on-demand|review/quality/security/frontend chuyên sâu|
 |`full-flow`|on-demand|self-driving fix/dev/verify loop (Encore + Next)|
 |`branch-sync`|on-demand|check/preview/merge/sync mọi git branch về main không conflict|
+|`report-pdf`|on-demand|báo cáo/tài liệu PDF "boardroom-grade" từ HTML design system (§N section spine, bảng cmp navy + pills, callout 4 màu, stat cards, footer chạy) — template + `scripts/build.sh` (WeasyPrint); cùng họ với các PDF review CloudGO|
 |`token-bench`|on-demand|đo token thật mà codegraph/codebase-memory-mcp tiết kiệm vs grep+read (kèm correctness check)|
 |`last30days`|on-demand|research social recency (Reddit/X/YouTube/HN…)|
 |`deep-research`|on-demand|điều tra source-heavy → brief có provenance/citation|
