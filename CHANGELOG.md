@@ -5,6 +5,25 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Fixed
+- **`8sync omp update` could hang forever and repaired via the wrong channel.** omp's
+  self-updater downloads a ~185 MB standalone binary with no progress output and no timeout
+  of its own; the verb ran it with `Command::output()` (silent, unbounded), and its repair
+  path reinstalled via `npm install -g` for an EEXIST scenario that no longer matches the
+  omp.sh standalone layout. Now: the update attempt is time-boxed (10 min) with a 60 s
+  heartbeat, interrupted-update `~/.local/bin/omp.*.new` partials (up to ~185 MB each) are
+  swept, and repair reinstalls via the official `omp.sh/install --binary` (same channel as
+  `8sync setup`, stall-protected + smoke-tested), with binary backup/restore insurance.
+- **Retired omp extensions hard-fail loading since omp 17.4 (zod v4).** Stale copies of the
+  old engine — the multi-file `8sync-gs/` and the `ckit-engine.ts` / `ckit-workflow.ts`
+  interim renames — use `.default([])` array-literal zod defaults, which omp 17.4's bundled
+  zod v4 rejects at load ("ParseError: A mutable default value must be specified as a
+  factory"), spamming a warning and silently dropping those tools in every project still
+  carrying a copy. `ensure_engine`'s sweep (formerly workflow-only) now also removes
+  `8sync-gs/` and the `ckit-*` renames from the global and project extension dirs on every
+  `8sync harness` / `harness up`. `ckit-*` removal is content-gated on the
+  `8sync-engine`/`8sync-workflow` lineage marker so a user's own same-named file survives.
+
 ## [0.57.0] — 2026-08-14
 
 ### Added

@@ -255,3 +255,29 @@ _(consolidated 45 dòng cũ → su-code/archive/KNOWLEDGE-1786671697.md)_
   Windows went green and linux-x86_64 went red on the very next run. A stage filename needs
   pid **plus** a per-call atomic counter. Covered now by `step0_overlay_survives_concurrent_
   writers` (8 writers × 25 + 4 readers asserting no torn read, no leaked stage file).
+- **validated: omp 17.3.x self-update is a ~185 MB standalone download with zero progress
+  output and no internal timeout.** On a ~640 KB/s link that is 5+ minutes of silence that
+  users read as a hang; Ctrl-C leaves `~/.local/bin/omp.<ts>.<pid>.0.new` partials (up to
+  185 MB each). Canonical repair is `curl -fsSL https://omp.sh/install | sh -s -- --binary`
+  (GitHub releases → `~/.local/bin/omp`), NOT `npm install -g @oh-my-pi/pi-coding-agent` —
+  the npm channel diverges from the omp.sh layout `8sync setup` installs. Verified live:
+  `8sync omp update --force` reinstalled 17.3.3 in 373 s with heartbeat + partial sweep.
+
+## omp 17.4 bundles zod v4 — mutable array defaults kill extension loading (2026-08-21)
+
+- **validated: `.default([])` array-literal defaults now throw "ParseError: A mutable
+  default value must be specified as a factory" at extension load.** omp 17.4's bundled
+  zod v4 rejects object/array defaults that are not factories; the failing extension is
+  skipped (warning banner) while every other extension keeps loading, so the damage is
+  silent tool loss, not a crash. Trigger sites were `ckit-engine.ts:146`
+  (`verify: z.array(z.string()).default([])`) and `8sync-gs/index.ts:257`. Primitive
+  defaults (`.default(false)`, `.default("")`) are unaffected; write
+  `.default(() => [])` in new extensions. Stale copies are swept by
+  `remove_retired_extensions` (crates/cli/src/verbs/skill/deploy.rs) on every
+  `8sync harness` / `harness up`.
+- **failure: gate a name-based sweep on the full lineage marker, not a bare mention.**
+  The first `ckit-*` content gate used `contains("8sync")` and the sandbox's own control
+  file ("not 8sync") matched it — a user file that merely mentions 8sync would have been
+  deleted. Gate: `contains("8sync-engine") || contains("8sync-workflow")`. Proof pattern:
+  plant a mention-only control file in the sandbox and assert it SURVIVES the sweep, not
+  just that stale files die.

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Báo cáo — [tên tài liệu]</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 18mm 18mm;
+    @bottom-left { content: "[Brand] · [phân loại]"; font-size: 7.5pt; color: #8a94a6; }
+    @bottom-center { content: "[Bảo mật / phạm vi lưu hành]"; font-size: 7.5pt; color: #b0b7c3; }
+    @bottom-right { content: "Trang " counter(page) "/" counter(pages); font-size: 7.5pt; color: #8a94a6; }
+  }
+  @page :first { margin-top: 0; @bottom-left { content: ""; } @bottom-center { content: ""; } @bottom-right { content: ""; } }
+  * { box-sizing: border-box; }
+  body { font-family: "Liberation Sans","Arial",sans-serif; font-size: 9.7pt; line-height: 1.5; color: #1f2733; margin: 0; -weasy-hyphens: none; }
+  h1,h2,h3,h4 { color: #0f2b46; font-weight: 700; line-height: 1.2; }
+  p { margin: 0 0 6px; text-align: justify; }
+  a { color: #10618f; text-decoration: none; }
+  strong { color: #0f2b46; }
+  .muted { color: #5b6675; }
+  code { font-family: "Liberation Mono","DejaVu Sans Mono",monospace; font-size: 8.4pt; background:#f2f5f9; padding:0 3px; border-radius:3px; color:#294; }
+  code.k { color:#b03a2e; }
+
+  .cover { padding: 40mm 4mm 0; page-break-after: always; }
+  .cover .kicker { font-size: 9pt; letter-spacing: 3px; text-transform: uppercase; color: #d47a1e; font-weight: 700; }
+  .cover h1 { font-size: 25pt; margin: 14px 0 6px; letter-spacing: -0.5px; }
+  .cover .sub { font-size: 12.5pt; color: #3f4c5e; font-weight: 400; margin-bottom: 30px; }
+  .cover .rule { height: 4px; width: 66px; background: #d47a1e; margin: 0 0 26px; }
+  .cover .meta { font-size: 9.5pt; color: #3f4c5e; }
+  .cover .meta table { border-collapse: collapse; }
+  .cover .meta td { padding: 3px 0; vertical-align: top; }
+  .cover .meta td.k { color: #8a94a6; width: 140px; font-weight:700; text-transform:uppercase; font-size:7.8pt; letter-spacing:1px; padding-right:14px;}
+  .cover .tagbox { margin-top: 30px; border-left: 4px solid #0f2b46; background: #f4f7fb; padding: 14px 18px; font-size: 9.5pt; color:#2b3646;}
+
+  h2 { font-size: 14pt; margin: 22px 0 4px; padding-bottom: 5px; border-bottom: 2px solid #e4e9f1; }
+  h2 .n { color: #d47a1e; margin-right: 8px; }
+  h3 { font-size: 10.8pt; margin: 14px 0 3px; color:#173a5c;}
+  ul,ol { margin: 4px 0 8px; padding-left: 18px; }
+  li { margin: 2px 0; }
+
+  .callout { border-left: 4px solid #d47a1e; background: #fdf6ec; padding: 9px 14px; margin: 10px 0; font-size: 9.3pt; }
+  .callout.blue { border-color:#10618f; background:#eef5fb; }
+  .callout.green { border-color:#1c7c54; background:#eef7f2; }
+  .callout.red { border-color:#c0392b; background:#fbeeec; }
+  .callout .lbl { font-weight:700; text-transform:uppercase; letter-spacing:.6px; font-size:7.6pt; color:#b26414; display:block; margin-bottom:2px;}
+  .callout.blue .lbl { color:#0d5583; } .callout.green .lbl { color:#14603f; } .callout.red .lbl { color:#a5281b; }
+
+  .stats { display:flex; gap:8px; margin:12px 0; }
+  .stat { flex:1; border:1px solid #e4e9f1; border-radius:6px; padding:10px 10px 9px; text-align:center; background:#fafbfd;}
+  .stat .big { font-size:18pt; font-weight:700; color:#c1611a; line-height:1;}
+  .stat .cap { font-size:7.6pt; color:#5b6675; margin-top:5px; line-height:1.25;}
+
+  table.cmp { width:100%; border-collapse:collapse; margin:10px 0; font-size:8.5pt; }
+  table.cmp th, table.cmp td { border:1px solid #dbe2ec; padding:6px 8px; vertical-align:top; text-align:left; }
+  table.cmp thead th { background:#0f2b46; color:#fff; font-size:8.3pt; font-weight:700; }
+  table.cmp th.axis { background:#eef2f7; color:#0f2b46; width:16%; }
+  table.cmp tbody tr:nth-child(even) td { background:#f7f9fc; }
+  table.cmp td.win { background:#eef7f2 !important; }
+  .pill { display:inline-block; font-size:7pt; font-weight:700; padding:1px 6px; border-radius:8px; color:#fff; white-space:nowrap;}
+  .p-red { background:#c0392b;} .p-amber{ background:#d47a1e;} .p-green{ background:#1c7c54;} .p-gray{ background:#6b7683;}
+  .quote { font-style:italic; color:#3f4c5e; border-left:3px solid #cdd6e2; padding-left:12px; margin:8px 0; font-size:9.3pt;}
+  .avoid-break { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<!-- ══ BÌA: 4 khối theo thứ tự — kicker / h1+sub / rule cam / meta table / tagbox ══ -->
+<section class="cover">
+  <div class="kicker">Loại tài liệu · Phạm vi</div>
+  <h1>[Tiêu đề lớn — hướng kết luận]</h1>
+  <div class="sub">[Một dòng định vị: đối tượng đọc, phạm vi, câu hỏi chính]</div>
+  <div class="rule"></div>
+  <div class="meta"><table>
+    <tr><td class="k">Chuẩn bị cho</td><td>[người đọc chính] · [nhóm phụ]</td></tr>
+    <tr><td class="k">Người soạn</td><td>[tên / vai trò]</td></tr>
+    <tr><td class="k">Ngày</td><td>[YYYY-MM-DD]</td></tr>
+    <tr><td class="k">Phạm vi</td><td>[cái gì thuộc tài liệu — cái gì KHÔNG]</td></tr>
+  </table></div>
+  <div class="tagbox"><strong>Câu hỏi trung tâm:</strong> [câu hỏi tài liệu trả lời, nguyên văn]?</div>
+</section>
+
+<!-- ══ §0 LUÔN là kết luận — reader bận chỉ đọc mục này ══ -->
+<h2><span class="n">§0</span>Kết luận</h2>
+<div class="callout green"><span class="lbl">Verdict</span><strong>[Một câu kết luận đậm, trả lời câu hỏi trung tâm.]</strong></div>
+<ul>
+  <li><strong>[Dẫn chứng 1]</strong> — [một dòng giải thích + nguồn].</li>
+  <li><strong>[Dẫn chứng 2]</strong> — [một dòng].</li>
+  <li><strong>[Dẫn chứng 3]</strong> — [một dòng].</li>
+</ul>
+
+<!-- ══ §N: mỗi mục một chủ đề; số § tay, tăng dần; h3 cho mục con ══ -->
+<h2><span class="n">§1</span>Bối cảnh &amp; phạm vi</h2>
+<p>[Đoạn văn đặt vấn đề. Tách trường hợp bị trộn lẫn để so sánh công bằng.]</p>
+<h3>[Mục con]</h3>
+<p>[Nội dung.] <code>code-nam-trong-dong</code> hoặc <code class="k">code-cam-doi-mau</code>.</p>
+
+<h2><span class="n">§2</span>Số liệu chính <span class="pill p-green">LIVE</span></h2>
+<!-- 3-4 stat card: số to + chú thích NGUỒN — không số nào không trace được -->
+<div class="stats avoid-break">
+  <div class="stat"><div class="big">00</div><div class="cap">[chú thích số 1]<br>[nguồn]</div></div>
+  <div class="stat"><div class="big">00<span style="font-size:9pt">đơn-vị</span></div><div class="cap">[chú thích số 2]<br>[nguồn]</div></div>
+  <div class="stat"><div class="big">0/0</div><div class="cap">[chú thích số 3]<br>[nguồn]</div></div>
+</div>
+
+<h2><span class="n">§3</span>Bảng so sánh</h2>
+<!-- cột trái th.axis; pill mỗi ô: p-red=Yếu · p-amber=TB · p-green=Tốt; td.win = cột thắng -->
+<table class="cmp avoid-break">
+  <thead><tr><th class="axis">Tiêu chí</th><th>[Hạng mục A]</th><th>[Hạng mục B]</th></tr></thead>
+  <tbody>
+    <tr><td>[Tiêu chí 1]</td><td><span class="pill p-green">Tốt</span> [chi tiết]</td><td class="win"><span class="pill p-green">Tốt</span> [chi tiết]</td></tr>
+    <tr><td>[Tiêu chí 2]</td><td><span class="pill p-amber">TB</span> [chi tiết]</td><td><span class="pill p-red">Yếu</span> [chi tiết]</td></tr>
+  </tbody>
+</table>
+
+<!-- ══ Callout 4 biến thể + quote — dùng đúng nhãn ══ -->
+<div class="callout blue"><span class="lbl">Bối cảnh</span>[Thông tin nền cần nhớ khi đọc.]</div>
+<div class="callout"><span class="lbl">Lưu ý</span>[Điểm cần chú ý — biến thể mặc định amber.]</div>
+<div class="callout red"><span class="lbl">Rủi ro</span>[Cái gì có thể hỏng, hậu quả ra sao.]</div>
+<div class="quote">[Trích dẫn nguyên văn — người nói / nguồn.]</div>
+
+<!-- ══ § cuối: nguồn tham khảo (publisher + title + bare domain) ══ -->
+<h2><span class="n">§N</span>Nguồn tham khảo</h2>
+<ol>
+  <li>[Publisher, “Title” YYYY · domain.com]</li>
+</ol>
+
+</body>
+</html>

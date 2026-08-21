@@ -1269,18 +1269,51 @@ fn deploy_omp_pair(
     Ok(())
 }
 
-/// Clean cutover for machines that ran an earlier 8sync: the `<NS>-workflow.ts`
-/// extension is retired — its tools now live in `8sync-engine.ts`. A copy left on
-/// disk would keep registering the same tool names alongside the engine, so it is
-/// swept from the global and project extension dirs (a rebranded build also has to
-/// sweep the historical `8sync-` name). Best-effort: absent is the normal case and
-/// a failed unlink never bails the harness run.
-fn remove_retired_workflow_extension(home: &Path, root: Option<&Path>) {
+/// Clean cutover for retired omp extensions. Anything swept here either
+/// double-registers the engine's tool names next to `8sync-engine.ts`, or —
+/// since omp 17.4 bundled zod v4 — hard-fails extension loading for the whole
+/// project with "ParseError: A mutable default value must be specified as a
+/// factory" (the old bodies use `.default([])` array literals). Swept from the
+/// global and project extension dirs; a rebranded build also sweeps the
+/// historical `8sync-` name. Best-effort: absent is the normal case and a
+/// failed unlink never bails the harness run.
+///
+/// - `<NS>-workflow.ts` / `8sync-workflow.ts` — retired into `8sync-engine.ts`
+///   (same tool names).
+/// - `8sync-gs/` — the multi-file gsd engine the single-file engine replaced.
+/// - `ckit-engine.ts` / `ckit-workflow.ts` — interim renames of the two above.
+///   Not 8sync-namespaced, so removal is content-gated: the body must carry the
+///   `8sync-engine` / `8sync-workflow` lineage marker (they are literally those
+///   extensions under another name); a user's own same-named file survives.
+fn remove_retired_extensions(home: &Path, root: Option<&Path>) {
     let ns = crate::brand::ns_file("workflow.ts");
+    let mut dirs = vec![home.join(".omp/agent/extensions")];
+    if let Some(r) = root {
+        dirs.push(r.join(".omp/extensions"));
+    }
     for name in [ns.as_str(), "8sync-workflow.ts"] {
-        let _ = std::fs::remove_file(home.join(".omp/agent/extensions").join(name));
-        if let Some(r) = root {
-            let _ = std::fs::remove_file(r.join(".omp/extensions").join(name));
+        for d in &dirs {
+            let f = d.join(name);
+            if std::fs::remove_file(&f).is_ok() {
+                ui::ok(&format!("removed retired extension → {}", f.display()));
+            }
+        }
+    }
+    for d in &dirs {
+        let f = d.join("8sync-gs");
+        if std::fs::remove_dir_all(&f).is_ok() {
+            ui::ok(&format!("removed retired engine dir → {}", f.display()));
+        }
+    }
+    for name in ["ckit-engine.ts", "ckit-workflow.ts"] {
+        for d in &dirs {
+            let f = d.join(name);
+            if std::fs::read_to_string(&f)
+                .is_ok_and(|b| b.contains("8sync-engine") || b.contains("8sync-workflow"))
+                && std::fs::remove_file(&f).is_ok()
+            {
+                ui::ok(&format!("removed retired extension → {}", f.display()));
+            }
         }
     }
 }
@@ -1358,7 +1391,7 @@ fn remove_unprefixed_predecessor(home: &Path, root: Option<&Path>, file: &str) {
 /// worktree tools) and every slash command under `assets/commands/`. 100% on omp
 /// core (config dirs only, never patches omp) so updates stay safe.
 pub(crate) fn ensure_engine(home: &Path, root: Option<&Path>) -> Result<()> {
-    remove_retired_workflow_extension(home, root);
+    remove_retired_extensions(home, root);
     let eng = crate::brand::ns_file("engine.ts");
     deploy_omp_pair(
         home,
