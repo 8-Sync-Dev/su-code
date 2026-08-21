@@ -212,3 +212,7 @@ _(consolidated 19 dòng cũ → su-code/archive/KNOWLEDGE-1787286513.md)_
   continuing the engine run. Prevention: land or stash pending work BEFORE starting an
   engine run with commit:true.
 - **rename note (2026-08-21, same session):** the ported skill SHIPS as `super-pdf` (v0.58.0). Paths `~/.omp/skills/report-pdf/…` in the entries above are the pre-release draft name — post-release the deployed path is `~/.omp/skills/super-pdf/` and the mirror `su-code/skills/super-pdf/` (gitignored). Any `su-code/skills/report-pdf` dir found on disk is a mirror re-vendor leftover; safe to delete.
+
+## Size ceiling recalibration (2026-08-21)
+
+- **validated: the ratchet needs recalibration when FEATURE releases, not bloat, eat the headroom.** linux-x86_64 (musl, CI): v0.54.1 5,074,384 → v0.55.0 5,078,512 → v0.56.0 5,160,432 → v0.57.0 5,238,672 (4,208 B under the 5 MiB ceiling) → v0.58.0 5,259,280 (over by 16,400). Attribution: `web` feature gate = +1,732,232 B (the elephant); v0.58 delta +20,608 B = omp-update hardening + retired-extension sweep + super-pdf skill (compressed ~4 KB) — all wanted. Decision: ceiling 5,242,880 → 5,304,320 B (5,180 KiB), tight on purpose so the NEXT release trips it and must attribute. Local gnu builds run ~52 KB smaller than CI musl — gate the CI musl number, not the local one.
