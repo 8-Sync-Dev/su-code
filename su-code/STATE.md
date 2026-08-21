@@ -1,5 +1,5 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** none — **v0.58.0 RELEASED 2026-08-21** (super-pdf skill #27 · omp-update hardening · omp-17.4 extension sweep), main + tag pushed, CI in flight/verify assets. Next large work: `ai-router-hub` M1 (monorepo `8sync-startup`, blocked on B3 creds).
+> **Active feature:** none — **v0.58.0 RELEASED 2026-08-21** (super-pdf skill #27 · omp-update hardening · omp-17.4 extension sweep), main + tag pushed, CI GREEN — 5 assets published (linux-x86_64 5,259,280 B dưới ceiling 5,304,320). Next large work: `ai-router-hub` M1 (monorepo `8sync-startup`, blocked on B3 creds).
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
@@ -15,7 +15,7 @@ Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code 
   + `scripts/build.sh` (WeasyPrint qua `uv run`). E2E: render 3 trang A4 từ bản
   DEPLOYED + zai-vision verify toàn bộ token = YES hết. Managed skill
   `repo-md2pdf-git-report` đã trỏ về engine sống (đường `tools/report-github-md2pf` chết).
-- **RELEASED v0.58.0** — tag `69e2108`+, `git push origin main + v0.58.0` xong; release.yml build 5 platform. Sau CI xanh: `8sync up` an toàn cho mọi máy.
+- **RELEASED v0.58.0** — tag `69e2108`+, `git push origin main + v0.58.0` xong; CI xanh, 5 asset publish — `8sync up` an toàn cho mọi máy. Size ceiling recalib 5,242,880→5,304,320 B (attribute: web +1.7 MB; ratchet tight chủ đích).
 
 ## 🚚 HANDOFF — 2026-08-14 (STEP-0 deny-list: `8sync .` could not launch omp)
 
