@@ -324,6 +324,34 @@ pub(crate) fn inject_agents_md(home: &Path, root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Cursor-native always-on rule. Cursor discovers project skills from
+/// `.cursor/skills/` (not `su-code/skills/`); this `.mdc` is the equivalent of
+/// the AGENTS.md force-load block so a Cursor session loads the same CORE
+/// contract without reading omp's `~/.omp` tree.
+pub(crate) fn inject_cursor_rule(home: &Path, root: &Path) -> Result<()> {
+    let stats = build_force_load(home, root);
+    let path = root.join(".cursor/rules/8sync-harness.mdc");
+    if let Some(p) = path.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    let body = format!(
+        "---\n\
+         description: 8sync harness force-load (CORE skills, code-intel first). Always applied.\n\
+         alwaysApply: true\n\
+         ---\n\n\
+         {}\n\n\
+         Project skills live in `.cursor/skills/<name>/SKILL.md` (Cursor Agent Skills standard; \
+         mirrored from `su-code/skills/` by `8sync harness create`).\n",
+        stats.block.trim()
+    );
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    if existing != body {
+        std::fs::write(&path, body)?;
+        ui::ok(&format!("injected Cursor rule → {}", path.display()));
+    }
+    Ok(())
+}
+
 enum EntryKind {
     Markdown { h1: &'static str },
     Plain,
@@ -443,6 +471,21 @@ mod tests {
             "the absolute project root must never appear in the block"
         );
 
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn cursor_rule_is_always_apply_mdc() {
+        let base = std::env::temp_dir().join(format!("8sync-cursor-rule-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let home = base.join("home");
+        let root = base.join("repo");
+        skill_fixture(&root.join("su-code/skills"), "codegraph");
+        inject_cursor_rule(&home, &root).unwrap();
+        let body = std::fs::read_to_string(root.join(".cursor/rules/8sync-harness.mdc")).unwrap();
+        assert!(body.contains("alwaysApply: true"), "Cursor standard: alwaysApply mdc");
+        assert!(body.contains(".cursor/skills/"), "points at Cursor skill dir");
+        assert!(body.contains("su-code/skills/codegraph/SKILL.md"));
         let _ = std::fs::remove_dir_all(&base);
     }
 }

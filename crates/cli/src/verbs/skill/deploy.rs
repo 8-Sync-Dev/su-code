@@ -166,6 +166,124 @@ pub(crate) fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Host adapters that speak the Agent Skills open standard from a *different*
+/// project path than `su-code/skills/` (the committed canonical tree):
+///   `.cursor/skills/`  — Cursor Agent Skills (project)
+///   `.zcode/skills/`   — Z.ai Code
+/// Prefer a relative symlink / Windows junction so the trees cannot drift; fall
+/// back to a copy when the OS refuses links. Also writes `.cursor/rules/*.mdc`.
+pub(crate) fn ensure_host_adapters(home: &Path, root: &Path, force: bool) -> Result<()> {
+    let src = root.join("su-code/skills");
+    if src.is_dir() {
+        for (rel, label) in [(".cursor/skills", "Cursor"), (".zcode/skills", "Z.ai Code")] {
+            mirror_skill_host(&src, &root.join(rel), label, force)?;
+        }
+    }
+    super::inject::inject_cursor_rule(home, root)?;
+    Ok(())
+}
+
+fn mirror_skill_host(src: &Path, dst: &Path, label: &str, force: bool) -> Result<()> {
+    if dst.exists() && !force {
+        if same_dir(src, dst) {
+            ui::skip(&dst.display().to_string(), "already linked");
+            return Ok(());
+        }
+        ui::skip(
+            &dst.display().to_string(),
+            "exists (use --force to refresh)",
+        );
+        return Ok(());
+    }
+    if dst.exists() {
+        remove_link_or_dir(dst)?;
+    }
+    let how = link_or_copy_dir(src, dst)?;
+    ui::ok(&format!("{label} skills → {} ({how})", dst.display()));
+    Ok(())
+}
+
+fn same_dir(a: &Path, b: &Path) -> bool {
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => false,
+    }
+}
+
+fn remove_link_or_dir(path: &Path) -> Result<()> {
+    let meta = std::fs::symlink_metadata(path)?;
+    // Unlink the name only. Never `remove_dir_all` a junction/symlink — that
+    // can walk into `su-code/skills` and delete the canonical tree.
+    if meta.file_type().is_symlink() || is_windows_reparse_point(&meta) {
+        std::fs::remove_dir(path).or_else(|_| std::fs::remove_file(path))?;
+        return Ok(());
+    }
+    if meta.is_dir() {
+        std::fs::remove_dir_all(path)?;
+    } else {
+        std::fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+fn is_windows_reparse_point(_meta: &std::fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        return _meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+#[cfg(windows)]
+fn strip_verbatim(path: &Path) -> String {
+    let s = path.to_string_lossy();
+    s.strip_prefix(r"\\?\").unwrap_or(&s).to_string()
+}
+
+/// Both host dirs sit one level under the repo root, so the relative link is
+/// always `../su-code/skills`. Hardcoded on purpose — a computed relative path
+/// is a bigger function for two known layouts.
+fn link_or_copy_dir(src: &Path, dst: &Path) -> Result<&'static str> {
+    if let Some(p) = dst.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    let rel = Path::new("..").join("su-code").join("skills");
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&rel, dst)?;
+        return Ok("link");
+    }
+    #[cfg(windows)]
+    {
+        if std::os::windows::fs::symlink_dir(&rel, dst).is_ok() {
+            return Ok("link");
+        }
+        let abs = std::fs::canonicalize(src)?;
+        let out = Command::new("cmd")
+            .args([
+                "/C",
+                "mklink",
+                "/J",
+                &strip_verbatim(dst),
+                &strip_verbatim(&abs),
+            ])
+            .output()?;
+        if out.status.success() {
+            return Ok("link");
+        }
+        copy_dir_recursive(src, dst)?;
+        return Ok("copy");
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        copy_dir_recursive(src, dst)?;
+        Ok("copy")
+    }
+}
+
 /// Make sure the `codegraph` binary is installed (upstream curl installer) and
 /// registered in the skills.toml registry. The SKILL.md tree is deployed
 /// separately from embedded assets.
@@ -1738,5 +1856,41 @@ mod legacy_command_tests {
                 "`{asset}` ships today yet is listed as a retired body"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod host_adapter_tests {
+    #[test]
+    fn host_adapters_create_cursor_and_zcode_from_su_code_skills() {
+        let base = std::env::temp_dir().join(format!("8sync-hosts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let home = base.join("home");
+        let root = base.join("repo");
+        let skill = root.join("su-code/skills/foo");
+        std::fs::create_dir_all(&skill).unwrap();
+        std::fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: foo\ndescription: fixture\n---\n\nbody\n",
+        )
+        .unwrap();
+
+        super::ensure_host_adapters(&home, &root, true).unwrap();
+
+        assert!(
+            root.join(".cursor/skills/foo/SKILL.md").is_file(),
+            "Cursor Agent Skills dir must expose SKILL.md"
+        );
+        assert!(
+            root.join(".zcode/skills/foo/SKILL.md").is_file(),
+            "Z.ai Code skills dir must expose SKILL.md"
+        );
+        let rule = std::fs::read_to_string(root.join(".cursor/rules/8sync-harness.mdc")).unwrap();
+        assert!(rule.contains("alwaysApply: true"));
+        super::ensure_host_adapters(&home, &root, true).unwrap();
+        assert!(skill.join("SKILL.md").is_file(), "canonical skill must survive --force");
+        assert!(root.join(".cursor/skills/foo/SKILL.md").is_file());
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

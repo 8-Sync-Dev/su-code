@@ -5,6 +5,19 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+## [0.59.0] — 2026-08-25
+
+### Added
+- **`8sync harness create` — full multi-host bootstrap for Cursor + Z.ai Code + omp.** One command
+  vendors `su-code/skills/`, then fans the same Agent Skills tree out to **`.cursor/skills/`**
+  (Cursor's project skill path) and **`.zcode/skills/`** (Z.ai Code), plus a Cursor-native
+  **`.cursor/rules/8sync-harness.mdc`** (`alwaysApply: true`) so a Cursor session loads the
+  CORE contract without reading `~/.omp`. Host dirs are a relative symlink / Windows junction
+  when the OS allows it, otherwise a copy. `create --sweep [DIR]` stamps every omp project
+  (has `su-code/` or AGENTS.md) under DIR — default `~/Projects`, and on Windows also
+  `<Users>/Projects` next to the home folder. Bare `8sync harness` / `init` / `global --sweep`
+  now run the same host adapters, so existing projects pick this up on the next refresh.
+
 ## [0.58.0] — 2026-08-21
 
 ### Added

@@ -1,5 +1,21 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** none — **v0.58.0 RELEASED 2026-08-21** (super-pdf skill #27 · omp-update hardening · omp-17.4 extension sweep), main + tag pushed, CI GREEN — 5 assets published (linux-x86_64 5,259,280 B dưới ceiling 5,304,320). Next large work: `ai-router-hub` M1 (monorepo `8sync-startup`, blocked on B3 creds).
+> **Active feature:** `harness-create-hosts` → **v0.59.0** — `8sync harness create` fans `su-code/skills/` to Cursor (`.cursor/skills` + `.cursor/rules/*.mdc`) and Z.ai Code (`.zcode/skills`). Branched from v0.58.0 main (`15998ce`).
+
+## Goal
+Ship `8sync harness create [--force] [--sweep]` on top of v0.58.0, PR + tag `v0.59.0`.
+
+## Checklist
+- [x] Port host adapters onto v0.58.0 (do NOT ship from the stale 0.56.0 tree without `.git`)
+- [x] KEEP-COMMITTED comment does not re-add `su-code/skills/` (v0.58 RC)
+- [ ] Unit tests + compile
+- [ ] PR + tag v0.59.0 (tag matches Cargo.toml)
+
+## Current
+Code ported on `feature/harness-create-hosts` in `C:\Users\Projects\su-code-v058`. Verify-gate next.
+
+## Next
+1. `cargo test --bin 8sync --no-default-features cursor`
+2. Push branch, open PR, tag `v0.59.0`
 
 ## Goal
 Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.

@@ -10,7 +10,8 @@
 //!   stays cache-hot for Anthropic prompt caching.
 //! CWD-independent — never touches the current project. `--sweep [DIR]` then
 //! stamps the per-project layer (mirror skills + inject AGENTS.md + seed memory
-//! + gitleaks hook) into every git repo under DIR (default ~/Projects).
+//! + gitleaks hook + `.cursor` / `.zcode` hosts) into every git repo under DIR
+//! (default ~/Projects, then `<home-parent>/Projects` on Windows).
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -153,7 +154,8 @@ pub(crate) fn harness_global(
 /// can never make its parent look like a project.
 use discover::is_omp_project;
 
-/// Resolve the sweep root: explicit DIR > `~/Projects` (if present) > cwd.
+/// Resolve the sweep root: explicit DIR > `~/Projects` (if present) >
+/// `<home-parent>/Projects` (Windows layout: C:\Users\Admin + C:\Users\Projects) > cwd.
 fn sweep_root(env: &env_detect::Env, dir: &str) -> PathBuf {
     if !dir.is_empty() {
         return PathBuf::from(dir);
@@ -161,6 +163,11 @@ fn sweep_root(env: &env_detect::Env, dir: &str) -> PathBuf {
     let projects = env.home.join("Projects");
     if projects.is_dir() {
         return projects;
+    }
+    if let Some(sibling) = env.home.parent().map(|p| p.join("Projects")) {
+        if sibling.is_dir() {
+            return sibling;
+        }
     }
     std::env::current_dir().unwrap_or_else(|_| env.home.clone())
 }
@@ -170,6 +177,7 @@ fn sweep_root(env: &env_detect::Env, dir: &str) -> PathBuf {
 fn find_git_repos(root: &Path, max_depth: usize) -> Vec<PathBuf> {
     const SKIP: &[&str] = &[
         "node_modules", "target", "dist", "build", "vendor", "venv", ".venv", "__pycache__",
+        "AppData",
     ];
     let mut repos = Vec::new();
     let mut frontier = vec![(root.to_path_buf(), 0usize)];
@@ -214,6 +222,8 @@ fn find_git_repos(root: &Path, max_depth: usize) -> Vec<PathBuf> {
      // `.omp/commands/auto.md` (precedence over global) points at su-code/, not
      // a stale agents/ copy from an older binary.
      deploy::ensure_engine(&env.home, Some(root))?;
+     deploy::ensure_rules(&env.home, Some(root))?;
+     deploy::ensure_host_adapters(&env.home, root, force)?;
      deploy::ensure_codegraph_init(root);
      Ok(mirrored)
  }

@@ -208,7 +208,10 @@ pub(crate) fn seed_gitignore(root: &Path) -> Result<()> {
         ".env\n",
         ".env.*\n",
         "!.env.example\n",
-        "# KEEP COMMITTED (do NOT add here): su-code/ (memory), su-code/skills/, AGENTS.md, CHANGELOG.md",
+        "# KEEP COMMITTED (do NOT add here): su-code/ (memory), AGENTS.md, CHANGELOG.md, .cursor/rules/\n",
+        "# Host skill mirrors (rebuilt from su-code/skills/ by `8sync harness create`):\n",
+        ".cursor/skills/\n",
+        ".zcode/skills/\n",
     );
     upsert_block(
         &root.join(".gitignore"),

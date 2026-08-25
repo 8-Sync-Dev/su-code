@@ -41,7 +41,7 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
     ui::header("8sync harness init");
     deploy::migrate_namespace(&env.home);
     let in_project = discover::detect_current_project_root().is_some();
-    let total = if in_project { 9 } else { 4 };
+    let total = if in_project { 10 } else { 4 };
     let mut p = Progress::new(total);
 
     // 1. Master force-load file (omp reads this first every session).
@@ -115,6 +115,8 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
         if n > 0 {
             ui::ok(&format!("dropped skill-index AGENTS.md into {} sub-folder(s)", n));
         }
+        p.step("host adapters → .cursor/ + .zcode/ (Cursor + Z.ai Code)");
+        let _ = deploy::ensure_host_adapters(&env.home, &root, force);
         let _ = deploy::ensure_engine(&env.home, Some(&root));
         let _ = deploy::cleanup_legacy_gs(&env.home, Some(&root));
         p.done();
@@ -126,6 +128,24 @@ pub(crate) fn harness_init(env: &env_detect::Env, force: bool) -> Result<()> {
         ui::warn("not inside a project (no AGENTS.md/.git/Cargo.toml/package.json/... in cwd or ancestors)");
         ui::info("  → `cd` into a project root, then re-run `8sync harness init`");
         let _ = deploy::ensure_engine(&env.home, None);
+    }
+    Ok(())
+}
+
+/// `8sync harness create` — full multi-host bootstrap: omp + su-code/skills +
+/// `.cursor/` (Cursor Agent Skills + alwaysApply rule) + `.zcode/skills`.
+/// Current project always; `--sweep [DIR]` also stamps every omp project
+/// (has `su-code/` or AGENTS.md) under DIR (default ~/Projects).
+pub(crate) fn harness_create(
+    env: &env_detect::Env,
+    force: bool,
+    sweep: Option<&str>,
+) -> Result<()> {
+    ui::header("8sync harness create");
+    ui::info("full host bootstrap: omp · su-code/skills · .cursor · .zcode");
+    harness_init(env, force)?;
+    if let Some(dir) = sweep {
+        super::global::harness_global(env, Some(dir), false, force)?;
     }
     Ok(())
 }

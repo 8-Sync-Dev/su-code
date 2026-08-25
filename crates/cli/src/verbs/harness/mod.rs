@@ -40,6 +40,8 @@ mod toolstats;
 #[command(after_help = indoc::indoc! {"
     EXAMPLES
       8sync harness                   ONE command — deploy/update skills + mirror + inject + memory + index (idempotent)
+      8sync harness create            FULL host bootstrap: omp + su-code/skills + .cursor (Cursor standard) + .zcode
+      8sync harness create --sweep    …and stamp every omp project (has su-code/ or AGENTS.md) under ~/Projects
       8sync harness global            apply omp rules MACHINE-WIDE (all projects) + Anthropic token-optimizer defaults
       8sync harness global --sweep    …and stamp skills/memory into every omp project (has su-code/ or AGENTS.md) under ~/Projects
       8sync harness init              explicit full bootstrap with progress UI (force re-deploy everything)
@@ -68,7 +70,7 @@ mod toolstats;
       external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)
 "})]
 pub struct Args {
-    /// init (default) | up | global | audit | bench | eval | toolstats | model | gateway | web | compaction | help
+    /// init (default) | create | up | global | audit | bench | eval | toolstats | model | gateway | web | compaction | help
     pub sub: Option<String>,
     /// Optional value for value-taking sub-commands (e.g. `compaction <pct>`).
     pub value: Option<String>,
@@ -109,9 +111,10 @@ pub struct Args {
     /// `web --no-open`: do not auto-open the browser.
     #[arg(long)]
     pub no_open: bool,
-    /// `global --sweep [DIR]`: also stamp the per-project layer (skills mirror +
-    /// AGENTS.md inject + memory seed + gitleaks hook) into every omp project
-    /// (repo with su-code/ or AGENTS.md/CLAUDE.md) under DIR (default ~/Projects).
+    /// `global --sweep [DIR]` / `create --sweep [DIR]`: also stamp the per-project layer
+    /// (skills mirror + AGENTS.md inject + memory seed + gitleaks hook + .cursor/.zcode hosts)
+    /// into every omp project (repo with su-code/ or AGENTS.md/CLAUDE.md) under DIR (default
+    /// ~/Projects)
     #[arg(long, value_name = "DIR", num_args = 0..=1, default_missing_value = "")]
     pub sweep: Option<String>,
     /// `add-model --url <baseUrl>`: the model's API endpoint (REQUIRED — omp
@@ -152,6 +155,7 @@ pub fn run(a: Args) -> Result<()> {
     match sub.as_deref() {
         None => auto::harness_auto(&env, a.force),
         Some("init") => init::harness_init(&env, a.force),
+        Some("create") => init::harness_create(&env, a.force, a.sweep.as_deref()),
         Some("up") => up::harness_up(&env, a.loop_every.as_deref(), a.timer.as_deref(), a.pull, a.commit),
         Some("global") => global::harness_global(&env, a.sweep.as_deref(), a.pull, a.force),
         Some("bench") => bench::harness_bench(&env),
@@ -198,7 +202,7 @@ pub fn run(a: Args) -> Result<()> {
         }
         Some(other) => {
             ui::warn(&format!("unknown subcommand: {}", other));
-            ui::info("try: 8sync harness init | up [--pull|--commit|--loop DUR|--timer DUR|off] | global [--sweep DIR] | gateway | audit | eval | bench | help");
+            ui::info("try: 8sync harness create [--sweep] | init | up [--pull|--commit|--loop DUR|--timer DUR|off] | global [--sweep DIR] | gateway | audit | eval | bench | help");
             Ok(())
         }
     }
@@ -225,6 +229,8 @@ fn print_help() {
 
     println!("COMMANDS");
     println!("{}", crate::brand::render("  8sync harness                   ONE command — skills+update+mirror+inject+memory+index (idempotent, re-run anytime)"));
+    println!("{}", crate::brand::render("  8sync harness create            FULL host bootstrap: omp + su-code/skills + .cursor (Cursor Agent Skills + rules) + .zcode"));
+    println!("{}", crate::brand::render("  8sync harness create --sweep [DIR]  …and stamp every omp project (su-code/ or AGENTS.md) under DIR (default ~/Projects)"));
     println!("{}", crate::brand::render("  8sync harness global            apply omp rules MACHINE-WIDE: ~/.omp skills+APPEND_SYSTEM+MCP → ALL projects, + Anthropic token defaults"));
     println!("{}", crate::brand::render("  8sync harness global --sweep [DIR]  …and stamp skills/memory into every omp project (su-code/ or AGENTS.md) under DIR (default ~/Projects)"));
     println!("{}", crate::brand::render("  8sync harness init              full bootstrap: skills + codegraph + AGENTS.md + memory + CHANGELOG + .gitignore"));
@@ -277,8 +283,8 @@ fn print_help() {
     println!("  external  : ponytail (full) + addyosmani/agent-skills (best-effort clone → ~/.omp/skills)");
 
     println!("\nFILE TAXONOMY (portability — survives a move to a new machine)");
-    println!("  COMMIT : AGENTS.md · CLAUDE.md · su-code/*.md · CHANGELOG.md · su-code/skills/   (learned/decided)");
-    println!("{}", crate::brand::render("  IGNORE : .codegraph/ · .cache/8sync/                                           (derived → rebuilt by init)"));
+    println!("  COMMIT : AGENTS.md · CLAUDE.md · su-code/*.md · CHANGELOG.md · su-code/skills/ · .cursor/rules/   (learned/decided)");
+    println!("{}", crate::brand::render("  IGNORE : .codegraph/ · .cache/8sync/ · .cursor/skills/ · .zcode/skills/   (derived → rebuilt by create/init)"));
     println!("  SECRET : .env · .env.* (keep .env.example)                                     (NEVER commit)");
     println!("{}", crate::brand::render("  → init seeds these into a managed .gitignore block; `8sync doctor` warns if memory is ignored."));
 
