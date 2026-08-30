@@ -14,9 +14,9 @@ Two directions, one rule: **pick the modality that fits the content.**
 
 **Can I see pixels?**
 - **Native VLM (GLM-5.3 / GLM-5.3-Flash / any `zai/glm-5.3*` — the 8sync default): YES.**
-  Docs: https://docs.z.ai/guides/vlm/glm-5.3-flash. Images are `image_url` in the message.
-  **Look at the attached image yourself** (`inspect_image` or the in-session attachment).
-  Do NOT call `mcp__zai_vision_*` / `@z_ai/mcp-server` / `glm-4.6v-flash`.
+  Docs: https://docs.z.ai/guides/vlm/glm-5.3-flash. Images arrive as `image_url` or via the
+  `read` tool on local image files (`read path: "image.png"` decodes inline).
+  **Look at the image directly in this session.** Do NOT call `mcp__zai_vision_*` / `@z_ai/mcp-server`.
 - **Vision model (Opus-class): yes.** Use images for STRUCTURE/overview (below). Same rule:
   look yourself; do not bounce to a sidecar vision API.
 - **Text-only (GLM-5.2 and older): no.** You cannot read PNGs. Only then route an incoming
