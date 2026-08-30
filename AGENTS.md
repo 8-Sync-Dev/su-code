@@ -13,6 +13,8 @@ Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read
 
 Lý do: 5 query cấu trúc ≈ 3.4k token vs ≈ 412k token grep từng file (−99%). Dump cả file / grep mù = đốt token = bug.
 
+> ⚠ `codegraph` binary chưa cài. Chạy `8sync harness init` (auto cài) HOẶC `npx -y @colbymchenry/codegraph install` rồi quay lại đọc tiếp.
+
 ## 🚨 STEP 1 — skills 2 tầng: CORE (đọc ngay) · SPECIALIST + on-demand (đọc khi cần)
 
 Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatter `name`+`description`. Skill vendored ở `su-code/skills/<name>/` (bản commit trong repo, mirror từ `~/.omp/skills/`). Mỗi skill liệt kê 1 lần.
@@ -28,7 +30,7 @@ Nhỏ + dùng cho MỌI task. **Thứ tự = ưu tiên (đọc top-down).** Mở
 
 ### 🧩 SPECIALIST always-on — biết khả năng, đọc body KHI task khớp (progressive disclosure)
 
-KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF.
+KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF. **GLM-5.3 / GLM-5.3-Flash = native VLM** (https://docs.z.ai/guides/vlm/glm-5.3-flash): nhìn ảnh trực tiếp trong session — **CẤM** `mcp__zai_vision_*` / `@z_ai/mcp-server`. zai-vision chỉ cho GLM-5.2 text-only.
 
 - `assp-skill` — `su-code/skills/assp-skill/SKILL.md`
 - `impeccable` — `su-code/skills/impeccable/SKILL.md`
@@ -38,52 +40,170 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)
 
+- `academic-paper` — `su-code/skills/academic-paper/SKILL.md`
+- `accessibility` — `su-code/skills/accessibility/SKILL.md`
+- `agent-browser` — `su-code/skills/agent-browser/SKILL.md`
 - `ai-microservice-design` — `su-code/skills/ai-microservice-design/SKILL.md`
+- `alpha-research` — `su-code/skills/alpha-research/SKILL.md`
 - `api-and-interface-design` — `su-code/skills/api-and-interface-design/SKILL.md`
+- `autoresearch` — `su-code/skills/autoresearch/SKILL.md`
+- `best-practices` — `su-code/skills/best-practices/SKILL.md`
 - `branch-sync` — `su-code/skills/branch-sync/SKILL.md`
+- `brand-logo-kit` — `su-code/skills/brand-logo-kit/SKILL.md`
+- `browser-profile-control` — `su-code/skills/browser-profile-control/SKILL.md`
 - `browser-testing-with-devtools` — `su-code/skills/browser-testing-with-devtools/SKILL.md`
+- `business-brief` — `su-code/skills/business-brief/SKILL.md`
+- `campaign-plan` — `su-code/skills/campaign-plan/SKILL.md`
 - `ci-cd-and-automation` — `su-code/skills/ci-cd-and-automation/SKILL.md`
+- `clean-code-javascript` — `su-code/skills/clean-code-javascript/SKILL.md`
+- `clouds-f` — `su-code/skills/clouds-f/SKILL.md`
+- `clouds-rust` — `su-code/skills/clouds-rust/SKILL.md`
+- `clouds-tauri` — `su-code/skills/clouds-tauri/SKILL.md`
+- `code-optimizer` — `su-code/skills/code-optimizer/SKILL.md`
 - `code-review-and-quality` — `su-code/skills/code-review-and-quality/SKILL.md`
 - `code-simplification` — `su-code/skills/code-simplification/SKILL.md`
+- `coding-standards` — `su-code/skills/coding-standards/SKILL.md`
+- `competitive-brief` — `su-code/skills/competitive-brief/SKILL.md`
+- `competitor-video-analysis` — `su-code/skills/competitor-video-analysis/SKILL.md`
+- `vercel-composition-patterns` — `su-code/skills/composition-patterns/SKILL.md`
 - `context-engineering` — `su-code/skills/context-engineering/SKILL.md`
+- `contributing` — `su-code/skills/contributing/SKILL.md`
+- `core-web-vitals` — `su-code/skills/core-web-vitals/SKILL.md`
+- `debug-like-expert` — `su-code/skills/debug-like-expert/SKILL.md`
+- `debug-verify` — `su-code/skills/debug-verify/SKILL.md`
 - `debugging-and-error-recovery` — `su-code/skills/debugging-and-error-recovery/SKILL.md`
 - `deep-research` — `su-code/skills/deep-research/SKILL.md`
+- `defensible-cv` — `su-code/skills/defensible-cv/SKILL.md`
 - `deprecation-and-migration` — `su-code/skills/deprecation-and-migration/SKILL.md`
+- `discord-ops` — `su-code/skills/discord-ops/SKILL.md`
+- `docker` — `su-code/skills/docker/SKILL.md`
 - `documentation-and-adrs` — `su-code/skills/documentation-and-adrs/SKILL.md`
 - `doubt-driven-development` — `su-code/skills/doubt-driven-development/SKILL.md`
+- `draft-content` — `su-code/skills/draft-content/SKILL.md`
+- `eino-examples` — `su-code/skills/eino-examples/SKILL.md`
+- `eino-first` — `su-code/skills/eino-first/SKILL.md`
+- `eli5` — `su-code/skills/eli5/SKILL.md`
 - `encore-eino-go` — `su-code/skills/encore-eino-go/SKILL.md`
+- `encore-go-api` — `su-code/skills/encore-go-api/SKILL.md`
+- `encore-go-auth` — `su-code/skills/encore-go-auth/SKILL.md`
+- `encore-go-code-review` — `su-code/skills/encore-go-code-review/SKILL.md`
+- `encore-go-cron` — `su-code/skills/encore-go-cron/SKILL.md`
+- `encore-go-database` — `su-code/skills/encore-go-database/SKILL.md`
+- `encore-go-pubsub` — `su-code/skills/encore-go-pubsub/SKILL.md`
+- `encore-go-secret` — `su-code/skills/encore-go-secret/SKILL.md`
+- `encore-go-service` — `su-code/skills/encore-go-service/SKILL.md`
+- `encore-go-testing` — `su-code/skills/encore-go-testing/SKILL.md`
+- `encore-go-webhook` — `su-code/skills/encore-go-webhook/SKILL.md`
+- `encore-migrations` — `su-code/skills/encore-migrations/SKILL.md`
+- `exercise-forge` — `su-code/skills/exercise-forge/SKILL.md`
+- `Explore Codebase` — `su-code/skills/explore-codebase/SKILL.md`
+- `fb-group-growth` — `su-code/skills/fb-group-growth/SKILL.md`
 - `feature` — `su-code/skills/feature/SKILL.md`
+- `feature-ship` — `su-code/skills/feature-ship/SKILL.md`
+- `frontend-design` — `su-code/skills/frontend-design/SKILL.md`
+- `frontend-patterns` — `su-code/skills/frontend-patterns/SKILL.md`
 - `frontend-ui-engineering` — `su-code/skills/frontend-ui-engineering/SKILL.md`
 - `full-flow` — `su-code/skills/full-flow/SKILL.md`
 - `git-workflow-and-versioning` — `su-code/skills/git-workflow-and-versioning/SKILL.md`
 - `idea-refine` — `su-code/skills/idea-refine/SKILL.md`
+- `improve-codebase-architecture` — `su-code/skills/improve-codebase-architecture/SKILL.md`
 - `incremental-implementation` — `su-code/skills/incremental-implementation/SKILL.md`
 - `interview-me` — `su-code/skills/interview-me/SKILL.md`
+- `issue-history` — `su-code/skills/issue-history/SKILL.md`
+- `issue-master-flow` — `su-code/skills/issue-master-flow/SKILL.md`
+- `javascript-cheatsheet` — `su-code/skills/javascript-cheatsheet/SKILL.md`
+- `javascript-refactoring` — `su-code/skills/javascript-refactoring/SKILL.md`
+- `jobs` — `su-code/skills/jobs/SKILL.md`
+- `lark-base-ops` — `su-code/skills/lark-base-ops/SKILL.md`
+- `lark-review-digest` — `su-code/skills/lark-review-digest/SKILL.md`
 - `last30days` — `su-code/skills/last30days/SKILL.md`
+- `lib-docs-fetch` — `su-code/skills/lib-docs-fetch/SKILL.md`
+- `linkedin-cv-sync` — `su-code/skills/linkedin-cv-sync/SKILL.md`
+- `lint` — `su-code/skills/lint/SKILL.md`
+- `literature-review` — `su-code/skills/literature-review/SKILL.md`
+- `live-verify` — `su-code/skills/live-verify/SKILL.md`
+- `ml-training-recipe` — `su-code/skills/ml-training-recipe/SKILL.md`
+- `modal-compute` — `su-code/skills/modal-compute/SKILL.md`
+- `modern-javascript-patterns` — `su-code/skills/modern-javascript-patterns/SKILL.md`
+- `modern-javascript-tutorial` — `su-code/skills/modern-javascript-tutorial/SKILL.md`
 - `nextjs-app` — `su-code/skills/nextjs-app/SKILL.md`
 - `observability-and-instrumentation` — `su-code/skills/observability-and-instrumentation/SKILL.md`
+- `org-social-ops` — `su-code/skills/org-social-ops/SKILL.md`
+- `paper-code-audit` — `su-code/skills/paper-code-audit/SKILL.md`
+- `paper-writing` — `su-code/skills/paper-writing/SKILL.md`
+- `peer-review` — `su-code/skills/peer-review/SKILL.md`
 - `performance-optimization` — `su-code/skills/performance-optimization/SKILL.md`
+- `performance-report` — `su-code/skills/performance-report/SKILL.md`
 - `planning-and-task-breakdown` — `su-code/skills/planning-and-task-breakdown/SKILL.md`
 - `ponytail-audit` — `su-code/skills/ponytail-audit/SKILL.md`
 - `ponytail-debt` — `su-code/skills/ponytail-debt/SKILL.md`
 - `ponytail-gain` — `su-code/skills/ponytail-gain/SKILL.md`
 - `ponytail-help` — `su-code/skills/ponytail-help/SKILL.md`
 - `ponytail-review` — `su-code/skills/ponytail-review/SKILL.md`
+- `post-all` — `su-code/skills/post-all/SKILL.md`
+- `preview` — `su-code/skills/preview/SKILL.md`
+- `product-handoff` — `su-code/skills/product-handoff/SKILL.md`
+- `prompt-context-harness-loop` — `su-code/skills/prompt-context-harness-loop/SKILL.md`
+- `prompt-optimizer` — `su-code/skills/prompt-optimizer/SKILL.md`
+- `react` — `su-code/skills/react/SKILL.md`
+- `vercel-react-best-practices` — `su-code/skills/react-best-practices/SKILL.md`
+- `vercel-react-native-skills` — `su-code/skills/react-native-skills/SKILL.md`
+- `react-state-management` — `su-code/skills/react-state-management/SKILL.md`
+- `react-three-fiber` — `su-code/skills/react-three-fiber/SKILL.md`
+- `vercel-react-view-transitions` — `su-code/skills/react-view-transitions/SKILL.md`
+- `redesign-existing-projects` — `su-code/skills/redesign-skill/SKILL.md`
+- `Refactor Safely` — `su-code/skills/refactor-safely/SKILL.md`
 - `remote-compute` — `su-code/skills/remote-compute/SKILL.md`
-- `report-pdf` — `su-code/skills/report-pdf/SKILL.md`
+- `remote-job-scan` — `su-code/skills/remote-job-scan/SKILL.md`
+- `replication` — `su-code/skills/replication/SKILL.md`
 - `research-paper` — `su-code/skills/research-paper/SKILL.md`
+- `research-review` — `su-code/skills/research-review/SKILL.md`
+- `responsive-design` — `su-code/skills/responsive-design/SKILL.md`
+- `responsive-web-design` — `su-code/skills/responsive-web-design/SKILL.md`
+- `review-mr` — `su-code/skills/review-mr/SKILL.md`
+- `review-status` — `su-code/skills/review-status/SKILL.md`
+- `runpod-compute` — `su-code/skills/runpod-compute/SKILL.md`
 - `security-and-hardening` — `su-code/skills/security-and-hardening/SKILL.md`
+- `security-audit` — `su-code/skills/security-audit/SKILL.md`
 - `senior-frontend` — `su-code/skills/senior-frontend/SKILL.md`
 - `senior-security` — `su-code/skills/senior-security/SKILL.md`
+- `seo` — `su-code/skills/seo/SKILL.md`
+- `seo-audit` — `su-code/skills/seo-audit/SKILL.md`
+- `session-log` — `su-code/skills/session-log/SKILL.md`
+- `session-search` — `su-code/skills/session-search/SKILL.md`
+- `shadcn` — `su-code/skills/shadcn/SKILL.md`
 - `shipping-and-launch` — `su-code/skills/shipping-and-launch/SKILL.md`
+- `site-ux-audit` — `su-code/skills/site-ux-audit/SKILL.md`
 - `social-growth` — `su-code/skills/social-growth/SKILL.md`
+- `source-comparison` — `su-code/skills/source-comparison/SKILL.md`
 - `source-driven-development` — `su-code/skills/source-driven-development/SKILL.md`
 - `spec-driven-development` — `su-code/skills/spec-driven-development/SKILL.md`
+- `super-pdf` — `su-code/skills/super-pdf/SKILL.md`
+- `tailwind-design-system` — `su-code/skills/tailwind-design-system/SKILL.md`
+- `tanstack-query` — `su-code/skills/tanstack-query/SKILL.md`
+- `tanstack-table` — `su-code/skills/tanstack-table/SKILL.md`
+- `tanstack-virtual` — `su-code/skills/tanstack-virtual/SKILL.md`
+- `tauri-ui-test` — `su-code/skills/tauri-ui-test/SKILL.md`
 - `tauri-v2` — `su-code/skills/tauri-v2/SKILL.md`
 - `test-driven-development` — `su-code/skills/test-driven-development/SKILL.md`
+- `threejs-addons-api` — `su-code/skills/threejs-addons-api/SKILL.md`
 - `token-bench` — `su-code/skills/token-bench/SKILL.md`
+- `ts-pattern` — `su-code/skills/ts-pattern/SKILL.md`
+- `typescript-advanced-types` — `su-code/skills/typescript-advanced-types/SKILL.md`
 - `using-agent-skills` — `su-code/skills/using-agent-skills/SKILL.md`
+- `vn-contract-docs` — `su-code/skills/vn-contract-docs/SKILL.md`
+- `vn-crm-pronoun` — `su-code/skills/vn-crm-pronoun/SKILL.md`
+- `vue` — `su-code/skills/vue/SKILL.md`
+- `watch` — `su-code/skills/watch/SKILL.md`
+- `web-component-design` — `su-code/skills/web-component-design/SKILL.md`
+- `web-design-guidelines` — `su-code/skills/web-design-guidelines/SKILL.md`
+- `web-quality-audit` — `su-code/skills/web-quality-audit/SKILL.md`
+- `workspace-surface-audit` — `su-code/skills/workspace-surface-audit/SKILL.md`
+- `write-docs` — `su-code/skills/write-docs/SKILL.md`
+- `write-paper` — `su-code/skills/write-paper/SKILL.md`
+- `writing-skill` — `su-code/skills/writing-skill/SKILL.md`
 - `zai-vision` — `su-code/skills/zai-vision/SKILL.md`
+- `zus-release` — `su-code/skills/zus-release/SKILL.md`
 
 ### Quy tắc bất biến
 
@@ -350,7 +470,7 @@ Khi `8sync harness init` (hoặc `8sync setup`) chạy, **27 skill bundled** đ�
 |`impeccable`|`always` (specialist)|**design system CHUẨN — BẮT BUỘC cho mọi UI/design/redesign/audit**; có `scripts/` + `references/house/*` (frontend-agent-workflow + clouds-f orchestration + keyword routers)|
 |`taste-skill`|`always` (specialist)|anti-slop frontend taste cho landing/portfolio/redesign|
 |`image-routing`|`always` (specialist)|chọn image vs text reads để tiết kiệm token|
-|`zai-vision`|`always` (specialist)|GLM-5.2 text-only → GLM-5V bridge qua MCP `zai-vision`; đọc pixel: OCR screenshot, chẩn đoán lỗi từ ảnh, diagram/chart, UI→code, visual regression|
+|`zai-vision`|`always` (specialist)|FALLBACK only — SKIP khi session là GLM-5.3 / 5.3-Flash (native VLM, nhìn ảnh trực tiếp). Chỉ dùng cho GLM-5.2 text-only → MCP `zai-vision`|
 |`locate-anything`|`always` (specialist)|visual grounding (NVIDIA LocateAnything-3B qua `8sync locate`) — box + click-center coords cho GUI/OCR/detection; non-commercial license|
 |`feature`|on-demand|feature LỚN nhiều phase/nhiều session (>10 file) theo GSD; state ở `su-code/planning/<slug>/`|
 |`code-review-and-quality` · `senior-security` · `senior-frontend`|on-demand|review/quality/security/frontend chuyên sâu|

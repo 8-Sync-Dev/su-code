@@ -69,7 +69,7 @@ pub(crate) fn harness_model(env: &env_detect::Env, args: &[String]) -> Result<()
     println!();
     print_omp_roles(&omp_cfg);
     ui::info("combo: 8sync harness model claude+glm   (set ALL omp roles: opus=thinking, glm=mechanical)");
-    ui::info("aliases: claude|opus → anthropic/claude-opus-4-8 · sonnet → sonnet-5 · glm|zai → zai/glm-5.2");
+    ui::info("aliases: claude|opus → anthropic/claude-opus-4-8 · sonnet → sonnet-5 · glm|zai → zai/glm-5.3-flash");
     ui::info("one role: 8sync harness model <default|plan|smol|slow | review|debug|code|trivial> <model>");
     Ok(())
 }
@@ -94,7 +94,7 @@ fn apply_combo(toml_path: &std::path::Path, omp_cfg: &std::path::Path, combo: &s
         ("tiny", format!("{cheap}:minimal")),
         ("commit", format!("{cheap}:minimal")),
         ("advisor", cheap.clone()),
-        ("vision", format!("{strong}:high")),
+        ("vision", vision_role_for_combo(&strong, &cheap)),
         ("slow", format!("{strong}:high")),
         ("plan", format!("{strong}:xhigh")),
         ("designer", format!("{strong}:xhigh")),
@@ -138,8 +138,25 @@ fn resolve_alias(tok: &str) -> String {
         "claude" | "opus" | "anthropic" => "anthropic/claude-opus-4-8".to_string(),
         "sonnet" => "anthropic/claude-sonnet-5".to_string(),
         "haiku" => "anthropic/claude-haiku-4-5-20251001".to_string(),
-        "glm" | "zai" => "zai/glm-5.2".to_string(),
+        "glm" | "zai" | "flash" => "zai/glm-5.3-flash".to_string(),
+        "glm-5.3" | "glm53" => "zai/glm-5.3".to_string(),
         other => other.to_string(),
+    }
+}
+
+/// True when this omp model id can take `image_url` natively (no zai-vision MCP).
+/// GLM-5.3 / GLM-5.3-Flash: https://docs.z.ai/guides/vlm/glm-5.3-flash
+/// Does **not** match text-only `glm-5.2`.
+pub(crate) fn is_native_vlm(id: &str) -> bool {
+    let s = id.to_ascii_lowercase();
+    s.contains("glm-5.3") || s.contains("glm-4v") || s.contains("glm-5v")
+}
+
+fn vision_role_for_combo(strong: &str, cheap: &str) -> String {
+    if is_native_vlm(cheap) {
+        format!("{cheap}:high")
+    } else {
+        format!("{strong}:high")
     }
 }
 
@@ -274,4 +291,42 @@ pub(crate) fn set_model_toml(
         .insert(key.to_string(), toml::Value::String(value.to_string()));
     std::fs::write(path, toml::to_string(&doc)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn glm_alias_is_native_53_flash() {
+        assert_eq!(resolve_alias("glm"), "zai/glm-5.3-flash");
+        assert_eq!(resolve_alias("zai"), "zai/glm-5.3-flash");
+        assert_eq!(resolve_alias("flash"), "zai/glm-5.3-flash");
+        assert_eq!(resolve_alias("glm-5.3"), "zai/glm-5.3");
+        assert_eq!(resolve_alias("zai/glm-5.2"), "zai/glm-5.2");
+    }
+
+    #[test]
+    fn native_vlm_matches_53_not_52() {
+        assert!(is_native_vlm("zai/glm-5.3-flash:high"));
+        assert!(is_native_vlm("zai/glm-5.3"));
+        assert!(is_native_vlm("GLM-5.3-Flash"));
+        assert!(!is_native_vlm("zai/glm-5.2:xhigh"));
+        assert!(!is_native_vlm("zai/glm-5.2"));
+        assert!(!is_native_vlm("anthropic/claude-opus-4-8"));
+    }
+
+    #[test]
+    fn combo_vision_stays_on_native_glm() {
+        let cheap = resolve_alias("glm");
+        let strong = resolve_alias("claude");
+        assert_eq!(
+            vision_role_for_combo(&strong, &cheap),
+            "zai/glm-5.3-flash:high"
+        );
+        assert_eq!(
+            vision_role_for_combo("anthropic/claude-opus-4-8", "zai/glm-5.2"),
+            "anthropic/claude-opus-4-8:high"
+        );
+    }
 }

@@ -5,6 +5,18 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Fixed
+- **GLM-5.3 / GLM-5.3-Flash native vision.** These models read images in-session
+  (`image_url`, https://docs.z.ai/guides/vlm/glm-5.3-flash). Always-on prompts
+  (`APPEND_SYSTEM`, `image-routing`, `00-force-load`, recall hook) used to treat
+  every Z.ai model as text-only GLM-5.2 and bounce pixels through the
+  `zai-vision` MCP (`glm-4.6v-flash`). Agents now **look at the attached image**
+  when the session is `zai/glm-5.3*`. `zai-vision` remains a **fallback for
+  GLM-5.2 only** (STOP gate at the top of the skill). Alias `glm`/`zai` →
+  `zai/glm-5.3-flash`; combo `claude+glm` keeps `modelRoles.vision` on the cheap
+  native VLM instead of routing images to Opus. Cursor/AGENTS force-load now
+  states the same gate (Cursor does not read `~/.omp/APPEND_SYSTEM.md`).
+
 ## [0.59.0] — 2026-08-25
 
 ### Added

@@ -13,14 +13,18 @@ output) → single-file `bash grep`. `read` a file when you are about to edit it
 Under `step0` (default) the `grep`/`glob` TOOLS are not in the session at all; MCP tools are
 orthogonal to that and always present — call them by exact name, never a guessed variant.
 
-## Vision — this model may be text-only
-Self-check first: can I see pixels? GLM-5.2 cannot. Route every real image through **zai-vision MCP**
-(`extract_text_from_screenshot` · `analyze_image` · `diagnose_error_screenshot` · `ui_diff_check`) →
-text → act on the text. For WHERE something sits (click target, box, node placement) use
-`8sync locate <image> "<target>"` — zai-vision answers *what it says*, locate answers *where it is*.
-Structure (call/dependency graphs, dashboards, long PDFs) is cheaper as ONE image via `8sync shot` /
-`8sync pdf-img`; code, exact config, line-numbered data and hashes are ALWAYS text — never image-ify
-them. Decision table: `~/.omp/skills/image-routing/SKILL.md`.
+## Vision — look first when the model is a native VLM
+Self-check: what model am I? **GLM-5.3 / GLM-5.3-Flash / any `zai/glm-5.3*`** are native
+multimodal (https://docs.z.ai/guides/vlm/glm-5.3-flash). Images arrive as `image_url`
+(URL or base64). **LOOK at the attached image in this session.** Do NOT call
+`mcp__zai_vision_*`, `@z_ai/mcp-server`, or `glm-4.6v-flash` — those are a sidecar for
+older **text-only** models (GLM-5.2 and below). Only those text-only models route through
+**zai-vision MCP** (`extract_text_from_screenshot` · `analyze_image` ·
+`diagnose_error_screenshot` · `ui_diff_check`). For WHERE something sits (click target,
+box) use `8sync locate <image> "<target>"` — the VLM answers *what it says*, locate
+answers *where it is*. Structure (graphs, dashboards, long PDFs) is cheaper as ONE image
+via `8sync shot` / `8sync pdf-img`; code, exact config, line-numbered data and hashes stay
+text. Decision table: `~/.omp/skills/image-routing/SKILL.md`.
 
 ## Always-on skills — open the SKILL.md before acting, in this order
 1. **codegraph** — `~/.omp/skills/codegraph/SKILL.md` — semantic code intel (the loop's senses).
@@ -29,8 +33,8 @@ them. Decision table: `~/.omp/skills/image-routing/SKILL.md`.
 4. **8sync-cli** — prefer `8sync` verbs over raw shell.
 
 Specialists — open the body only when the task matches: **impeccable** (any frontend — mandatory),
-**assp** (copy/brand), **taste** (anti-slop), **image-routing** → **zai-vision** (images),
-**locate-anything** (grounding).
+**assp** (copy/brand), **taste** (anti-slop), **image-routing** (images; native VLM looks
+first), **zai-vision** (text-only GLM-5.2 fallback ONLY), **locate-anything** (grounding).
 
 ## Memory, state, verification
 - **`recall` / `reflect` BEFORE** answering anything about past sessions, decisions or preferences;

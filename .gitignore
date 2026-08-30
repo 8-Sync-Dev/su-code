@@ -9,7 +9,11 @@ su-code/planning/**/evidence-*.png
 .env
 .env.*
 !.env.example
-# KEEP COMMITTED (do NOT add here): su-code/ (memory), AGENTS.md, CHANGELOG.md
+# KEEP COMMITTED (do NOT add here): su-code/ (memory), AGENTS.md, CHANGELOG.md, .cursor/rules/
+# Host skill mirrors (rebuilt from su-code/skills/ by `8sync harness create`):
+.cursor/skills/
+.zcode/skills/
+
 # <<< 8sync <<<
 
 # This repo dogfoods its own harness, so `8sync harness` deploys the shipped

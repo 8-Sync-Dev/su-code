@@ -1,17 +1,28 @@
 ---
 name: zai-vision
-description: Use this skill whenever the model needs to "see" an image, screenshot, PDF page, diagram, chart, git diff render, or video — GLM-5.2 (the default omp model) is TEXT-ONLY. Apply it as the bridge step after any browser screenshot (`8sync shot`), PDF render (`8sync pdf-img`), diff render (`8sync diff-img`), or omp's own `inspect_image` when a specialized read (OCR, UI-to-code, error diagnosis, diagram/chart understanding, visual regression) is needed. Covers every combination with the rest of the stack: browser, codegraph/codebase-memory-mcp, serena, headroom, retain/recall, advisor.
+description: FALLBACK only. Use this skill ONLY when the CURRENT model is text-only (GLM-5.2 and older). SKIP the entire skill when the session model is GLM-5.3 / GLM-5.3-Flash / any zai/glm-5.3* — those are native VLMs (https://docs.z.ai/guides/vlm/glm-5.3-flash) and MUST read images in-session. Do not call mcp__zai_vision_* from a GLM-5.3 session. For text-only models, this is the GLM-5V MCP bridge after 8sync shot / pdf-img / diff-img.
 ---
 
-# zai-vision — GLM-5V bridge for a text-only GLM-5.2
+# zai-vision — FALLBACK for text-only models (NOT GLM-5.3)
 
-**Why this exists**: omp's default model is `zai/glm-5.2:xhigh` — **text-only**, it cannot read pixels. `8sync harness` auto-installs and registers the `zai-vision` MCP (`@z_ai/mcp-server`, npm), which exposes **GLM-5V** (Zhipu/Z.AI's vision family) as 8 model-callable tools, authed with the **SAME Z.AI key** already used for `glm-5.2` (pulled via `omp token zai`, no separate signup). The bridge pattern is always:
+## STOP — native VLM gate
+
+If the current model id contains **`glm-5.3`** (including `glm-5.3-flash`, `zai/glm-5.3*`):
+**close this skill. Look at the image yourself. Do not call any zai-vision / `@z_ai/mcp-server` tool.**
+GLM-5.3 is a native multimodal model (https://docs.z.ai/guides/vlm/glm-5.3-flash): images are
+`messages[].content[]` with `type: image_url` (URL or base64). Routing them through
+`glm-4.6v-flash` is a downgrade and a bug.
+
+This skill exists only because older **GLM-5.2 is text-only**. Keep reading only if you are
+on GLM-5.2 or another text-only model.
+
+**Why this exists**: omp used to default to `zai/glm-5.2` — **text-only**, it cannot read pixels. `8sync harness` auto-installs and registers the `zai-vision` MCP (`@z_ai/mcp-server`, npm) as a **fallback** for those text-only sessions. The current default is **`zai/glm-5.3-flash`**, which does NOT need this bridge. For a text-only session the pattern is:
 
 ```
 image (screenshot / PDF page / diff render / chart) → zai-vision tool → TEXT → GLM-5.2 acts on the text
 ```
 
-Never hand raw image bytes to GLM-5.2 expecting it to "look" — it can't. Always route through a vision tool first.
+Never hand raw image bytes to GLM-5.2 expecting it to "look" — it can't. Always route through a vision tool first. GLM-5.3 / 5.3-Flash already look — do not use this bridge.
 
 ## Verified working setup (tested end-to-end on 2026-07-01)
 

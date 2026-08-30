@@ -13,10 +13,15 @@ Two directions, one rule: **pick the modality that fits the content.**
 ## STEP 0 — self-check your modality
 
 **Can I see pixels?**
-- **Vision model (Opus-class): yes.** Use images for STRUCTURE/overview (below).
-- **Text-only (GLM-5.2 — the 8sync default): no.** You cannot read PNGs at all. Read text;
-  route any real incoming image through the **`zai-vision` MCP** (`~/.omp/skills/zai-vision/SKILL.md`)
-  to get TEXT back, then act.
+- **Native VLM (GLM-5.3 / GLM-5.3-Flash / any `zai/glm-5.3*` — the 8sync default): YES.**
+  Docs: https://docs.z.ai/guides/vlm/glm-5.3-flash. Images are `image_url` in the message.
+  **Look at the attached image yourself** (`inspect_image` or the in-session attachment).
+  Do NOT call `mcp__zai_vision_*` / `@z_ai/mcp-server` / `glm-4.6v-flash`.
+- **Vision model (Opus-class): yes.** Use images for STRUCTURE/overview (below). Same rule:
+  look yourself; do not bounce to a sidecar vision API.
+- **Text-only (GLM-5.2 and older): no.** You cannot read PNGs. Only then route an incoming
+  image through the **`zai-vision` MCP** (`~/.omp/skills/zai-vision/SKILL.md`) to get TEXT
+  back, then act.
 
 ## Honest token economics (read before assuming image is cheaper)
 
@@ -59,7 +64,7 @@ Two directions, one rule: **pick the modality that fits the content.**
 ## Examples
 
 Review a UI: `8sync shot http://localhost:3000/login` → one PNG instead of `LoginScreen.tsx` +
-styles (~8k tok). GLM: pass the PNG to zai-vision → text.
+styles (~8k tok). GLM-5.3 / 5.3-Flash: look at the PNG yourself. GLM-5.2 only: zai-vision → text.
 
 Grok the architecture (vision model): boot `8sync harness web`, then
 `8sync shot 'http://127.0.0.1:8731/codegraph?shot=1' -o /tmp/cg.png` — **`?shot=1` = canvas-only**

@@ -1031,17 +1031,12 @@ fn resolve_zai_api_key() -> Option<String> {
 }
 
 /// Ensure the **Z.AI vision MCP** (`@z_ai/mcp-server`) is installed + registered.
-/// GLM-5.2 is text-only; this MCP exposes GLM-5V-Turbo as model-callable tools
-/// (`ui_to_artifact`, `extract_text_from_screenshot`, `diagnose_error_screenshot`,
-/// `understand_technical_diagram`, `analyze_data_visualization`, `ui_diff_check`,
-/// `analyze_image`, `analyze_video`) authed by the SAME Z.AI key. Closing the loop:
-/// `8sync shot <url>` (browser capture) → zai-vision tool → text → GLM-5.2 acts.
-/// Defaults `Z_AI_VISION_MODEL` to `glm-4.6v-flash` — the ONLY vision model this
-/// setup verified working end-to-end through the real MCP tool call on a stock
-/// Z.AI account with no vision resource package (it's the free-tier vision model
-/// per Z.AI's pricing page; paid ones like glm-4.6v/glm-5v-turbo 400 with
-/// "1113 insufficient balance" until a vision package is purchased). Installs via
-/// `bun add -g` (fast stdio binary on PATH); falls back to `bunx`. Never bails.
+/// **Fallback only:** GLM-5.3 / GLM-5.3-Flash are native VLMs and must read
+/// `image_url` in-session (https://docs.z.ai/guides/vlm/glm-5.3-flash). This MCP
+/// exists for **text-only GLM-5.2** sessions: it exposes GLM-5V tools
+/// (`ui_to_artifact`, `extract_text_from_screenshot`, …) authed by the SAME Z.AI
+/// key. Defaults `Z_AI_VISION_MODEL` to `glm-4.6v-flash` (free-tier sidecar).
+/// Installs via `bun add -g`; falls back to `bunx`. Never bails.
 pub(crate) fn ensure_zai_vision_mcp(env: &env_detect::Env) -> Result<()> {
     // 1. Install the package so `zai-mcp-server` is on PATH (preferred over a
     //    per-connect `bunx` cold-start). bun is omnipresent in the omp stack.
@@ -1054,7 +1049,7 @@ pub(crate) fn ensure_zai_vision_mcp(env: &env_detect::Env) -> Result<()> {
     } else if which::which("bunx").is_ok() {
         ("bunx".to_string(), vec!["@z_ai/mcp-server".to_string()])
     } else {
-        ui::warn("z.ai vision MCP: needs `bun` (https://bun.sh) — skipped; GLM-5.2 stays text-only");
+        ui::warn("z.ai vision MCP: needs `bun` (https://bun.sh) — skipped; text-only GLM-5.2 has no sidecar (GLM-5.3 still reads images natively)");
         return deregister_omp_mcp(&env.home, "zai-vision");
     };
     // 2. Auth: same Z.AI key that auths `zai/glm-5.2`. Declared at fn scope so the
@@ -1071,7 +1066,7 @@ pub(crate) fn ensure_zai_vision_mcp(env: &env_detect::Env) -> Result<()> {
     //    inlined into mcp.json (user-private, never committed; gitignored).
     let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     register_omp_mcp(&env.home, "zai-vision", &command, &args_ref, &env_vars)?;
-    ui::ok("z.ai vision MCP (GLM-5V) bridges GLM-5.2's text-only gap — ui_to_artifact · extract_text_from_screenshot · diagnose_error_screenshot · ui_diff_check · analyze_image");
+    ui::ok("z.ai vision MCP registered as GLM-5.2 fallback only — GLM-5.3 / 5.3-Flash look at images in-session (do not call this MCP)");
     Ok(())
 }
 
@@ -1253,8 +1248,9 @@ pub(crate) fn ensure_omp_capabilities_snapshot(home: &Path) -> Result<()> {
          read the image (modality-fit — structure beats its adjacency-list text). NEVER \
          image-ify source code / exact config / line-numbered data — text is cheaper AND \
          lossless (Claude bills images per 28x28 patch, pay-per-pixel; the 10x/90% figure \
-         needs a dedicated OCR encoder, not a screenshot). GLM-5.2 is text-only → images \
-         via zai-vision. Full table: `~/.omp/skills/image-routing/SKILL.md`.\n",
+         needs a dedicated OCR encoder, not a screenshot). GLM-5.3 / 5.3-Flash are native \
+         VLMs — look at the image. GLM-5.2 is text-only → zai-vision fallback. Full table: \
+         `~/.omp/skills/image-routing/SKILL.md`.\n",
     );
     out.push_str("\n## omp built-in tools (from `omp --help`)\n\n");
     if builtin_tools.is_empty() {
@@ -1657,6 +1653,39 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// GLM-5.3 / 5.3-Flash are native VLMs. Always-on prompts must tell the agent
+    /// to look at the image — not bounce pixels through the zai-vision sidecar.
+    #[test]
+    fn glm53_reads_images_natively_not_via_zai_vision() {
+        let append = assets::read("configs/omp/APPEND_SYSTEM.md").unwrap();
+        assert!(
+            append.contains("glm-5.3"),
+            "APPEND_SYSTEM must name GLM-5.3 as a native VLM"
+        );
+        assert!(
+            !append.contains("GLM-5.2 cannot. Route every real image through **zai-vision MCP**"),
+            "stale text-only-default routing must be gone"
+        );
+        assert!(
+            append.contains("LOOK at the attached image")
+                || append.contains("LOOK at the attached image in this session"),
+            "APPEND_SYSTEM must order a native-VLM look"
+        );
+        let routing = assets::read("skills/image-routing/SKILL.md").unwrap();
+        assert!(routing.contains("glm-5.3"));
+        assert!(
+            routing.contains("Do NOT call `mcp__zai_vision_*`"),
+            "image-routing must forbid the sidecar on GLM-5.3"
+        );
+        let zai = assets::read("skills/zai-vision/SKILL.md").unwrap();
+        assert!(zai.contains("STOP"), "zai-vision must have a native-VLM STOP gate");
+        assert!(zai.contains("glm-5.3"));
+        assert!(zai.contains("FALLBACK"));
+        let recall = assets::read("hooks/8sync-recall.ts").unwrap();
+        assert!(recall.contains("GLM-5.3"));
+        assert!(!recall.contains("images → zai-vision (never guess"));
     }
 
     /// The interceptor block is rendered from `models.toml`, and a regex survives

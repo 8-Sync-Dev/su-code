@@ -249,7 +249,7 @@ Nhỏ + dùng cho MỌI task. **Thứ tự = ưu tiên (đọc top-down).** Mở
 {core_lines}\n\
 ### 🧩 SPECIALIST always-on — biết khả năng, đọc body KHI task khớp (progressive disclosure)\n\
 \n\
-KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF.\n\
+KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Khi task khớp → mở `SKILL.md` tương ứng NGAY. **`impeccable` = design system CHUẨN, BẮT BUỘC mở body ngay khi có việc UI/design/redesign/audit** (kèm `references/house/*`); `assp` cho copy/offer; `taste` chống slop; `image-routing` khi xử lý ảnh/diff/PDF. **GLM-5.3 / GLM-5.3-Flash = native VLM** (https://docs.z.ai/guides/vlm/glm-5.3-flash): nhìn ảnh trực tiếp trong session — **CẤM** `mcp__zai_vision_*` / `@z_ai/mcp-server`. zai-vision chỉ cho GLM-5.2 text-only.\n\
 \n\
 {specialist_lines}\n\
 ### 🔎 On-demand — tên = trigger; mở `SKILL.md` của skill khi task khớp (mô tả ở frontmatter, KHÔNG nhồi ở đây)\n\
@@ -486,6 +486,10 @@ mod tests {
         assert!(body.contains("alwaysApply: true"), "Cursor standard: alwaysApply mdc");
         assert!(body.contains(".cursor/skills/"), "points at Cursor skill dir");
         assert!(body.contains("su-code/skills/codegraph/SKILL.md"));
+        assert!(
+            body.contains("GLM-5.3") && body.contains("CẤM") && body.contains("mcp__zai_vision_*"),
+            "Cursor alwaysApply rule must tell GLM-5.3 to look at images, not zai-vision"
+        );
         let _ = std::fs::remove_dir_all(&base);
     }
 }

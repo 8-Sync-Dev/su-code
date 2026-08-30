@@ -1,150 +1,31 @@
 # STATE (8sync managed — live plan; rewrite ở MỖI phase-boundary, đọc đầu phiên)
-> **Active feature:** `harness-create-hosts` → **v0.59.0** — `8sync harness create` fans `su-code/skills/` to Cursor (`.cursor/skills` + `.cursor/rules/*.mdc`) and Z.ai Code (`.zcode/skills`). Branched from v0.58.0 main (`15998ce`).
+> **Active feature:** Reconcile su-code-v058 & Fix GLM-5.3-Flash native vision across all projects.
 
 ## Goal
-Ship `8sync harness create [--force] [--sweep]` on top of v0.58.0, PR + tag `v0.59.0`.
+Hợp nhất toàn bộ commit và working changes từ `C:\Users\Projects\su-code-v058` vào repo chuẩn `C:\Users\Projects\su-code`, xóa bỏ thư mục thừa `su-code-v058`, khắc phục triệt để luồng đọc ảnh của GLM-5.3-Flash (phân định rõ model hỗ trợ vision trong catalog omp vs tool `read`), build release và sweep cập nhật toàn bộ 13+ dự án trên máy.
 
 ## Checklist
-- [x] Port host adapters onto v0.58.0 (do NOT ship from the stale 0.56.0 tree without `.git`)
-- [x] KEEP-COMMITTED comment does not re-add `su-code/skills/` (v0.58 RC)
-- [ ] Unit tests + compile
-- [ ] PR + tag v0.59.0 (tag matches Cargo.toml)
+- [ ] Slice 1: Reconcile workspace — di dời .git + changes từ `su-code-v058` sang `su-code`, verify git log/status rồi xóa an toàn `su-code-v058`
+- [ ] Slice 2: Calibrate GLM-5.3-Flash vision routing — alias trỏ chuẩn `zai/glm-5.3-flash`, cập nhật `APPEND_SYSTEM.md` + `image-routing` hướng dẫn agent dùng tool `read` để nạp ảnh
+- [ ] Slice 3: Build release binary, atomic install vào `%LOCALAPPDATA%\Programs\8sync\8sync.exe`, sweep `--force` toàn bộ dự án `C:\Users\Projects` và smoke-test vision
 
 ## Current
-Code ported on `feature/harness-create-hosts` in `C:\Users\Projects\su-code-v058`. Verify-gate next.
+Plan đã được lập chi tiết qua `engine_plan` (3 slices, 7 tasks) và đã qua review độc lập của `PlanReviewer`. Sẵn sàng thực thi.
 
 ## Next
-1. `cargo test --bin 8sync --no-default-features cursor`
-2. Push branch, open PR, tag `v0.59.0`
+Chạy `/sx-auto` để thực thi tuần tự 3 slices theo engine plan.
 
-## Goal
-Biến 8sync/omp thành **super agent-team** token-optimal: omp = core, su-code = tools. Automation = **`/auto`** (`8sync-engine`: slice/task state machine · code-enforced verify-retry · worktree); model **adaptive per-prompt**; context **always-read**; terminal + web **glass**.
+## Assumptions & Evidence
+1. `C:\Users\Projects\su-code-v058` chứa git history thật trên nhánh `fix/glm-53-native-vision` (commit `8e95f1d`) cùng 18 file modified. `C:\Users\Projects\su-code` là clone rỗng chưa commit.
+2. `omp models --json` định nghĩa `zai/glm-5.3-flash` có `"input": ["text", "image"]`, trong khi `zai/glm-5.3` chỉ có `"input": ["text"]`.
+3. Tool `read` trong harness omp tự động decode file ảnh thành khối `[image/webp]` chuyển tới LLM nếu model hỗ trợ vision.
+4. Lệnh sweep cần cờ `--force` (`8sync harness create --force --sweep`) để đè các skill và system prompt cũ trên 13+ dự án hiện hữu.
 
-## ✅ SHIPPED — 2026-08-21 (session /sx-auto; released as v0.58.0)
-- **omp 17.4 extension sweep** — zod v4 cấm `.default([])` mutable defaults; stale
-  `ckit-*` + `8sync-gs/` ở 3 project (agentic-cloudgo-v1/gitlab, defensible-cv) đã xoá;
-  `remove_retired_extensions` (deploy.rs) tự sweep mỗi `8sync harness`, content-gate
-  lineage marker `8sync-engine|8sync-workflow`. omp `update` khoẻ (17.4.0).
-- **`super-pdf` = skill bundled thứ 27** (rename từ draft `report-pdf` trước release) —
-  HTML design system (đúng họ template các PDF review CloudGO: chips strip + kicker +
-  meta + tagbox, §N spine, cmp navy + pills, callout 4 màu, stat cards, footer 3 vùng)
-  + `scripts/build.sh` (WeasyPrint qua `uv run`). E2E: render 3 trang A4 từ bản
-  DEPLOYED + zai-vision verify toàn bộ token = YES hết. Managed skill
-  `repo-md2pdf-git-report` đã trỏ về engine sống (đường `tools/report-github-md2pf` chết).
-- **RELEASED v0.58.0** — tag `69e2108`+, `git push origin main + v0.58.0` xong; CI xanh, 5 asset publish — `8sync up` an toàn cho mọi máy. Size ceiling recalib 5,242,880→5,304,320 B (attribute: web +1.7 MB; ratchet tight chủ đích).
+## Contracts & Interfaces
+- Binary target: `%LOCALAPPDATA%\Programs\8sync\8sync.exe`
+- Model default vision alias: `glm`, `zai`, `flash` → `zai/glm-5.3-flash`
+- Project sweep target: `C:\Users\Projects`
 
-## 🚚 HANDOFF — 2026-08-14 (STEP-0 deny-list: `8sync .` could not launch omp)
-
-**Repo state (su-code):** branch `main`, still 0.56.0, **101 tests green**, size gate OK
-(4 859 696 B — under the 5 MiB ceiling, over the 4 MiB goal as always). Binary rebuilt and
-installed to `~/.local/bin/8sync`; `8sync harness` re-run on this box.
-
-**Shipped this session — the launcher was dead, not the sessions**
-- `8sync . <name>` / `8sync ai` had been exiting instantly with
-  `CliUsageError: Unknown tools in --tools: ast_grep, github, checkpoint, rewind, security_scan`.
-  STEP-0 drove omp with `--tools`, an ALLOWLIST, so 8sync mirrored omp's whole built-in set;
-  omp 17.3 renamed/dropped 5 of those names. Because omp died before drawing a frame, the user
-  fell back to a bare `omp --continue` — omp's DEFAULT per-cwd store, not the named session's —
-  and the named session looked lost. Nothing was ever lost.
-- STEP-0 is now a deny-list: `models.rs` writes `~/.config/8sync/omp-step0.yml`
-  (`grep.enabled: false`, `glob.enabled: false`) and passes `--config <that file>`. Names only
-  what must go, so no omp release can brick a launch. `STEP0_TOOLS`, `omp_valid_tools()` and
-  `step0_tool_drift()` are gone.
-- `8sync doctor` now probes ENFORCEMENT (`omp --tools grep,glob` must be rejected under the
-  overlay) instead of comparing a constant against a list that is not even stable per version.
-- A named session prints `omp --session-dir … --continue` on launch, so the other lane is
-  reachable by hand.
-- Registered the 4 foundation skills v0.56.0 forgot (`tauri-v2`, `nextjs-app`, `encore-eino-go`,
-  `ai-microservice-design`) in `BUNDLED_SKILLS` — embedded + in AGENTS.md but never deployed.
-
-**Verified live (not inferred)**
-- `8sync . core` in `~/Projects/startup/8sync-startup` → omp v17.3.2 TUI up, no usage error.
-- Scratch project: create → turn → the jsonl lands in the NAMED store and NOT in omp's default
-  store; re-`8sync . <name>` resumes the SAME file and the model recalled the earlier word.
-- `8sync ai "…"` one-shot clean; `8sync doctor` → "STEP-0 in force: omp rejects grep/glob".
-- Isolation is sound: `--session-dir <empty dir> --continue` starts fresh, never leaks into the
-  default store.
-
-**Done ✓**
-- [x] STEP-0 deny-list (`models.rs`, `doctor.rs`, `assets/configs/models.toml`) — 102 tests green.
-- [x] Named-session store hint (`session.rs`).
-- [x] 4 foundation skills registered in `BUNDLED_SKILLS` (`skill/deploy.rs`) + deployed here.
-- [x] **`sx-` commands are now machine-wide.** `~/.omp/agent/commands/` = 10 `sx-*`, 0 unprefixed.
-      `8sync harness global --sweep` stamped **10 omp projects**; the 6 repos still holding
-      pre-prefix `auto/feature/pull-now/push-now/sync-pr.md` (defensible-cv, auto-work-cloudgo,
-      agentic-cloudgo-v1, agentic-cloudgo-gitlab, box-work, 8sync-startup) are clean.
-      `defensible-cv/.omp/commands/omp-update.md` intentionally survives — user-authored, and the
-      deletion gate is content-based, so it is never eaten.
-- [x] **RELEASED v0.57.0** — all 5 platform assets published
-      (`gh release view v0.57.0`), so `8sync up` now carries the fix.
-      The tag sits on `9ae3c2c`, not on the `release:` commit: the first two CI runs failed and
-      the tag was deleted + re-cut each time (nothing had published, so no consumer saw them).
-      Both failures were the overlay write, from opposite sides — Windows read a truncated `""`,
-      then Linux hit two threads staging the same pid-named temp file. Fixed by staged-write +
-      `rename` with a per-call sequence; `step0_overlay_survives_concurrent_writers` covers it.
-
-**Next / TODO ▸**
-- [ ] `8sync harness audit` — doctor reports 9 stale doc paths / 2 oversized.
-- [ ] **M1 (ai-router-hub)** — in monorepo `8sync-startup`; needs B3 credentials.
-
-**Blockers ⚠**
-- **Any machine still on ≤v0.56.0 with omp ≥17.3 cannot launch `8sync .` at all** (the `--tools`
-  usage error). Cured by `8sync up` now that v0.57.0 is tagged; before upgrading, the escape
-  hatch on such a box is `8sync ai --no-step0`.
-- M1 needs Postgres + a provider account + a CLIProxyAPI host — outside agent reach.
-
-**Per-machine (NOT in git) — re-apply on the other box**
-- `8sync harness global --sweep` is REQUIRED per machine: `~/.omp/agent/commands/`,
-  `~/.omp/skills/`, `APPEND_SYSTEM.md`, MCP registrations and the per-project `.omp/` layers all
-  live in `~`, not in the repo. Without it the other box still shows the pre-prefix `/push-now`
-  and no `/sx-*`. This is exactly what bit this session.
-- `~/.config/8sync/omp-step0.yml` is written on demand by the binary — nothing to copy.
-- The 3440x1440 panel is capped at **100 Hz** because the RTX 5080 is on **nouveau**.
-  `8sync setup --profile nvidia` installs RPM Fusion `akmod-nvidia`; Secure Boot is **disabled**,
-  so no MOK enrolment is needed. After a reboot, `8sync hz max` should offer 180 Hz. Not run —
-  driver swaps are the user's call.
-- `~/.omp/agent/models.yml` holds a plaintext agentrouter API key. Machine-local, not in git,
-  but rotate it if that file was ever shared.
-- Lessons: `su-code/KNOWLEDGE.md` §"STEP-0 must be a deny-list, not an allowlist (2026-08-14)".
-
-**New-machine runbook (ordered):**
-1. `git pull`
-2. `8sync up` (v0.57.0+) — or `bash scripts/bootstrap.sh` when HEAD is ahead of the last tag.
-3. `8sync setup`
-4. `8sync harness global --sweep` — global rules + `sx-` commands + per-project layers.
-5. `cd <repo> && 8sync harness` — full pass incl. codegraph index for the repo you work in.
-6. `8sync doctor` — expect `✓ STEP-0 in force: omp rejects grep/glob`.
-
-## Prior sessions — still-live facts only
-- **`ai-router-hub` moved out.** Product memory lives in the monorepo
-  `~/Projects/startup/8sync-startup/su-code/planning/ai-router-hub/` (commit `be18d7e`); this repo
-  is the 8sync binary only. **M0 DONE** (Go vet/build/test PASS, review READY), **M1 BLOCKED** on
-  credentials. Resume there: `8sync-startup/su-code/STATE.md` → `backend-go-snapshot/_RESTORE.md`.
-- **Shipped and released:** v0.53.0 named sessions (`new/ls/mv/rm/merge` + `--worktree`), v0.54.1
-  cross-platform `8sync up` (`selfup.rs::asset_label`), serena registered with
-  `--enable-web-dashboard False` (default cost 16 proc / 878 MB), v0.56.0 `8sync hz` + `8sync lcd`.
-- **`codegraph callers` gives FALSE NEGATIVES** — use `mcp__serena_find_referencing_symbols`.
-  Never `rm -rf .codegraph`; re-index with `codegraph index --force` or `8sync harness`.
-- **`omp update` can rewrite `~/.omp/agent/config.yml`** (bashInterceptor, MCP) — re-run
-  `8sync harness global` after updating omp.
-- **Docker box still owed:** `encore run`/`encore test` on ai-router-hub backend-go, checking
-  Risk #1 (`Response.Result interface{}` may be rejected by Encore's schema parser) —
-  see `M0-VERIFICATION.md`.
-- `8sync harness toolstats` after a few enforced sessions: expect `grep`→0, `cbm`/`serena`>0
-  (baseline 66.7% optimizer).
-
-## ✅ SHIPPED — `lean-binary` feature (2026-08-02)
-1. **M0** — landed 5 pending deliverables (`8sync omp update` verb · `branch-sync` skill + `/sync-pr` · `harness global` auto-stamp · `deep-research` §5 + binary brief).
-2. **M1** — first `[features]` table; A/B'd every gate with `scripts/size-report.sh`. `cargo bloat` under-attributed SQLite **~26×**.
-3. **M2** — deleted what the data pointed at: `rusqlite` (**−1 035 384 B**; the DB stored nothing — ingest opened with `DELETE FROM calls`) and `elkjs` → dagre (**−512 768 B**). Output byte-identical under frozen input. **Bug fixed mid-flight (`b331832`):** a directory merely *named* `su-code` made its parent look like a project → blank memory + 74 skills in the repo root. `discover::MEMORY_DIR` = `"su-code"`, **not** `brand::NS` (= `"8sync"`).
-4. **M3** — `cross` → `cargo-zigbuild` for aarch64 (the Docker leg had no JS toolchain → embedded the **stub dashboard**), plus `scripts/size-gate.sh` (5 MiB ceiling / 4 MiB goal). `universal2` rejected.
-
-**Size table:** x86_64 default **4 859 696** (+15.87 % vs goal) · aarch64-musl **4 151 328** (−1.02 %) · `--no-default-features` **3 109 496** (−25.86 %).
-
-**Prior shipped:** omp-17 MCP fix + Lark (`589807e`) · STEP-0 MCP fix omp-16 (`64bd650`) · `/push-now`+`/pull-now` (`c402209`, `6bb38ae`) · v0.52.0 (`8sync vpn`).
-
-## Assumptions (auto-decided — user can correct)
-- Default autonomy = L2 (assisted); L3 bật bằng `/auto` + `8sync harness up --timer`.
-- **prompt-optimizer (linshenkx) evaluated and NOT integrated** — it optimizes human-authored prose, which is the layer that already failed 3× here; it is AGPL-3.0 vs su-code MIT (no vendoring), and a 5th MCP server adds catalog pressure against omp's ~40-tool discovery cutoff. Use the hosted web app for authoring skill/system-prompt text if wanted.
-- **eino (CloudWeGo) evaluated and NOT adopted** — omp is already the agent runtime; replacing it forfeits MCP xd:// devices, skills, sessions, extensions. eino would only make sense for a future Go sidecar exposing a deterministic pipeline as an MCP tool, a niche codegraph + cbm already fill.
-- Division of labour that the evidence supports: **LLM does judgement, Rust does enforcement** (allowlist, interceptor, drift guard) — deterministic levers the model cannot talk its way around.
+## Non-goals
+- Không can thiệp vào các model text-only ngoài việc giữ fallback `zai-vision` cho GLM-5.2 trở xuống.
+- Không xóa bỏ bất kỳ file code nghiệp vụ của các dự án con khi thực hiện sweep.

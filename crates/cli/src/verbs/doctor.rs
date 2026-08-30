@@ -257,13 +257,13 @@ fn check_ai_engines(home: &std::path::Path) {
             ui::warn(&format!("  {} MISSING — run `8sync harness` (auto-installs + registers)", bin));
         }
     }
-    // Z.AI vision MCP — bridges GLM-5.2 (text-only) with GLM-5V via the same key.
+    // Z.AI vision MCP — fallback for text-only GLM-5.2. GLM-5.3 reads images natively.
     let zai_registered = mcp.contains("\"zai-vision\"");
     let zai_bin = which::which("zai-mcp-server").is_ok() || which::which("bunx").is_ok();
     if zai_bin && zai_registered {
-        ui::ok("  zai-vision MCP ON — GLM-5V reads images for text-only GLM-5.2 (ui_to_artifact · extract_text · diagnose_error · ui_diff_check)");
+        ui::ok("  zai-vision MCP ON — fallback for text-only GLM-5.2 only; GLM-5.3 / 5.3-Flash read images natively (do not route through this MCP)");
     } else {
-        ui::warn("  zai-vision MCP OFF — `8sync harness` auto-installs @z_ai/mcp-server (vision for GLM-5.2)");
+        ui::warn("  zai-vision MCP OFF — fallback for GLM-5.2; GLM-5.3 already sees images (`8sync harness` installs the sidecar if needed)");
     }
     let cfg = std::fs::read_to_string(home.join(".omp/agent/config.yml")).unwrap_or_default();
     if cfg.contains("backend: mnemopi") {

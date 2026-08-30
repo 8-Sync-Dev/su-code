@@ -1,4 +1,7 @@
-# CLAUDE.md — guidance for Claude Code
+---
+description: 8sync harness force-load (CORE skills, code-intel first). Always applied.
+alwaysApply: true
+---
 
 <!-- 8sync:skills:begin -->
 ## 🚨 STEP 0 — CODE INTELLIGENCE FIRST (codegraph + codebase-memory-mcp; bắt buộc)
@@ -217,3 +220,5 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - **Loop / STATE spine**: đọc `su-code/STATE.md` đầu phiên; rewrite ở mỗi phase-boundary (Goal·Checklist·Current·Next). Context gần đầy → handoff vào STATE + bài học vào KNOWLEDGE rồi reinit. Đo loop: `8sync harness bench`.
 - **Loop discipline (C/D/E)**: implementer↔verifier qua `task` (verifier chạy build/test ĐỘC LẬP, verify-gate TRƯỚC commit); FAIL → ghi `failure:` vào KNOWLEDGE, đọc đầu phiên để khỏi lặp; quy trình `validated:` → distill vào `su-code/PLAYBOOKS.md` (index theo `When:`); autonomy L1 report · L2 assisted · L3 unattended — không tự `push`/PR ở L3 mặc định.
 <!-- 8sync:skills:end -->
+
+Project skills live in `.cursor/skills/<name>/SKILL.md` (Cursor Agent Skills standard; mirrored from `su-code/skills/` by `8sync harness create`).

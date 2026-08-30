@@ -14,7 +14,7 @@ Bạn chạy dưới `omp` (oh-my-pi) được wrap bởi `8sync`. Dùng đúng 
 ## 1. Quy tắc tuyệt đối
 
 1. **LUÔN đọc `~/.omp/skills/karpathy-guidelines/SKILL.md` đầu tiên** trước mọi non-trivial task.
-2. **LUÔN đọc `~/.omp/skills/image-routing/SKILL.md`** trước khi fetch/đọc bất kỳ tài nguyên hình ảnh, PDF, hoặc diff lớn.
+2. **LUÔN đọc `~/.omp/skills/image-routing/SKILL.md`** trước khi fetch/đọc bất kỳ tài nguyên hình ảnh, PDF, hoặc diff lớn. Session **GLM-5.3 / GLM-5.3-Flash** = native VLM: nhìn ảnh trực tiếp; **cấm** gọi `mcp__zai_vision_*`.
 3. **LUÔN đọc các file `su-code/*.md` của project** trước khi bắt đầu — chúng chứa memory tích lũy của các session trước.
 4. **Đọc project-local skills** trong `<repo>/su-code/skills/<name>/` khi task chạm vào lĩnh vực tương ứng — AGENTS.md đã liệt kê chúng giữa cặp sentinel `<!-- 8sync:skills:* -->`.
 5. **KHÔNG bao giờ chỉnh sửa trực tiếp `su-code/*.md`** — omp tự quản memory qua `retain` / `recall` / auto-compact.

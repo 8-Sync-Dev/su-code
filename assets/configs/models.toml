@@ -13,8 +13,10 @@
 # Edit freely (or via `8sync harness model <key> <value>`). "" = let omp decide.
 # Override one call:  8sync ai --model opus "review this PR"
 #
-# Vision/ảnh: omp has no --vision CLI flag, so set it in omp's own config:
-#   ~/.omp/agent/config.yml →  modelRoles: { vision: opus }   (images → Opus)
+# Vision/ảnh: GLM-5.3 / GLM-5.3-Flash are native VLMs — they read images in-session
+# (https://docs.z.ai/guides/vlm/glm-5.3-flash). Do not bounce pixels to zai-vision MCP.
+# omp has no --vision CLI flag; combo `claude+glm` now keeps vision on GLM when cheap
+# is a native VLM. Override in ~/.omp/agent/config.yml → modelRoles.vision if needed.
 
 # advisor = passive per-turn reviewer that checks each turn against the rules
 # (code-intel first, correct tool names, open SKILL.md) and injects corrective
