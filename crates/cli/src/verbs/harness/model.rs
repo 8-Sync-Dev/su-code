@@ -138,6 +138,7 @@ fn resolve_alias(tok: &str) -> String {
         "claude" | "opus" | "anthropic" => "anthropic/claude-opus-4-8".to_string(),
         "sonnet" => "anthropic/claude-sonnet-5".to_string(),
         "haiku" => "anthropic/claude-haiku-4-5-20251001".to_string(),
+        "fable" | "fable-5-1" | "claude-fable-5-1" => "anthropic/claude-fable-5-1".to_string(),
         "glm" | "zai" | "flash" => "zai/glm-5.3-flash".to_string(),
         "glm-5.3" | "glm53" => "zai/glm-5.3".to_string(),
         other => other.to_string(),
@@ -304,6 +305,12 @@ mod tests {
         assert_eq!(resolve_alias("flash"), "zai/glm-5.3-flash");
         assert_eq!(resolve_alias("glm-5.3"), "zai/glm-5.3");
         assert_eq!(resolve_alias("zai/glm-5.2"), "zai/glm-5.2");
+    }
+    #[test]
+    fn fable_alias_resolves_to_claude_fable_5_1() {
+        assert_eq!(resolve_alias("fable"), "anthropic/claude-fable-5-1");
+        assert_eq!(resolve_alias("fable-5-1"), "anthropic/claude-fable-5-1");
+        assert_eq!(resolve_alias("claude-fable-5-1"), "anthropic/claude-fable-5-1");
     }
 
     #[test]
