@@ -311,17 +311,20 @@ pub fn harness_claude_code(env: &env_detect::Env, args: &[String]) -> Result<()>
     std::env::set_var("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", &settings.env.claude_code_disable_nonessential_traffic);
     std::env::set_var("CLAUDE_CODE_ATTRIBUTION_HEADER", &settings.env.claude_code_attribution_header);
 
+    let is_official = base_url.contains("api.anthropic.com");
+
     #[cfg(target_os = "windows")]
     {
-        let ps_cmd = format!(
-            "[System.Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', '{}', [System.EnvironmentVariableTarget]::User); \
-             [System.Environment]::SetEnvironmentVariable('ANTHROPIC_AUTH_TOKEN', '{}', [System.EnvironmentVariableTarget]::User); \
-             [System.Environment]::SetEnvironmentVariable('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', '{}', [System.EnvironmentVariableTarget]::User); \
-             [System.Environment]::SetEnvironmentVariable('CLAUDE_CODE_ATTRIBUTION_HEADER', '{}', [System.EnvironmentVariableTarget]::User);",
-            base_url, token, settings.env.claude_code_disable_nonessential_traffic, settings.env.claude_code_attribution_header
-        );
-        let _ = Command::new("powershell").args(["-Command", &ps_cmd]).status();
-        ui::ok("persisted Windows User environment variables");
+        if is_official {
+            let ps_cmd = format!(
+                "[System.Environment]::SetEnvironmentVariable('ANTHROPIC_AUTH_TOKEN', '{}', [System.EnvironmentVariableTarget]::User); \
+                 [System.Environment]::SetEnvironmentVariable('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', '{}', [System.EnvironmentVariableTarget]::User); \
+                 [System.Environment]::SetEnvironmentVariable('CLAUDE_CODE_ATTRIBUTION_HEADER', '{}', [System.EnvironmentVariableTarget]::User);",
+                token, settings.env.claude_code_disable_nonessential_traffic, settings.env.claude_code_attribution_header
+            );
+            let _ = Command::new("powershell").args(["-Command", &ps_cmd]).status();
+            ui::ok("persisted Windows User environment variables");
+        }
     }
 
     // 4. Update ~/.omp/agent/models.yml
@@ -335,22 +338,19 @@ pub fn harness_claude_code(env: &env_detect::Env, args: &[String]) -> Result<()>
         "providers:\n".to_string()
     };
 
-    // Build replacement blocks
-    let anthropic_block = render_provider_block("anthropic", &v1_url, token);
-    let custom_block = if slug != "anthropic" {
-        render_provider_block(&slug, &v1_url, token)
+    // Build replacement blocks: custom gateways register ONLY under their slug, never hijacking native 'anthropic'
+    let mut replacement_blocks: Vec<(&str, String)> = Vec::new();
+    if is_official || slug == "anthropic" {
+        replacement_blocks.push(("anthropic", render_provider_block("anthropic", &v1_url, token)));
     } else {
-        String::new()
-    };
+        replacement_blocks.push((&slug, render_provider_block(&slug, &v1_url, token)));
+    }
 
-    let updated_models_yml = merge_provider_blocks(&existing_content, &[
-        ("anthropic", &anthropic_block),
-        (&slug, &custom_block),
-    ]);
+    let block_refs: Vec<(&str, &str)> = replacement_blocks.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    let updated_models_yml = merge_provider_blocks(&existing_content, &block_refs);
 
     std::fs::write(&models_yml_path, &updated_models_yml)?;
-    ui::ok(&format!("updated {} (registered 9 Claude models)", models_yml_path.display()));
-
+    ui::ok(&format!("updated {} (registered 9 Claude models under {})", models_yml_path.display(), if is_official { "anthropic" } else { &slug }));
     // 5. Update ~/.omp/agent/config.yml default model to latest Claude model
     let config_yml_path = agent_dir.join("config.yml");
     if config_yml_path.exists() {
