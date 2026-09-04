@@ -5,6 +5,17 @@ versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nh�
 
 ## [Unreleased]
 
+### Added
+- **`8sync harness claude-code [JSON|FILE]` — one-command Claude Code settings & Anthropic models auto-setup.**
+  Accepts the standard Claude Code settings JSON payload (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`,
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, `CLAUDE_CODE_ATTRIBUTION_HEADER`). Automatically writes
+  `~/.claude/settings.json`, configures Windows User environment variables, updates `~/.omp/agent/models.yml`
+  with the 9 current Claude models (`claude-opus-5`, `claude-fable-5-1`, `claude-fable-5`, `claude-opus-4-8`,
+  `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-4-5`) under
+  both `anthropic` override and custom provider slug, configures `anthropic-budget-effort` thinking, sets
+  `anthropic/claude-fable-5-1:high` as default role, and verifies connectivity with a live probe.
+  Also available via standalone scripts: `scripts/setup-claude-key.ps1` and `scripts/setup-claude-key.sh`.
+
 ### Fixed
 - **GLM-5.3 / GLM-5.3-Flash native vision.** These models read images in-session
   (`image_url`, https://docs.z.ai/guides/vlm/glm-5.3-flash). Always-on prompts

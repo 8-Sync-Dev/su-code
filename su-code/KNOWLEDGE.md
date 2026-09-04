@@ -232,3 +232,17 @@ _(consolidated 19 dòng cũ → su-code/archive/KNOWLEDGE-1787286513.md)_
 
 - **validated: GLM-5.3 / GLM-5.3-Flash are native VLMs**, not text-only. Docs: https://docs.z.ai/guides/vlm/glm-5.3-flash — images go in `messages[].content[]` as `type: image_url` (URL or base64). The old always-on line “GLM-5.2 cannot. Route every real image through zai-vision MCP” made every Z.ai session bounce pixels to `@z_ai/mcp-server` / `glm-4.6v-flash`. Fix: APPEND_SYSTEM + image-routing look-first; zai-vision SKILL has a STOP gate for `glm-5.3*`; keep the MCP as GLM-5.2 fallback only. Alias `glm`/`zai` → `zai/glm-5.3-flash`. Combo vision role = cheap when cheap is a native VLM.
 - **failure:** treating “Z.ai model” as “needs zai-vision MCP”. The MCP is a **sidecar for text-only GLM-5.2**, not the vision API for GLM-5.3. If the session model contains `glm-5.3`, calling `mcp__zai_vision_*` is a bug.
+
+## Claude Code settings & Anthropic auto-setup (2026-09-04)
+
+- **validated: one-command Claude Code settings & Anthropic models auto-setup (`8sync harness claude-code`).**
+  Accepts the standard Claude Code settings JSON payload (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`,
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, `CLAUDE_CODE_ATTRIBUTION_HEADER`). Automatically writes
+  `~/.claude/settings.json`, configures Windows User environment variables, updates `~/.omp/agent/models.yml`
+  with the 9 current Claude models under both `anthropic` and custom provider slug, configures
+  `anthropic-budget-effort` thinking, sets `anthropic/claude-fable-5-1:high` as default role, and verifies
+  connectivity with a live probe.
+- **validated: Anthropic relay gateways (e.g. apikey.fun) require `/v1` in baseUrl for omp's `anthropic-messages` API.**
+  When setting up custom providers in `models.yml`, `baseUrl` must be `https://api.apikey.fun/v1` so omp appends
+  `/messages` to reach `/v1/messages`. Custom gateways that enforce Claude Code client access reject `/v1/chat/completions`
+  with permission error but allow `/v1/messages`.

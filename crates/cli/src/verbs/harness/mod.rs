@@ -24,6 +24,7 @@ mod local_model;
 mod custom_model;
 mod browser;
 mod gateway;
+pub(crate) mod claude_code;
 mod up;
 #[cfg(feature = "web")]
 mod web;
@@ -172,6 +173,10 @@ pub fn run(a: Args) -> Result<()> {
         Some("gateway") => {
             let args: Vec<String> = [v1.clone(), a.value2.clone()].into_iter().flatten().collect();
             gateway::harness_gateway(&env, &args)
+        }
+        Some("claude-code") | Some("claude") | Some("claude-key") | Some("import-claude") => {
+            let args: Vec<String> = [v1.clone(), a.value2.clone()].into_iter().flatten().collect();
+            claude_code::harness_claude_code(&env, &args)
         }
         Some("add-local-model") => {
             let args: Vec<String> =
