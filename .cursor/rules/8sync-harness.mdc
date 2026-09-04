@@ -15,8 +15,6 @@ Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read
 
 Lý do: 5 query cấu trúc ≈ 3.4k token vs ≈ 412k token grep từng file (−99%). Dump cả file / grep mù = đốt token = bug.
 
-> ⚠ `codegraph` binary chưa cài. Chạy `8sync harness init` (auto cài) HOẶC `npx -y @colbymchenry/codegraph install` rồi quay lại đọc tiếp.
-
 ## 🚨 STEP 1 — skills 2 tầng: CORE (đọc ngay) · SPECIALIST + on-demand (đọc khi cần)
 
 Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatter `name`+`description`. Skill vendored ở `su-code/skills/<name>/` (bản commit trong repo, mirror từ `~/.omp/skills/`). Mỗi skill liệt kê 1 lần.
@@ -108,6 +106,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `full-flow` — `su-code/skills/full-flow/SKILL.md`
 - `git-workflow-and-versioning` — `su-code/skills/git-workflow-and-versioning/SKILL.md`
 - `idea-refine` — `su-code/skills/idea-refine/SKILL.md`
+- `image-gen` — `su-code/skills/image-gen/SKILL.md`
 - `improve-codebase-architecture` — `su-code/skills/improve-codebase-architecture/SKILL.md`
 - `incremental-implementation` — `su-code/skills/incremental-implementation/SKILL.md`
 - `interview-me` — `su-code/skills/interview-me/SKILL.md`

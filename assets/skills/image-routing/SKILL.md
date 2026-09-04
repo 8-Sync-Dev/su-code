@@ -57,6 +57,9 @@ Two directions, one rule: **pick the modality that fits the content.**
 - **`8sync shot <url|file>`** — real (bundled/system Chromium → PNG; prints the vision-token
   estimate). Renders any URL incl. `8sync harness web` pages, or local HTML.
 - **`8sync pdf-img <file>`** — PDF pages → PNGs (poppler).
+- **`8sync gen-img "<prompt>" -o <output.png>`** — AI image generation via `gpt-image-2`
+  (OpenAI / api.apikey.fun). Generates logos, icons, diagrams, UI mockups, and illustrations.
+  Detailed runbook in the **`image-gen`** skill (`~/.omp/skills/image-gen/SKILL.md`).
 - **Memory the OCR-Memory way** (arXiv 2604.26622): use an image to LOCATE a segment (the graph /
   an indexed page), then fetch the CONTENT as exact text from codebase-memory-mcp or the file.
   Image to find, text to read — never OCR precise content back out of a picture.

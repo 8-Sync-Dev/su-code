@@ -14,7 +14,7 @@ use crate::{assets, env_detect, ui};
 /// Module-level so the guard tests can assert BOTH directions against the real
 /// data — a fn-local literal can only be text-scraped, and the direction that
 /// actually bites (an asset dir nobody registered) needs the list itself.
-const BUNDLED_SKILLS: [(&str, &str); 27] = [
+const BUNDLED_SKILLS: [(&str, &str); 28] = [
     ("skills/codegraph",               "codegraph"),
     ("skills/karpathy-guidelines",     "karpathy-guidelines"),
     ("skills/ponytail",                "ponytail"),
@@ -25,6 +25,7 @@ const BUNDLED_SKILLS: [(&str, &str); 27] = [
     ("skills/image-routing",           "image-routing"),
     ("skills/zai-vision",              "zai-vision"),
     ("skills/locate-anything",         "locate-anything"),
+    ("skills/image-gen",               "image-gen"),
     ("skills/code-review-and-quality", "code-review-and-quality"),
     ("skills/senior-security",         "senior-security"),
     ("skills/senior-frontend",         "senior-frontend"),

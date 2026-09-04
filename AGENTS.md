@@ -13,8 +13,6 @@ Mọi câu hỏi về code → dùng code-intelligence engine TRƯỚC grep/read
 
 Lý do: 5 query cấu trúc ≈ 3.4k token vs ≈ 412k token grep từng file (−99%). Dump cả file / grep mù = đốt token = bug.
 
-> ⚠ `codegraph` binary chưa cài. Chạy `8sync harness init` (auto cài) HOẶC `npx -y @colbymchenry/codegraph install` rồi quay lại đọc tiếp.
-
 ## 🚨 STEP 1 — skills 2 tầng: CORE (đọc ngay) · SPECIALIST + on-demand (đọc khi cần)
 
 Mỗi skill = 1 directory (Agent Skills open standard): `SKILL.md` có frontmatter `name`+`description`. Skill vendored ở `su-code/skills/<name>/` (bản commit trong repo, mirror từ `~/.omp/skills/`). Mỗi skill liệt kê 1 lần.
@@ -106,6 +104,7 @@ KHÔNG đọc body mỗi phiên (giữ prefix gọn, tiết kiệm KV-cache). Kh
 - `full-flow` — `su-code/skills/full-flow/SKILL.md`
 - `git-workflow-and-versioning` — `su-code/skills/git-workflow-and-versioning/SKILL.md`
 - `idea-refine` — `su-code/skills/idea-refine/SKILL.md`
+- `image-gen` — `su-code/skills/image-gen/SKILL.md`
 - `improve-codebase-architecture` — `su-code/skills/improve-codebase-architecture/SKILL.md`
 - `incremental-implementation` — `su-code/skills/incremental-implementation/SKILL.md`
 - `interview-me` — `su-code/skills/interview-me/SKILL.md`
@@ -405,6 +404,7 @@ Không tự nói chuyện USB: đi qua IPC của `lian-li-linux` daemon (`$XDG_R
 | `8sync harness toolstats` | Đọc omp session JSONL → tỉ lệ **optimizer** (codegraph/cbm/serena/headroom) vs **fallback** (grep/read/search/find/glob) + fail per tool. Phát hiện STEP-0 không được dùng. **Không DB** — mỗi lần chạy re-scan toàn bộ JSONL rồi fold in-memory (bản SQLite cũ mở đầu bằng `DELETE FROM calls` nên chưa bao giờ lưu gì; xoá `rusqlite` = −1 060 840 B) |
 | `8sync skill [add <spec>\|gen \|list\|update]` | Quản lý skill: `add` clone GitHub (collection-aware) / `builtin:<name>` / **`<url>@<ref>` để pin commit/tag** (ghi `rev` vào `skills.toml` = lockfile, reproducible); `update [name]` re-pull theo `src` (git dedup theo URL, honor `rev` pin); `gen` fuse N skill |
 | `8sync shot <url\|file>` | Render web/file → PNG (cho image-routing) |
+| `8sync gen-img <prompt>` | Tạo ảnh AI từ prompt qua `gpt-image-2` (`-o <file.png>`, `--size 1024x1024`) |
 | `8sync diff-img [ref]` | Git diff → PNG |
 | `8sync pdf-img <file>` | PDF page → PNG |
 
@@ -472,6 +472,7 @@ Khi `8sync harness init` (hoặc `8sync setup`) chạy, **27 skill bundled** đ�
 |`image-routing`|`always` (specialist)|chọn image vs text reads để tiết kiệm token|
 |`zai-vision`|`always` (specialist)|FALLBACK only — SKIP khi session là GLM-5.3 / 5.3-Flash (native VLM, nhìn ảnh trực tiếp). Chỉ dùng cho GLM-5.2 text-only → MCP `zai-vision`|
 |`locate-anything`|`always` (specialist)|visual grounding (NVIDIA LocateAnything-3B qua `8sync locate`) — box + click-center coords cho GUI/OCR/detection; non-commercial license|
+|`image-gen`|`always` (specialist)|tạo ảnh AI (logos, icons, diagrams, UI mockups) qua `gpt-image-2` (`8sync gen-img`)|
 |`feature`|on-demand|feature LỚN nhiều phase/nhiều session (>10 file) theo GSD; state ở `su-code/planning/<slug>/`|
 |`code-review-and-quality` · `senior-security` · `senior-frontend`|on-demand|review/quality/security/frontend chuyên sâu|
 |`full-flow`|on-demand|self-driving fix/dev/verify loop (Encore + Next)|

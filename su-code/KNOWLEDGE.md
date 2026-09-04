@@ -246,3 +246,18 @@ _(consolidated 19 dòng cũ → su-code/archive/KNOWLEDGE-1787286513.md)_
   When setting up custom providers in `models.yml`, `baseUrl` must be `https://api.apikey.fun/v1` so omp appends
   `/messages` to reach `/v1/messages`. Custom gateways that enforce Claude Code client access reject `/v1/chat/completions`
   with permission error but allow `/v1/messages`.
+
+## AI Image Generation via gpt-image-2 & Codex endpoint (2026-09-04)
+
+- **validated: `gpt-image-2` on `https://api.apikey.fun/v1/images/generations` returns high-res PNGs.**
+  The endpoint accepts `model: "gpt-image-2"`, `prompt`, `size` (1024x1024, 1536x1024, etc.), `n: 1`.
+  Response data returns either base64-encoded bytes in `data[0].b64_json` or a CDN URL in `data[0].url`.
+  Request requires `Authorization: Bearer <key>` and optionally `x-openai-actor-authorization: apikey.fun`.
+  Standard DALL-E model strings (e.g. `dall-e-3`) are rejected with "requires an image model".
+- **validated: `openai-responses` wire API in omp works for Codex models.**
+  Models registered in `~/.omp/agent/models.yml` under `api: openai-responses` (with `baseUrl: https://api.apikey.fun/v1`
+  and custom header `x-openai-actor-authorization: apikey.fun`) support `gpt-5.6-sol`, `gpt-5.6-terra`,
+  `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, and `gpt-5.3-codex-spark`.
+- **validated: `8sync gen-img <prompt> -o <file.png>` CLI verb and `image-gen` skill deployed machine-wide.**
+  Allows any project or agent to generate images without python/pip dependencies. VLM models (GLM-5.3-Flash,
+  Opus) can immediately verify the result in-session with `read path: "<output.png>"`.

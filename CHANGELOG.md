@@ -4,6 +4,17 @@ Mọi thay đổi đáng kể của `8sync` ghi vào đây. Format theo [Keep a 
 versioning theo [SemVer](https://semver.org). **8sync rule:** mỗi PR cập nhật mục `Unreleased`.
 
 ## [Unreleased]
+### Added
+- **`8sync gen-img <prompt> [-o file.png]` — AI Image Generation via `gpt-image-2`.**
+  Generates logos, icons, diagrams, UI mockups, and illustrations via `gpt-image-2`
+  (OpenAI Images API via `https://api.apikey.fun/v1/images/generations`). Resolves API key
+  from `--key`, `OPENAI_API_KEY`, or `~/.omp/agent/models.yml`. Decodes base64 or downloads
+  image URL directly.
+- **`image-gen` bundled skill (28th skill).** Teaches agents when and how to generate images,
+  mockups, and visual assets, with prompt engineering best practices and immediate VLM inspection.
+- **Standalone image generation scripts:** `scripts/gen-img.ps1` (PowerShell) and `scripts/gen-img.sh` (Bash).
+- **Codex & OpenAI provider auto-configuration in `models.yml`:** Registered `gpt-5.6-sol`, `gpt-5.6-terra`,
+  `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, and `gpt-5.3-codex-spark`.
 
 ## [0.60.0] — 2026-09-04
 ### Added

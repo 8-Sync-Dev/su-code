@@ -31,6 +31,7 @@ Nhỏ + dùng cho MỌI task: codegraph → karpathy → ponytail → 8sync-cli.
 - **`image-routing`** — image-vs-text routing. Mở khi: xử lý ảnh/diff/PDF.
 - **`zai-vision`** — FALLBACK only. SKIP khi session là **GLM-5.3 / GLM-5.3-Flash** (native VLM — nhìn ảnh trực tiếp, https://docs.z.ai/guides/vlm/glm-5.3-flash). Chỉ mở khi model **text-only (GLM-5.2 trở xuống)** và `image-routing` chọn "image": OCR / chẩn đoán lỗi / diagram / UI→code qua MCP `zai-vision`. **Cấm** gọi `mcp__zai_vision_*` từ session GLM-5.3.
 - **`locate-anything`** — visual grounding (NVIDIA LocateAnything-3B via `8sync locate`). Mở khi: cần TỌA ĐỘ chính xác của UI element (để click), box vị trí object/text trong ảnh — grounding chứ không phải caption. Bổ trợ `browser` + `8sync shot`. Non-commercial license.
+- **`image-gen`** — tạo ảnh AI (logos, icons, diagrams, UI mockups, illustrations) via `gpt-image-2` (`8sync gen-img`). Mở khi: người dùng yêu cầu tạo/vẽ/sinh ảnh hoặc asset trực quan.
 
 On-demand (đọc khi task khớp description): `code-review-and-quality`, `senior-security`, `senior-frontend`, `full-flow`, `last30days`, `feature`, `branch-sync`, `token-bench`; `encore-deploy` (chỉ khi project dùng Encore); `social-growth` (opt-in — `8sync skill add builtin:social-growth`). **Research** (ported từ `companion-inc/feynman` sang omp-native tools — xem `assets/skills/<name>/SKILL.md`): `deep-research` (điều tra + brief có provenance), `research-paper` (replicate · recipe · audit · draft · autoresearch loop), `remote-compute` (Docker sandbox · Modal · RunPod).
 
@@ -48,6 +49,7 @@ If inside a project (cwd có `.git` / `Cargo.toml` / `package.json` / …) — �
 | User-facing copy / UI text / landing / pricing / new product feature | **karpathy → assp → impeccable + taste** |
 | Frontend design / redesign / UI build / audit | **karpathy → impeccable → taste** (+ assp for any copy) |
 | Review UI / PDF / diff | karpathy → **image-routing** → look yourself if GLM-5.3; **zai-vision** ONLY if text-only |
+| Generate image / icon / logo / diagram | **image-gen** → `8sync gen-img "<prompt>" -o <path>` |
 | Inside an 8sync repo | CORE always-on (đọc ngay) + specialist/on-demand khi khớp + `su-code/*.md` (STATE đầu phiên) |
 | Simple one-liner question | codegraph if codebase-related, else karpathy |
 

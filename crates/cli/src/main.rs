@@ -117,6 +117,9 @@ enum Cmd {
     /// Visual grounding: image + prompt → labeled boxes (LocateAnything-3B). `--setup` first.
     Locate(verbs::locate::Args),
 
+    /// Generate an image from a prompt via AI (gpt-image-2)
+    #[command(name = "gen-img")]
+    GenImg(verbs::gen_img::Args),
     /// Show overview cheatsheet (alias of `8sync` with no args)
     Help,
 
@@ -185,6 +188,7 @@ fn main() -> Result<()> {
         Some(Cmd::DiffImg(a)) => verbs::diff_img::run(a),
         Some(Cmd::PdfImg(a))  => verbs::pdf_img::run(a),
         Some(Cmd::Locate(a))  => verbs::locate::run(a),
+        Some(Cmd::GenImg(a))  => verbs::gen_img::run(a),
         Some(Cmd::Help)       => { verbs::root::print_cheatsheet(); Ok(()) }
         Some(Cmd::Flow)       => verbs::flow::run(),
         Some(Cmd::Find(a))    => verbs::find::run(a),

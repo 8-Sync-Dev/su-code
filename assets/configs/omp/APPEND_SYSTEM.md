@@ -25,6 +25,8 @@ Only those text-only models route through **zai-vision MCP** (`extract_text_from
 answers *where it is*. Structure (graphs, dashboards, long PDFs) is cheaper as ONE image
 via `8sync shot` / `8sync pdf-img`; code, exact config, line-numbered data and hashes stay
 text. Decision table: `~/.omp/skills/image-routing/SKILL.md`.
+**Image Generation**: create visuals, logos, mockups, and diagrams via `8sync gen-img "<prompt>" -o <output.png>`
+(powered by `gpt-image-2`). Runbook: `~/.omp/skills/image-gen/SKILL.md`.
 
 ## Always-on skills — open the SKILL.md before acting, in this order
 1. **codegraph** — `~/.omp/skills/codegraph/SKILL.md` — semantic code intel (the loop's senses).
@@ -34,7 +36,8 @@ text. Decision table: `~/.omp/skills/image-routing/SKILL.md`.
 
 Specialists — open the body only when the task matches: **impeccable** (any frontend — mandatory),
 **assp** (copy/brand), **taste** (anti-slop), **image-routing** (images; native VLM looks
-first), **zai-vision** (text-only GLM-5.2 fallback ONLY), **locate-anything** (grounding).
+first), **image-gen** (create/generate images via gpt-image-2), **zai-vision** (text-only GLM-5.2 fallback ONLY),
+**locate-anything** (grounding).
 
 ## Memory, state, verification
 - **`recall` / `reflect` BEFORE** answering anything about past sessions, decisions or preferences;
